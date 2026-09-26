@@ -9,10 +9,11 @@ import { RUNTIME_TTL_SECONDS, PENDING_MAIL_STALE_SECONDS } from "../../domain/ru
 import { Faults, InstallerState, JoinCode, Lease, LiveWorld, PendingMail, PhoneLease, Probe, Tombstone, Upload, WorldState } from "../../domain/runtime-world";
 import { LIVE_WORLD_KEY, MAIL_PREFIX, installerStateKey, joinCodeKey, leaseKey, pendingPartition, phoneLeaseKey, worldStateKey } from "../keys";
 import type { WorldRuntimePort } from "../ports-runtime";
-import type { Patch, TransactOp } from "../table-client";
+import { TTL_ATTRIBUTE, type Patch, type TransactOp } from "../table-client";
 import {
   createEntity,
   entityRow,
+  expiresIn,
   getEntity,
   isExpired,
   listPrefix,
@@ -83,8 +84,18 @@ export function worldRuntimeRepo(ctx: RepoContext): WorldRuntimePort {
       upsertInstaller(installerId, clockId, { activeWorkOrderId: workOrderId, activeSetAtSim: workOrderId === null ? null : atSim }),
     setProcessError: (installerId, clockId, error) => upsertInstaller(installerId, clockId, { processError: error }),
 
-    addPendingMail: (clockId, mailId) =>
-      createEntity(ctx, PendingMail, "PendingMail", { clockId, mailId, sentAtReal: nowIso(ctx), status: "OPEN" }, { ttlSeconds: RUNTIME_TTL_SECONDS.pending }),
+    async addPendingMail(clockId, mailId) {
+      try {
+        return await createEntity(ctx, PendingMail, "PendingMail", { clockId, mailId, sentAtReal: nowIso(ctx), status: "OPEN" }, { ttlSeconds: RUNTIME_TTL_SECONDS.pending });
+      } catch (error) {
+        if (!isConflict(error)) throw error;
+      }
+      // A resend of the same mail: an open mark stays as it is; a closed or expired one opens again.
+      const current = await getEntity(ctx, PendingMail, "PendingMail", { clockId, mailId });
+      if (current === undefined) throw new ConnectorError("CONFLICT", "pending mail mark changed while it was reopened", TABLE);
+      if (current.status === "OPEN" && !isExpired(ctx, current.expiresAt)) return current;
+      return patchEntity(ctx, PendingMail, "PendingMail", current, { status: "OPEN", sentAtReal: nowIso(ctx), closedAtReal: null, eventType: null, [TTL_ATTRIBUTE]: expiresIn(ctx, RUNTIME_TTL_SECONDS.pending) });
+    },
     async closePendingMail(clockId, mailId, eventType) {
       const current = await getEntity(ctx, PendingMail, "PendingMail", { clockId, mailId });
       if (current === undefined || current.status === "CLOSED") return current;

@@ -2,14 +2,15 @@
 // and pure functions. No SST or Pulumi dependency: infra/ci.ts and infra/web.ts apply them, and
 // infra/ci-spec.test.ts checks them, against the template text as well, without an AWS account.
 //
-// CloudFront is account-wide and the pinned aws provider cannot tag its functions, key-value stores
-// or cache policies, so the deploy role cannot be fenced to them by `sst:app` as it is elsewhere:
+// CloudFront is account-wide and its functions, key-value stores and cache policies are not fenced by
+// `sst:app` as the rest of the app is (functions carry the default tags since aws 7.33.0, but the
+// deploy role reads and writes their tags by name too):
 //
 //   function          ARN `function/<name>`. SST would name it `<app, truncated>-<stage>-<logical>-
 //                     <random>`, and the truncated app name is shared by any app whose name starts
 //                     the same. infra/ci.ts pins `<app>-<stage>-<logical>` instead, so the role
-//                     updates, publishes and deletes only `function/<app>-<DeployStage>-*` (a create
-//                     has no resource-level permission, and a name is unique in the account).
+//                     updates, publishes, tags and deletes only `function/<app>-<DeployStage>-*` (a
+//                     create has no resource-level permission, and a name is unique in the account).
 //   key-value store   ARN `key-value-store/<opaque id>`, and it is the routing table of the Router.
 //                     The bootstrap creates the store of the deploy stage with a fixed name and the
 //                     role writes only that ARN; infra/web.ts hands it to the Router.

@@ -33,7 +33,7 @@
 // already exists in the demos account shared by other projects: the app references it and the
 // deploy role is denied creating, changing or deleting it.
 //
-// CloudFront parts cannot be tagged, so the deploy role is fenced to them by name or by ARN
+// CloudFront parts are not fenced by tag, so the deploy role is fenced to them by name or by ARN
 // (infra/ci-spec.ts): this module also names every CloudFront function `<app>-<stage>-<logical>`.
 //
 // Verify: `aws --profile craftech-demos iam get-role --role-name <CI_DEPLOY_ROLE_NAME>` ·
@@ -82,7 +82,7 @@ $transform(aws.iam.Policy, (args) => {
 });
 
 // CloudFront functions (the viewer-request function of the Router): the deploy role may update,
-// publish and delete only `function/<app>-poc-*`. Assigned unconditionally: SST's own naming runs
+// publish, tag and delete only `function/<app>-poc-*`. Assigned unconditionally: SST's own naming runs
 // first and would leave a truncated app name plus a random suffix. A name only changes on creation
 // (SST ignores later changes to it), so no deployed function is ever renamed.
 $transform(aws.cloudfront.Function, (args, _opts, name) => {

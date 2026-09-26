@@ -646,7 +646,7 @@ Resources:
               StringEquals:
                 lambda:FunctionUrlAuthType: NONE
 
-  # ---- CloudFront parts of the Router (no tags; fences in infra/ci-spec.ts) -----------------
+  # ---- CloudFront parts of the Router (fenced by name or ARN, not by tag; infra/ci-spec.ts) --
   DeployEdgePolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -675,7 +675,10 @@ Resources:
               - cloudfront:DeleteFunction
               - cloudfront:DescribeFunction
               - cloudfront:GetFunction
+              - cloudfront:ListTagsForResource
               - cloudfront:PublishFunction
+              - cloudfront:TagResource
+              - cloudfront:UntagResource
               - cloudfront:UpdateFunction
             Resource: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:function/${AppName}-${DeployStage}-*"
           - Sid: RouterKeyValueStoreOfThisApp

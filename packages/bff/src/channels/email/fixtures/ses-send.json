@@ -1,0 +1,59 @@
+{
+  "version": "0",
+  "id": "5c0c0dd1-7a4c-4d0e-9f36-2b1f4c1f0a00",
+  "detail-type": "Email Sent",
+  "source": "aws.ses",
+  "account": "776805327629",
+  "time": "2026-10-13T13:00:01Z",
+  "region": "us-east-1",
+  "resources": [
+    "arn:aws:ses:us-east-1:776805327629:configuration-set/aws-cds-hackathon-poc-cuadrilla-email-poc"
+  ],
+  "detail": {
+    "eventType": "Send",
+    "mail": {
+      "timestamp": "2026-10-13T13:00:01.120Z",
+      "source": "=?UTF-8?B?Q3VhZHJpbGxhIMK3IEFjdGFz?= <actas@cuadrilla.demo.craftech.io>",
+      "sourceArn": "arn:aws:ses:us-east-1:776805327629:identity/cuadrilla.demo.craftech.io",
+      "sendingAccountId": "776805327629",
+      "messageId": "0100019a2b3c4d5e-11111111-2222-3333-4444-555555555501-000000",
+      "destination": [
+        "success+c10421@simulator.amazonses.com"
+      ],
+      "headersTruncated": false,
+      "tags": {
+        "ses:configuration-set": [
+          "aws-cds-hackathon-poc-cuadrilla-email-poc"
+        ],
+        "ses:source-ip": [
+          "192.0.2.10"
+        ],
+        "ses:from-domain": [
+          "cuadrilla.demo.craftech.io"
+        ],
+        "ses:caller-identity": [
+          "aws-cds-hackathon-poc-cuadrilla-poc-InstallerWorkerRole"
+        ],
+        "ses:outgoing-ip": [
+          "192.0.2.20"
+        ],
+        "ispId": [
+          "isp-demo"
+        ],
+        "workOrderId": [
+          "wo-24817"
+        ],
+        "mailId": [
+          "mail-test-001"
+        ],
+        "kind": [
+          "CERTIFICATE_EMAIL"
+        ],
+        "stage": [
+          "poc"
+        ]
+      }
+    },
+    "send": {}
+  }
+}

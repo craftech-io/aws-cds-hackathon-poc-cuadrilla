@@ -1,0 +1,85 @@
+// Why the contact policy held a message back (docs/design-brief.md §5.7). A denial names its rule
+// and one of these reasons (`DENY CP-ALLOWLIST UNKNOWN_SENDER`), which `AuditLog.reason` stores and
+// the console shows next to the rule chip. Reasons are closed per rule: `REASON_RULE` says which
+// rule may give each one, and the engine refuses a rule that answers with a reason of another.
+import { z } from "zod";
+import type { ContactRule } from "@cuadrilla/shared";
+
+export const PolicyReason = z.enum([
+  // CP-KIND-CHANNEL: the matrix of docs/design-brief.md §3
+  "KIND_WRONG_CHANNEL",
+  "KIND_WRONG_RECIPIENT",
+  "KIND_WRONG_FORM",
+  "KIND_WRONG_AUTHOR",
+  "KIND_WRONG_TEMPLATE",
+  "KIND_NOTICE_MISSING",
+  // CP-ALLOWLIST
+  "UNKNOWN_SENDER",
+  "UNKNOWN_SENDER_CAP",
+  "NOT_ALLOWLISTED",
+  "NO_PHONE",
+  // CP-OPTIN, CP-OPTOUT
+  "NO_OPT_IN",
+  "OPTED_OUT",
+  // CP-BRIDGE
+  "BRIDGE_ACTIVE",
+  // CP-ROSTER
+  "NO_ROSTER",
+  "NOT_ON_ROSTER",
+  // CP-QUIET-HOURS (a deferral, never a drop)
+  "QUIET_HOURS",
+  // CP-ONE-DAYSTART
+  "DAY_START_ALREADY_SENT",
+  // CP-WA-24H
+  "WINDOW_CLOSED",
+  // CP-TEMPLATE-APPROVED
+  "TEMPLATE_NOT_APPROVED",
+  // CP-RECIPIENT-FENCE
+  "RECIPIENT_NOT_ALLOWED",
+  "EMAIL_CAP_REACHED",
+  // CP-CERT-EVIDENCE
+  "CERT_MISSING",
+  "CERT_ORDER_NOT_CLOSED",
+  "CERT_HASH_MISMATCH",
+  // CP-NO-SENSITIVE-ASK, CP-NO-FOREIGN-LINKS
+  "SENSITIVE_ASK",
+  "FOREIGN_LINK",
+  // CP-CITATION
+  "CITATION_MISSING",
+  "CITATION_NOT_IN_TURN",
+  "TURN_SECTIONS_UNKNOWN",
+]);
+export type PolicyReason = z.infer<typeof PolicyReason>;
+
+/** The only rule that may give each reason. */
+export const REASON_RULE: Readonly<Record<PolicyReason, ContactRule>> = {
+  KIND_WRONG_CHANNEL: "CP-KIND-CHANNEL",
+  KIND_WRONG_RECIPIENT: "CP-KIND-CHANNEL",
+  KIND_WRONG_FORM: "CP-KIND-CHANNEL",
+  KIND_WRONG_AUTHOR: "CP-KIND-CHANNEL",
+  KIND_WRONG_TEMPLATE: "CP-KIND-CHANNEL",
+  KIND_NOTICE_MISSING: "CP-KIND-CHANNEL",
+  UNKNOWN_SENDER: "CP-ALLOWLIST",
+  UNKNOWN_SENDER_CAP: "CP-ALLOWLIST",
+  NOT_ALLOWLISTED: "CP-ALLOWLIST",
+  NO_PHONE: "CP-ALLOWLIST",
+  NO_OPT_IN: "CP-OPTIN",
+  OPTED_OUT: "CP-OPTOUT",
+  BRIDGE_ACTIVE: "CP-BRIDGE",
+  NO_ROSTER: "CP-ROSTER",
+  NOT_ON_ROSTER: "CP-ROSTER",
+  QUIET_HOURS: "CP-QUIET-HOURS",
+  DAY_START_ALREADY_SENT: "CP-ONE-DAYSTART",
+  WINDOW_CLOSED: "CP-WA-24H",
+  TEMPLATE_NOT_APPROVED: "CP-TEMPLATE-APPROVED",
+  RECIPIENT_NOT_ALLOWED: "CP-RECIPIENT-FENCE",
+  EMAIL_CAP_REACHED: "CP-RECIPIENT-FENCE",
+  CERT_MISSING: "CP-CERT-EVIDENCE",
+  CERT_ORDER_NOT_CLOSED: "CP-CERT-EVIDENCE",
+  CERT_HASH_MISMATCH: "CP-CERT-EVIDENCE",
+  SENSITIVE_ASK: "CP-NO-SENSITIVE-ASK",
+  FOREIGN_LINK: "CP-NO-FOREIGN-LINKS",
+  CITATION_MISSING: "CP-CITATION",
+  CITATION_NOT_IN_TURN: "CP-CITATION",
+  TURN_SECTIONS_UNKNOWN: "CP-CITATION",
+};

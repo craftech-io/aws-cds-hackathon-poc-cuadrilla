@@ -177,7 +177,11 @@ describe("QaDriver", () => {
     const dlq = grants.find((grant) => grant.actions.includes("sqs:ReceiveMessage"));
     expect(dlq).toEqual({ actions: [...QA_DRIVER_DLQ_ONLY_ACTIONS], resources: ["{InstallerEventsDlq}"] });
     for (const fn of ROLES.filter((name) => name !== "QaDriver")) {
-      for (const action of [...QA_DRIVER_DLQ_ONLY_ACTIONS, "cloudwatch:DescribeAlarmHistory", "sns:Publish"]) expect(expectedActions(fn), fn).not.toContain(action);
+      for (const action of ["cloudwatch:DescribeAlarmHistory", "sns:Publish"]) expect(expectedActions(fn), fn).not.toContain(action);
+      expect(expectedGrants(fn).filter((grant) => grant.resources.includes("{InstallerEventsDlq}")), fn).toEqual([]);
+      // Only the worker's event source mapping receives, and only from InstallerEvents.
+      const receives = expectedGrants(fn).filter((grant) => QA_DRIVER_DLQ_ONLY_ACTIONS.some((action) => grant.actions.includes(action)));
+      expect(receives.flatMap((grant) => grant.resources), fn).toEqual(fn === "InstallerWorker" ? ["{InstallerEvents}"] : []);
     }
   });
 
@@ -198,6 +202,15 @@ describe("least privilege", () => {
     expect(ROLES.filter((role) => expectedActions(role).includes("bedrock-agentcore:InvokeHarness"))).toEqual(["InstallerWorker"]);
     const cost = expectedGrants("CostGuard");
     expect(cost).toEqual([{ actions: ["dynamodb:PutItem"], resources: ["{Runtime}"], conditions: [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#*"] }] }]);
+  });
+
+  it("[W2-B2] gives a BUTTON_ACTION's needs to the worker that runs it, never to InboundWhatsApp: PIPELINE (SES, G3, TIMERS), MOCK_NETWORK, CertificateWriter", () => {
+    const has = (role: RoleName, action: string, resource: string) => expectedGrants(role).some((grant) => grant.actions.includes(action) && grant.resources.includes(resource));
+    const needs = [["ses:SendEmail", "arn:aws:ses:us-east-1:776805327629:identity/cuadrilla.demo.craftech.io"], ["scheduler:CreateSchedule", "arn:aws:scheduler:us-east-1:776805327629:schedule/aws-cds-hackathon-poc-cuadrilla-poc-schedules/*"], ["bedrock:ApplyGuardrail", "{G3}"], ["lambda:InvokeFunctionUrl", "{NetworkMock}"], ["lambda:InvokeFunction", "{CertificateWriter}"]] as const;
+    for (const [action, resource] of needs) {
+      expect(has("InstallerWorker", action, resource), `${action} on InstallerWorker`).toBe(true);
+      expect(has("InboundWhatsApp", action, resource), `${action} on InboundWhatsApp`).toBe(false);
+    }
   });
 
   it("reports drift between generated and declared actions", () => {

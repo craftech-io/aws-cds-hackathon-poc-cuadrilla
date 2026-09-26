@@ -5,15 +5,16 @@
 // uploads `vocabularyFile()` to `Seed/<VOCABULARY_OBJECT_KEY>` and creates the vocabulary from it.
 //
 // Phrase rules (a wrong row leaves CreateVocabulary FAILED and breaks the deploy; the test checks
-// them): only the `es` character set (a-z, A-Z, apostrophe, hyphen, period, á é í ó ú ñ ü and their
-// capitals except Ü); no spaces and no digits; words joined by hyphens; letters that are spelled out
-// written as an acronym with periods ("O.N.U."), joined to a word by a hyphen ("luz-P.O.N.").
-// DisplayAs holds the written form, and may use spaces, digits and symbols ("SC/APC").
+// them): only a-z, A-Z, apostrophe, hyphen, á é í ó ú ñ ü and their capitals except Ü; no spaces, no
+// digits and no periods (es-MX rejects the period that other Spanish locales take for spelled-out
+// acronyms); words joined by hyphens; a spelled-out acronym written as the Spanish names of its
+// letters joined by hyphens ("o-ene-u"). DisplayAs holds the written form, and may use spaces, digits
+// and symbols ("SC/APC").
 //
 // Pure module: infra/ imports it at synth time.
 
 export const VOCABULARY_NAME = "cuadrilla-poc-ftth-es-mx";
-export const VOCABULARY_VERSION = "v001";
+export const VOCABULARY_VERSION = "v002";
 /** Key in the `Seed` bucket; Transcribe requires the `.txt` extension for a table file. */
 export const VOCABULARY_OBJECT_KEY = `transcribe/vocabulary-${VOCABULARY_VERSION}.txt`;
 export const VOCABULARY_CONTENT_TYPE = "text/plain; charset=utf-8";
@@ -26,16 +27,16 @@ export interface VocabularyRow {
 }
 
 export const VOCABULARY_ROWS: readonly VocabularyRow[] = [
-  // Acronyms spelled out letter by letter.
-  { phrase: "O.N.U.", displayAs: "ONU" },
-  { phrase: "O.N.T.", displayAs: "ONT" },
-  { phrase: "O.L.T.", displayAs: "OLT" },
-  { phrase: "P.O.N.", displayAs: "PON" },
-  { phrase: "G.P.O.N.", displayAs: "GPON" },
-  { phrase: "L.O.S.", displayAs: "LOS" },
-  { phrase: "S.C.-A.P.C.", displayAs: "SC/APC" },
-  { phrase: "d.B.m.", displayAs: "dBm" },
-  { phrase: "luz-P.O.N.", displayAs: "luz PON" },
+  // Acronyms spelled out letter by letter, as the Spanish names of the letters.
+  { phrase: "o-ene-u", displayAs: "ONU" },
+  { phrase: "o-ene-te", displayAs: "ONT" },
+  { phrase: "o-ele-te", displayAs: "OLT" },
+  { phrase: "pe-o-ene", displayAs: "PON" },
+  { phrase: "ge-pe-o-ene", displayAs: "GPON" },
+  { phrase: "ele-o-ese", displayAs: "LOS" },
+  { phrase: "ese-ce-a-pe-ce", displayAs: "SC/APC" },
+  { phrase: "de-be-eme", displayAs: "dBm" },
+  { phrase: "luz-pe-o-ene", displayAs: "luz PON" },
   // Phrases of several words.
   { phrase: "luz-roja", displayAs: "luz roja" },
   { phrase: "medidor-de-potencia", displayAs: "medidor de potencia" },

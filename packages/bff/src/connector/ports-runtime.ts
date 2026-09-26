@@ -145,6 +145,8 @@ export interface RuntimePort {
   currentEpoch(clockId: string): Promise<number>;
   /** `true` the first time `(source, id)` is seen within 7 days. */
   claimIdempotency(source: string, id: string, result?: JsonObject): Promise<boolean>;
+  /** Gives a claim back when its work failed before it was done, so a redelivery processes it again. */
+  releaseIdempotency(source: string, id: string): Promise<void>;
   getIdempotency(source: string, id: string): Promise<Idempotency | undefined>;
   /**
    * All-or-nothing reservation of several plain counters with ceilings (rate limits, jumps, replies to
@@ -179,6 +181,7 @@ export interface WorldRuntimePort {
   clearWorldInFlight(clockId: string, eventId: string): Promise<void>;
   setActiveWorkOrder(installerId: string, clockId: string, workOrderId: string | null, atSim?: string): Promise<InstallerState>;
   setProcessError(installerId: string, clockId: string, error: ProcessError | null): Promise<InstallerState>;
+  /** Opens `MAIL#<mailId>`; a resend of the same mail reopens a closed mark and keeps an open one. */
   addPendingMail(clockId: string, mailId: string): Promise<PendingMail>;
   closePendingMail(clockId: string, mailId: string, eventType: string): Promise<PendingMail | undefined>;
   listPendingMail(clockId: string): Promise<PendingMailState>;

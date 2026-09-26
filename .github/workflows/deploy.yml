@@ -74,6 +74,9 @@ jobs:
           npm test
 
       - name: Seed, manual, flows, tour, ownership, tool schemas, channel modes and network contract
+        # seed:validate's invariant 11 runs the forbidden-terms list over the seed and fails closed without it.
+        env:
+          FORBIDDEN_TERMS: ${{ secrets.FORBIDDEN_TERMS }}
         run: |
           run_if() { if [ -f "$1" ]; then npm run "$2"; else echo "::notice::$2 skipped: $1 is not in the repository yet."; fi; }
           run_if scripts/seed/validate.ts seed:validate

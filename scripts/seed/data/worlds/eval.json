@@ -1,0 +1,930 @@
+{
+  "generator": "scripts/seed/generate.ts",
+  "generatorVersion": "1.0.0",
+  "photos": [
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-meter-01"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24819",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.1
+      },
+      "photoId": "ph-meter-02"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24818",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -24.3
+      },
+      "photoId": "ph-meter-03"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24833",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -26.1
+      },
+      "photoId": "ph-meter-04"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-meter-05"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24818",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -25.3
+      },
+      "photoId": "ph-meter-06"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24818",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -28.6
+      },
+      "photoId": "ph-meter-07"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24831",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -29
+      },
+      "photoId": "ph-meter-08"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24819",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -6.4
+      },
+      "photoId": "ph-meter-09"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24820",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -7.8
+      },
+      "photoId": "ph-meter-10"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.9
+      },
+      "photoId": "ph-meter-11"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24822",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.5
+      },
+      "photoId": "ph-meter-12"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24820",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.8
+      },
+      "photoId": "ph-meter-13"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24842",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -19.3
+      },
+      "photoId": "ph-meter-14"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24821",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -23.6
+      },
+      "photoId": "ph-meter-15"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24819",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.3
+      },
+      "photoId": "ph-meter-16"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24822",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.3
+      },
+      "photoId": "ph-meter-17"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24821",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.8
+      },
+      "photoId": "ph-meter-18"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24820",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.2
+      },
+      "photoId": "ph-meter-19"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24840",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.8
+      },
+      "photoId": "ph-meter-20"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-meter-21"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24818",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.6
+      },
+      "photoId": "ph-meter-22"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-label-01"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24818",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.6
+      },
+      "photoId": "ph-label-02"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24819",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.6
+      },
+      "photoId": "ph-label-03"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24820",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.2
+      },
+      "photoId": "ph-label-04"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24820",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.2
+      },
+      "photoId": "ph-label-05"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24820",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.2
+      },
+      "photoId": "ph-label-06"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24822",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.9
+      },
+      "photoId": "ph-label-07"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24831",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -23.9
+      },
+      "photoId": "ph-label-08"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24821",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.8
+      },
+      "photoId": "ph-label-09"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24832",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.1
+      },
+      "photoId": "ph-label-10"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24833",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -26.1
+      },
+      "photoId": "ph-label-11"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-label-12"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24833",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -26.1
+      },
+      "photoId": "ph-label-13"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24840",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.2
+      },
+      "photoId": "ph-label-14"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24841",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -23.3
+      },
+      "photoId": "ph-label-15"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24842",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -19.7
+      },
+      "photoId": "ph-label-16"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24818",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.6
+      },
+      "photoId": "ph-label-17"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24819",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.6
+      },
+      "photoId": "ph-label-18"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-rosette-01"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-rosette-02"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24818",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.6
+      },
+      "photoId": "ph-rosette-03"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24819",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.6
+      },
+      "photoId": "ph-rosette-04"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24820",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.2
+      },
+      "photoId": "ph-rosette-05"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24822",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.9
+      },
+      "photoId": "ph-rosette-06"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24821",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.8
+      },
+      "photoId": "ph-rosette-07"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24831",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -23.9
+      },
+      "photoId": "ph-rosette-08"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24832",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.1
+      },
+      "photoId": "ph-rosette-09"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24833",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -26.1
+      },
+      "photoId": "ph-rosette-10"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24840",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.2
+      },
+      "photoId": "ph-rosette-11"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24841",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -23.3
+      },
+      "photoId": "ph-rosette-12"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24842",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -19.7
+      },
+      "photoId": "ph-rosette-13"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-rosette-14"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24818",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -22.6
+      },
+      "photoId": "ph-rosette-15"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24819",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -20.6
+      },
+      "photoId": "ph-rosette-16"
+    },
+    {
+      "installer": "own",
+      "item": "ONU_LABEL_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-adv-01"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -30.7
+      },
+      "photoId": "ph-adv-02"
+    },
+    {
+      "installer": "own",
+      "item": "ROSETTE_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-adv-03"
+    },
+    {
+      "installer": "own",
+      "item": "POWER_READING_PHOTO",
+      "model": "wo-24817",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "operState": "ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "photoId": "ph-adv-04",
+      "precondition": {
+        "seedPassEvidence": {
+          "item": "POWER_READING_PHOTO",
+          "on": "separate-order",
+          "photoId": "ph-meter-01"
+        }
+      }
+    }
+  ],
+  "questions": [
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-01"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-02"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-03"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-04"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-05"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-06"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-07"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-08"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-09"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-10"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-11"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-12"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-13"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-14"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-15"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-16"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-17"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-18"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-19"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-20"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-21"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-22"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-23"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-24"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-25"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-26"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-27"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-28"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-29"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-30"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-31"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-32"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-33"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-34"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-35"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-36"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-37"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-38"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-39"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-A-40"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-01"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-02"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-03"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-04"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-05"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-06"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-07"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-08"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-09"
+    },
+    {
+      "installer": "own",
+      "model": "wo-24819",
+      "questionId": "q-R-10"
+    }
+  ],
+  "seed": 20260926,
+  "startAtSim": "2026-10-13T07:00:00-06:00",
+  "template": "eval",
+  "templateVersion": "v001",
+  "whatsappMode": "simulated"
+}

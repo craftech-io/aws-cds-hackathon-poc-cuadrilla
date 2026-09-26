@@ -235,10 +235,10 @@ Convenciones:
 
 ### FL-031 · Oferta de escalar aceptada
 - Actores: instalador, sistema · Canal: WhatsApp · Disparador: botón "Consultar a mi supervisor" de FL-030 (o aceptación en texto libre).
-- Pasos: el botón es determinista: `open_case(OUT_OF_MANUAL)` con un resumen armado por código (orden, última pregunta enmascarada, secciones consultadas) → escalera, sin turno del agente. Si el instalador acepta en texto libre, el agente llama `escalate_case(OUT_OF_MANUAL, summary)`.
+- Pasos: el botón es determinista: `BUTTON_ACTION` en la cola del instalador y el `InstallerWorker` hace `open_case(OUT_OF_MANUAL)` con un resumen armado por código (orden, última pregunta enmascarada, secciones consultadas) → escalera, sin turno del agente. Si el instalador acepta en texto libre, el agente llama `escalate_case(OUT_OF_MANUAL, summary)`.
 - Estado esperado: `Case OUT_OF_MANUAL` con la pregunta en el resumen (enmascarada); `CASE_NOTICE`; con el botón, ningún `TURN#` para esa acción.
 - Reglas: `LAD-OPEN`.
-- Prueba: U `agent-tools/cases/cases.test.ts`, `channels/whatsapp/keywords.test.ts` · LF `manual.flow.test.ts` · SR `SC-03/4`.
+- Prueba: U `agent-tools/cases/cases.test.ts`, `channels/whatsapp/keywords.test.ts`, `channels/whatsapp/button-actions.test.ts` · LF `manual.flow.test.ts` · SR `SC-03/4`.
 
 ### FL-032 · Temas denegados: precio, compensación, instrucción eléctrica
 - Actores: instalador, agente · Canal: WhatsApp · Disparador: (a) "¿Le hago descuento si paga el año?"; (b) "Llegamos tarde, ¿le regalo un mes?"; (c) "¿Cómo conecto un contacto nuevo desde el tablero para la ONU?".
@@ -351,10 +351,10 @@ Convenciones:
 
 ### FL-047 · Cierre con evidencia completa: acta PDF
 - Actores: instalador, agente, sistema · Canal: WhatsApp · Disparador: botón "Cerrar instalación" (determinista, sin turno del agente) o "ya terminé" en texto libre (turno del agente).
-- Pasos: 1) `close_installation({outcome: INSTALLED})` (desde el botón con `caller CHANNEL`, o desde el turno): chequeos de completitud; si no hay una lectura de la ONU `ONLINE` en rango de los últimos 30 min simulados, la tool hace la suya con `get_onu_status` antes de decidir. Si falta algo → `NOT_COMPLETE` (FL-050): desde el botón, sin turno, el canal manda el aviso fijo `SYSTEM_NOTICE` `closeNotComplete` de `copy/` con `refs.items` = `missing`; desde un turno, lo comunica el agente. 2) `CertificateWriter`: contenido desde la orden, enmascarador y G3, PDF con fotos, `sha256`. 3) Orden `CLOSED`.
+- Pasos: 1) `close_installation({outcome: INSTALLED})` (desde el botón: `BUTTON_ACTION` en la cola del instalador que el `InstallerWorker` ejecuta con `caller CHANNEL`; o desde el turno): chequeos de completitud; si no hay una lectura de la ONU `ONLINE` en rango de los últimos 30 min simulados, la tool hace la suya con `get_onu_status` antes de decidir. Si falta algo → `NOT_COMPLETE` (FL-050): desde el botón, sin turno, el worker manda el aviso fijo `SYSTEM_NOTICE` `closeNotComplete` de `copy/` con `refs.items` = `missing`; desde un turno, lo comunica el agente. 2) `CertificateWriter`: contenido desde la orden, enmascarador y G3, PDF con fotos, `sha256`. 3) Orden `CLOSED`.
 - Estado esperado: `WorkOrders/CERT` con `sha256` igual al objeto de `Evidence/certificates/`; el PDF contiene número de orden, serial, potencia, cinco ítems y tres imágenes (verificado extrayendo el texto y contando imágenes).
 - Reglas: `CP-CERT-EVIDENCE`, `CED-NO-FORCE-CLOSE`, G3.
-- Prueba: U `certificates/pdf.test.ts`, `certificates/writer.test.ts`, `agent-tools/cases/close.test.ts` · LF `closing.flow.test.ts` · SR `SC-05/2`.
+- Prueba: U `certificates/pdf.test.ts`, `certificates/writer.test.ts`, `agent-tools/cases/close.test.ts`, `channels/whatsapp/button-actions.test.ts` · LF `closing.flow.test.ts` · SR `SC-05/2`.
 
 ### FL-048 · Acta por SES al cliente y a operaciones
 - Actores: sistema, cliente (simulador de SES), buzón de operaciones · Canal: email · Disparador: acta generada.
@@ -372,10 +372,10 @@ Convenciones:
 
 ### FL-050 · Cierre sin evidencia completa: denegado
 - Actores: instalador, agente, sistema · Canal: WhatsApp · Disparador: (a) botón "Cerrar instalación" con la roseta pendiente (sin turno); (b) "ya terminé, cierra la instalación" en texto libre con la roseta pendiente (turno del agente).
-- Pasos: (a) `close_installation` con `caller CHANNEL` → `NOT_COMPLETE` con la lista → `SYSTEM_NOTICE` fijo `closeNotComplete` de `copy/` con `refs.items` = `missing` (determinista); (b) `close_installation` desde el turno → `NOT_COMPLETE` → `REPLY` del agente con lo que falta.
+- Pasos: (a) `BUTTON_ACTION` en la cola del instalador → el `InstallerWorker` hace `close_installation` con `caller CHANNEL` → `NOT_COMPLETE` con la lista → `SYSTEM_NOTICE` fijo `closeNotComplete` de `copy/` con `refs.items` = `missing` (determinista); (b) `close_installation` desde el turno → `NOT_COMPLETE` → `REPLY` del agente con lo que falta.
 - Estado esperado: ningún acta; orden `IN_PROGRESS`; (a) un `SYSTEM_NOTICE closeNotComplete` con `refs.items ∋ ROSETTE_PHOTO` y ningún `TurnNote`; (b) `REPLY` con `refs.items ∋ ROSETTE_PHOTO`.
 - Reglas: `CP-CERT-EVIDENCE`.
-- Prueba: U `agent-tools/cases/close.test.ts` · LF `closing.flow.test.ts` · SR `SC-05/1.a`, `SC-05/1.b`. Notas: `SC-05/1.a` es la variante (a), `det`; `SC-05/1.b` es la (b), `agent` con el oráculo §4.3.
+- Prueba: U `agent-tools/cases/close.test.ts`, `channels/whatsapp/button-actions.test.ts` · LF `closing.flow.test.ts` · SR `SC-05/1.a`, `SC-05/1.b`. Notas: `SC-05/1.a` es la variante (a), `det`; `SC-05/1.b` es la (b), `agent` con el oráculo §4.3.
 
 ### FL-051 · Rebote o queja del email del acta
 - Actores: sistema, supervisor (consola) · Canal: email, consola · Disparador: cliente con `bounce+…@simulator` (Beatriz, 24831) o `complaint+…@simulator`.
@@ -683,8 +683,8 @@ Convenciones:
 
 ### FL-093 · Entrantes duplicados
 - Actores: sistema · Canal: WhatsApp · Disparador: el mismo `wamid` dos veces (reentrega de SNS o reintento del simulador).
-- Pasos: idempotencia por `wamid` y por `eventId` de la cola.
-- Estado esperado: un `Message IN`, un turno, una transcripción.
+- Pasos: idempotencia por `wamid` y por `eventId` de la cola. Si el procesamiento falla después de tomar la marca (`FAILED`, reintento de SNS), la marca se devuelve: la reentrega reusa el `Message IN` guardado y encola con el mismo `eventId`.
+- Estado esperado: un `Message IN`, un turno, una transcripción, también cuando el primer intento falló.
 - Reglas: idempotencia doble.
 - Prueba: U `channels/whatsapp/inbound.test.ts`, `worker/idempotency.test.ts` · SR `SC-12/1`.
 
