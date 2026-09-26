@@ -118,17 +118,17 @@ const LAMBDAS = Object.keys(LAMBDA_CAPABILITIES) as LambdaName[];
 // ---- Vocabulary file -------------------------------------------------------------------------------
 
 describe("vocabulary file in Seed/transcribe/", () => {
-  it("uploads the table-format text of copy/transcribe-vocabulary.ts to Seed/transcribe/vocabulary-v001.txt as UTF-8 plain text", async () => {
+  it("uploads the table-format text of copy/transcribe-vocabulary.ts to Seed/transcribe/vocabulary-v002.txt as UTF-8 plain text", async () => {
     const { only } = await evaluate();
     const file = only("aws.s3.BucketObjectv2");
     expect(await resolveDeep(file.args)).toEqual({
       bucket: SEED_BUCKET,
-      key: "transcribe/vocabulary-v001.txt",
+      key: "transcribe/vocabulary-v002.txt",
       content: vocabularyFile(),
       contentType: "text/plain; charset=utf-8",
     });
     expect(VOCABULARY_OBJECT_KEY).toBe(`transcribe/vocabulary-${VOCABULARY_VERSION}.txt`);
-    expect(integrations).toContain("`Seed/transcribe/vocabulary-v001.txt`");
+    expect(integrations).toContain("`Seed/transcribe/vocabulary-v002.txt`");
   });
 
   it("writes one header and one row per phrase, each with exactly three TABs and SoundsLike and IPA empty", async () => {
@@ -166,7 +166,7 @@ describe("Transcribe vocabulary cuadrilla-poc-ftth-es-mx", () => {
     expect(await resolveDeep(vocabulary.args)).toEqual({
       vocabularyName: "cuadrilla-poc-ftth-es-mx",
       languageCode: "es-MX",
-      vocabularyFileUri: `s3://${SEED_BUCKET}/transcribe/vocabulary-v001.txt`,
+      vocabularyFileUri: `s3://${SEED_BUCKET}/transcribe/vocabulary-v002.txt`,
     });
     expect(vocabulary.opts?.dependsOn).toEqual([only("aws.s3.BucketObjectv2").instance]);
     // The default tags of sst.config.ts are its only tags: the CI role tags it with the app's keys only.
@@ -185,12 +185,12 @@ describe("Transcribe vocabulary cuadrilla-poc-ftth-es-mx", () => {
     expect(() => module.assertVocabularyFences(VOCABULARY_NAME, "transcribe/vocabulary-v001.csv")).toThrow(/\.txt/);
   });
 
-  it("pins the file of v001 by its sha256, so new rows need a new version (a new key the vocabulary picks up)", async () => {
+  it("pins the file of v002 by its sha256, so new rows need a new version (a new key the vocabulary picks up)", async () => {
     const { module } = await evaluate();
     const digest = createHash("sha256").update(vocabularyFile(), "utf8").digest("hex");
     expect(module.VOCABULARY_FILE_SHA256[VOCABULARY_VERSION]).toBe(digest);
     expect(() => module.assertVocabularyPinned(`${vocabularyFile()}\nsplice\t\t\t`, VOCABULARY_VERSION)).toThrow(/bump VOCABULARY_VERSION/);
-    expect(() => module.assertVocabularyPinned(vocabularyFile(), "v002")).toThrow(/pinned in infra\/media\.ts \(none\)/);
+    expect(() => module.assertVocabularyPinned(vocabularyFile(), "v003")).toThrow(/pinned in infra\/media\.ts \(none\)/);
   });
 
   it("fails the deploy when the rows change under the same version", async () => {
@@ -198,7 +198,7 @@ describe("Transcribe vocabulary cuadrilla-poc-ftth-es-mx", () => {
       const original = await importOriginal<typeof import("../packages/bff/src/copy/transcribe-vocabulary")>();
       return { ...original, vocabularyFile: () => `${original.vocabularyFile()}\nsplice\t\t\t` };
     });
-    await expect(evaluate()).rejects.toThrow(/Transcribe vocabulary v001/);
+    await expect(evaluate()).rejects.toThrow(/Transcribe vocabulary v002/);
   });
 });
 

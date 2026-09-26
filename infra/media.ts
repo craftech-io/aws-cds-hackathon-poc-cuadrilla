@@ -41,7 +41,7 @@
 // Verify:
 //   aws --profile craftech-demos transcribe get-vocabulary --vocabulary-name cuadrilla-poc-ftth-es-mx
 //     → VocabularyState READY, LanguageCode es-MX
-//   aws --profile craftech-demos s3api head-object --bucket <Seed> --key transcribe/vocabulary-v001.txt
+//   aws --profile craftech-demos s3api head-object --bucket <Seed> --key transcribe/vocabulary-v002.txt
 //     → ContentType text/plain; charset=utf-8
 //   aws --profile craftech-demos s3api get-bucket-lifecycle-configuration --bucket <Media>
 //     → rule expire-transcripts, prefix transcripts/, 1 day
@@ -59,7 +59,7 @@ const VOCABULARY_KEY_PREFIX = "transcribe/";
 
 /** sha256 of the vocabulary file of each published version (see "Why the digest" above). */
 export const VOCABULARY_FILE_SHA256: Readonly<Record<string, string>> = {
-  v001: "7dd9c2a4cb7418ee0dcab2eeb95ee6d4e25aa810f06ab3307491730cfa3cde2c",
+  v002: "eca7acf8a778e0d305bb7cf6816249af5e1a54bc95cea6c372591f82075d8d92",
 };
 
 const sha256 = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
