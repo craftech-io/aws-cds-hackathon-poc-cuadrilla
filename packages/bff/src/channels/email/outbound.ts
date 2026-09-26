@@ -10,12 +10,13 @@
 //   6. `Runtime/PENDING#<clockId>` · `MAIL#<mailId>` (the world is busy until SES answers) and the
 //      outbox row `QUEUED` with the body as it leaves;
 //   7. `SendEmail`; the row becomes `SENT` with SES's message id, or `FAILED` (the pending mark is
-//      closed and the cap given back, so a retry starts clean).
+//      closed and the cap given back, so a retry starts clean: a resend of the same id reopens the
+//      mark and puts the row back to `QUEUED` before calling SES again).
 //
 // The SES events move the row afterwards (channels/email/events.ts). `probe` answers `fence.probe` of
 // the QaDriver: the same decision, without sending.
 import { SendEmailCommand, type SESv2Client } from "@aws-sdk/client-sesv2";
-import { ChannelError, ConnectorError, ispIdOfClock } from "@cuadrilla/shared";
+import { ChannelError, ispIdOfClock } from "@cuadrilla/shared";
 import type { Connector } from "../../connector/ports";
 import type { Actor } from "../../domain/common";
 import type { OutboundEmail } from "../../domain/conversations";
@@ -162,9 +163,11 @@ export function createEmailClient(deps: EmailClientDeps): EmailClient {
     }
 
     const sentAtReal = (await realClock.now()).toISOString();
-    await openPending(request.clockId, mailId);
+    await connector.worlds.addPendingMail(request.clockId, mailId);
+    // A resend of a mail whose send failed: the row starts over as QUEUED, so SENT and SES's events move it again.
+    const retried = existing?.status === "FAILED" ? await connector.conversations.updateMail({ ispId, sentAtSim: existing.sentAtSim, mailId }, { status: "QUEUED" }) : existing;
     const mail =
-      existing ??
+      retried ??
       (await connector.conversations.appendMail({
         mailId,
         ispId,
@@ -203,15 +206,6 @@ export function createEmailClient(deps: EmailClientDeps): EmailClient {
     const sent = await connector.conversations.updateMail(ref, { status: nextStatus(current?.status ?? "QUEUED", "SENT"), providerMessageId });
     log.info("email sent", { mailId, providerMessageId, recipientClass: decision.recipientClass, attachment: request.attachment !== undefined });
     return { ok: true, mailId, providerMessageId, mail: sent, duplicate: false };
-  }
-
-  // A retried send finds its own pending mark: the world stays busy under the same id.
-  async function openPending(clockId: string, mailId: string): Promise<void> {
-    try {
-      await connector.worlds.addPendingMail(clockId, mailId);
-    } catch (error) {
-      if (!(error instanceof ConnectorError && error.code === "CONFLICT")) throw error;
-    }
   }
 
   async function probe(clockId: string, addresses: readonly string[], actor: Actor): Promise<FenceDecision[]> {

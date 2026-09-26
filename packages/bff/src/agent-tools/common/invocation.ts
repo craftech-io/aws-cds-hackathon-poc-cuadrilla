@@ -4,9 +4,13 @@
 //             its own keys in `context.clientContext.custom` (`bedrockAgentCoreGatewayId`,
 //             `bedrockAgentCoreToolName` = `<target>___<tool>`). The only principal is the Harness:
 //             a `sessionToken` is required and a `caller` is refused, whatever Cedar allowed.
-//   Direct    the worker, the channel, the console or the QaDriver invoke the Lambda (or import the
-//             target) with `{ tool, input, subject? }`; `input` carries `sessionToken` XOR `caller`.
-//             `caller` does not authenticate: the Lambda's resource policy is the fence.
+//   Direct    `{ tool, input, subject? }`, where `input` carries `sessionToken` XOR `caller`. The
+//             worker, the channel and the console import the target and call it in process (`invoke`);
+//             the only principal besides the Gateway that may invoke the Lambda is the QaDriver, so a
+//             direct invocation of the Lambda takes a `caller` of kind `QA` (fenced to `qa-*`, `eval-*`
+//             and the judge test world) or a verified session, never a CHANNEL, CONSOLE, WORKER or
+//             SCHEDULER caller: `caller` does not authenticate, and the Lambda entry refuses what only
+//             the in-process callers may claim to be.
 import { z } from "zod";
 import {
   Caller,
@@ -38,6 +42,7 @@ export const INVOCATION_REASON = {
   PRINCIPAL_XOR: "PRINCIPAL_XOR",
   CALLER_INVALID: "CALLER_INVALID",
   PRINCIPAL_NOT_ALLOWED: "PRINCIPAL_NOT_ALLOWED",
+  CALLER_NOT_IN_PROCESS: "CALLER_NOT_IN_PROCESS",
 } as const;
 
 /** Envelope of a direct invocation. */
@@ -124,6 +129,15 @@ export function checkPrincipal(definition: ToolDefinition, identity: ToolIdentit
     if (kind !== "QA" && kind !== "EVAL") return fail("FORBIDDEN", "QA invokes tools only in qa-* and eval-* worlds", INVOCATION_REASON.PRINCIPAL_NOT_ALLOWED);
   }
   return undefined;
+}
+
+/**
+ * A direct invocation of the target Lambda (never the Gateway's, never `invoke`): only the QaDriver
+ * reaches it, so only a `QA` caller or a verified session is accepted there.
+ */
+export function checkLambdaEntry(call: ToolCall, identity: ToolIdentity): ToolFailure | undefined {
+  if (call.via !== "DIRECT" || identity.kind === "HARNESS" || identity.kind === "QA") return undefined;
+  return fail("FORBIDDEN", `a ${identity.kind} caller calls the tool in process, never through the Lambda`, INVOCATION_REASON.CALLER_NOT_IN_PROCESS);
 }
 
 /** The scope the principal alone grants (a caller's subject is verified afterwards, scope.ts). */

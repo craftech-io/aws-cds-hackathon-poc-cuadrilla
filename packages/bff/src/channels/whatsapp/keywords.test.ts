@@ -88,54 +88,41 @@ describe("plan B keywords", () => {
 });
 
 describe("deterministic buttons", () => {
-  it("[FL-031] 'Consultar a mi supervisor' opens the OUT_OF_MANUAL case directly, with the last question and the offer's sections, and no turn", async () => {
+  it("[FL-031] 'Consultar a mi supervisor' runs nothing in the channel: BUTTON_ACTION on the installer's queue with the order and the offer, no turn", async () => {
     const h = await inboundHarness();
-    const conversations = h.world.connector.conversations;
-    const question = await processInboundEvent(say(ROGELIO.phone, "wamid.Q1", "¿Se cobra la roseta en otro cuarto? mi tel 5512345678"), h.deps);
-    expect(await outcome(question)).toEqual(["QUEUED"]);
-    await conversations.appendMessage({
-      messageId: "msg-offer-0001",
-      personId: ROGELIO.personId,
-      ispId: "isp-demo",
-      clockId: DEMO,
-      direction: "OUT",
-      channel: "WHATSAPP",
-      content: "INTERACTIVE",
-      kind: "REPLY",
-      status: "SENT",
-      author: "AGENT",
-      simulated: false,
-      sentAtSim: "2026-10-13T07:05:00-06:00",
-      refs: { citations: ["COM-04"] },
-    });
     const nonce = await nonceFor(h, "rogelio", "CONSULT_SUPERVISOR", { kind: "WORK_ORDER", id: "wo-24817" }, "msg-offer-0001");
-    h.rec.queued.length = 0;
     const tap = await processInboundEvent(liveEvent({ messages: [waReply(ROGELIO.phone, "wamid.Q2", nonce, "Consultar supervisor")] }), h.deps);
     expect(await outcome(tap)).toEqual(["BUTTON"]);
-    expect(h.rec.actions).toMatchObject([
-      { name: "openConsultCase", input: { workOrderId: "wo-24817", personId: ROGELIO.personId, citations: ["COM-04"], question: "¿Se cobra la roseta en otro cuarto? mi tel [TELEFONO]" } },
+    expect(h.rec.actions).toEqual([]);
+    expect(h.rec.queued).toMatchObject([
+      { type: "BUTTON_ACTION", action: "CONSULT_SUPERVISOR", installerId: ROGELIO.personId, clockId: DEMO, workOrderId: "wo-24817", offerMessageId: "msg-offer-0001", message: { messageId: "wamid.Q2" } },
     ]);
-    expect(h.rec.queued).toEqual([]);
-    const tapped = (await conversations.listMessages(ROGELIO.personId)).find((message) => message.messageId === "wamid.Q2");
-    expect(tapped).toMatchObject({ buttonAction: "CONSULT_SUPERVISOR", workOrderId: "wo-24817", content: "INTERACTIVE" });
+    const tapped = (await h.world.connector.conversations.listMessages(ROGELIO.personId)).find((message) => message.messageId === "wamid.Q2");
+    expect(tapped).toMatchObject({ buttonAction: "CONSULT_SUPERVISOR", workOrderId: "wo-24817", content: "INTERACTIVE", status: "READ" });
   });
 
-  it("[FL-047] [FL-050] 'Cerrar instalación' calls close_installation; NOT_COMPLETE answers the fixed closeNotComplete with the missing items, no turn", async () => {
-    const h = await inboundHarness({ actions: { closeInstallation: async () => ({ ok: false, code: "NOT_COMPLETE", missing: ["ROSETTE_PHOTO", "CUSTOMER_OK"] }) } });
-    const nonce = await nonceFor(h, "rogelio", "CLOSE_INSTALLATION", { kind: "WORK_ORDER", id: "wo-24817" });
-    await processInboundEvent(liveEvent({ messages: [waReply(ROGELIO.phone, "wamid.C1", nonce, "Cerrar instalación")] }), h.deps);
-    expect(h.rec.notices).toMatchObject([{ notice: "closeNotComplete", text: esMX.closeNotComplete(["ROSETTE_PHOTO", "CUSTOMER_OK"]), refs: { items: ["ROSETTE_PHOTO", "CUSTOMER_OK"] } }]);
-    expect(h.rec.queued).toEqual([]);
+  it("[FL-047] [FL-050] 'Cerrar instalación' and 'Cliente conforme' go to the installer's FIFO group (ADR-0017), after the tap opened the window", async () => {
+    const h = await inboundHarness();
+    const close = await nonceFor(h, "rogelio", "CLOSE_INSTALLATION", { kind: "WORK_ORDER", id: "wo-24817" });
+    const ok = await nonceFor(h, "rogelio", "CUSTOMER_OK", { kind: "WORK_ORDER", id: "wo-24817" });
+    await processInboundEvent(liveEvent({ messages: [waReply(ROGELIO.phone, "wamid.K1", ok, "Cliente conforme")] }), h.deps);
+    await processInboundEvent(liveEvent({ messages: [waReply(ROGELIO.phone, "wamid.C1", close, "Cerrar instalación")] }), h.deps);
+    expect(h.rec.queued.map((event) => [event.type, event.type === "BUTTON_ACTION" ? event.action : undefined, event.installerId])).toEqual([
+      ["BUTTON_ACTION", "CUSTOMER_OK", ROGELIO.personId],
+      ["BUTTON_ACTION", "CLOSE_INSTALLATION", ROGELIO.personId],
+    ]);
+    expect(h.rec.actions).toEqual([]);
+    expect(h.rec.notices).toEqual([]);
     const person = await h.world.connector.people.getPerson(ROGELIO.personId);
     expect(person?.lastInboundAtSim).toBe(new Date(SIM_START).toISOString());
   });
 
-  it("[FL-047] 'Cliente conforme' records the customer's OK, no turn", async () => {
+  it("[FL-047] a work-order button whose nonce points at no order answers buttonExpired and queues nothing", async () => {
     const h = await inboundHarness();
-    const nonce = await nonceFor(h, "rogelio", "CUSTOMER_OK", { kind: "WORK_ORDER", id: "wo-24817" });
-    await processInboundEvent(liveEvent({ messages: [waReply(ROGELIO.phone, "wamid.K1", nonce, "Cliente conforme")] }), h.deps);
-    expect(h.rec.actions).toMatchObject([{ name: "recordCustomerOk", input: { workOrderId: "wo-24817" } }]);
+    const nonce = await nonceFor(h, "rogelio", "CLOSE_INSTALLATION", { kind: "DAY", id: "2026-10-13" });
+    expect(await outcome(await processInboundEvent(liveEvent({ messages: [waReply(ROGELIO.phone, "wamid.C2", nonce, "Cerrar instalación")] }), h.deps))).toEqual(["BUTTON"]);
     expect(h.rec.queued).toEqual([]);
+    expect(h.rec.notices).toMatchObject([{ notice: "buttonExpired" }]);
   });
 
   it("[FL-055] a supervisor's 'Tomar caso' goes to the queue of the installer of the case (ADR-0017)", async () => {

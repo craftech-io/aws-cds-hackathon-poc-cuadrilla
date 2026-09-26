@@ -13,6 +13,7 @@ import {
   META_ID,
   PEOPLE,
   SIM_KEY,
+  TOPIC_ARN,
   inboundHarness,
   liveEvent,
   liveRecord,
@@ -28,6 +29,7 @@ const text = waText(ROGELIO, "wamid.HBgMNTI1NTAxMDEwMDAxFQIAEhgUM0EwRkI0RDg3QjM1
 function deps(overrides: Partial<PhoneFilterDeps> = {}): PhoneFilterDeps {
   return {
     verifier: testVerifier(),
+    topicArn: () => TOPIC_ARN,
     simEnvelopeKey: SIM_KEY,
     numberIds: () => ({ phoneNumberId: AWS_ID, metaPhoneNumberId: META_ID }),
     stageTransports: () => ["simulated", "live"],
@@ -86,6 +88,22 @@ describe("number filter with the real shape of the event", () => {
     const record = liveRecord({ messages: [text] });
     expect(await screenRecord({ ...record, Sns: { ...record.Sns, SignatureVersion: "1" } }, deps())).toEqual({ verdict: "REJECT", reason: "BAD_SIGNATURE_VERSION" });
     expect(await screenRecord({ ...record, Sns: { ...record.Sns, Message: record.Sns.Message.replace("La ONU", "Tu ONU") } }, deps())).toEqual({ verdict: "REJECT", reason: "BAD_SIGNATURE" });
+  });
+
+  it("[FL-091] refuses a validly signed notification of any other topic, before qa-foreign and the number filter", async () => {
+    const otherApp = "arn:aws:sns:us-east-1:776805327629:another-app-topic";
+    const otherAccount = "arn:aws:sns:us-east-1:111122223333:aws-cds-hackathon-poc-cuadrilla-wa-inbound";
+    for (const topicArn of [otherApp, otherAccount]) {
+      const record = liveRecord({ messages: [text], topicArn });
+      expect(await testVerifier().verify(record.Sns)).toBe("VALID");
+      expect(await screenRecord(record, deps())).toEqual({ verdict: "REJECT", reason: "FOREIGN_TOPIC" });
+      expect(await screenRecord(liveRecord({ messages: [text], topicArn, attributes: { "qa-foreign": "1" } }), deps())).toEqual({ verdict: "REJECT", reason: "FOREIGN_TOPIC" });
+    }
+    const { rec, world, deps: inbound } = await inboundHarness();
+    const spoofed = await processInboundEvent({ Records: [liveRecord({ messages: [text], topicArn: otherApp })] }, inbound);
+    expect(spoofed).toEqual({ records: [{ verdict: "REJECT", reason: "FOREIGN_TOPIC", messages: [], statuses: [] }], retry: false });
+    expect(await world.connector.conversations.listMessages(PEOPLE.rogelio.personId)).toEqual([]);
+    expect(rec.queued).toEqual([]);
   });
 
   it("[FL-091] needs the live transport in the stage for a live event of our number", async () => {

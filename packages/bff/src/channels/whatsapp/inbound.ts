@@ -5,13 +5,16 @@
 //
 //   1-3  origin and number (phone-filter.ts): a foreign event leaves a probe and a metric, nothing else
 //   4    world and person (identity.ts); a live message stamps `lastInboundAtReal` (events.ts)
-//   5    idempotency by `wamid` in the world, then "ALTA <código>" from a real phone (gate.ts)
+//   5    idempotency by `wamid` in the world (a failure gives the claim back, so the redelivery runs
+//        again: the `Message IN` is reused and the queue deduplicates by event id), then "ALTA <código>"
+//        from a real phone (gate.ts)
 //        unknown number → at most the fixed reply, never the agent (gate.ts)
 //        ALTA / BAJA (no opt-in needed) → keywords.ts; no opt-in → fixed reply, no turn
 //        over the messages per hour of the identity (channels/rate-limit.ts) → DENY RATE_LIMIT, nothing else
 //        a button → its nonce (nonces.ts); a voice note or a photo → its media (media.ts)
 //        the `Message IN` (masked) and `lastInboundAtSim`: every inbound, a tap too, opens the window
-//        TURNO / ÓRDENES / a button → keywords.ts; a supervisor's message → routing.ts
+//        TURNO / ÓRDENES / a button → keywords.ts (a button on a work order → BUTTON_ACTION on the
+//        installer's queue); a supervisor's message → routing.ts
 //        an installer's message → `INBOUND_MESSAGE` on the installer's queue, then the read receipt
 import type { Connector } from "../../connector/ports";
 import type { Message, MessageContent, MessageMedia } from "../../domain/conversations";
@@ -84,10 +87,15 @@ export interface InboundResult {
   readonly records: readonly RecordOutcome[];
   /**
    * A dependency failed on a record that may be ours: the handler throws so SNS retries it. A message
-   * already processed is then a `DUPLICATE` (idempotency by `wamid`), so a retry never repeats effects.
+   * already processed is then a `DUPLICATE` (idempotency by `wamid`); one that failed gave its claim
+   * back and runs again, reusing its stored `Message IN` and the same event id (the queue's
+   * deduplication id), so a retry processes it once and never repeats its effects.
    */
   readonly retry: boolean;
 }
+
+/** Idempotency source of an inbound message: `IDEMP#wa-inbound#<clockId>#<wamid>`. */
+const INBOUND_IDEMPOTENCY = "wa-inbound";
 
 const CONTENT: Readonly<Record<InboundContent["kind"], MessageContent>> = { TEXT: "TEXT", BUTTON: "BUTTON", VOICE: "VOICE", IMAGE: "IMAGE", UNSUPPORTED: "OTHER" };
 
@@ -119,26 +127,31 @@ async function storeMessage(incoming: Incoming, person: StaffMessage["person"], 
   const active = person.role === "INSTALLER" ? (await deps.connector.worlds.getInstallerState(person.personId))?.activeWorkOrderId : undefined;
   const workOrderId = nonce?.object.kind === "WORK_ORDER" ? nonce.object.id : active;
   const text = maskedText(content);
-  const message: Message = await deps.connector.conversations.appendMessage({
-    messageId: raw.id,
-    personId: person.personId,
-    ispId: person.ispId,
-    clockId,
-    direction: "IN",
-    channel: "WHATSAPP",
-    content: messageContent(raw, content),
-    status: "RECEIVED",
-    author: `PERSON:${person.personId}`,
-    simulated: incoming.origin === "SIMULATED",
-    transport: sender.transport,
-    providerMessageId: raw.id,
-    sentAtSim: world.simNow.toISOString(),
-    sentAtReal: atReal,
-    ...(text === undefined ? {} : { text }),
-    ...(workOrderId === undefined ? {} : { workOrderId }),
-    ...(extra.media === undefined ? {} : { media: extra.media }),
-    ...(nonce === undefined ? {} : { nonce: nonce.nonce, buttonAction: nonce.action, refs: { buttonObject: { ...nonce.object } } }),
-  });
+  // A redelivery after a failure finds the `Message IN` its first attempt stored.
+  const earlier = await deps.connector.conversations.findMessageByProviderId(raw.id);
+  const stored = earlier?.personId === person.personId && earlier.clockId === clockId && earlier.direction === "IN" ? earlier : undefined;
+  const message: Message =
+    stored ??
+    (await deps.connector.conversations.appendMessage({
+      messageId: raw.id,
+      personId: person.personId,
+      ispId: person.ispId,
+      clockId,
+      direction: "IN",
+      channel: "WHATSAPP",
+      content: messageContent(raw, content),
+      status: "RECEIVED",
+      author: `PERSON:${person.personId}`,
+      simulated: incoming.origin === "SIMULATED",
+      transport: sender.transport,
+      providerMessageId: raw.id,
+      sentAtSim: world.simNow.toISOString(),
+      sentAtReal: atReal,
+      ...(text === undefined ? {} : { text }),
+      ...(workOrderId === undefined ? {} : { workOrderId }),
+      ...(extra.media === undefined ? {} : { media: extra.media }),
+      ...(nonce === undefined ? {} : { nonce: nonce.nonce, buttonAction: nonce.action, refs: { buttonObject: { ...nonce.object } } }),
+    }));
   await deps.connector.people.recordInbound(person.personId, { atSim: world.simNow.toISOString() });
   return { sender, clockId, ispId: person.ispId, person, wamid: raw.id, message, eventId: inboundEventId(clockId, raw.id), simNow: world.simNow, timeZone: world.timeZone };
 }
@@ -234,7 +247,19 @@ async function processMessage(origin: "LIVE" | "SIMULATED", envelopeClockId: str
   const { connector } = deps;
   const sender = await resolveSender({ origin, waId: raw.from, ...(envelopeClockId === undefined ? {} : { clockId: envelopeClockId }) }, { people: connector.people, worlds: connector.worlds, phoneHashKey: deps.phoneHashKey });
   if (origin === "LIVE") await recordLiveInbound(sender, raw.timestamp, connector);
-  if (!(await connector.runtime.claimIdempotency("wa-inbound", `${sender.clockId ?? "no-world"}#${raw.id}`))) return "DUPLICATE";
+  const claim = `${sender.clockId ?? "no-world"}#${raw.id}`;
+  if (!(await connector.runtime.claimIdempotency(INBOUND_IDEMPOTENCY, claim))) return "DUPLICATE";
+  try {
+    return await processClaimed(origin, sender, raw, deps);
+  } catch (error) {
+    // Not done: give the claim back so SNS's (or the simulator's) redelivery processes it.
+    await connector.runtime.releaseIdempotency(INBOUND_IDEMPOTENCY, claim).catch((releaseError: unknown) => deps.logger.error("inbound WhatsApp claim not released", { messageId: raw.id, error: releaseError }));
+    throw error;
+  }
+}
+
+async function processClaimed(origin: "LIVE" | "SIMULATED", sender: SenderIdentity, raw: InboundMessageType, deps: InboundDeps): Promise<MessageOutcome> {
+  const { connector } = deps;
   const world = sender.clockId === undefined ? undefined : await deps.worldTime(sender.clockId);
   const content = contentOf(raw);
   const keyword = content.kind === "TEXT" ? parseKeyword(content.text) : null;

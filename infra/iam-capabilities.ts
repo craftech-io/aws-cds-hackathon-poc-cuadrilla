@@ -221,7 +221,8 @@ export const LAMBDA_CAPABILITIES = {
   InstallerWorker: {
     capabilities: ["PIPELINE", "TRANSCRIBE", "MOCK_NETWORK"],
     tables: { WorkOrders: "write", People: "write", Cases: "write", Conversations: "write", Runtime: "write", AuditLog: "write", Isps: "read", Reference: "read", CuadrillaMetrics: "write" },
-    grants: [g(["bedrock-agentcore:InvokeHarness"], ["{Harness}"]), guardrailG1, sqsSend(), g(["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"], ["{InstallerEvents}"])],
+    // CertificateWriter: close_installation of a "Cerrar instalación" tap (BUTTON_ACTION) runs in process here.
+    grants: [g(["bedrock-agentcore:InvokeHarness"], ["{Harness}"]), guardrailG1, sqsSend(), g(["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"], ["{InstallerEvents}"]), g(["lambda:InvokeFunction"], ["{CertificateWriter}"])],
   },
   ToolOrders: {
     capabilities: ["MOCK_NETWORK"],

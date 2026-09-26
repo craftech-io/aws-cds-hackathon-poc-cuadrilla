@@ -7,9 +7,9 @@
 //                                                  code, the lease is released instead (FL-005)
 //   TURNO           supervisor with opt-in         register_shift + "Turno registrado hasta las …" (plan B)
 //   ÓRDENES         installer with opt-in          AGENT_TURN(ORDERS_REQUESTED) on the installer's queue (FL-016)
-//   "Consultar a mi supervisor"   installer        open_case(OUT_OF_MANUAL), no turn (FL-031)
-//   "Cerrar instalación"          installer        close_installation; NOT_COMPLETE → closeNotComplete (FL-047, FL-050)
-//   "Cliente conforme"            installer        record_customer_ok
+//   "Consultar a mi supervisor", "Cerrar instalación", "Cliente conforme"   installer → BUTTON_ACTION on
+//                                  the installer's queue (ADR-0017); the InstallerWorker runs it without a
+//                                  turn (button-actions.ts: FL-031, FL-047, FL-050)
 //   "Tomar caso", "No puedo", "Cerrar caso", a case of the list   supervisor → SUPERVISOR_ACTION on the
 //                                  queue of the installer of the case (ADR-0017)
 //
@@ -24,7 +24,7 @@ import type { Nonce } from "../../domain/runtime";
 import { zonedParts } from "../../services/business-hours/zoned-time";
 import { type StaffDeps, type StaffMessage, actionInput, messageRefOf, noticeTo } from "./context";
 import { releasePhoneLease } from "./lease";
-import type { SupervisorAction } from "./ports";
+import type { SupervisorAction, WorkOrderButton } from "./ports";
 
 /** Buttons each role may tap; a nonce with another action is refused (`NONCE_ACTION`). */
 export const INSTALLER_BUTTONS: readonly WaButtonAction[] = ["VIEW_ORDERS", "VIEW_REPLY", "CHOOSE_ORDER", "CHOOSE_ITEM", "CONSULT_SUPERVISOR", "NO_THANKS", "CUSTOMER_OK", "CLOSE_INSTALLATION"];
@@ -78,23 +78,28 @@ export async function handleKeyword(keyword: Keyword, staff: StaffMessage, conse
   }
 }
 
-export type ButtonOutcome = "CASE_OPENED" | "INSTALLATION_CLOSED" | "CLOSE_NOT_COMPLETE" | "CLOSE_FAILED" | "CUSTOMER_OK" | "ORDERS_REQUESTED" | "QUEUED" | "SUPERVISOR_QUEUED" | "OBJECT_GONE";
+export type ButtonOutcome = "BUTTON_QUEUED" | "ORDERS_REQUESTED" | "QUEUED" | "SUPERVISOR_QUEUED" | "OBJECT_GONE";
 
 /** Whether the tap starts a turn or a worker step, so the message gets the read receipt. */
 export function isQueuedOutcome(outcome: ButtonOutcome): boolean {
-  return outcome === "ORDERS_REQUESTED" || outcome === "QUEUED";
+  return outcome === "ORDERS_REQUESTED" || outcome === "QUEUED" || outcome === "BUTTON_QUEUED";
 }
 
-/** What the summary of an `OUT_OF_MANUAL` case is built from (FL-031): the last question and the offer's sections. */
-async function consultBasis(nonce: Nonce, staff: StaffMessage, deps: StaffDeps): Promise<{ question?: string; citations: string[] }> {
-  const { conversations } = deps.connector;
-  const offer = nonce.messageId === undefined ? undefined : await conversations.findMessage(staff.person.personId, nonce.messageId);
-  const cited = offer?.refs?.citations;
-  const citations = Array.isArray(cited) ? cited.filter((value): value is string => typeof value === "string") : [];
-  const before = await conversations.listMessages(staff.person.personId, { ...(offer === undefined ? {} : { toSim: offer.sentAtSim }), descending: true, limit: 20 });
-  const asked = before.find((message: Message) => message.direction === "IN" && message.messageId !== staff.message.messageId && (message.text ?? message.transcript?.text) !== undefined);
-  const question = asked?.text ?? asked?.transcript?.text;
-  return question === undefined ? { citations } : { question, citations };
+/** A tap on a work order: the InstallerWorker runs it in the installer's message group (button-actions.ts). */
+async function queueButtonAction(action: WorkOrderButton, nonce: Nonce, staff: StaffMessage, deps: StaffDeps): Promise<ButtonOutcome> {
+  if (nonce.object.kind !== "WORK_ORDER") return "OBJECT_GONE";
+  await deps.queue.enqueue({
+    type: "BUTTON_ACTION",
+    action,
+    eventId: staff.eventId,
+    clockId: staff.clockId,
+    ispId: staff.ispId,
+    installerId: staff.person.personId,
+    workOrderId: nonce.object.id,
+    ...(nonce.messageId === undefined ? {} : { offerMessageId: nonce.messageId }),
+    message: messageRefOf(staff.message),
+  });
+  return "BUTTON_QUEUED";
 }
 
 async function supervisorAction(action: SupervisorAction, caseId: string, staff: StaffMessage, deps: StaffDeps, message: Message = staff.message): Promise<ButtonOutcome> {
@@ -117,24 +122,11 @@ async function supervisorAction(action: SupervisorAction, caseId: string, staff:
 /** Runs a resolved button tap (the nonce already matched this phone, world and role). */
 export async function handleButton(nonce: Nonce, staff: StaffMessage, deps: StaffDeps): Promise<ButtonOutcome> {
   const object = nonce.object;
-  const onOrder = object.kind === "WORK_ORDER" ? { ...actionInput(staff), workOrderId: object.id } : undefined;
   switch (nonce.action) {
     case "CONSULT_SUPERVISOR":
-      if (onOrder === undefined) return "OBJECT_GONE";
-      await deps.actions.openConsultCase({ ...onOrder, ...(await consultBasis(nonce, staff, deps)) });
-      return "CASE_OPENED";
-    case "CLOSE_INSTALLATION": {
-      if (onOrder === undefined) return "OBJECT_GONE";
-      const outcome = await deps.actions.closeInstallation(onOrder);
-      if (outcome.ok) return "INSTALLATION_CLOSED";
-      if (outcome.code !== "NOT_COMPLETE") return "CLOSE_FAILED";
-      await deps.notices.send(noticeTo(staff, "closeNotComplete", esMX.closeNotComplete(outcome.missing), { refs: { items: [...outcome.missing], workOrderId: object.id } }));
-      return "CLOSE_NOT_COMPLETE";
-    }
+    case "CLOSE_INSTALLATION":
     case "CUSTOMER_OK":
-      if (onOrder === undefined) return "OBJECT_GONE";
-      await deps.actions.recordCustomerOk(onOrder);
-      return "CUSTOMER_OK";
+      return queueButtonAction(nonce.action, nonce, staff, deps);
     case "VIEW_ORDERS":
       await queueOrdersRequested(staff, deps);
       return "ORDERS_REQUESTED";

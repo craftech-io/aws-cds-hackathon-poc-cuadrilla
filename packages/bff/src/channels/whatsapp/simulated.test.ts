@@ -66,7 +66,10 @@ describe("simulated transport", () => {
     const payload = renderText(TO, "Limpia el conector de la roseta (§DIAG-02).");
     const result = await transport.send({ message: ref, clockId: JUDGE, ispId: "isp-judge-07", payload });
     expect(result).toEqual({ ok: true, providerMessageId: "wamid.SIM.01J9ZQX0000000000000000001", payload });
-    expect(await w.connector.conversations.getMessage(ref)).toMatchObject({ status: "DELIVERED", providerMessageId: "wamid.SIM.01J9ZQX0000000000000000001", refs: { whatsapp: payload } });
+    const { to: _to, ...withoutRecipient } = payload;
+    const stored = await w.connector.conversations.getMessage(ref);
+    expect(stored).toMatchObject({ status: "DELIVERED", providerMessageId: "wamid.SIM.01J9ZQX0000000000000000001", refs: { whatsapp: withoutRecipient } });
+    expect(stored?.refs?.whatsapp).not.toHaveProperty("to");
     const events = await w.connector.conversations.listMessageEvents(PEOPLE.rogelioJ07.personId, "msg-sim-0002");
     expect(events.map((event) => [event.status, event.atReal, event.pricing?.category])).toEqual([
       ["SENT", REAL_NOW, "service"],

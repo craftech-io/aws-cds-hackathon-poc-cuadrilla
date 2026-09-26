@@ -53,13 +53,23 @@ export function sendFailureOf(error: unknown): ChannelSendFailure {
   return sendFailure(failure.error.code, failure.error.reason ?? failure.error.message, { retryable: isRetryable(error) });
 }
 
-/** Stores the send on the pipeline's message: provider id, `SENT`, real instant and the Cloud API JSON. */
+/**
+ * The Cloud API JSON as it is stored on the message: without `to`. The recipient's phone lives only in
+ * `People` (a phone bound by a join code not even there, only its hash), so a stored payload never
+ * carries it; the message already names the person.
+ */
+export function storedPayload(payload: MetaMessage): JsonObject {
+  const { to: _recipient, ...rest } = payload;
+  return JSON.parse(JSON.stringify(rest)) as JsonObject;
+}
+
+/** Stores the send on the pipeline's message: provider id, `SENT`, real instant and the Cloud API JSON without the recipient. */
 export async function recordSent(
   conversations: Pick<ConversationsPort, "getMessage" | "updateMessage">,
   ref: MessageRef,
   sent: SentMessage & { readonly atReal: string },
 ): Promise<void> {
   const current = await conversations.getMessage(ref);
-  const whatsapp = JSON.parse(JSON.stringify(sent.payload)) as JsonObject;
+  const whatsapp = storedPayload(sent.payload);
   await conversations.updateMessage(ref, { providerMessageId: sent.providerMessageId, status: "SENT", sentAtReal: sent.atReal, refs: { ...(current?.refs ?? {}), whatsapp } });
 }

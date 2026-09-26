@@ -64,6 +64,14 @@ describe("runtime state over the memory connector", () => {
     expect(await world.connector.runtime.claimIdempotency("INBOUND", "wamid.SIM.1")).toBe(true);
   });
 
+  it("gives a claim back so a redelivery of work that failed is claimed again", async () => {
+    expect(await world.connector.runtime.claimIdempotency("INBOUND", "wamid.SIM.2")).toBe(true);
+    await world.connector.runtime.releaseIdempotency("INBOUND", "wamid.SIM.2");
+    expect(await world.connector.runtime.getIdempotency("INBOUND", "wamid.SIM.2")).toBeUndefined();
+    expect(await world.connector.runtime.claimIdempotency("INBOUND", "wamid.SIM.2")).toBe(true);
+    expect(await world.connector.runtime.claimIdempotency("INBOUND", "wamid.SIM.2")).toBe(false);
+  });
+
   it("reserves plain counters all or nothing, gives them back, and refuses cost-cap keys", async () => {
     const jump = { counterKey: COUNTER_KEYS.jump(JUDGE, "2026-10-13T13"), kind: "JUMP" as const, by: 1, max: 2 };
     const rate = { counterKey: COUNTER_KEYS.rateReal(JUDGE, HASH_A, "2026-10-13T13"), kind: "RATE" as const, by: 1, max: 20 };

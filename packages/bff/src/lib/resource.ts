@@ -30,6 +30,7 @@ export const BUCKET_NAMES = ["Media", "Evidence", "Manual", "Seed"] as const;
 export type BucketName = (typeof BUCKET_NAMES)[number];
 
 const NamedResource = z.object({ name: z.string().min(1) });
+const LinkedArn = z.object({ arn: z.string().startsWith("arn:aws:") });
 const ChannelModesResource = z.object({
   email: z.literal("live"),
   whatsapp: z.object({ transports: z.array(WhatsAppTransport).min(1) }),
@@ -74,6 +75,11 @@ export function channelModes(): ChannelModes {
 /** Whether the stage has this WhatsApp transport (ADR-0002); the mode of each world is in `Isps/SETTINGS`. */
 export function hasWhatsAppTransport(transport: WhatsAppTransport): boolean {
   return channelModes().whatsapp.transports.includes(transport);
+}
+
+/** ARN of the app's WhatsApp topic (`Resource.WaInboundOrigin.arn`): the only topic a live inbound record may come from. */
+export function waInboundTopicArn(): string {
+  return readLinked("WaInboundOrigin", LinkedArn).arn;
 }
 
 /** Stage flags are the only values read from the environment (CLAUDE.md). */

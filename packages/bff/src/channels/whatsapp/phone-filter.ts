@@ -1,8 +1,11 @@
 // The first thing `InboundWhatsApp` does with a record (docs/architecture-integrations.md §4.4, steps
 // 1 to 3; ADR-0002), before idempotency, identity or any parsing of messages:
 //
-//   1. Origin. Live: a valid SNS signature (version 2, certificate from our region's SNS host); a
-//      `qa-foreign=1` attribute is foreign always; the stage must have the `live` transport.
+//   1. Origin. Live: a valid SNS signature (version 2, certificate from our region's SNS host) whose
+//      signed `TopicArn` is our WhatsApp topic (SNS signs every topic of every account with the same
+//      certificate, so the signature alone would accept a notification of someone else's topic handed
+//      to the Lambda directly); a `qa-foreign=1` attribute is foreign always; the stage must have the
+//      `live` transport.
 //      Simulated: a valid `sim-envelope` HMAC and a world whose `whatsappMode` is `simulated`.
 //   2. Number, in the envelope (`whatsAppWebhookEntry` still unparsed): `context.MetaPhoneNumberIds[]`
 //      must hold our Meta id WITH the ARN of our number (built from the AWS id); simulated: `sim-<clockId>`.
@@ -32,6 +35,7 @@ export type RejectReason =
   | "BAD_SIGNATURE"
   | "BAD_SIGNATURE_VERSION"
   | "BAD_CERT_URL"
+  | "FOREIGN_TOPIC"
   | "UNSUPPORTED_TYPE"
   | "BAD_SIM_SIGNATURE"
   | "SIM_WORLD_NOT_SIMULATED"
@@ -53,6 +57,8 @@ export interface NumberIds {
 
 export interface PhoneFilterDeps {
   readonly verifier: SnsVerifier;
+  /** ARN of our WhatsApp topic (`Resource.WaInboundOrigin.arn`): the only `TopicArn` a live record may carry. */
+  readonly topicArn: () => string;
   readonly simEnvelopeKey: SecretKey;
   readonly numberIds: () => NumberIds | undefined;
   /** `ChannelModes.whatsapp.transports` of the stage. */
@@ -116,6 +122,8 @@ async function screenLive(record: SnsRecord, deps: PhoneFilterDeps): Promise<Scr
   if (signature === "CERT_UNAVAILABLE") return { verdict: "RETRY", reason: signature };
   if (signature === "BAD_VERSION") return { verdict: "REJECT", reason: "BAD_SIGNATURE_VERSION" };
   if (signature !== "VALID") return { verdict: "REJECT", reason: signature };
+  // `TopicArn` is inside the signed string: this binds the signature to our topic.
+  if (sns.TopicArn !== deps.topicArn()) return { verdict: "REJECT", reason: "FOREIGN_TOPIC" };
   const envelope = parseEnvelope(sns.Message);
   if (messageAttribute(sns, QA_FOREIGN_ATTRIBUTE) === "1") return foreign("QA_FOREIGN", sns.MessageId, envelope?.context.MetaPhoneNumberIds[0]?.metaPhoneNumberId);
   // The world of a live event is resolved after the filter (identity.ts); only the stage decides here.

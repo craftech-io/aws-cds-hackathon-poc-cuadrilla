@@ -75,8 +75,8 @@ describe("[FL-096] LAM-CALLER: sessionToken XOR caller, and only the session thr
     expect(calls).toEqual([]);
   });
 
-  it("accepts a caller without the Gateway keys and scopes it to its world and verified subject", async () => {
-    const response = await evidence().handler({ tool: "get_checklist", input: { caller: consoleUser }, subject: { workOrderId: "wo-24817" } });
+  it("accepts a caller in process and scopes it to its world and verified subject", async () => {
+    const response = await evidence().invoke("get_checklist", { caller: consoleUser }, { subject: { workOrderId: "wo-24817" } });
     expect(response).toEqual({ ok: true, items: [], complete: false });
     expect(calls[0]?.ctx.identity.kind).toBe("CONSOLE");
     expect(calls[0]?.ctx.scope).toEqual({ ispId: ISP, clockId: CLOCK, installerId: "inst-rogelio", workOrderId: "wo-24817" });
@@ -109,6 +109,22 @@ describe("[FL-096] LAM-CALLER: sessionToken XOR caller, and only the session thr
     expect(calls).toEqual([]);
   });
 
+  it("refuses a CHANNEL, CONSOLE, WORKER or SCHEDULER caller on a direct invocation of the Lambda: only the QaDriver invokes it", async () => {
+    const liveChannel = { kind: "CHANNEL", ispId: ISP, clockId: CLOCK, eventId: "evt-0003" };
+    const close = await cases().handler({ tool: "close_installation", input: { caller: liveChannel, outcome: "INSTALLED" }, subject: { workOrderId: "wo-24817" } });
+    expect(reason(close)).toEqual(["FORBIDDEN", "CALLER_NOT_IN_PROCESS"]);
+    const scheduler = { kind: "SCHEDULER", ispId: ISP, clockId: CLOCK, eventId: "evt-0004" };
+    for (const caller of [consoleUser, worker, scheduler]) {
+      expect(reason(await evidence().handler({ tool: "get_checklist", input: { caller }, subject: { workOrderId: "wo-24817" } }))).toEqual(["FORBIDDEN", "CALLER_NOT_IN_PROCESS"]);
+    }
+    expect(calls).toEqual([]);
+    const qa = await evidence().handler({ tool: "validate_install_photo", input: { caller: { kind: "QA", ispId: QA_ISP, clockId: QA_CLOCK }, candidateId: "ec_01", item: "ONU_LABEL_PHOTO" } });
+    expect(qa.ok).toBe(true);
+    const token = await kit.openSession();
+    expect((await evidence().handler({ tool: "get_checklist", input: { sessionToken: token } })).ok).toBe(true);
+    expect(calls.map((call) => call.tool)).toEqual(["validate_install_photo", "get_checklist"]);
+  });
+
   it("refuses both principals, none, a malformed envelope and a tool of another target", async () => {
     const token = await kit.openSession();
     const both = await evidence().handler({ tool: "get_checklist", input: { sessionToken: token, caller: worker } });
@@ -134,7 +150,7 @@ describe("principals of each tool (docs/tool-catalog.md, invocan)", () => {
 
   it("refuses a subject of another world with FORBIDDEN and AuditLog DENY LAM-SCOPE", async () => {
     const channel = { kind: "CHANNEL", ispId: QA_ISP, clockId: QA_CLOCK, eventId: "evt-0002" };
-    const response = await cases().handler({ tool: "close_installation", input: { caller: channel, outcome: "INSTALLED" }, subject: { workOrderId: "wo-24817" } });
+    const response = await cases().invoke("close_installation", { caller: channel, outcome: "INSTALLED" }, { subject: { workOrderId: "wo-24817" } });
     expect(reason(response)).toEqual(["FORBIDDEN", "WORK_ORDER_NOT_IN_SESSION"]);
     expect(calls).toEqual([]);
     const rows = await kit.memory.connector.audit.listByDecision(QA_ISP, "DENY");

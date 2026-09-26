@@ -101,6 +101,7 @@ export function queueName(app: string, stage: string, queue: InstallerQueue): st
 /** Modules of other work packages this infra reads once they have been evaluated. */
 const LATE_MODULES = {
   agentcore: () => import("./agentcore"),
+  certificates: () => import("./certificates"),
   media: () => import("./media"),
   "messaging-email": () => import("./messaging-email"),
   "messaging-whatsapp": () => import("./messaging-whatsapp"),
@@ -121,9 +122,13 @@ export function lateModule(owner: LateModule): Promise<object> {
 /**
  * Capability Linkables the worker takes late (mode `optional`), each with its runtime properties and
  * exactly the grants of its capability: `Harness` (bedrock-agentcore:InvokeHarness, WP-26),
- * `Transcribe` (TRANSCRIBE, WP-21), `EmailChannel` (SEND_EMAIL with the recipient fence, WP-20).
+ * `Transcribe` (TRANSCRIBE, WP-21), `EmailChannel` (SEND_EMAIL with the recipient fence, WP-20), and
+ * the `CertificateWriter` Function (WP-38; linking it grants InvokeFunction on it alone) that
+ * close_installation invokes when the worker runs a "Cerrar instalación" tap (BUTTON_ACTION).
  */
-export const WORKER_LATE_LINKS = { agentcore: ["Harness"], media: ["Transcribe"], "messaging-email": ["EmailChannel"] } as const satisfies Partial<Record<LateModule, readonly string[]>>;
+export const WORKER_LATE_LINKS = { agentcore: ["Harness"], media: ["Transcribe"], "messaging-email": ["EmailChannel"], certificates: ["CertificateWriter"] } as const satisfies Partial<
+  Record<LateModule, readonly string[]>
+>;
 
 /**
  * Functions of those modules called with the role's name: `mockLinks`/`mockPermissions` (the mocks a

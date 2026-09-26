@@ -1,13 +1,13 @@
 // The adapters a Lambda uses, built once per container from what SST links (`Resource` through
 // lib/resource.ts and lib/secrets.ts, never `process.env`): the EUM Social client with the AWS id of
-// our number, the SNS verifier, the S3 media store, the subkeys, the world readers and the kill
+// our number, the SNS verifier and our topic's ARN, the S3 media store, the subkeys, the world readers and the kill
 // switch. What belongs to other modules (the outbound pipeline, the installer queue, the
 // deterministic handlers) arrives as ports: `handlers/inbound-whatsapp.ts` passes them in.
 import { connector as defaultConnector } from "../../connector/index";
 import type { Connector } from "../../connector/ports";
 import { type Clock, systemClock } from "../../lib/clock";
 import type { Logger } from "../../lib/log";
-import { bucketName, channelModes } from "../../lib/resource";
+import { bucketName, channelModes, waInboundTopicArn } from "../../lib/resource";
 import { NOT_CONNECTED, WhatsAppMetaPhoneNumberIdValue, WhatsAppPhoneNumberIdValue } from "../../lib/secret-schemas";
 import { secretValue, subkey } from "../../lib/secrets";
 import { killSwitchReader } from "../../ops/defaults";
@@ -68,6 +68,7 @@ export function inboundDeps(ports: InboundPorts): InboundDeps {
     connector,
     filter: {
       verifier: snsVerifier(),
+      topicArn: waInboundTopicArn,
       simEnvelopeKey: subkey("sim-envelope"),
       numberIds: linkedNumberIds,
       stageTransports: () => channelModes().whatsapp.transports,

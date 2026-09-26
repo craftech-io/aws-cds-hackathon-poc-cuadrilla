@@ -23,7 +23,7 @@ import { issueNonce } from "./nonces";
 import { type SimulatedContent, buildSimulatedEvent } from "./sim-envelope";
 import { snsStringToSign, createSnsVerifier } from "./sns-signature";
 import type { SnsNotification } from "./payloads";
-import { type ChannelActions, type ChannelMetric, type ChannelQueueEvent, type NoticeRequest, connectorWorldTime, worldModeReader } from "./ports";
+import { type ChannelActions, type ChannelMetric, type ChannelQueueEvent, type NoticeRequest, type WorkOrderActions, connectorWorldTime, worldModeReader } from "./ports";
 
 export const AWS_ID = "phone-number-id-0123456789abcdef0123456789abcdef";
 export const META_ID = "106540352242922";
@@ -58,6 +58,7 @@ export const waIdOf = (phone: string): string => phone.slice(1);
 const snsKeys = generateKeyPairSync("rsa", { modulusLength: 2048 });
 export const SNS_PUBLIC_PEM = snsKeys.publicKey.export({ type: "spki", format: "pem" }).toString();
 export const CERT_URL = "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-0000000000000000000000.pem";
+export const TOPIC_ARN = "arn:aws:sns:us-east-1:776805327629:aws-cds-hackathon-poc-cuadrilla-wa-inbound";
 
 export type UnsignedSns = Pick<SnsNotification, "Type" | "MessageId" | "TopicArn" | "Message" | "Timestamp" | "SignatureVersion"> &
   Partial<Pick<SnsNotification, "Subject" | "SigningCertUrl" | "SigningCertURL" | "MessageAttributes">>;
@@ -81,6 +82,8 @@ export interface LiveRecordOptions {
   readonly attributes?: Readonly<Record<string, string>>;
   readonly certUrl?: string;
   readonly messageId?: string;
+  /** `TopicArn` of the notification (our topic by default). */
+  readonly topicArn?: string;
 }
 
 export function liveRecord(options: LiveRecordOptions = {}): { EventSource: string; Sns: SnsNotification } {
@@ -105,7 +108,7 @@ export function liveRecord(options: LiveRecordOptions = {}): { EventSource: stri
   const sns = signSns({
     Type: "Notification",
     MessageId: options.messageId ?? "a1b2c3d4-0000-4000-8000-000000000001",
-    TopicArn: "arn:aws:sns:us-east-1:776805327629:aws-cds-hackathon-poc-cuadrilla-wa-inbound",
+    TopicArn: options.topicArn ?? TOPIC_ARN,
     Subject: null,
     Message: JSON.stringify(body),
     Timestamp: REAL_NOW,
@@ -162,7 +165,7 @@ export async function seedWorlds(world: ReturnType<typeof testConnector>, liveWo
 export interface Recorded {
   readonly notices: NoticeRequest[];
   readonly queued: ChannelQueueEvent[];
-  readonly actions: Array<{ readonly name: keyof ChannelActions; readonly input: Record<string, unknown> }>;
+  readonly actions: Array<{ readonly name: keyof ChannelActions | keyof WorkOrderActions; readonly input: Record<string, unknown> }>;
   readonly metrics: Array<{ readonly metric: ChannelMetric; readonly dimensions: Readonly<Record<string, string>> }>;
   readonly sent: unknown[];
   readonly media: Array<{ readonly op: string; readonly mediaId?: string; readonly key?: string }>;
@@ -237,6 +240,14 @@ export function recordingActions(rec: Recorded, overrides: Partial<ChannelAction
       record("registerShift")(input);
       return { closesAtSim: "2026-10-14T07:00:00-06:00" };
     },
+    ...overrides,
+  };
+}
+
+/** The worker's handlers of a `BUTTON_ACTION`, recording what they were asked. */
+export function recordingWorkOrderActions(rec: Recorded, overrides: Partial<WorkOrderActions> = {}): WorkOrderActions {
+  const record = (name: keyof WorkOrderActions) => (input: object) => void rec.actions.push({ name, input: { ...input } });
+  return {
     openConsultCase: async (input) => record("openConsultCase")(input),
     closeInstallation: async (input) => {
       record("closeInstallation")(input);
@@ -278,6 +289,7 @@ export async function inboundHarness(options: { liveTransport?: boolean; liveWor
     connector,
     filter: {
       verifier: testVerifier(),
+      topicArn: () => TOPIC_ARN,
       simEnvelopeKey: SIM_KEY,
       numberIds: () => ({ phoneNumberId: AWS_ID, metaPhoneNumberId: META_ID }),
       stageTransports: () => (options.liveTransport ?? true ? ["simulated", "live"] : ["simulated"]),

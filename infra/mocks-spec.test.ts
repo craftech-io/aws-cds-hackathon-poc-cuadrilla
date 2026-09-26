@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DISPATCH_EVENT_SOURCE, DispatchEventType } from "../packages/dispatch-mock/src/events";
 import { CAPABILITIES, IAM_ARNS, WORLDS_LEADING_KEYS, actionDrift, type LambdaName } from "./iam-capabilities";
 import { TABLE_ACTIONS, dataActions } from "./storage-access";
+import { SNS_SIGNATURE_VERSION } from "../packages/bff/src/channels/whatsapp/config";
 
 const HEX = "0123456789abcdef".repeat(2);
 const PHONE_ARN = `arn:aws:social-messaging:us-east-1:776805327629:phone-number-id/${HEX}`;
@@ -176,6 +177,20 @@ describe("WhatsApp inbound topic (P-01 option A, docs/architecture-integrations.
     expect(IAM_ARNS.waTopic).toBe(`arn:aws:sns:us-east-1:776805327629:${topic.topic.name}`);
   });
 
+  it("signs with SignatureVersion 2, the only version InboundWhatsApp accepts (SNS defaults to SHA1, version 1)", async () => {
+    const { named } = await evaluate(CONNECTED);
+    const topic = named("sst.aws.SnsTopic", "WaInboundTopic").args as { topic: { signatureVersion?: number } };
+    expect(topic.topic.signatureVersion).toBe(2);
+    expect(String(topic.topic.signatureVersion)).toBe(SNS_SIGNATURE_VERSION);
+  });
+
+  it("links InboundWhatsApp the topic's ARN as WaInboundOrigin, with no permission, so a live record is bound to our topic", async () => {
+    const { named } = await evaluate(CONNECTED);
+    const origin = named("sst.Linkable", "WaInboundOrigin").args as { properties: { arn: unknown }; include?: unknown[] };
+    expect(await resolveDeep(origin.properties.arn)).toBe(IAM_ARNS.waTopic);
+    expect(origin.include).toBeUndefined();
+  });
+
   it("lets EUM Social (same account) and the QaDriver's role publish and denies sns:Publish to every other principal", async () => {
     const { policy } = await evaluate(CONNECTED);
     const topic = IAM_ARNS.waTopic;
@@ -259,12 +274,12 @@ describe("InboundWhatsApp IAM (docs/architecture.md §14)", () => {
     expect(await resolveDeep(pending.whatsapp.whatsappPermissions("InstallerWorker"))).toEqual([]);
   });
 
-  it("links its tables, Media, the secrets it reads, ChannelModes and the installer queue", async () => {
+  it("links its tables, Media, the secrets it reads, ChannelModes, the installer queue and the origin topic", async () => {
     const { fn } = await granted(CONNECTED);
     const names = ((await resolveDeep(fn.args.link)) as Array<{ name?: unknown; secretName?: string }>).map((link) => link.secretName ?? link.name);
     const linked = await Promise.all(names.map((name) => resolveDeep(name)));
     expect(linked.sort()).toEqual(
-      ["AuditLog", "BrandConfig", "Cases", "ChannelModes", "Conversations", "InstallerEvents", "Isps", "Media", "People", "Runtime", "SeedOverrides", "SessionTokenKey", "WhatsAppMetaPhoneNumberId", "WhatsAppPhoneNumberId", "WorkOrders"].sort(),
+      ["AuditLog", "BrandConfig", "Cases", "ChannelModes", "Conversations", "InstallerEvents", "Isps", "Media", "People", "Runtime", "SeedOverrides", "SessionTokenKey", "WaInboundOrigin", "WhatsAppMetaPhoneNumberId", "WhatsAppPhoneNumberId", "WorkOrders"].sort(),
     );
   });
 });

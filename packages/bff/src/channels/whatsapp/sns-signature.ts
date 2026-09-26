@@ -1,7 +1,8 @@
 // Origin check of a live event (docs/architecture-integrations.md §4.4, step 1): the SNS signature,
 // version 2 (SHA256withRSA) only, with a certificate that can only come from
 // `https://sns.us-east-1.amazonaws.com/…pem`. The signature proves the message went through SNS, not
-// who published it; the topic policy fences the publishers (docs/architecture.md §13, residual 6).
+// which topic nor who published it: phone-filter.ts compares the signed `TopicArn` with our topic, and
+// the topic policy fences the publishers (docs/architecture.md §13, residual 6).
 // Certificates are downloaded with a timeout and retries, and cached per container.
 import { X509Certificate, createPublicKey, createVerify, type KeyObject } from "node:crypto";
 import { withRetry } from "../../lib/retry";

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { EMAIL_SENDER_NAMES } from "../../copy/es-MX-documents";
 import { toSendToolFailure } from "../adapter";
 import { MAX_ATTACHMENT_BYTES, loadCertificatePdf, s3AttachmentReader } from "./attachments";
+import { applyEmailEvent } from "./events";
 import { encodeWords } from "./mime";
 import { CASE_ID, CUSTOMER, DEMO_MAILBOX, OPS_MAILBOX, PDF, PDF_KEY, PDF_SHA, ZONE_CHIEF, alertRequest, certificateRequest, emailWorld } from "./testing";
 
@@ -78,6 +79,24 @@ describe("certificate emails [FL-048]", () => {
     expect(world.capUsed()).toBe(0);
     world.ses.on(SendEmailCommand).rejects(new MessageRejected({ message: "rejected", $metadata: {} }));
     expect(await world.client.send(certificateRequest(world.clockId))).toMatchObject({ ok: false, code: "UNAVAILABLE", reason: "MessageRejected", retryable: false });
+  });
+
+  it("[FL-048] a resend of the same mailId after a throttled send starts over: QUEUED, SENT, the world busy again and SES's events apply", async () => {
+    const world = await emailWorld();
+    const mailId = "mail-cert-24817-customer";
+    world.ses.on(SendEmailCommand).rejects(new TooManyRequestsException({ message: "slow down", $metadata: {} }));
+    expect(await world.client.send(certificateRequest(world.clockId, { mailId }))).toMatchObject({ ok: false, retryable: true });
+    expect((await world.connector.conversations.findMail(world.ispId, mailId))?.status).toBe("FAILED");
+    world.ses.on(SendEmailCommand).resolves({ MessageId: "ses-ok" });
+    const resent = await world.client.send(certificateRequest(world.clockId, { mailId }));
+    expect(resent).toMatchObject({ ok: true, mailId, providerMessageId: "ses-ok", duplicate: false, mail: { status: "SENT" } });
+    expect(await world.connector.conversations.listOutbox(world.ispId)).toHaveLength(1);
+    expect((await world.connector.worlds.listPendingMail(world.clockId)).open.map((mail) => [mail.mailId, mail.status])).toEqual([[mailId, "OPEN"]]);
+    expect(world.capUsed()).toBe(1);
+    const delivery = await applyEmailEvent(world.connector, { type: "DELIVERY", providerMessageId: "ses-ok", atReal: "2026-10-13T16:05:03.000Z", ispId: world.ispId, clockId: world.clockId, mailId, kind: "CERTIFICATE_EMAIL", workOrderId: "wo-24817" });
+    expect(delivery).toMatchObject({ applied: true, previous: "SENT", status: "DELIVERED", changed: true, deliveryStatus: "DELIVERED" });
+    expect((await world.connector.worlds.listPendingMail(world.clockId)).open).toEqual([]);
+    expect(await world.client.send(certificateRequest(world.clockId, { mailId }))).toMatchObject({ ok: true, duplicate: true, providerMessageId: "ses-ok" });
   });
 
   it("[FL-048] refuses a request that does not describe a certificate email", async () => {

@@ -204,6 +204,15 @@ describe("least privilege", () => {
     expect(cost).toEqual([{ actions: ["dynamodb:PutItem"], resources: ["{Runtime}"], conditions: [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#*"] }] }]);
   });
 
+  it("[W2-B2] gives a BUTTON_ACTION's needs to the worker that runs it, never to InboundWhatsApp: PIPELINE (SES, G3, TIMERS), MOCK_NETWORK, CertificateWriter", () => {
+    const has = (role: RoleName, action: string, resource: string) => expectedGrants(role).some((grant) => grant.actions.includes(action) && grant.resources.includes(resource));
+    const needs = [["ses:SendEmail", "arn:aws:ses:us-east-1:776805327629:identity/cuadrilla.demo.craftech.io"], ["scheduler:CreateSchedule", "arn:aws:scheduler:us-east-1:776805327629:schedule/aws-cds-hackathon-poc-cuadrilla-poc-schedules/*"], ["bedrock:ApplyGuardrail", "{G3}"], ["lambda:InvokeFunctionUrl", "{NetworkMock}"], ["lambda:InvokeFunction", "{CertificateWriter}"]] as const;
+    for (const [action, resource] of needs) {
+      expect(has("InstallerWorker", action, resource), `${action} on InstallerWorker`).toBe(true);
+      expect(has("InboundWhatsApp", action, resource), `${action} on InboundWhatsApp`).toBe(false);
+    }
+  });
+
   it("reports drift between generated and declared actions", () => {
     expect(actionDrift("DispatchMock", ["events:PutEvents"])).toEqual({ extra: [], missing: [] });
     expect(actionDrift("DispatchMock", ["events:PutEvents", "ses:SendEmail"])).toEqual({ extra: ["ses:SendEmail"], missing: [] });

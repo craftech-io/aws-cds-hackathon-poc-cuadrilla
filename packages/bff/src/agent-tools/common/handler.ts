@@ -5,7 +5,8 @@
 //   1. the call: a Gateway call (tool arguments + Gateway keys in the context) or a direct one
 //   2. `LAM-CALLER`: `sessionToken` XOR `caller`; through the Gateway only `sessionToken`
 //   3. the principal: a verified session of an open turn (the Harness) or a caller bound to a world,
-//      and only the principals the tool accepts (QA only in `qa-*`/`eval-*` worlds)
+//      and only the principals the tool accepts (QA only in `qa-*`/`eval-*` worlds); a direct
+//      invocation of the Lambda only with a session or a QA caller (the other callers run in process)
 //   4. `LAM-SCOPE`: the scope comes from the session (or the caller and its verified subject)
 //   5. `LAM-KILL`: `UNAVAILABLE` without effects while `KILL#AGENT` is on, `report_safety_hazard` exempt
 //   6. `LAM-STRICT`: strict arguments; `override`, `decision`, `force` refused with any value
@@ -23,6 +24,7 @@ import {
   INVOCATION_REASON,
   type LambdaContextLike,
   type ToolCall,
+  checkLambdaEntry,
   checkPrincipal,
   principalScope,
   readPrincipal,
@@ -71,7 +73,7 @@ function checkTools<D extends ToolRuntime>(spec: ToolHandlerSpec<D>): Map<string
 export function createToolHandler<D extends ToolRuntime>(spec: ToolHandlerSpec<D>): ToolHandler {
   const tools = checkTools(spec);
 
-  async function execute(call: ToolCall): Promise<ToolResponse> {
+  async function execute(call: ToolCall, entry: "LAMBDA" | "IN_PROCESS"): Promise<ToolResponse> {
     const deps = spec.deps();
     const realNow = await deps.realClock.now();
     const loggerFor = deps.loggerFor ?? ((correlationId: string) => createLogger({ correlationId }));
@@ -92,7 +94,7 @@ export function createToolHandler<D extends ToolRuntime>(spec: ToolHandlerSpec<D
       return refuse(toToolFailure(error), call.correlationId);
     }
     const correlationId = correlationIdFrom(call.correlationId ?? (identity.kind === "HARNESS" ? identity.session.turnId : identity.caller.eventId));
-    const notAllowed = checkPrincipal(binding.definition, identity);
+    const notAllowed = (entry === "LAMBDA" ? checkLambdaEntry(call, identity) : undefined) ?? checkPrincipal(binding.definition, identity);
     if (notAllowed !== undefined) return refuse(notAllowed, correlationId);
 
     const logger = loggerFor(correlationId).child({ ...bindings, principal: identity.kind });
@@ -143,9 +145,9 @@ export function createToolHandler<D extends ToolRuntime>(spec: ToolHandlerSpec<D
   }
 
   // Last line of "never throws": dependencies that cannot even be built (a missing link, a clock).
-  const run = (call: ToolCall | ToolFailure): Promise<ToolResponse> =>
+  const run = (call: ToolCall | ToolFailure, entry: "LAMBDA" | "IN_PROCESS"): Promise<ToolResponse> =>
     "via" in call
-      ? execute(call).catch((error: unknown) => {
+      ? execute(call, entry).catch((error: unknown) => {
           createLogger({ bindings: { component: "agent-tools", target: spec.target } }).error("tool.failed", { metric: "ToolErrors", value: 1, error });
           return toToolFailure(error);
         })
@@ -154,7 +156,7 @@ export function createToolHandler<D extends ToolRuntime>(spec: ToolHandlerSpec<D
   return {
     target: spec.target,
     toolNames: [...tools.keys()],
-    handler: (event, context) => run(readToolCall(spec.target, event, context)),
-    invoke: (tool, input, options = {}) => run(readToolCall(spec.target, { tool, input, ...options }, undefined)),
+    handler: (event, context) => run(readToolCall(spec.target, event, context), "LAMBDA"),
+    invoke: (tool, input, options = {}) => run(readToolCall(spec.target, { tool, input, ...options }, undefined), "IN_PROCESS"),
   };
 }

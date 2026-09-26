@@ -4,7 +4,9 @@
 // our number (`whatsappPhoneArn()`).
 //
 // Topic. `aws-cds-hackathon-poc-cuadrilla-wa-inbound`: a fixed name (unique in the account, inside the
-// `sns:<app>-*` fence of the CI deploy role), STANDARD, because EUM Social publishes to no FIFO topic.
+// `sns:<app>-*` fence of the CI deploy role), STANDARD, because EUM Social publishes to no FIFO topic,
+// and `SignatureVersion 2` (SHA256withRSA): SNS signs with version 1 (SHA1) unless the topic says
+// otherwise, and `InboundWhatsApp` refuses anything but version 2 before it looks at the event.
 // It is the only event destination of the app's own WABA (P-01, option A); the operator points the
 // WABA at it (docs/pending.md P-01, scripts/channels/waba-event-destination.ts): no role of the app nor
 // the CI role holds `PutWhatsAppBusinessAccountEventDestinations`. No SSE: EUM Social cannot publish to
@@ -24,6 +26,10 @@
 // redrive policy, no on-failure destination, no filter policy (a `qa-foreign` event must reach the
 // function, which records the `PROBE#foreign#` probe). The Bff and the QaDriver also invoke it with the
 // simulator's envelope (their modules grant it). Reserved concurrency 10 (docs/architecture.md §12).
+// It links `WaInboundOrigin` (the topic's ARN, no permission): a live record is ours only when the
+// `TopicArn` inside its SNS signature is this topic, so a notification SNS signed for any other topic
+// (of this account or another) is refused even when a principal with `lambda:InvokeFunction` hands it
+// over directly.
 //
 // Number. `WhatsAppPhoneNumberId` is the AWS id (`phone-number-id-<32 hex>`); its ARN drops the prefix
 // (`…:phone-number-id/<32 hex>`), and every `social-messaging:*` statement is omitted while the secret
@@ -33,7 +39,7 @@
 //
 // Verify:
 //   aws --profile craftech-demos sns get-topic-attributes --topic-arn arn:aws:sns:us-east-1:776805327629:aws-cds-hackathon-poc-cuadrilla-wa-inbound
-//     → no FifoTopic, no KmsMasterKeyId, Policy with the statements of `waInboundTopicPolicy`
+//     → SignatureVersion 2, no FifoTopic, no KmsMasterKeyId, Policy with the statements of `waInboundTopicPolicy`
 //   aws --profile craftech-demos sns list-subscriptions-by-topic --topic-arn <same>   → one lambda subscription: InboundWhatsApp
 //   aws --profile craftech-demos sns get-subscription-attributes --subscription-arn <arn>   → no RedrivePolicy, no FilterPolicy
 //   aws --profile craftech-demos socialmessaging get-linked-whatsapp-business-account --id <WabaId>
@@ -51,6 +57,8 @@ export { whatsappPhoneArn } from "./iam-capabilities";
 export const WA_INBOUND_TOPIC_NAME = `${APP}-wa-inbound`;
 export const INBOUND_WHATSAPP_HANDLER = "packages/bff/src/handlers/inbound-whatsapp.handler";
 export const EUM_SOCIAL_PRINCIPAL = "social-messaging.amazonaws.com";
+/** SHA256withRSA; the only version `InboundWhatsApp` accepts (packages/bff/src/channels/whatsapp/config.ts). */
+export const SNS_SIGNATURE_VERSION = 2;
 
 /** Placeholder of iam-capabilities.ts for the ARN of our number. */
 const WHATSAPP_PHONE = "{whatsappPhone}";
@@ -90,6 +98,7 @@ export const waInboundTopic = new sst.aws.SnsTopic("WaInboundTopic", {
   transform: {
     topic: (args) => {
       args.name = WA_INBOUND_TOPIC_NAME;
+      args.signatureVersion = SNS_SIGNATURE_VERSION;
     },
   },
 });
@@ -106,6 +115,9 @@ export const WaInbound = new sst.Linkable("WaInbound", {
   properties: { arn: waInboundTopic.arn, name: waInboundTopic.name },
   include: [sst.aws.permission({ actions: ["sns:Publish"], resources: [waInboundTopic.arn] })],
 });
+
+/** What InboundWhatsApp links: `Resource.WaInboundOrigin.arn`, the only topic a live record may come from; no permission. */
+export const WaInboundOrigin = new sst.Linkable("WaInboundOrigin", { properties: { arn: waInboundTopic.arn } });
 
 /**
  * InboundWhatsApp's statements: its tables and Media, its grants on our number (none while it is not
@@ -129,7 +141,7 @@ export const InboundWhatsApp = new sst.aws.Function("InboundWhatsApp", {
   description: "WhatsApp inbound (our WABA's topic and the phone simulator): number filter first, then world, identity and the installer queue.",
   handler: INBOUND_WHATSAPP_HANDLER,
   link: links(
-    [...storageLinks("InboundWhatsApp"), SessionTokenKey, WhatsAppPhoneNumberId, WhatsAppMetaPhoneNumberId, SeedOverrides, BrandConfig, ChannelModes],
+    [...storageLinks("InboundWhatsApp"), SessionTokenKey, WhatsAppPhoneNumberId, WhatsAppMetaPhoneNumberId, SeedOverrides, BrandConfig, ChannelModes, WaInboundOrigin],
     lateLinks("messaging-whatsapp", "workers", () => import("./workers"), ["InstallerEvents"], "optional"),
   ),
   permissions: inboundPermissions(),

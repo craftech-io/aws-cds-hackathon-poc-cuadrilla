@@ -124,6 +124,7 @@ async function evaluate(owners: "built" | "stubs") {
     agentcore: { Harness: rt.linkable("Harness", ["bedrock-agentcore:InvokeHarness"]), Memory: rt.linkable("Memory", capabilityActions("MEMORY_ADMIN")) },
     media: { Transcribe: rt.linkable("Transcribe", capabilityActions("TRANSCRIBE")) },
     "messaging-email": { EmailChannel: rt.linkable("EmailChannel", capabilityActions("SEND_EMAIL")) },
+    certificates: { CertificateWriter: rt.once("sst.aws.Function", "CertificateWriter") },
     // The contract of infra/mocks.ts: the mocks a role calls (Linkables with their capability) and the
     // mocks' tables it writes (by name, with the statement fenced by dynamodb:LeadingKeys).
     mocks: { mockLinks, mockPermissions: (fn: LambdaName) => (fn === "WorldJanitor" ? mockTableStatement(fn) : []) },
@@ -256,12 +257,12 @@ describe("InstallerWorker", () => {
     ]);
   });
 
-  it("links its tables, Media and Evidence by name, the guardrails, the queue, TIMERS and the capabilities of the wave", async () => {
+  it("links its tables, Media and Evidence by name, the guardrails, the queue, TIMERS, the capabilities of the wave and CertificateWriter", async () => {
     expect(linkNames((await fnArgs("InstallerWorker")).link)).toEqual([
       ...stored("InstallerWorker"),
       ...["Media", "Evidence", "GuardrailG1", "GuardrailG2", "GuardrailG3", "ChannelModes", "CostCaps"],
       ...["SessionTokenKey", "WhatsAppPhoneNumberId", "SeedOverrides", "BrandConfig", "InstallerEvents"],
-      ...["Scheduler", "Harness", "Transcribe", "EmailChannel", "NetworkMock"],
+      ...["Scheduler", "Harness", "Transcribe", "EmailChannel", "CertificateWriter", "NetworkMock"],
     ]);
   });
 });
@@ -361,7 +362,7 @@ describe("least privilege (docs/architecture.md §14)", () => {
 
   const late = (entries: Record<string, readonly string[]>): Array<[string, string]> => Object.entries(entries).flatMap(([owner, names]) => names.map((name): [string, string] => [owner, name]));
   const LATE: Array<[string, string]> = [
-    ...[["agentcore", "Harness"], ["media", "Transcribe"], ["messaging-email", "EmailChannel"], ["mocks", "mockLinks"], ["mocks", "mockPermissions"]],
+    ...[["agentcore", "Harness"], ["media", "Transcribe"], ["messaging-email", "EmailChannel"], ["certificates", "CertificateWriter"], ["mocks", "mockLinks"], ["mocks", "mockPermissions"]],
     ...[["messaging-whatsapp", "whatsappPermissions"], ["agentcore", "Memory"], ["bff", "bff"], ["bff", "qaDriver"]],
   ] as Array<[string, string]>;
 

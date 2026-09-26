@@ -76,7 +76,7 @@ Generada desde las líneas "Prueba" de `docs/flows-catalog.md`; `npm run flows:c
 | FL-028 | Pregunta de política respondida con cita | `agent-tools/knowledge/search.test.ts`, `outbound/grounding.test.ts` | `manual.flow.test.ts` | `manual.spec.ts` | `SC-03/1`, `EV-01/2` | — | — |
 | FL-029 | Pregunta de procedimiento respondida con cita | `outbound/verify.test.ts` | `manual.flow.test.ts` | — | `SC-03/2`, `EV-01/2` | — | — |
 | FL-030 | Pregunta que el manual no cubre | `agent-tools/knowledge/search.test.ts` | `manual.flow.test.ts` | — | `SC-03/3`, `EV-01/2` | — | Oráculo §4.3 |
-| FL-031 | Oferta de escalar aceptada | `agent-tools/cases/cases.test.ts`, `channels/whatsapp/keywords.test.ts` | `manual.flow.test.ts` | — | `SC-03/4` | — | — |
+| FL-031 | Oferta de escalar aceptada | `agent-tools/cases/cases.test.ts`, `channels/whatsapp/keywords.test.ts`, `channels/whatsapp/button-actions.test.ts` | `manual.flow.test.ts` | — | `SC-03/4` | — | — |
 | FL-032 | Temas denegados: precio, compensación, instrucción eléctrica | `infra/guardrail-policies.test.ts`, `worker/guardrail-block.test.ts` | `manual.flow.test.ts` | — | `SC-03/5..7`, `EV-01/2` | — | Oráculo §4.3 |
 | FL-033 | Respuesta no fundada bloqueada | `outbound/pipeline.test.ts`, `outbound/verify.test.ts` | `manual.flow.test.ts` | — | — | — | Excepción §2.1 (requiere que el modelo invente) |
 | FL-034 | Base de conocimiento no disponible | `knowledge/client.test.ts` | `manual.flow.test.ts` | — | `SC-03/8` | — | — |
@@ -92,10 +92,10 @@ Generada desde las líneas "Prueba" de `docs/flows-catalog.md`; `npm run flows:c
 | FL-044 | Validación manual en la consola | `routers/evidence.test.ts`, `services/evidence-override/override.test.ts` | — | `evidence.spec.ts`, `order-detail.spec.ts` | `SC-13/1..2` | — | — |
 | FL-045 | El agente no puede validar evidencia por su cuenta | `agent-tools/evidence/checklist.test.ts`, `infra/policy-rules.test.ts` | `security.flow.test.ts` | — | `SC-13/3` | — | — |
 | FL-046 | Imagen no pedida, demasiado pesada o sticker | `channels/whatsapp/media.test.ts` | `evidence.flow.test.ts` | — | `SC-04/15.a`, `SC-04/15.b` | — | — |
-| FL-047 | Cierre con evidencia completa: acta PDF | `certificates/pdf.test.ts`, `certificates/writer.test.ts`, `agent-tools/cases/close.test.ts` | `closing.flow.test.ts` | — | `SC-05/2` | — | — |
+| FL-047 | Cierre con evidencia completa: acta PDF | `certificates/pdf.test.ts`, `certificates/writer.test.ts`, `agent-tools/cases/close.test.ts`, `channels/whatsapp/button-actions.test.ts` | `closing.flow.test.ts` | — | `SC-05/2` | — | — |
 | FL-048 | Acta por SES al cliente y a operaciones | `channels/email/outbound.test.ts`, `certificates/deliveries.test.ts` | `closing.flow.test.ts` | `outbox.spec.ts` | `SC-05/3` | `SMK/6` | — |
 | FL-049 | Acta al instalador por WhatsApp | `channels/whatsapp/outbound.test.ts`, `certificates/deliveries.test.ts` | `closing.flow.test.ts` | — | `SC-05/4` | — | `SC-05/4.a` prueba el documento tras el botón y `SC-05/4.b`, la plantilla con `tool.invoke(close_installation)` sin entrante sobre una orden `qa-*` con `lastInboundAtSim` de hace 25 h; `certificates/deliveries.test.ts` asierta que el toque del botón reabre la ventana |
-| FL-050 | Cierre sin evidencia completa: denegado | `agent-tools/cases/close.test.ts` | `closing.flow.test.ts` | — | `SC-05/1.a`, `SC-05/1.b` | — | `SC-05/1.a` es la variante (a), `det`; `SC-05/1.b` es la (b), `agent` con el oráculo §4.3 |
+| FL-050 | Cierre sin evidencia completa: denegado | `agent-tools/cases/close.test.ts`, `channels/whatsapp/button-actions.test.ts` | `closing.flow.test.ts` | — | `SC-05/1.a`, `SC-05/1.b` | — | `SC-05/1.a` es la variante (a), `det`; `SC-05/1.b` es la (b), `agent` con el oráculo §4.3 |
 | FL-051 | Rebote o queja del email del acta | `channels/email/events.test.ts` | `closing.flow.test.ts` | `cases.spec.ts` | `SC-05/5..6` | — | — |
 | FL-052 | Visita fallida sin acta | `agent-tools/cases/close.test.ts` | `closing.flow.test.ts` | — | `SC-05/7` | — | — |
 | FL-053 | Datos personales filtrados en el acta y en las plantillas | `certificates/writer.test.ts`, `lib/mask.test.ts`, `outbound/render/whatsapp.test.ts` | `closing.flow.test.ts` | — | `SC-05/8` | — | — |

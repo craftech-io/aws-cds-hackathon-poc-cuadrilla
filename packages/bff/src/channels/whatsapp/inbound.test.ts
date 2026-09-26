@@ -178,6 +178,30 @@ describe("who gets past the channel", () => {
     expect(result.retry).toBe(true);
   });
 
+  it("[FL-093] the redelivery of a message whose processing failed after the claim runs it once: one Message IN, one queued event, the read receipt", async () => {
+    const h = await inboundHarness();
+    const event = liveEvent({ messages: [waText(ROGELIO.phone, "wamid.F1", "uno")] });
+    const throttled = { ...h.deps, queue: { enqueue: async () => Promise.reject(new Error("SQS throttled")) } };
+    expect(await processInboundEvent(event, throttled)).toMatchObject({ records: [{ messages: ["FAILED"] }], retry: true });
+    expect(h.rec.queued).toEqual([]);
+    expect(await processInboundEvent(event, h.deps)).toMatchObject({ records: [{ messages: ["QUEUED"] }], retry: false });
+    expect(h.rec.queued).toMatchObject([{ type: "INBOUND_MESSAGE", installerId: ROGELIO.personId, message: { messageId: "wamid.F1" } }]);
+    const stored = await h.world.connector.conversations.listMessages(ROGELIO.personId);
+    expect(stored.map((message) => [message.messageId, message.direction, message.status])).toEqual([["wamid.F1", "IN", "READ"]]);
+    expect(await outcomes(await processInboundEvent(event, h.deps))).toEqual(["DUPLICATE"]);
+    expect(h.rec.queued).toHaveLength(1);
+  });
+
+  it("[FL-093] a failed ALTA is recorded on the redelivery", async () => {
+    const h = await inboundHarness();
+    const alta = liveEvent({ messages: [waText(PEOPLE.julian.phone, "wamid.A1", "ALTA")] });
+    const down = { ...h.deps, actions: { ...h.deps.actions, recordConsent: async () => Promise.reject(new Error("People throttled")) } };
+    expect(await outcomes(await processInboundEvent(alta, down))).toEqual(["FAILED"]);
+    expect(await outcomes(await processInboundEvent(alta, h.deps))).toEqual(["KEYWORD"]);
+    expect(h.rec.actions).toMatchObject([{ name: "recordConsent", input: { personId: PEOPLE.julian.personId, sourceMessageId: "wamid.A1" } }]);
+    expect(await h.world.connector.conversations.listMessages(PEOPLE.julian.personId)).toHaveLength(1);
+  });
+
   it("[FL-098] over the world's messages per hour: DENY RATE_LIMIT, nothing kept and no turn; BAJA still works", async () => {
     const h = await inboundHarness();
     await h.world.connector.isps.updateSettings("isp-demo", { rateLimitPerHour: 2 });

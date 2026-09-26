@@ -1,8 +1,9 @@
 // What the WhatsApp adapter needs from the rest of the product, as ports. The adapter decides; the
 // ports act: the outbound pipeline sends every fixed notice (packages/bff/src/outbound/, so the
-// contact policy and the audit log see it), the installer queue takes what a turn or a case must do
-// (`InstallerEvents.fifo`, `MessageGroupId = installerId`, ADR-0017), and the deterministic handlers
-// of docs/tool-catalog.md run what a keyword or a button asks for (`caller CHANNEL`, never a turn).
+// contact policy and the audit log see it), the installer queue takes what a turn, a case or a button
+// on a work order must do (`InstallerEvents.fifo`, `MessageGroupId = installerId`, ADR-0017), and the
+// deterministic handlers of docs/tool-catalog.md run what a keyword asks for (`caller CHANNEL`, never a
+// turn). A button on a work order is a `BUTTON_ACTION` the InstallerWorker runs (button-actions.ts).
 import { createHash } from "node:crypto";
 import { type ChecklistItem, type WhatsAppMode, type WhatsAppTransport, parseClockId } from "@cuadrilla/shared";
 import type { Connector, MessageRef } from "../../connector/ports";
@@ -64,9 +65,24 @@ export interface NoticeSender {
   send(request: NoticeRequest): Promise<void>;
 }
 
+/**
+ * A fixed notice the worker sends to the installer of a queued event, answering the tap: no phone
+ * travels in the queue; the outbound pipeline resolves the recipient and its transport from the person.
+ */
+export interface InstallerNotice extends Omit<NoticeRequest, "recipient" | "list"> {
+  readonly personId: string;
+}
+
+export interface InstallerNoticeSender {
+  send(notice: InstallerNotice): Promise<void>;
+}
+
 // ---- Installer queue ----------------------------------------------------------------------------
 
 export type SupervisorAction = "TAKE_CASE" | "DECLINE_CASE" | "CLOSE_CASE" | "RELAY";
+
+/** Buttons of an installer on a work order: they change the installer's work, so they run in the installer's queue. */
+export type WorkOrderButton = "CONSULT_SUPERVISOR" | "CLOSE_INSTALLATION" | "CUSTOMER_OK";
 
 interface QueuedBase {
   /** `MessageDeduplicationId` and `IDEMP#<type>#<eventId>` of the worker. */
@@ -82,7 +98,14 @@ interface QueuedBase {
 export type ChannelQueueEvent =
   | (QueuedBase & { readonly type: "INBOUND_MESSAGE" })
   | (QueuedBase & { readonly type: "AGENT_TURN"; readonly trigger: "ORDERS_REQUESTED" })
-  | (QueuedBase & { readonly type: "SUPERVISOR_ACTION"; readonly action: SupervisorAction; readonly supervisorId: string; readonly caseId: string });
+  | (QueuedBase & { readonly type: "SUPERVISOR_ACTION"; readonly action: SupervisorAction; readonly supervisorId: string; readonly caseId: string })
+  | (QueuedBase & {
+      readonly type: "BUTTON_ACTION";
+      readonly action: WorkOrderButton;
+      readonly workOrderId: string;
+      /** The message that offered the button (its nonce's `messageId`): the sections a consult cites. */
+      readonly offerMessageId?: string;
+    });
 
 export interface EventQueue {
   /** Marks the event in flight for the installer and the world, then `SendMessage` (docs/architecture.md §7). */
@@ -116,12 +139,21 @@ export type CloseOutcome =
   | { readonly ok: false; readonly code: "NOT_COMPLETE"; readonly missing: readonly ChecklistItem[] }
   | { readonly ok: false; readonly code: "FAILED" };
 
+/** What `InboundWhatsApp` runs itself for a keyword: the person's consent and a supervisor's shift, never a work order. */
 export interface ChannelActions {
   /** `record_consent` with medium `WHATSAPP_KEYWORD` and the poster's text version. */
   recordConsent(input: ChannelActionInput & { readonly textVersion: string }): Promise<void>;
   revokeConsent(input: ChannelActionInput): Promise<void>;
   /** `register_shift` (plan B "TURNO"): the supervisor's shift window. */
   registerShift(input: ChannelActionInput): Promise<{ readonly closesAtSim: string }>;
+}
+
+/**
+ * What the InstallerWorker runs for a `BUTTON_ACTION` (`caller CHANNEL`: the tap is the installer's,
+ * not a turn), inside the installer's message group, with the worker's PIPELINE, TIMERS, MOCK_NETWORK
+ * and CertificateWriter invoke.
+ */
+export interface WorkOrderActions {
   /**
    * `open_case(OUT_OF_MANUAL)` from the "Consultar a mi supervisor" button (FL-031), with what the
    * summary is built from: the last question (already masked) and the sections of the offer.

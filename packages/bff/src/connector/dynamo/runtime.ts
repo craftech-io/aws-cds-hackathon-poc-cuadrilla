@@ -4,7 +4,7 @@
 // ADR-0019). Rows with a TTL are checked on read too: DynamoDB deletes lazily.
 import { ConnectorError } from "@cuadrilla/shared";
 import { CAP_KEY_PREFIXES, CapCounter, Clock, Counter, Idempotency, Nonce, RUNTIME_TTL_SECONDS, Session, Turn, TurnResult } from "../../domain/runtime";
-import { COUNTER_KEYS, counterRowKey, turnPartition, turnResultPrefix } from "../keys";
+import { COUNTER_KEYS, counterRowKey, idempotencyKey, turnPartition, turnResultPrefix } from "../keys";
 import type { CounterReservation, RuntimePort } from "../ports-runtime";
 import { TTL_ATTRIBUTE, type Patch, type TransactOp } from "../table-client";
 import {
@@ -121,6 +121,9 @@ export function runtimeRepo(ctx: RepoContext): RuntimePort {
         if (error instanceof ConnectorError && error.code === "CONFLICT") return false;
         throw error;
       }
+    },
+    async releaseIdempotency(source, id) {
+      await client.delete(TABLE, idempotencyKey(source, id));
     },
     getIdempotency: async (source, id) => valid(await getEntity(ctx, Idempotency, "Idempotency", { source, id })),
 
