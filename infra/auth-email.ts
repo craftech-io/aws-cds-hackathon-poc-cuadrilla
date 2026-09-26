@@ -107,9 +107,14 @@ export function cognitoMessages(options: AuthEmailOptions) {
   return {
     adminCreateUserConfig: {
       allowAdminCreateUserOnly: true,
-      inviteMessageTemplate: { emailSubject: invitation.subject, emailMessage: invitation.message },
+      inviteMessageTemplate: { emailSubject: invitation.subject, emailMessage: invitation.message, smsMessage: COGNITO_INVITE_SMS },
     },
-    verificationMessageTemplate: { defaultEmailOption: "CONFIRM_WITH_CODE", emailSubject: verification.subject, emailMessage: verification.message },
+    verificationMessageTemplate: {
+      defaultEmailOption: "CONFIRM_WITH_CODE",
+      emailSubject: verification.subject,
+      emailMessage: verification.message,
+      smsMessage: COGNITO_VERIFICATION_SMS,
+    },
   };
 }
 
@@ -222,6 +227,10 @@ export const COGNITO_USERNAME = "{username}";
 export const COGNITO_CODE = "{####}";
 export const COGNITO_EMAIL_MAX_CHARS = 20_000;
 export const COGNITO_SUBJECT_MAX_CHARS = 140;
+// The pool has no SMS configuration and never sends one (MFA is TOTP only), but CreateUserPool
+// rejects the empty SMS template the provider sends when a message template leaves it out.
+export const COGNITO_INVITE_SMS = `${PRODUCT_NAME}: usuario ${COGNITO_USERNAME}, contraseña temporal ${COGNITO_CODE}`;
+export const COGNITO_VERIFICATION_SMS = `${PRODUCT_NAME}: tu código de verificación es ${COGNITO_CODE}`;
 
 export const CRAFTECH_URL = "https://craftech.io";
 /** PNG, because email clients do not render SVG (packages/web/public/brand). */

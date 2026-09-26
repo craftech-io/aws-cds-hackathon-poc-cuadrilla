@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { ConsoleRole } from "../packages/shared/src/enums";
 import {
   COGNITO_CODE,
+  COGNITO_INVITE_SMS,
+  COGNITO_VERIFICATION_SMS,
   COGNITO_EMAIL_MAX_CHARS,
   COGNITO_SUBJECT_MAX_CHARS,
   COGNITO_USERNAME,
@@ -104,8 +106,25 @@ describe("sign-up, recovery and passwords", () => {
     const messages = cognitoMessages(COBRANDED);
     const invitation = invitationEmail(COBRANDED);
     const verification = verificationEmail(COBRANDED);
-    expect(messages.adminCreateUserConfig.inviteMessageTemplate).toEqual({ emailSubject: invitation.subject, emailMessage: invitation.message });
-    expect(messages.verificationMessageTemplate).toEqual({ defaultEmailOption: "CONFIRM_WITH_CODE", emailSubject: verification.subject, emailMessage: verification.message });
+    expect(messages.adminCreateUserConfig.inviteMessageTemplate).toEqual({ emailSubject: invitation.subject, emailMessage: invitation.message, smsMessage: COGNITO_INVITE_SMS });
+    expect(messages.verificationMessageTemplate).toEqual({
+      defaultEmailOption: "CONFIRM_WITH_CODE",
+      emailSubject: verification.subject,
+      emailMessage: verification.message,
+      smsMessage: COGNITO_VERIFICATION_SMS,
+    });
+  });
+
+  it("fills both SMS templates the way CreateUserPool validates them, although no SMS is ever sent", () => {
+    // MessageTemplateType / VerificationMessageTemplateType: 6..140 characters, the code placeholder,
+    // and the username placeholder in the invitation.
+    for (const sms of [COGNITO_INVITE_SMS, COGNITO_VERIFICATION_SMS]) {
+      expect(sms.length).toBeGreaterThanOrEqual(6);
+      expect(sms.length).toBeLessThanOrEqual(140);
+      expect(count(sms, COGNITO_CODE)).toBe(1);
+      expect(sms).not.toMatch(VOSEO);
+    }
+    expect(count(COGNITO_INVITE_SMS, COGNITO_USERNAME)).toBe(1);
   });
 });
 
