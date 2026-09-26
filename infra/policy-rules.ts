@@ -22,6 +22,10 @@
 //   - automated reasoning judges the whole engine: a forbid created while no permit covers its action is
 //     "Overly Restrictive", so the permits are created first and every forbid depends on all of them
 //     (`creationPlan`, applied by infra/policy.ts);
+//   - a policy name another engine of the account already holds is refused (ConflictException "Policy
+//     with the same name already exists", although this engine lists no such policy), and the account
+//     is shared with another app, so the name in the engine carries the app and the stage
+//     (`enginePolicyName`);
 //   - each statement is validated against the Gateway's tool schemas, so every field it cites must be
 //     declared there (`schemaProblems`, run by infra/policy.ts on the generated schemas before creating);
 //   - reading an absent field is an evaluation error and Cedar skips an erroring policy: a forbid that
@@ -103,7 +107,7 @@ export interface CedarCondition {
 
 export interface CedarPolicyDefinition {
   readonly id: CedarStatementId;
-  /** Resource name in the engine: `^[A-Za-z][A-Za-z0-9_]*$`, at most 48 characters, unique. */
+  /** Statement name (`CED_NO_OVERRIDE`), unique; the engine gets it inside `enginePolicyName`. */
   readonly name: string;
   readonly effect: CedarEffect;
   /** Gateway action ids the statement covers. */
@@ -143,9 +147,23 @@ export function policyName(id: CedarStatementId): string {
   return id.replace(/-/g, "_");
 }
 
+/** Longest name the engine accepts for itself and for each policy, both `^[A-Za-z][A-Za-z0-9_]*$`. */
+export const MAX_ENGINE_NAME_CHARS = 48;
+
 /** Name of the engine: `^[A-Za-z][A-Za-z0-9_]*$`, at most 48 characters. */
 export function policyEngineName(app: string, stage: string): string {
-  return `${app}_${stage}`.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 48);
+  return `${app}_${stage}`.replace(/[^A-Za-z0-9_]/g, "_").slice(0, MAX_ENGINE_NAME_CHARS);
+}
+
+/**
+ * Name of a policy in the engine, `<last word of the app>_<stage>_<statement name>`
+ * (`cuadrilla_poc_CED_NO_OVERRIDE`): policy names are unique across the engines of the account, not
+ * per engine, and another app shares the account. The namespace is cut so the name fits in 48 characters.
+ */
+export function enginePolicyName(app: string, stage: string, name: string): string {
+  const words = app.split(/[^A-Za-z0-9]+/).filter((word) => word.length > 0);
+  const namespace = `${words[words.length - 1] ?? app}_${stage}`.replace(/[^A-Za-z0-9_]/g, "_");
+  return `${namespace.slice(0, Math.max(0, MAX_ENGINE_NAME_CHARS - name.length - 1))}_${name}`;
 }
 
 // ---- Rendering ---------------------------------------------------------------------------------
@@ -244,9 +262,9 @@ export interface PolicyCreationStep {
 }
 
 /**
- * Permits first, every forbid after all the permits, and one policy at a time: the engine answers
- * concurrent CreatePolicy calls with a spurious ConflictException ("Policy with the same name already
- * exists") for a name it does not hold, so each step also waits for the one before it.
+ * Permits first, every forbid after all the permits, and one policy at a time: the analyzer judges each
+ * new policy against those already in the engine, so each step also waits for the one before it and
+ * that set never depends on which concurrent create lands first.
  */
 export function creationPlan(policies: readonly CedarPolicyDefinition[]): PolicyCreationStep[] {
   const permits = policies.filter((policy) => policy.effect === "permit");

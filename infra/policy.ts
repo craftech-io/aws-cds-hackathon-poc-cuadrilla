@@ -16,6 +16,8 @@
 //      the engine reject a policy halfway.
 //
 // Order: the five permits first (CED-PERMIT-<TARGET>), then every forbid with `dependsOn` all of them.
+// Names: `enginePolicyName` (`cuadrilla_poc_CED_NO_OVERRIDE`), because policy names are unique across the
+// engines of the shared account.
 // CED-KILL-SWITCH exists only while KILL_SWITCH_ACTIVE is true in infra/policy-rules.ts (the runtime
 // stop is `Runtime/KILL#`, ADR-0019); switching it on or off is a deploy through CI.
 //
@@ -26,9 +28,10 @@
 // Verify (AWS CLI ≥ 2.27, or the SDK v3 scripts, docs/architecture.md §16):
 //   aws --profile craftech-demos bedrock-agentcore-control list-policy-engines
 //   aws --profile craftech-demos bedrock-agentcore-control list-policies --policy-engine-id <id>
-//     → 14 policies ACTIVE: CED_PERMIT_* ×5, CED_SESSION_* ×5, CED_WA_INSTALLER_ONLY, CED_NO_OVERRIDE,
-//       CED_NO_SUPERVISOR_DECISION, CED_NO_FORCE_CLOSE; no CED_KILL_SWITCH (switched off)
-//   aws --profile craftech-demos bedrock-agentcore-control get-policy --policy-engine-id <id> --policy-id <CED_NO_OVERRIDE id>
+//     → 14 policies ACTIVE, each named cuadrilla_poc_<statement>: CED_PERMIT_* ×5, CED_SESSION_* ×5,
+//       CED_WA_INSTALLER_ONLY, CED_NO_OVERRIDE, CED_NO_SUPERVISOR_DECISION, CED_NO_FORCE_CLOSE; no
+//       CED_KILL_SWITCH (switched off)
+//   aws --profile craftech-demos bedrock-agentcore-control get-policy --policy-engine-id <id> --policy-id <cuadrilla_poc_CED_NO_OVERRIDE id>
 //     → the statement of infra/policy-rules.ts with the real Gateway ARN and Harness role
 
 import {
@@ -36,6 +39,7 @@ import {
   assumedRoleEntityId,
   cedarPolicies,
   creationPlan,
+  enginePolicyName,
   inputSchemasByAction,
   policyEngineName,
   schemaProblems,
@@ -120,7 +124,7 @@ export function attachGatewayPolicies(args: AttachGatewayPoliciesArgs): Record<s
       `Policy${step.definition.name.replace(/_/g, "")}`,
       {
         policyEngineId,
-        name: step.definition.name,
+        name: enginePolicyName($app.name, $app.stage, step.definition.name),
         description: step.definition.description,
         enforcementMode: step.definition.enforcementMode,
         validationMode: step.definition.validationMode,

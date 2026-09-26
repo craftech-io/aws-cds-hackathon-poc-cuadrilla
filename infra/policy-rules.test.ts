@@ -15,6 +15,7 @@ import {
   cedarPolicies,
   cedarSchema,
   creationPlan,
+  enginePolicyName,
   inputSchemasByAction,
   policyEngineName,
   policyName,
@@ -125,6 +126,17 @@ describe("statements", () => {
     }
     expect(new Set(switchedOn.map((policy) => policy.name)).size).toBe(switchedOn.length);
     expect(policyEngineName("aws-cds-hackathon-poc-cuadrilla", "poc")).toBe("aws_cds_hackathon_poc_cuadrilla_poc");
+  });
+
+  it("names each policy in the engine with the app and the stage, within 48 characters (names are unique across the account)", () => {
+    for (const policy of switchedOn) {
+      const name = enginePolicyName("aws-cds-hackathon-poc-cuadrilla", "poc", policy.name);
+      expect(name).toBe(`cuadrilla_poc_${policy.name}`);
+      expect(name).toMatch(/^[A-Za-z][A-Za-z0-9_]{0,47}$/);
+    }
+    const longStage = enginePolicyName("other-app", "a-very-long-personal-stage-name", "CED_NO_SUPERVISOR_DECISION");
+    expect(longStage).toBe("app_a_very_long_perso_CED_NO_SUPERVISOR_DECISION");
+    expect(longStage).toHaveLength(48);
   });
 
   it("permits exactly the 12 Gateway tools of docs/tool-catalog.md, one permit per target (CED-PERMIT-<TARGET>)", () => {
