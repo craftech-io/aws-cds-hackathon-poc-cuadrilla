@@ -243,13 +243,19 @@ export interface PolicyCreationStep {
   readonly after: readonly string[];
 }
 
-/** Permits first and independent; every forbid after all the permits. */
+/**
+ * Permits first, every forbid after all the permits, and one policy at a time: the engine answers
+ * concurrent CreatePolicy calls with a spurious ConflictException ("Policy with the same name already
+ * exists") for a name it does not hold, so each step also waits for the one before it.
+ */
 export function creationPlan(policies: readonly CedarPolicyDefinition[]): PolicyCreationStep[] {
   const permits = policies.filter((policy) => policy.effect === "permit");
+  const forbids = policies.filter((policy) => policy.effect === "forbid");
   const permitNames = permits.map((policy) => policy.name);
+  const previous = (list: readonly CedarPolicyDefinition[], index: number): string[] => (index === 0 ? [] : [list[index - 1]?.name ?? ""]);
   return [
-    ...permits.map((definition) => ({ definition, after: [] })),
-    ...policies.filter((policy) => policy.effect === "forbid").map((definition) => ({ definition, after: permitNames })),
+    ...permits.map((definition, index) => ({ definition, after: previous(permits, index) })),
+    ...forbids.map((definition, index) => ({ definition, after: [...permitNames, ...previous(forbids, index)] })),
   ];
 }
 

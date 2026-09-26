@@ -150,15 +150,15 @@ describe("engine limits and creation order", () => {
     for (const policy of switchedOn) expect(qualified(policy.statement).length, policy.name).toBeLessThan(MAX_STATEMENT_CHARS);
   });
 
-  it("creates the five permits first and every forbid after all of them", () => {
+  it("creates the five permits first, every forbid after all of them, and one policy at a time", () => {
     for (const set of [policies, switchedOn]) {
       const plan = creationPlan(set);
       const permitNames = GATEWAY_TARGETS.map((target) => `CED_PERMIT_${target.toUpperCase()}`);
-      expect(plan.slice(0, 5).map((step) => [step.definition.name, step.after])).toEqual(permitNames.map((name) => [name, []]));
-      for (const step of plan.slice(5)) {
+      expect(plan.slice(0, 5).map((step) => [step.definition.name, step.after])).toEqual(permitNames.map((name, index) => [name, index === 0 ? [] : [permitNames[index - 1]]]));
+      plan.slice(5).forEach((step, index) => {
         expect(step.definition.effect).toBe("forbid");
-        expect(step.after).toEqual(permitNames);
-      }
+        expect(step.after).toEqual(index === 0 ? permitNames : [...permitNames, plan[4 + index]?.definition.name]);
+      });
       expect(plan.map((step) => step.definition.name).sort()).toEqual(set.map((policy) => policy.name).sort());
     }
   });
