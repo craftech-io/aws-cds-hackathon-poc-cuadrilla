@@ -1,6 +1,7 @@
 // Reads the principal out of the Cognito id token. The console only decodes the payload: the
-// signature is verified by the BFF on every call, and the JWT is the only source of `ispId` and
-// role, both stamped by the pre-token trigger from the registry (never the `custom:ispId` attribute) (docs/design-brief.md §6). Nothing here trusts user input.
+// signature is verified by the BFF on every call, and the JWT is the only source of `ispId`, role
+// and `isJudge`, stamped by the pre-token trigger from the registry (never the `custom:ispId`
+// attribute) (docs/design-brief.md §6). Nothing here trusts user input.
 import { ConsoleRole } from "@cuadrilla/shared";
 import { z } from "zod";
 
@@ -15,6 +16,8 @@ const IdTokenClaimsSchema = z.looseObject({
   name: z.string().optional(),
   ispId: z.string().min(1).optional(),
   role: z.string().optional(),
+  /** Stamped as the string "true" for judge accounts (packages/bff/src/auth/principal.ts). */
+  isJudge: z.string().optional(),
   "cognito:groups": z.array(z.string()).optional(),
 });
 
@@ -28,6 +31,8 @@ export interface Principal {
   readonly ispId?: string;
   readonly role?: ConsoleRole;
   readonly groups: readonly ConsoleRole[];
+  /** A judge acts as supervisor in its own world, never with TOTP or a password change. */
+  readonly isJudge: boolean;
   /** Epoch milliseconds. */
   readonly expiresAt: number;
 }
@@ -66,15 +71,16 @@ function roleOf(claims: IdTokenClaims, groups: readonly ConsoleRole[]): ConsoleR
 
 export function principalFromClaims(claims: IdTokenClaims): Principal {
   const groups = groupsOf(claims);
+  const role = roleOf(claims, groups);
   const principal: Principal = {
     sub: claims.sub,
     groups,
+    isJudge: role === "JUDGE" || claims.isJudge === "true",
     expiresAt: claims.exp * 1000,
     ...(claims.email !== undefined ? { email: claims.email } : {}),
     ...(claims.name !== undefined ? { name: claims.name } : {}),
     ...(claims.ispId !== undefined ? { ispId: claims.ispId } : {}),
   };
-  const role = roleOf(claims, groups);
   return role ? { ...principal, role } : principal;
 }
 

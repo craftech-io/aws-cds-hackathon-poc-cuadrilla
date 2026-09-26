@@ -122,7 +122,7 @@ export function resolveTestPath(level: Level, cited: string): string {
   if (level === "LF") return cited.startsWith("tests/") ? cited : `tests/flows/${cited}`;
   if (cited.endsWith(".spec.ts")) return `packages/web/e2e/${cited}`;
   if (/^(infra|scripts|tests)\//.test(cited)) return cited;
-  for (const pkg of ["network-mock", "dispatch-mock", "network-contract"]) if (cited.startsWith(`${pkg}/`)) return `packages/${pkg}/src/${cited.slice(pkg.length + 1)}`;
+  for (const pkg of ["shared", "network-mock", "dispatch-mock", "network-contract"]) if (cited.startsWith(`${pkg}/`)) return `packages/${pkg}/src/${cited.slice(pkg.length + 1)}`;
   if (cited.startsWith("views/")) return `packages/web/src/${cited}`;
   return `packages/bff/src/${cited}`;
 }

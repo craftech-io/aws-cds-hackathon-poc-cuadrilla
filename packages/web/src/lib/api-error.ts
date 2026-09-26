@@ -1,8 +1,9 @@
 // A failed console call as the views need it: a kind that decides what to show, the tRPC code and
-// HTTP status, the BFF's fine-grained `reason` (an old sign-in, a file that is not complete)
+// HTTP status, the BFF's fine-grained `reason` (an old sign-in, a checklist that is not complete)
 // and the correlation id support asks for. The error crossed the network, so its shape is parsed
 // with zod before anything reads it.
 import { z } from "zod";
+import { ContractError } from "./console-api";
 
 export type ApiErrorKind =
   | "recentLogin"
@@ -66,6 +67,8 @@ export function isAbortError(error: unknown): boolean {
 }
 
 export function toApiError(error: unknown): ApiError {
+  // The BFF answered, but not what the console expects: a version mismatch, never a network failure.
+  if (error instanceof ContractError) return { kind: "unknown", code: "CONTRACT", httpStatus: null, reason: null, correlationId: null, message: error.message };
   const parsed = ClientErrorShape.safeParse(error);
   if (!parsed.success) {
     return { kind: "unknown", code: "UNKNOWN", httpStatus: null, reason: null, correlationId: null, message: error instanceof Error ? error.message : String(error) };

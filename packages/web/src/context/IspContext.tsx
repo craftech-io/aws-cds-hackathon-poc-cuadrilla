@@ -1,6 +1,7 @@
 // Operator-level state shared by every view: the operator comes from the JWT (`ispId`) and the
-// scope that filters the work (field crew and day, `ScopeBar`). The operator's visible name, its
-// settings and the world clock arrive with the BFF routers (WP-40); views read them through `useIsp`.
+// scope that filters the work (field crew and day, `ScopeBar`). The operator's visible name comes
+// from the brand (BrandContext) and the world clock from WorldClockContext; views read the scope
+// through `useIsp`.
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
 export interface WorkScope {

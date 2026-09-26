@@ -2,8 +2,8 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// Served from "/" behind the CloudFront Router (infra/web.ts); the BFF and the upload page live on
-// the same origin under /api and /u.
+// Served from "/" behind the CloudFront Router (infra/web.ts); the BFF lives on the same origin
+// under /api.
 export default defineConfig({
   base: "/",
   plugins: [react(), tailwindcss()],

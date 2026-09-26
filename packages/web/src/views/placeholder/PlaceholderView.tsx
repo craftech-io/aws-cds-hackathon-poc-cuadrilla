@@ -1,6 +1,6 @@
-// Stand-in for the views that later work packages build (docs/build-plan.md, waves 1 and 5): the
-// title and description of the route, so the shell, the navigation and the role guards can be
-// tested end to end before the data exists.
+// Stand-in for a console view that a later work package builds (docs/build-plan.md, wave 5): the
+// title and description of the route until `views/<route id>/view.tsx` exists, so the shell, the
+// navigation and the role guards work end to end before the data does.
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { copy } from "../../copy/console";

@@ -1,6 +1,144 @@
-// Explicit re-exports only (no automatic barrel).
+// Explicit re-exports only (no automatic barrel). The console imports this index, so nothing reachable
+// from here may use Node APIs: the media keys (node:crypto) live on their own subpath,
+// `@cuadrilla/shared/media/keys`, and `testing.ts` is for this package's contract tests only.
 
-export { ChannelName, ConsoleRole, ErrorCode, SendChannel, Weekday, WhatsAppTransport, channelNameOf } from "./enums";
+export {
+  AuditDecision,
+  BrandMode,
+  CaseKind,
+  CaseReason,
+  CaseStatus,
+  ChannelName,
+  ChecklistItem,
+  ChecklistItemStatus,
+  ClockMode,
+  ConsoleRole,
+  ErrorCode,
+  HazardCategory,
+  IspKind,
+  KillScope,
+  ManualCategory,
+  MessageKind,
+  OnuOperState,
+  OpticalClass,
+  PersonRole,
+  PhotoItem,
+  RejectReason,
+  Rung,
+  RungOutcome,
+  SendChannel,
+  StepOutcome,
+  Symptom,
+  TemplateName,
+  TemplateStatus,
+  TimerFiredBy,
+  TimerKind,
+  TimerStatus,
+  TurnTrigger,
+  Verdict,
+  WaButtonAction,
+  Weekday,
+  WhatsAppMode,
+  WhatsAppTransport,
+  WorkOrderStatus,
+  channelNameOf,
+} from "./enums";
+
+export { ContactRule, Guardrail, GuardrailAction, PolicyResult, RULE_FAMILIES, RuleId, ruleFamilyOf } from "./rules";
+export type { RuleFamily } from "./rules";
+
+export {
+  CaseId,
+  ConsoleUserId,
+  CrewId,
+  CustomerId,
+  EvidenceId,
+  ID_PREFIX,
+  ID_SPEC,
+  InstallerId,
+  IspId,
+  ManualSectionId,
+  OnuSerial,
+  PersonId,
+  PhotoId,
+  QuestionId,
+  SupervisorId,
+  ValidationId,
+  VersionTag,
+  VoiceNoteId,
+  WORK_ORDER_NUMBER_RANGES,
+  WorkOrderId,
+  WorkOrderNumber,
+  ZoneChiefId,
+  ZoneId,
+  idSchema,
+  isId,
+  isSetPhotoId,
+  kindOfId,
+  makeId,
+  manualCategoryOf,
+  personRoleOfId,
+  seedPhotoId,
+  versionTag,
+  workOrderId,
+  workOrderNumberOf,
+  workOrderNumberRange,
+} from "./ids";
+export type { IdKind, IdPrefix, WorkOrderNumberRange } from "./ids";
+
+export {
+  ClockId,
+  DEMO_CLOCK_ID,
+  DEMO_ISP_ID,
+  JUDGE_TEST_CLOCK_ID,
+  JUDGE_TEST_ISP_ID,
+  clockIdOfIsp,
+  clockTagOf,
+  evalClockId,
+  isQaReachableClock,
+  ispIdOfClock,
+  ispKindOfClock,
+  ispKindOfIspId,
+  judgeClockId,
+  parseClockId,
+  qaClockId,
+} from "./clock-ids";
+export type { ParsedClockId } from "./clock-ids";
+
+export { ULID_BODY, Ulid, encodeUlid, ulidTime } from "./ulid";
+
+export {
+  Caller,
+  CallerKind,
+  PrincipalInput,
+  SESSION_TOKEN_MAX_TTL_SECONDS,
+  SESSION_TOKEN_PATTERN,
+  SessionToken,
+  isSessionTokenExpired,
+  principalKind,
+  splitSessionToken,
+} from "./caller";
+export type { PrincipalKind, SessionTokenParts } from "./caller";
+
+export {
+  ALL_FLOW_IDS,
+  FLOW_AREAS,
+  FLOW_COUNT,
+  FlowArea,
+  FlowId,
+  FlowLevel,
+  ScenarioId,
+  StepAfter,
+  StepCitation,
+  StepDeclaration,
+  StepId,
+  StepKind,
+  flowId,
+  flowTag,
+  flowTagsIn,
+  parseStepCitation,
+} from "./flows";
+export type { ParsedStepCitation } from "./flows";
 
 export {
   CalendarDate,

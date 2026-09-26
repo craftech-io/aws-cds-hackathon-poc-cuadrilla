@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
+import { BrandProvider } from "./context/BrandContext";
 import { SessionProvider } from "./context/SessionContext";
 import "./index.css";
 import { RouterProvider } from "./lib/router";
@@ -12,7 +13,9 @@ createRoot(container).render(
   <StrictMode>
     <RouterProvider>
       <SessionProvider>
-        <App />
+        <BrandProvider>
+          <App />
+        </BrandProvider>
       </SessionProvider>
     </RouterProvider>
   </StrictMode>,

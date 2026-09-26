@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { FetchError } from "aws-jwt-verify/error";
 import { AUTH_REASON, AuthError } from "./errors";
-import { bearerToken, createCognitoIdTokenVerifier } from "./jwt";
-import { TEST_POOL, createTestIssuer } from "./testing";
+import { bearerToken, createCognitoIdTokenVerifier, staticJwksFetcher } from "./jwt";
+import { TEST_POOL, TOKEN_LIFETIME_SECONDS, createTestIssuer } from "./testing";
 
 async function reasonOf(promise: Promise<unknown>): Promise<string> {
   try {
@@ -18,12 +18,19 @@ describe("Cognito id token verification [FL-079]", () => {
   const issuer = createTestIssuer();
   const verifier = issuer.verifier();
 
-  it("accepts a token signed by the pool and returns its claims", async () => {
+  it("[FL-079] accepts a token signed by the pool and returns its claims", async () => {
     const claims = await verifier.verify(issuer.idToken());
     expect(claims.sub).toBe("7f1c9d2e-0000-4000-8000-000000000001");
     expect(claims.ispId).toBe("isp-demo");
+    expect(claims.userId).toBe("usr-sup-01");
     expect(claims.role).toBe("SUPERVISOR");
     expect(claims.token_use).toBe("id");
+    expect(claims.origin_jti).toBe("0b6f3c1e-0000-4000-8000-00000000a001");
+  });
+
+  it("[FL-079] keeps the tokens of one sign-in together: a refresh carries the same origin_jti", async () => {
+    const refreshed = await verifier.verify(issuer.idToken({ iat: Math.floor(Date.now() / 1000) + 5 }));
+    expect(refreshed.origin_jti).toBe((await verifier.verify(issuer.idToken())).origin_jti);
   });
 
   it("fetches the JWKS once and serves later tokens from the cache", async () => {
@@ -48,6 +55,15 @@ describe("Cognito id token verification [FL-079]", () => {
     const [, payload] = issuer.idToken().split(".");
     const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT", kid: issuer.kid })).toString("base64url");
     expect(await reasonOf(verifier.verify(`${header}.${payload}.`))).toBe(AUTH_REASON.TOKEN_INVALID);
+  });
+
+  it("[FL-079] accepts a 15-minute token until it expires and refuses it as TOKEN_EXPIRED afterwards", async () => {
+    const issuedAgo = (minutes: number) => {
+      const iat = Math.floor(Date.now() / 1000) - minutes * 60;
+      return issuer.idToken({ iat, auth_time: iat, exp: iat + TOKEN_LIFETIME_SECONDS });
+    };
+    expect((await verifier.verify(issuedAgo(14))).sub).toBe("7f1c9d2e-0000-4000-8000-000000000001");
+    expect(await reasonOf(verifier.verify(issuedAgo(16)))).toBe(AUTH_REASON.TOKEN_EXPIRED);
   });
 
   it("rejects an expired token as TOKEN_EXPIRED", async () => {
@@ -76,6 +92,13 @@ describe("Cognito id token verification [FL-079]", () => {
 
   it("rejects garbage", async () => {
     expect(await reasonOf(verifier.verify("not-a-jwt"))).toBe(AUTH_REASON.TOKEN_INVALID);
+  });
+
+  it("[FL-079] trusts another key only when a verifier is built with it on purpose (UI server entry, tests)", async () => {
+    const other = createTestIssuer();
+    expect(await reasonOf(verifier.verify(other.idToken()))).toBe(AUTH_REASON.TOKEN_INVALID);
+    const local = createCognitoIdTokenVerifier(TEST_POOL, { fetcher: staticJwksFetcher(other.jwks) });
+    expect((await local.verify(other.idToken())).sub).toBe("7f1c9d2e-0000-4000-8000-000000000001");
   });
 
   it("reports an outage, not a bad token, when the JWKS cannot be fetched", async () => {

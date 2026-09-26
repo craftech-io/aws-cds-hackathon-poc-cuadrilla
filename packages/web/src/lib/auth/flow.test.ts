@@ -177,7 +177,7 @@ describe("forgot password (ForgotPassword → ConfirmForgotPassword)", () => {
   });
 });
 
-describe("recent-login step-up (a fresh auth_time to approve or reopen)", () => {
+describe("recent-login step-up (a fresh auth_time for the manual evidence validation)", () => {
   it("signs the same person in again with the code, whatever email the form carries", async () => {
     const user = await cognito.addUser({ email: "ana@example.test", password: PASSWORD, totpSecret: randomBase32Secret() });
     const mode: FlowMode = { kind: "stepUp", sub: user.sub, email: user.email };

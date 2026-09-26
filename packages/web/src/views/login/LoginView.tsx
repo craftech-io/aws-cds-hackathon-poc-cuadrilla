@@ -1,8 +1,11 @@
-// `/login`: the console's own sign-in, "Cuadrilla · Powered by Craftech", against the
-// Cognito pool (USER_SRP_AUTH and its challenges, lib/auth/flow.ts). A finished sign-in stores the
-// tokens in the session and lands on `returnTo`.
+// `/login`: the console's own sign-in against the Cognito pool (USER_SRP_AUTH and its challenges,
+// lib/auth/flow.ts), under the brand of the stage (BrandMark: "Cuadrilla · Powered by Craftech", or
+// the co-branding with its disclaimer, ADR-0018). A finished sign-in stores the tokens in the
+// session and lands on `returnTo`.
 import { useMemo } from "react";
-import { CuadrillaWordmark, PoweredByCraftech } from "../../components/brand/Brand";
+import { PoweredByCraftech } from "../../components/brand/Brand";
+import { BrandMark } from "../../components/brand/BrandMark";
+import { useDemoBrand } from "../../context/BrandContext";
 import { useSession } from "../../context/SessionContext";
 import { copy } from "../../copy/console";
 import { flowDeps } from "../../lib/auth/deps";
@@ -14,12 +17,13 @@ import { loginCopy } from "./copy";
 import { useAuthFlow } from "./use-auth-flow";
 
 function BrandPanel() {
+  const brand = useDemoBrand("es");
   return (
     <section className="relative flex flex-col justify-between gap-10 overflow-hidden bg-navy px-6 py-8 text-white sm:px-10 lg:min-h-screen lg:py-12">
       <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-navy-soft/60" />
       <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-cyan/10" />
       <div className="relative">
-        <CuadrillaWordmark tone="dark" size="xl" />
+        <BrandMark brand={brand} tone="dark" size="xl" withPoweredBy={false} />
         <p className="mt-3 text-sm text-cyan-soft">{loginCopy.panel.tagline}</p>
       </div>
       <div className="relative hidden max-w-md lg:block">

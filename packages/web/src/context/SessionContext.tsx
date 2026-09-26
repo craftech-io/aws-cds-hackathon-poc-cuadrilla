@@ -1,6 +1,6 @@
 // Session of the console: Cognito tokens, the principal decoded from the id token, the tRPC client
-// that carries it, and the two security prompts of the console (sign in again to approve, or enrol
-// the optional TOTP). React Context + useState only (CLAUDE.md: no state libraries).
+// that carries it, and the two security prompts of the console (sign in again for the manual
+// evidence validation, or enrol the optional TOTP). React Context + useState only (CLAUDE.md: no state libraries).
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { type CognitoApi, createCognitoApi } from "../lib/auth/cognito";
 import { type SrpClient, createSrpClient } from "../lib/auth/srp";

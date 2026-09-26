@@ -43,7 +43,7 @@ export function linePath(points: readonly Point[], x: Scale, y: Scale): string {
   return points.map((point, index) => `${index === 0 ? "M" : "L"}${round(x(point.x))} ${round(y(point.y))}`).join(" ");
 }
 
-/** Horizontal then vertical segments: a running total that jumps on the day money moves. */
+/** Horizontal then vertical segments: a running count that jumps when something happens. */
 export function stepPath(points: readonly Point[], x: Scale, y: Scale): string {
   const [first, ...rest] = points;
   if (!first) return "";

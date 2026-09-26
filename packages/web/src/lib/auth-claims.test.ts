@@ -34,6 +34,12 @@ describe("principal from the id token", () => {
     expect(principal.role).toBeUndefined();
   });
 
+  it("marks judges from the stamped role or the isJudge claim", () => {
+    expect(principalFromIdToken(jwt({ ...base, ispId: "isp-judge-07", role: "JUDGE" })).isJudge).toBe(true);
+    expect(principalFromIdToken(jwt({ ...base, ispId: "isp-judge-07", role: "SUPERVISOR", isJudge: "true" })).isJudge).toBe(true);
+    expect(principalFromIdToken(jwt({ ...base, ispId: "isp-demo", role: "SUPERVISOR" })).isJudge).toBe(false);
+  });
+
   it("never takes the operator from the informative custom:ispId attribute", () => {
     expect(principalFromIdToken(jwt({ ...base, "custom:ispId": "isp-demo" })).ispId).toBeUndefined();
   });

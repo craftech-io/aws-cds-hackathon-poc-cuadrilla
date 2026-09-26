@@ -1,7 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BrandMark, NEUTRAL_BRAND, type DemoBrand } from "./BrandMark";
+import { type DemoBrand, NEUTRAL_BRAND } from "../../lib/brand";
+import { BrandMark } from "./BrandMark";
 
 const COBRAND: DemoBrand = {
   mode: "cobrand",
@@ -41,5 +42,12 @@ describe("BrandMark (ADR-0018)", () => {
     expect(text(html)).toContain("Operadora Socia");
     const withoutLogos = render({ mode: "cobrand", partnerDisplayName: "Operadora Socia", disclaimer: "Demo sintética." });
     expect(text(withoutLogos)).toContain("Operadora Socia");
+  });
+
+  it("reads as a sentence, with real spaces between its parts", () => {
+    const plain = (html: string) => html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    const html = renderToStaticMarkup(createElement(BrandMark, { brand: { mode: "cobrand", partnerDisplayName: "Operadora Socia", disclaimer: "Demo sintética." }, tone: "light", withPoweredBy: false }));
+    expect(plain(html).startsWith("Cuadrilla. for Operadora Socia")).toBe(true);
+    expect(plain(renderToStaticMarkup(createElement(BrandMark, { tone: "light" })))).toBe("Cuadrilla. Powered by");
   });
 });

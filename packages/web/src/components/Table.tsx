@@ -16,7 +16,7 @@ interface TableProps<Row> {
   readonly emptyTitle: string;
   readonly caption?: string;
   readonly variant?: TableVariant;
-  /** A full-width row under the row (a receipt, a template's text); `null` while it is closed. */
+  /** A full-width row under the row (an email as it went out, a template's text); `null` while it is closed. */
   readonly detail?: (row: Row) => ReactNode;
 }
 

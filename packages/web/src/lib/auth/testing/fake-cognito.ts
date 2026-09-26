@@ -2,7 +2,9 @@
 // verification (srp-server.ts) and real TOTP codes (totp.ts). Users are invited (temporary
 // password, FORCE_CHANGE_PASSWORD) or confirmed, with or without TOTP; the pool's MFA is OPTIONAL
 // like infra/auth.ts, or ON to exercise MFA_SETUP. Every request is recorded so a test can assert
-// what crossed the wire.
+// what crossed the wire. Tokens last 15 minutes like the pool's; the id token carries the claims the
+// pre-token trigger stamps (`ispId`, `role`, `isJudge`) and is unsigned unless a signer is given (the
+// Playwright specs sign it with an ephemeral RSA key, packages/web/e2e/support/tokens.ts).
 import { type AuthResponse, type AuthenticationResult, type CognitoApi, CognitoError, TOTP_MFA } from "../cognito";
 import { missingPasswordRules } from "../credentials";
 import { type ServerSession, type SrpVerifier, createVerifier, startServerSession } from "./srp-server";
@@ -10,10 +12,22 @@ import { randomBase32Secret, totpCode } from "./totp";
 
 export const FAKE_POOL_ID = "us-east-1_FakePool1";
 
+/** Lifetime of the id and access tokens of the pool (infra/auth.ts): 15 minutes. */
+export const FAKE_TOKEN_TTL_SECONDS = 15 * 60;
+
+export interface FakeCognitoOptions {
+  /** Signs the id token's claims; without it the token is unsigned (`alg: none`). */
+  readonly signIdToken?: (claims: Readonly<Record<string, unknown>>) => string;
+  readonly tokenTtlSeconds?: number;
+}
+
 export interface FakeUserInit {
   readonly email: string;
   readonly password: string;
   readonly role?: string;
+  /** Operator stamped in the id token; `isp-demo` by default. */
+  readonly ispId?: string;
+  readonly name?: string;
   readonly status?: "FORCE_CHANGE_PASSWORD" | "CONFIRMED";
   /** Base32 TOTP secret; set = TOTP already enabled. */
   readonly totpSecret?: string;
@@ -23,6 +37,8 @@ interface FakeUser {
   readonly sub: string;
   readonly email: string;
   readonly role: string;
+  readonly ispId: string;
+  readonly name: string | undefined;
   status: "FORCE_CHANGE_PASSWORD" | "CONFIRMED";
   srp: SrpVerifier;
   password: string;
@@ -72,7 +88,10 @@ export class FakeCognito implements CognitoApi {
   private readonly refreshTokens = new Map<string, string>();
   private counter = 0;
 
-  constructor(readonly poolId: string = FAKE_POOL_ID) {}
+  constructor(
+    readonly poolId: string = FAKE_POOL_ID,
+    private readonly options: FakeCognitoOptions = {},
+  ) {}
 
   async addUser(init: FakeUserInit): Promise<FakeUser> {
     this.counter += 1;
@@ -81,6 +100,8 @@ export class FakeCognito implements CognitoApi {
       sub,
       email: init.email.toLowerCase(),
       role: init.role ?? "SUPERVISOR",
+      ispId: init.ispId ?? "isp-demo",
+      name: init.name,
       status: init.status ?? "CONFIRMED",
       srp: await createVerifier(this.poolId, sub, init.password),
       password: init.password,
@@ -144,12 +165,29 @@ export class FakeCognito implements CognitoApi {
   private tokensFor(user: FakeUser): AuthenticationResult {
     this.counter += 1;
     const now = Math.floor(Date.now() / 1000);
-    const idToken = `${base64Url({ alg: "none" })}.${base64Url({ sub: user.sub, email: user.email, role: user.role, ispId: "isp-test", auth_time: now, exp: now + 3600, iat: now, iss: "fake", aud: "fake", token_use: "id" })}.sig`;
+    const ttl = this.options.tokenTtlSeconds ?? FAKE_TOKEN_TTL_SECONDS;
+    const claims = {
+      sub: user.sub,
+      email: user.email,
+      ...(user.name !== undefined ? { name: user.name } : {}),
+      "cognito:username": user.sub,
+      "cognito:groups": [user.role],
+      role: user.role,
+      ispId: user.ispId,
+      isJudge: user.role === "JUDGE" ? "true" : "false",
+      auth_time: now,
+      exp: now + ttl,
+      iat: now,
+      iss: `https://cognito-idp.us-east-1.amazonaws.com/${this.poolId}`,
+      aud: "fake-client",
+      token_use: "id",
+    };
+    const idToken = this.options.signIdToken ? this.options.signIdToken(claims) : `${base64Url({ alg: "none" })}.${base64Url(claims)}.sig`;
     const accessToken = `access-${this.counter}`;
     const refreshToken = `refresh-${this.counter}`;
     this.accessTokens.set(accessToken, user.sub);
     this.refreshTokens.set(refreshToken, user.sub);
-    return { IdToken: idToken, AccessToken: accessToken, RefreshToken: refreshToken, ExpiresIn: 3600 };
+    return { IdToken: idToken, AccessToken: accessToken, RefreshToken: refreshToken, ExpiresIn: ttl };
   }
 
   private userOfAccessToken(token: string): FakeUser {

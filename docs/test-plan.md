@@ -62,7 +62,7 @@ Generada desde las líneas "Prueba" de `docs/flows-catalog.md`; `npm run flows:c
 | FL-014 | Orden reprogramada o cancelada por el despacho | `feeds/dispatch-events.test.ts`, `dispatch-mock/dispatch.test.ts`, `dayplan/day-start.test.ts` | `day.flow.test.ts` | — | `SC-01/7`, `SC-01/9`, `SC-01/10` | — | — |
 | FL-015 | Orden reasignada a otro instalador | `feeds/dispatch-events.test.ts` | `day.flow.test.ts` | — | `SC-01/8` | — | — |
 | FL-016 | Plan B del instalador: "ÓRDENES" | `policy/templates.test.ts`, `channels/whatsapp/keywords.test.ts` | `day.flow.test.ts` | — | `SC-09/4.a`, `SC-09/4.b` | — | — |
-| FL-017 | Nota de voz transcrita | `media/transcribe.test.ts`, `media/keys.test.ts`, `channels/whatsapp/media.test.ts` | `diagnosis.flow.test.ts` | — | `SC-02/1`, `SC-18/4.b` (mundo `JUDGE#isp-judge-test`, clockId con `#`) | `SMK/5` | — |
+| FL-017 | Nota de voz transcrita | `media/transcribe.test.ts`, `shared/media/keys.test.ts`, `channels/whatsapp/media.test.ts` | `diagnosis.flow.test.ts` | — | `SC-02/1`, `SC-18/4.b` (mundo `JUDGE#isp-judge-test`, clockId con `#`) | `SMK/5` | — |
 | FL-018 | Nota de voz ininteligible, larga o formato no soportado | `media/transcribe.test.ts`, `channels/whatsapp/media.test.ts` | `diagnosis.flow.test.ts` | — | `SC-02/4..6` | — | — |
 | FL-019 | Estado de la ONU desde el orquestador | `agent-tools/orders/orders.test.ts`, `network/client.test.ts`, `network-mock/network.test.ts` | `diagnosis.flow.test.ts` | — | `SC-02/2` | `SMK/3` | — |
 | FL-020 | Diagnóstico guiado hasta ONU en línea | `agent-tools/cases/cases.test.ts`, `agent-tools/evidence/checklist.test.ts` | `diagnosis.flow.test.ts` | — | `SC-02/2..3` | — | — |

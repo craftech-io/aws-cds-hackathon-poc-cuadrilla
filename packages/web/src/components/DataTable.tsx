@@ -1,4 +1,4 @@
-// Table of an inbox: the columns of Table plus, optionally, a checkbox per row for batch actions
+// Table of a work queue: the columns of Table plus, optionally, a checkbox per row for batch actions
 // and a row that opens its detail. The row is focusable and opens with Enter, and the checkbox
 // never opens the row, so selecting and reading stay separate gestures.
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
@@ -9,9 +9,9 @@ import { RowCells, TableFrame, TableHead } from "./table-parts";
 export interface RowSelection<Row> {
   readonly selected: ReadonlySet<string>;
   readonly onChange: (next: ReadonlySet<string>) => void;
-  /** Rows that cannot be selected show no checkbox (e.g. a case that is not an approval). */
+  /** Rows that cannot be selected show no checkbox (e.g. a case that is already closed). */
   readonly isSelectable: (row: Row) => boolean;
-  /** Accessible name of each row's checkbox: "Seleccionar 2A". */
+  /** Accessible name of each row's checkbox: "Seleccionar la orden 24817". */
   readonly labelOf: (row: Row) => string;
   readonly allLabel: string;
 }

@@ -29,5 +29,6 @@ export const dataCopy = {
     ROLE_NOT_ALLOWED: "Tu rol no puede hacer esta acción.",
     CROSS_ISP: "Ese dato no pertenece a tu operadora.",
     USER_INACTIVE: "Tu usuario ya no está activo en la operadora.",
+    WORLD_BUSY: "El mundo está ocupado con algo en curso; el reloj no se mueve hasta que termine.",
   } as Readonly<Record<string, string>>,
 } as const;

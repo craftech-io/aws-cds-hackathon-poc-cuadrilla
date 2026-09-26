@@ -1,0 +1,12 @@
+{
+  // Playwright specs and their support: Node (the test runner, the route mocks, the ephemeral key)
+  // plus the DOM of the callbacks that run in the page. The sources of src/ they import (the fake
+  // user pool) are checked under the same options.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": []
+}

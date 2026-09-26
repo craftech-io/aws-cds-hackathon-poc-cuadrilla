@@ -138,7 +138,7 @@ Convenciones:
 - Pasos: 1) Media a `Media/`. 2) `transcribe_voice_note` (Transcribe `es-MX`, vocabulario FTTH) dentro del mensaje FIFO. 3) Clasificador de seguridad sin coincidencia. 4) Turno con `VOICE_TRANSCRIPT` y confianza. 5) Respuesta del agente.
 - Estado esperado: `Message IN media.kind VOICE` con `transcript.text` que contiene "ONU" y "PON" (oráculo por palabras con el normalizador único de `outbound/verify`: sin mayúsculas ni acentos, variantes del vocabulario) y `confidence ≥ 0,55`; trabajo de Transcribe con nombre derivado del mensaje, claves de media y de salida armadas por `media/keys.ts` (sin el `clockId` crudo) y salida borrada después de leerla; `REPLY` dentro de la ventana; `FirstReplyLatency{kind=voice}` registrado; el turno termina sin `max_tokens`.
 - Reglas: límites de media; normalizador; techo global de transcripción.
-- Prueba: U `media/transcribe.test.ts`, `media/keys.test.ts`, `channels/whatsapp/media.test.ts` · LF `diagnosis.flow.test.ts` · SR `SC-02/1`, `SC-18/4.b` (mundo `JUDGE#isp-judge-test`, clockId con `#`) · SMK `SMK/5`.
+- Prueba: U `media/transcribe.test.ts`, `shared/media/keys.test.ts`, `channels/whatsapp/media.test.ts` · LF `diagnosis.flow.test.ts` · SR `SC-02/1`, `SC-18/4.b` (mundo `JUDGE#isp-judge-test`, clockId con `#`) · SMK `SMK/5`.
 
 ### FL-018 · Nota de voz ininteligible, larga o formato no soportado
 - Actores: instalador · Canal: WhatsApp · Disparador: (a) `vn-09` (ruido), (b) audio de 150 s, (c) video o documento.

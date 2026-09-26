@@ -74,6 +74,7 @@ describe("citations", () => {
   it("resolves the short paths of the matrix", () => {
     expect(resolveTestPath("U", "routers/people.test.ts")).toBe("packages/bff/src/routers/people.test.ts");
     expect(resolveTestPath("U", "network-mock/network.test.ts")).toBe("packages/network-mock/src/network.test.ts");
+    expect(resolveTestPath("U", "shared/media/keys.test.ts")).toBe("packages/shared/src/media/keys.test.ts");
     expect(resolveTestPath("U", "dispatch-mock/dispatch.test.ts")).toBe("packages/dispatch-mock/src/dispatch.test.ts");
     expect(resolveTestPath("U", "views/landing/landing.test.ts")).toBe("packages/web/src/views/landing/landing.test.ts");
     expect(resolveTestPath("U", "infra/policy-rules.test.ts")).toBe("infra/policy-rules.test.ts");

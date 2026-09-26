@@ -9,8 +9,8 @@
 //        │                    └──▶ done                         TOTP offer; never to a judge)
 //        └──forgot──▶ forgotRequest ──▶ forgotConfirm ──▶ credentials (notice: passwordReset)
 //
-// The same machine runs the recent-login step-up (mode `stepUp`): approving or reopening a file
-// needs an interactive sign-in in the last 15 minutes (`auth_time`, ADR-0010), so the console signs
+// The same machine runs the recent-login step-up (mode `stepUp`): the manual validation of evidence
+// needs an interactive sign-in in the last 15 minutes (`auth_time`, ADR-0011), so the console signs
 // the same person in again, in place, and swaps the tokens.
 import { type AuthResponse, type CognitoApi, type Credential, TOTP_MFA } from "./cognito";
 import { missingPasswordRules, normalizeEmail, normalizeTotpCode } from "./credentials";

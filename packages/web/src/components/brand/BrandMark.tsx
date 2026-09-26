@@ -8,28 +8,9 @@
 // repository. A logo is only ever drawn with <img> (an SVG from the bucket runs no script), picking
 // the variant for the background (`onLight` on light, `onDark` on dark); without a logo, or while it
 // fails to load, the partner's name is drawn as a text wordmark.
+import { type DemoBrand, NEUTRAL_BRAND, type PartnerLogos } from "../../lib/brand";
 import { BrandImage } from "./BrandImage";
 import { type BrandSize, type BrandTone, CuadrillaWordmark, PoweredByCraftech, WORDMARK_TEXT } from "./Brand";
-
-export interface PartnerLogos {
-  /** Presigned URL of the variant for light backgrounds. */
-  readonly onLight?: string;
-  /** Presigned URL of the variant for dark backgrounds. */
-  readonly onDark?: string;
-}
-
-export type DemoBrand =
-  | { readonly mode: "neutral" }
-  | {
-      readonly mode: "cobrand";
-      readonly partnerDisplayName: string;
-      readonly logos?: PartnerLogos;
-      /** "Demo sintética: …", already in the language of the surface. */
-      readonly disclaimer: string;
-    };
-
-/** The brand every surface shows until the stage's configuration is loaded. */
-export const NEUTRAL_BRAND: DemoBrand = { mode: "neutral" };
 
 const LOGO_HEIGHT: Readonly<Record<BrandSize, string>> = { sm: "h-4", md: "h-5", lg: "h-6", xl: "h-9" };
 
@@ -55,15 +36,18 @@ export function BrandMark({ brand = NEUTRAL_BRAND, tone, size = "md", withPowere
       <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="inline-flex flex-wrap items-center gap-x-2">
           <CuadrillaWordmark tone={tone} size={size} />
+          {/* Real spaces between the parts: the line reads "Cuadrilla for <partner>" as text too. */}
           {brand.mode === "cobrand" ? (
             <>
-              <span className={`text-sm ${tone === "dark" ? "text-mist" : "text-slate"}`}>for</span>
+              {" "}
+              <span className={`text-sm ${tone === "dark" ? "text-mist" : "text-slate"}`}>for</span>{" "}
               <PartnerMark name={brand.partnerDisplayName} logos={brand.logos} tone={tone} size={size} />
             </>
           ) : null}
         </span>
         {withPoweredBy ? (
           <>
+            {" "}
             {separator}
             <PoweredByCraftech tone={tone} />
           </>

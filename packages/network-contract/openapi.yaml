@@ -1,0 +1,93 @@
+# Contract of the simulated network orchestrator (docs/architecture-integrations.md §6).
+#
+# The minimal API a generic orchestrator of a fiber (FTTH) network would expose for its ONUs; it
+# replicates no vendor or product. `src/schemas.ts` is its zod mirror, the one the client
+# (packages/bff/src/network/) and the mock (packages/network-mock/) validate with, and
+# `npm run network:contract` fails when the two drift apart.
+#
+# The mock's control routes (`/physical-action`, `/behaviour`) and its simulation headers
+# (`X-Caller`, `X-World-Time`, `X-Fault`) are not part of this contract: they live in
+# `src/control.ts` and the check fails if they ever show up here.
+openapi: 3.1.0
+info:
+  title: Network Orchestrator API
+  version: 1.0.0
+  description: >-
+    Status of the ONUs of a fiber (FTTH) access network as a generic network orchestrator reports it.
+    Every call is scoped to a world (X-World) and signed with AWS Signature V4.
+security:
+  - sigv4: []
+paths:
+  /v1/onus/{serial}:
+    get:
+      operationId: getOnu
+      parameters:
+        - name: serial
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Z0-9]{8,16}$"
+        - name: X-World
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: status of the ONU
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnuStatus"
+        "404":
+          description: unknown serial
+        "503":
+          description: temporarily unavailable, Retry-After header
+          headers:
+            Retry-After:
+              description: seconds to wait before retrying
+              schema:
+                type: integer
+  /v1/health:
+    get:
+      operationId: health
+      responses:
+        "200":
+          description: ok
+components:
+  securitySchemes:
+    sigv4:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: AWS Signature V4 (Lambda Function URL, AWS_IAM)
+  schemas:
+    OnuStatus:
+      type: object
+      required: [serial, operState, observedAt]
+      properties:
+        serial:
+          type: string
+        adminState:
+          type: string
+          enum: [ENABLED, DISABLED]
+        operState:
+          type: string
+          enum: [ONLINE, OFFLINE, LOS, DYING_GASP, NOT_PROVISIONED]
+        rxPowerDbm:
+          type: number
+          description: optical power received at the ONU, 1490 nm
+        txPowerDbm:
+          type: number
+        oltPort:
+          type: string
+          description: "e.g. OLT-N3/1/4"
+        profile:
+          type: string
+        lastSeenAt:
+          type: string
+          format: date-time
+        observedAt:
+          type: string
+          format: date-time

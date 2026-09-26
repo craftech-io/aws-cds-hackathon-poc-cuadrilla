@@ -1,5 +1,5 @@
-// A short message inside a view: the outcome of an action ("Plan aprobado"), a rule the view
-// applies ("Canales desactivados") or a warning before a decision. Failures of a BFF call use
+// A short message inside a view: the outcome of an action ("Caso tomado"), a rule the view
+// applies ("Solo lectura para operaciones") or a warning before a decision. Failures of a BFF call use
 // ApiErrorNotice instead, which knows the refusal reasons.
 import type { ReactNode } from "react";
 

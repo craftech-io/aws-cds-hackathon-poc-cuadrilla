@@ -42,7 +42,7 @@ export function normalizeTotpCode(code: string): string | undefined {
 export const TOTP_ISSUER = "Cuadrilla";
 
 /**
- * `otpauth://totp/Al%20D%C3%ADa:<email>?secret=…&issuer=…` (Key Uri Format): what Google
+ * `otpauth://totp/Cuadrilla:<email>?secret=…&issuer=…` (Key Uri Format): what Google
  * Authenticator, Microsoft Authenticator and 1Password scan. Rendered as a QR code locally; the
  * secret never leaves the page.
  */

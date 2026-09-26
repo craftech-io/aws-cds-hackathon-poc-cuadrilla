@@ -76,7 +76,7 @@ describe("safeReturnTo", () => {
   it("keeps same-origin paths and refuses the login route and other origins", () => {
     expect(safeReturnTo("/cases?x=1", "/login")).toBe("/cases?x=1");
     for (const bad of ["https://evil.example", "//evil.example", "/\\evil.example", "/login", "/login?returnTo=%2F", "", null, undefined]) {
-      expect(safeReturnTo(bad, "/login", "/dashboard")).toBe("/dashboard");
+      expect(safeReturnTo(bad, "/login", "/app/orders")).toBe("/app/orders");
     }
   });
 });

@@ -1,71 +1,87 @@
-// The principal of a console request. Every field comes from the verified id token, never from the
-// request input (docs/architecture.md §10). `ispId`, `userId`, `role` and `isJudge` are the claims
-// the pre-token trigger stamps from `Isps/USER#` (found by `SUB#<sub>`); the Cognito attribute
-// `custom:ispId` is informative only and is never read here, so a user who could change it would
-// still land in the operator of the registry.
+// The principal of a console request (docs/architecture.md §10). Every field comes from the verified
+// id token, never from the request input: `ispId`, `userId` and `role` are the claims the pre-token
+// trigger stamps from `Isps/USER#` (found by `SUB#<sub>`, auth-triggers/pre-token.ts). The Cognito
+// attribute `custom:ispId` is informative only and never read here, and neither are the Cognito
+// groups: a user who could change either would still land in the operator and role of the registry.
+//
+// Each operator has exactly one world (packages/shared/src/clock-ids.ts), so the principal is bound
+// to one world: `GLOBAL#isp-demo` for the demo's staff, `JUDGE#isp-judge-<nn>` for a judge. The
+// `QaDriver` builds its principals on the server instead (auth/qa-principal.ts), bound to the world
+// each call names.
 import { z } from "zod";
-import { ConsoleRole } from "@cuadrilla/shared";
+import { ClockId, ConsoleRole, ConsoleUserId, IspId, IspKind, clockIdOfIsp, ispKindOfIspId } from "@cuadrilla/shared";
 import { AUTH_REASON, AuthError } from "./errors";
 import type { IdTokenClaims } from "./jwt";
 
-/** Operator ids are `isp-<slug>` (docs/seed-spec.md §2). */
-export const IspId = z.string().regex(/^isp-[a-z0-9]+(?:-[a-z0-9]+)*$/);
-export type IspId = z.infer<typeof IspId>;
+/** Where a principal comes from: a verified Cognito id token, or the `QaDriver`, which builds it on the server. */
+export type PrincipalOrigin = "COGNITO" | "QA";
 
 export interface Principal {
-  /** Cognito `sub`: stable id of the user in the pool. */
+  readonly origin: PrincipalOrigin;
+  /** Cognito `sub`: stable id of the user in the pool (for a QA principal, a fixed marker). */
   readonly sub: string;
   /** Cognito username, the handle AdminGetUser expects. */
   readonly username: string;
-  /** Console user of the registry (`Isps/USER#`), once stamped or matched by the user directory. */
-  readonly userId?: string;
+  /** Console user of the registry (`Isps/USER#`): the actor of every audit entry. */
+  readonly userId: ConsoleUserId;
   /** The only operator this user may read or write. */
   readonly ispId: IspId;
+  /** The world of that operator, the only one this principal acts on. */
+  readonly clockId: ClockId;
   readonly role: ConsoleRole;
-  readonly groups: readonly ConsoleRole[];
   /** Judge accounts act as supervisors inside their own judge world, without TOTP or password change. */
   readonly isJudge: boolean;
   /** Epoch seconds of the last interactive sign-in (`auth_time`). */
   readonly authTime: number;
+  /** One sign-in (`origin_jti`, kept across refreshes): "one session per world" tells two apart. */
+  readonly sessionId: string;
 }
 
-// `ConsoleRole` is declared in precedence order, SUPERVISOR first.
-const ROLE_PRECEDENCE: readonly ConsoleRole[] = ConsoleRole.options;
+/** Operators whose staff sign in to the console: the demo and each judge (QA and evaluation worlds have none). */
+export const TOKEN_OPERATOR_KINDS: readonly IspKind[] = ["DEMO", "JUDGE"];
 
-/** Cognito group names that are console roles, highest precedence first. */
-export function consoleRolesOf(groupNames: readonly string[] | undefined): ConsoleRole[] {
-  return (groupNames ?? [])
-    .flatMap((group) => {
-      const parsed = ConsoleRole.safeParse(group);
-      return parsed.success ? [parsed.data] : [];
-    })
-    .sort((a, b) => ROLE_PRECEDENCE.indexOf(a) - ROLE_PRECEDENCE.indexOf(b));
-}
+// What the trigger stamps; a token without all three describes no principal.
+const StampedClaims = z.object({
+  ispId: IspId,
+  userId: ConsoleUserId,
+  role: ConsoleRole,
+  isJudge: z.enum(["true", "false"]).optional(),
+});
 
 /**
- * Same resolution the console uses to draw its menu (packages/web/src/lib/auth-claims.ts): the
- * stamped `role` wins, otherwise the highest-precedence group.
+ * A judge acts only inside a judge world, and a judge world has only judges (the same rule as the
+ * `CONSOLE` caller of packages/shared/src/caller.ts). Returns why the pair does not fit, if it does not.
  */
+export function roleWorldMismatch(role: ConsoleRole, kind: IspKind): string | undefined {
+  if ((role === "JUDGE") !== (kind === "JUDGE")) return "a judge belongs to a judge operator, and only judges do";
+  return undefined;
+}
+
+function incomplete(message: string): AuthError {
+  return new AuthError(AUTH_REASON.PRINCIPAL_INCOMPLETE, message);
+}
+
+/** The principal of a verified id token; `PRINCIPAL_INCOMPLETE` when the stamped claims do not form one. */
 export function principalFromClaims(claims: IdTokenClaims): Principal {
-  const ispId = IspId.safeParse(claims.ispId);
-  if (!ispId.success) {
-    throw new AuthError(AUTH_REASON.PRINCIPAL_INCOMPLETE, "the token carries no operator");
-  }
-  const groups = consoleRolesOf(claims["cognito:groups"]);
-  const stampedRole = ConsoleRole.safeParse(claims.role);
-  const role = stampedRole.success ? stampedRole.data : groups[0];
-  if (!role) {
-    throw new AuthError(AUTH_REASON.PRINCIPAL_INCOMPLETE, "the token carries no console role");
-  }
+  const stamped = StampedClaims.safeParse(claims);
+  if (!stamped.success) throw incomplete("the token carries no operator, console user or console role");
+  const { ispId, userId, role, isJudge } = stamped.data;
+  const kind = ispKindOfIspId(ispId);
+  if (!TOKEN_OPERATOR_KINDS.includes(kind)) throw incomplete("console accounts belong to the demo operator or to a judge");
+  const mismatch = roleWorldMismatch(role, kind);
+  if (mismatch !== undefined) throw incomplete(mismatch);
+  if (isJudge !== undefined && (isJudge === "true") !== (role === "JUDGE")) throw incomplete("the judge flag contradicts the console role");
   return {
+    origin: "COGNITO",
     sub: claims.sub,
     username: claims["cognito:username"],
-    ...(claims.userId ? { userId: claims.userId } : {}),
-    ispId: ispId.data,
+    userId,
+    ispId,
+    clockId: clockIdOfIsp(ispId),
     role,
-    groups,
-    isJudge: role === "JUDGE" || claims.isJudge === "true",
+    isJudge: role === "JUDGE",
     authTime: claims.auth_time,
+    sessionId: claims.origin_jti ?? `auth-${claims.auth_time}`,
   };
 }
 
@@ -75,7 +91,7 @@ export const RECENT_LOGIN_MAX_AGE_SECONDS = 15 * 60;
 // Tolerated clock difference between Cognito and the Lambda.
 const CLOCK_SKEW_SECONDS = 60;
 
-/** True while the last interactive sign-in is inside the recent-login window. */
+/** True while the last interactive sign-in is inside the recent-login window (real clock). */
 export function isSignInFresh(principal: Pick<Principal, "authTime">, now: Date, maxAgeSeconds: number = RECENT_LOGIN_MAX_AGE_SECONDS): boolean {
   const ageSeconds = Math.floor(now.getTime() / 1000) - principal.authTime;
   return ageSeconds >= -CLOCK_SKEW_SECONDS && ageSeconds <= maxAgeSeconds;

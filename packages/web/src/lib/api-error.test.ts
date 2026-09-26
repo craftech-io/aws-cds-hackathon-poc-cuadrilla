@@ -1,6 +1,7 @@
 import { TRPCClientError } from "@trpc/client";
 import { describe, expect, it } from "vitest";
 import { isAbortError, toApiError } from "./api-error";
+import { ContractError } from "./console-api";
 import type { AppRouter } from "./trpc-router";
 
 function serverError(code: string, reason: string | null) {
@@ -31,6 +32,10 @@ describe("toApiError", () => {
   it("calls a failure without an answer a network error", () => {
     const offline = TRPCClientError.from(new TypeError("Failed to fetch"));
     expect(toApiError(offline)).toMatchObject({ kind: "network", code: "NETWORK", reason: null });
+  });
+
+  it("tells an answer that breaks the contract apart from a network failure", () => {
+    expect(toApiError(new ContractError("clock.get", ["simNow: expected an ISO 8601 instant with offset"]))).toMatchObject({ kind: "unknown", code: "CONTRACT" });
   });
 
   it("never throws on something that is not a client error", () => {

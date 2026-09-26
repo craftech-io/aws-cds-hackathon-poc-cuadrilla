@@ -240,7 +240,7 @@ Reglas: `INSTALLED` exige checklist completo, ONU `ONLINE` en rango en los últi
 
 ## Procedimientos de la consola (tRPC)
 
-Todo procedimiento pasa por `ispProcedure`, salvo `brand.get`, público porque lo lee la landing (solo devuelve la marca resuelta de `BrandConfig`, sin datos de ningún mundo); **S** exige `SUPERVISOR` o `JUDGE`; **R** login ≤ 15 min.
+Todo procedimiento pasa por `ispProcedure`, salvo dos públicos sin datos de ningún mundo: `brand.get`, porque lo lee la landing (solo devuelve la marca resuelta de `BrandConfig`), y `health.live` (`GET /api/health`, sonda del Router y de los smoke checks; solo responde que la función está viva); **S** exige `SUPERVISOR` o `JUDGE`; **R** login ≤ 15 min.
 
 | Router | Procedimientos |
 |---|---|
@@ -257,7 +257,7 @@ Todo procedimiento pasa por `ispProcedure`, salvo `brand.get`, público porque l
 | `audit` | `list`, `violations`, `decisionsByRule` |
 | `tour` | `steps({track: EXPRESS \| FULL})` (horas de "Qué mirar" desde `clock.get`, escena de cada paso, tiempo estimado del recorrido), `run(step)` (ejecuta el botón del paso por los mismos procedimientos del simulador y del reloj) |
 | `account` | `session` (aviso de otra sesión para `JUDGE`), `changePassword`, `mfa.setup` (rechazados para `JUDGE`) |
-| `health` | `ping` (incluye `GET /v1/health` de los dos mocks con el rol del BFF) |
+| `health` | `live` (público, `GET /api/health`) · `ping` (incluye `GET /v1/health` de los dos mocks con el rol del BFF) |
 
 ## Acciones del `QaDriver`
 

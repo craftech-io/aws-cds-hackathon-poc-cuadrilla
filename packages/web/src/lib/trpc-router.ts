@@ -8,8 +8,8 @@ import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 
 export type { AppRouter };
 
-/** What each procedure answers, e.g. `RouterOutputs["dashboard"]["cash"]`. */
+/** What each procedure answers, e.g. `RouterOutputs["orders"]["list"]`. */
 export type RouterOutputs = inferRouterOutputs<AppRouter>;
 
-/** What each procedure takes, e.g. `RouterInputs["cases"]["approve"]`. */
+/** What each procedure takes, e.g. `RouterInputs["cases"]["take"]`. */
 export type RouterInputs = inferRouterInputs<AppRouter>;

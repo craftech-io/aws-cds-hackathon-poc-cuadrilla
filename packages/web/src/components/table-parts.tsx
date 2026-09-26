@@ -74,7 +74,7 @@ interface RowCellsProps<Row> {
   readonly columns: readonly Column<Row>[];
   readonly row: Row;
   readonly variant: TableVariant;
-  /** Top-aligned cells whatever the variant says (an inbox row with badges and lines). */
+  /** Top-aligned cells whatever the variant says (a queue row with badges and lines). */
   readonly top?: boolean;
 }
 

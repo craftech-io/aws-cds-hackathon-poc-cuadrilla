@@ -1,22 +1,29 @@
 // tRPC v11 foundation of the console BFF: request context, principal and the procedure builders
 // every feature router starts from (docs/architecture.md §10).
 //
-//   publicProcedure       no principal required (only the health probe)
-//   ispProcedure          verified id token with operator and role; an inactive user is refused
-//   supervisorProcedure   operator + role SUPERVISOR or JUDGE (a judge acts as supervisor in its own world)
-//   recentLoginProcedure  supervisor + interactive sign-in at most 15 minutes old (manual validation)
+//   publicProcedure       no principal: only `health.live` and `brand.get`, which carry no world's data
+//   ispProcedure          a verified principal of an active registry user, bound to its operator's
+//                         world; every id of the input is fenced to that operator (auth/fence.ts):
+//                         an id of another one → 403 + `AuditLog DENY CROSS_ISP`
+//   supervisorProcedure   + role SUPERVISOR or JUDGE (a judge acts as supervisor in its own world)
+//   recentLoginProcedure  + an interactive sign-in at most 15 minutes old (manual validation, ADR-0011)
 //
-// `ispId` and `role` come from the token, never from the input. WP-13 adds the cross-operator fence
-// (every id of the input checked against the operator: 403 plus `AuditLog DENY CROSS_ISP`) once the
-// connector exists (WP-07).
+// `ispId`, `role` and the world come from the principal, never from the input. A request's principal
+// comes only from a verified id token (`createContextFactory`); the `QaDriver` builds its principals
+// on the server (`createServerContext`, auth/qa-principal.ts) and the same middlewares run for both.
 import { TRPCError, initTRPC } from "@trpc/server";
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { z } from "zod";
-import type { ConsoleRole } from "@cuadrilla/shared";
+import { type ConsoleRole, type IspKind, ToolError, ispKindOfClock } from "@cuadrilla/shared";
 import { AUTH_REASON, AUTH_REFUSAL, AuthError, type AuthRefusal, describeError } from "../auth/errors";
+import { type InputReference, connectorOwners, findTrespass } from "../auth/fence";
 import { bearerToken } from "../auth/jwt";
 import { type Principal, isSignInFresh, principalFromClaims } from "../auth/principal";
-import { type Logger, correlationIdFrom } from "../lib/log";
+import { type QaPrincipalInput, qaPrincipal } from "../auth/qa-principal";
+import type { UserMatch } from "../auth/staff";
+import { userActor } from "../domain/common";
+import { type WorldClock, worldClock } from "../lib/clock";
+import { type LogFields, type Logger, correlationIdFrom } from "../lib/log";
 import { type ContextDeps, defaultDeps } from "./deps";
 import { reasonOf, toTrpcError } from "./errors";
 
@@ -29,9 +36,19 @@ export interface Context {
   readonly log: Logger;
 }
 
+/** The one world a principal acts on. */
+export interface ConsoleWorld {
+  readonly clockId: string;
+  readonly ispId: string;
+  readonly kind: IspKind;
+  /** Simulated time of the world (ADR-0010), read from `Runtime/CLOCK#` on each call. */
+  readonly clock: WorldClock;
+}
+
 export interface IspContext extends Context {
   readonly principal: Principal;
   readonly authFailure: null;
+  readonly world: ConsoleWorld;
 }
 
 export interface CreateContextOptions {
@@ -51,9 +68,9 @@ function correlationIdOf(event: CreateContextOptions["event"]): string {
 }
 
 /**
- * Builds `createContext` over explicit dependencies (tests, the QA driver). It never throws for a
- * bad token: the failure is kept in the context and `ispProcedure` turns it into the right HTTP
- * status, so public procedures keep working.
+ * Builds `createContext` over explicit dependencies (the Lambda's defaults, the local UI server, the
+ * tests). It never throws for a bad token: the failure is kept in the context and `ispProcedure`
+ * turns it into the right HTTP status, so public procedures keep working.
  */
 export function createContextFactory(resolveDeps: () => ContextDeps) {
   return async ({ event }: CreateContextOptions): Promise<Context> => {
@@ -74,12 +91,32 @@ export function createContextFactory(resolveDeps: () => ContextDeps) {
 /** `createContext(event)` → `{ principal }` over the linked resources of the BFF Lambda. */
 export const createContext = createContextFactory(defaultDeps);
 
+export interface ServerCallOptions extends QaPrincipalInput {
+  readonly correlationId?: string;
+}
+
+/**
+ * Context of a principal built on the server (the `QaDriver`'s `console.*` actions): no token, bound
+ * to the world the call names, through the same middlewares as a request. Throws `ROLE_NOT_ALLOWED`
+ * when the role cannot act on that world.
+ */
+export function createServerContext(options: ServerCallOptions, deps: ContextDeps): Context {
+  const correlationId = correlationIdFrom(options.correlationId);
+  const principal = qaPrincipal(options, deps.wallClock());
+  return { correlationId, principal, authFailure: null, deps, log: deps.loggerFor(correlationId) };
+}
+
+/** What the browser reads of an unexpected failure; the log keeps the rest under the correlation id. */
+export const INTERNAL_ERROR_MESSAGE = "the request could not be completed";
+
 const t = initTRPC.context<Context>().create({
   // Stack traces never travel to the browser, whatever NODE_ENV says inside the Lambda.
   isDev: false,
   errorFormatter({ shape, error, ctx }) {
     return {
       ...shape,
+      // An unexpected error's message may quote internals (tables, keys, request data): never sent.
+      message: error.code === "INTERNAL_SERVER_ERROR" ? INTERNAL_ERROR_MESSAGE : shape.message,
       data: {
         ...shape.data,
         reason: error.cause instanceof AuthError ? error.cause.reason : reasonOf(error.cause),
@@ -91,7 +128,6 @@ const t = initTRPC.context<Context>().create({
 });
 
 export const router = t.router;
-export const mergeRouters = t.mergeRouters;
 export const createCallerFactory = t.createCallerFactory;
 
 // Procedures throw the domain's typed errors (ToolError, ConnectorError); here they become the HTTP
@@ -111,29 +147,80 @@ export const publicProcedure = baseProcedure;
 
 const TRPC_CODE: Readonly<Record<AuthRefusal, TRPCError["code"]>> = { UNAUTHENTICATED: "UNAUTHORIZED", FORBIDDEN: "FORBIDDEN", UNAVAILABLE: "SERVICE_UNAVAILABLE" };
 
-function refuse(log: Logger, path: string, error: AuthError): never {
-  const fields = { path, reason: error.reason, ...(error.unavailable ? describeError(error.cause) : {}) };
+function refuse(log: Logger, path: string, error: AuthError, extra: LogFields = {}): never {
+  const fields = { path, reason: error.reason, ...extra, ...(error.unavailable ? describeError(error.cause) : {}) };
   if (error.unavailable) log.error("console.auth.unavailable", fields);
   else log.warn("console.auth.refused", fields);
   throw new TRPCError({ code: TRPC_CODE[AUTH_REFUSAL[error.reason]], message: error.message, cause: error });
 }
 
-export const ispProcedure = baseProcedure.use(async ({ ctx, next, path }) => {
-  const { principal: claimed, authFailure } = ctx;
-  if (!claimed) return refuse(ctx.log, path, authFailure ?? new AuthError(AUTH_REASON.TOKEN_MISSING, "missing bearer token"));
-
-  const log = ctx.log.child({ sub: claimed.sub, ispId: claimed.ispId, role: claimed.role });
-  let match;
+// A token lives 15 minutes and is verified offline: the registry row (read at most once a minute)
+// says whether the user is still active and still the same user of this operator.
+async function confirmRegistered(deps: ContextDeps, principal: Principal, log: Logger, path: string): Promise<void> {
+  let match: UserMatch | undefined;
   try {
-    match = ctx.deps.users ? await ctx.deps.users.find(claimed.ispId, claimed.sub) : undefined;
+    match = await deps.users.find(principal.ispId, principal.sub);
   } catch (error) {
-    return refuse(log, path, new AuthError(AUTH_REASON.AUTH_UNAVAILABLE, "could not read the user directory", { cause: error }));
+    refuse(log, path, new AuthError(AUTH_REASON.AUTH_UNAVAILABLE, "could not read the user directory", { cause: error }));
   }
-  if (match && !match.active) refuse(log, path, new AuthError(AUTH_REASON.USER_INACTIVE, "this console account is no longer active"));
+  if (match === undefined || !match.active) refuse(log, path, new AuthError(AUTH_REASON.USER_INACTIVE, "this console account is no longer active"));
+  if (match.userId !== principal.userId) refuse(log, path, new AuthError(AUTH_REASON.PRINCIPAL_INCOMPLETE, "sign in again to continue"));
+}
 
-  const principal: Principal = match ? { ...claimed, userId: match.userId } : claimed;
-  const ispContext: IspContext = { ...ctx, principal, authFailure: null, log };
-  return next({ ctx: ispContext });
+function consoleWorld(principal: Principal, deps: ContextDeps): ConsoleWorld {
+  return {
+    clockId: principal.clockId,
+    ispId: principal.ispId,
+    kind: ispKindOfClock(principal.clockId),
+    clock: worldClock(principal.clockId, { readClock: (clockId) => deps.connector.runtime.getClock(clockId), realClock: { now: async () => deps.wallClock() } }),
+  };
+}
+
+const resolvePrincipal = t.middleware(async ({ ctx, next, path }) => {
+  const { principal, authFailure } = ctx;
+  if (!principal) return refuse(ctx.log, path, authFailure ?? new AuthError(AUTH_REASON.TOKEN_MISSING, "missing bearer token"));
+  const log = ctx.log.child({ userId: principal.userId, ispId: principal.ispId, role: principal.role, origin: principal.origin });
+  // A QA principal has no Cognito identity to look up: the QaDriver built it for this call.
+  if (principal.origin === "COGNITO") await confirmRegistered(ctx.deps, principal, log, path);
+  return next({ ctx: { principal, authFailure: null, log, world: consoleWorld(principal, ctx.deps) } });
+});
+
+// The row goes to the principal's own operator: who asked, for what, when (in the world's time if
+// the world is readable). A failed write never lifts the refusal.
+async function auditCrossIsp(ctx: IspContext, path: string, reference: InputReference): Promise<void> {
+  const { principal } = ctx;
+  try {
+    const atSim = await ctx.world.clock.now().then((instant) => instant.toISOString(), () => undefined);
+    await ctx.deps.connector.audit.append({
+      ispId: principal.ispId,
+      clockId: principal.clockId,
+      ...(atSim === undefined ? {} : { atSim }),
+      decision: "DENY",
+      action: "CROSS_ISP",
+      actor: userActor(principal.userId),
+      reason: "the request names an id of another operator",
+      refs: { procedure: path },
+      detail: { targetKind: reference.kind, field: reference.field, requestedId: reference.value },
+    });
+  } catch (error) {
+    ctx.log.error("console.audit.failed", { path, auditAction: "CROSS_ISP", ...describeError(error) });
+  }
+}
+
+export const ispProcedure = baseProcedure.use(resolvePrincipal).use(async ({ ctx, next, path, getRawInput }) => {
+  let trespass: InputReference | undefined;
+  try {
+    trespass = await findTrespass(await getRawInput(), ctx.principal, connectorOwners(ctx.deps.connector));
+  } catch (error) {
+    // A malformed or oversized input is the caller's (400); a failed owner read fails closed (503).
+    if (error instanceof ToolError || error instanceof TRPCError) throw error;
+    return refuse(ctx.log, path, new AuthError(AUTH_REASON.AUTH_UNAVAILABLE, "could not check the ids of the request", { cause: error }));
+  }
+  if (trespass !== undefined) {
+    await auditCrossIsp(ctx, path, trespass);
+    return refuse(ctx.log, path, new AuthError(AUTH_REASON.CROSS_ISP, "this belongs to another operator"), { targetKind: trespass.kind, field: trespass.field });
+  }
+  return next();
 });
 
 function enforceRole(ctx: IspContext, path: string, roles: readonly ConsoleRole[]): void {

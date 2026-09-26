@@ -10,7 +10,7 @@ import type { TokenSet } from "./tokens";
 /** TOTP is optional for supervisors and operations and never offered to judges (docs/architecture.md §10). */
 export function offersTotp(tokens: TokenSet): boolean {
   try {
-    return principalFromIdToken(tokens.idToken).role !== "JUDGE";
+    return !principalFromIdToken(tokens.idToken).isJudge;
   } catch {
     return false;
   }

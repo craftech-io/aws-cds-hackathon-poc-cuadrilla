@@ -5,20 +5,9 @@ import { awsLambdaRequestHandler } from "@trpc/server/adapters/aws-lambda";
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2, Context as LambdaContext } from "aws-lambda";
 import { describeError } from "../auth/errors";
 import { createLogger } from "../lib/log";
+import { stripApiPrefix } from "./api-path";
 import { appRouter } from "./index";
 import { type Context, type CreateContextOptions, createContext } from "./trpc";
-
-/** Path the Router forwards to this function; the web client calls `/api/<procedure>`. */
-export const API_PREFIX = "/api";
-
-// The adapter takes the procedure name from `rawPath`. Behind the Router it arrives as
-// `/api/orders.list`; called on the Function URL directly (smoke tests) it is `/orders.list`.
-export function stripApiPrefix(event: APIGatewayProxyEventV2): APIGatewayProxyEventV2 {
-  const { rawPath } = event;
-  if (rawPath !== API_PREFIX && !rawPath.startsWith(`${API_PREFIX}/`)) return event;
-  const stripped = rawPath.slice(API_PREFIX.length) || "/";
-  return { ...event, rawPath: stripped, requestContext: { ...event.requestContext, http: { ...event.requestContext.http, path: stripped } } };
-}
 
 // Failures that are the caller's doing are logged where they are refused (routers/trpc.ts).
 const EXPECTED = new Set(["UNAUTHORIZED", "FORBIDDEN", "BAD_REQUEST", "NOT_FOUND", "CONFLICT", "PRECONDITION_FAILED"]);

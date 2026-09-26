@@ -2,6 +2,11 @@
 // pool's JWKS, issuer, audience (the web client id), `token_use = id` and expiry. The library is
 // AWS's own verifier; this module only adds the timeout and backoff every external call carries
 // and turns its errors into `AuthError` so the edge can tell "bad token" from "Cognito is down".
+//
+// The keys come only from `<issuer>/.well-known/jwks.json`, the issuer being derived from the pool
+// id: a token's own `jku`, `x5u` or `jwk` header is never followed. A `fetcher` that serves other
+// keys can only be passed by code that builds its own verifier (the local UI server's entry and the
+// tests); the Lambda's dependencies (routers/deps.ts) never pass one (auth/no-jwks-override.test.ts).
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { FetchError, JwtBaseError, JwtExpiredError, NonRetryableFetchError } from "aws-jwt-verify/error";
 import { fetch as fetchJwks, type Fetcher } from "aws-jwt-verify/https";
@@ -20,6 +25,8 @@ export const IdTokenClaims = z.looseObject({
   iat: z.number().int(),
   // Epoch seconds of the last interactive sign-in; a refresh does not move it.
   auth_time: z.number().int(),
+  // Id of the sign-in the token descends from; a refresh keeps it, a new sign-in changes it.
+  origin_jti: z.string().min(1).max(128).optional(),
   "cognito:username": z.string().min(1),
   "cognito:groups": z.array(z.string()).optional(),
   // Stamped by the pre-token trigger from `Isps/USER#` (never from the `custom:ispId` attribute).
@@ -43,8 +50,16 @@ export interface IdTokenVerifierConfig {
 }
 
 export interface IdTokenVerifierOptions {
-  /** Test seam: serves the JWKS instead of the network. */
+  /** Serves the JWKS instead of the network: tests and the local UI server's entry only. */
   readonly fetcher?: Fetcher;
+}
+
+/** A JWKS document served from memory, for a verifier built outside the Lambda (tests, local UI server). */
+export function staticJwksFetcher(jwks: { readonly keys: readonly unknown[] }): Fetcher {
+  const bytes = new TextEncoder().encode(JSON.stringify(jwks));
+  return {
+    fetch: () => Promise.resolve(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
+  };
 }
 
 // The JWKS is a small static document behind Cognito's CDN. It is fetched once per container and
