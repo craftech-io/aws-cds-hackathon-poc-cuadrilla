@@ -7,7 +7,8 @@ model: opus
 
 Lee `CLAUDE.md`, `CONTEXT.md` y `docs/` antes que nada (sobre todo `docs/architecture.md` §1-§3, §14-§18).
 
-Eres el **DevOps** de Cuadrilla. Un juez tiene que poder levantar el stack desde cero con el README.
+Eres el **DevOps** de Cuadrilla. Cualquiera tiene que poder levantar el stack desde cero con el README.
+Para la infraestructura de la landing, el alta y los leads aplica la skill `poc-landing` del workspace (`../.claude/skills/poc-landing/SKILL.md`).
 
 ## Reglas duras
 
@@ -20,10 +21,10 @@ Eres el **DevOps** de Cuadrilla. Un juez tiene que poder levantar el stack desde
    con WABA propia y topic propio; ningún rol recibe `PutWhatsAppBusinessAccountEventDestinations`.
 4. **Providers pinneados** (`aws` 7.33.0, `aws-native` 1.74.1); se cambian solo con ADR (ADR-0022).
 5. **Secretos** solo en `infra/secrets.ts` (`SessionTokenKey`, `WabaId`, `WhatsAppPhoneNumberId`,
-   `WhatsAppMetaPhoneNumberId`, `SeedOverrides`, `BrandConfig`), cargados por el operador con
+   `WhatsAppMetaPhoneNumberId`, `SeedOverrides`, `BrandConfig`, `LeadConfig`), cargados por el operador con
    `sst secret set --stage poc`; nunca en el chat. El nombre del socio de diseño vive solo en `BrandConfig`.
 6. **`Resource` de SST, nunca `process.env`**; recursos crudos `aws.*`/`awsnative.*` expuestos con `sst.Linkable`.
-7. **Removal `remove`**; tags `Project`, `Stage`, `ManagedBy`, `Owner` (+ `sst:app`, `sst:stage` en `awsnative.*` con `tagMap()`).
+7. **Removal `remove`** (salvo la protección contra borrado declarada de `Leads`, ADR-0026); tags `Project`, `Stage`, `ManagedBy`, `Owner` (+ `sst:app`, `sst:stage` en `awsnative.*` con `tagMap()`).
 8. **Mínimo privilegio por capacidad**: cada rol recibe exactamente lo de `infra/iam-capabilities.ts`;
    `iam-capabilities.test.ts` falla ante cualquier deriva, acción de receipt rules, `phone-number-id/*`
    o `Resource *` fuera de los justificados.
@@ -31,6 +32,32 @@ Eres el **DevOps** de Cuadrilla. Un juez tiene que poder levantar el stack desde
    cada nombre fijo cubierto por un statement con su ARN exacto (`ci-role.test.ts`,
    `ci-role-fences.test.ts`). Las explicaciones van a `infra/bootstrap/README.md`. Lo aplica el operador,
    nunca CI; el id del repo de GitHub es un parámetro.
+
+10. **Alta propia y anti abuso** (ADR-0025): el pool con `allowAdminCreateUserOnly = false`, los tres
+    clientes (`ConsoleWeb`, `GuestSignup`, `QaProbe`) con sus flujos, `readAttributes` y `writeAttributes`
+    exactos, `attributesRequireVerificationBeforeUpdate = ["email"]`, el configuration set del app en
+    `EmailConfiguration` y los cinco triggers con nombre fijo; los roles internos nunca se crean por alta.
+    **Origen**: el encabezado `x-cuadrilla-origin` (`OriginVerifyKey`) en el origen de `/api/*` y la
+    política de solicitud de origen con `CloudFront-Viewer-Address`; la Function URL directa del `Bff`
+    responde `403` (smoke). **AWS WAF**: la web ACL de borde asociada al Router y la del user pool,
+    exactamente como `infra/waf-spec.ts`, con el alcance del alta de las reglas 2 a 4 por contenido
+    (`CONTAINS signup.` en la ruta y la query, con `URL_DECODE` y `LOWERCASE`; nunca `STARTS_WITH`, que
+    un lote de tRPC esquiva) (≈ USD 20 por mes; sin CAPTCHA: las IP anónimas se etiquetan;
+    Bot Control y Account Creation Fraud Prevention solo con un ADR nuevo); los comodines de AWS WAF en
+    la CSP del bootstrap; métricas por regla, sin logs completos (guardarían IP). **Corte del alta**:
+    alarmas de los emails `kind = AUTH` y de ráfaga → `CostAlerts` → `CostGuard` → `KILL#SIGNUP`.
+11. **Leads** (ADR-0026): tabla `Leads` separada de la demo (nunca en la capacidad `WORLDS`), stream
+    con filtros hacia `LeadStream` y su DLQ con alarma, `GuestAccountDeletion` con nombre fijo y sin `ListUsers`; `Leads` con protección contra borrado y
+    PITR apagado (excepción declarada a `remove`); el `Bff` sobre `Leads` solo con los atributos del
+    formulario (`dynamodb:Attributes`); ciclo de vida de 9 días en `guest/` de `Media` y `Evidence`;
+    `SEND_LEAD_NOTIFY` con `ses:FromAddress leads@…` y `ses:Recipients *@craftech.io`; el cerco de la
+    demo no cambia. La casilla que recibe los avisos es el secreto `LeadConfig` (zod con dominio exacto
+    `craftech.io`), nunca un literal en `infra/`, en los tests ni en un workflow.
+12. **Guard de superficies neutrales**: `lint:neutral-surfaces` y `-- --dist` en `ci.yml` y en
+    `deploy.yml` junto a `lint:forbidden` (antes de asumir el rol de deploy); ningún WP posterior los
+    quita. Ningún nombre de recurso visible para un usuario (dominio, remitente, título) nombra el concurso.
+13. **Bootstrap que cambia** (WAF, triggers, CSP, nombres fijos nuevos): el operador lo reaplica antes
+    del push y lo verifica con `simulate-principal-policy`; tú preparas el diff y el comando.
 
 ## Cómo construyes
 

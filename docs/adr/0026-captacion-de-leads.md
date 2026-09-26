@@ -1,0 +1,95 @@
+---
+status: accepted
+---
+
+# Cada alta confirmada es un lead en una tabla propia, con consentimientos versionados, aviso a Craftech y borrado a pedido
+
+El CTO pidió explícitamente (2026-09-26) que el alta sirva también para registrar a quienes prueban la demo y poder contactarlos (skill `poc-landing`, "Captación de leads"). Los emails de los visitantes son datos personales reales en una POC que, por lo demás, es 100 % sintética: tienen que quedar separados de los datos de la demo, fuera de los logs y de las exportaciones de la demo, con consentimiento explícito y con baja a pedido (Ley 25.326 de Argentina; misma lógica para otros países). La revisión de seguridad del diseño (2026-09-26) sumó: el alcance del borrado a los usuarios sin confirmar, el vencimiento completo de una cuenta confirmada, un aviso de privacidad exacto y completo, el retiro del consentimiento de contacto sin borrar la cuenta y la retención de la media de los invitados. Decidimos:
+
+## Formulario y consentimientos
+
+- Campos: **email y contraseña** obligatorios; **nombre, empresa y cargo** opcionales (ninguno más). Idioma de la interfaz (`es-MX` o `en`) y atribución: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content` (cada uno ≤ 100 caracteres de `[A-Za-z0-9._-]`, el resto se descarta) y el **origen** del referrer (esquema y host, nunca ruta ni query), capturados al entrar a la landing y guardados solo en el navegador de esa persona (`sessionStorage`) hasta el alta.
+- **Dos consentimientos separados, sin tildar por defecto**, cada uno con su texto versionado en una sola fuente, `packages/shared/src/legal/consents.ts` (texto es-MX y en, id y versión `AAAA-MM-DD`; la web lo muestra y el BFF lo valida):
+  - `TERMS_PRIVACY` (obligatorio para crear la cuenta): aceptar los términos y el aviso de privacidad de Craftech, con links a `/legal/terms.html` y `/legal/privacy.html`, **y la transferencia internacional nombrada en el texto de la casilla misma** (no solo en la página enlazada: un consentimiento que solo está en un link no es expreso). Texto de `packages/shared/src/legal/consents.ts`, que la web muestra junto a la casilla:
+    - es-MX: "Acepto los Términos y el Aviso de privacidad de Craftech, incluida la transferencia de mis datos a Estados Unidos y a otras regiones de AWS descrita en el aviso."
+    - en: "I accept Craftech's Terms and Privacy Notice, including the transfer of my data to the United States and other AWS regions described in the notice."
+    - `leads/consent.test.ts` verifica que el texto de `TERMS_PRIVACY` en los dos idiomas nombra la transferencia (Estados Unidos / United States y otras regiones de AWS / other AWS regions) y que la casilla de la web (`docs/landing-spec.md` §7.3) muestra ese texto de `consents.ts`, sin copiarlo.
+  - `CONTACT` (opcional): "Acepto que Craftech me contacte por esta solución." / "I agree that Craftech may contact me about this solution."
+- `signup.start` rechaza (`INVALID`) una versión distinta de la vigente o `TERMS_PRIVACY` sin aceptar. Cada consentimiento se guarda con `{accepted, at (reloj real del servidor), textVersion, locale}` en su historia (`consentHistory[]`); el vigente es el último registro de cada id. Un cambio de texto es una versión nueva y nunca se reescribe la anterior.
+
+## Tabla `Leads`
+
+Tabla DynamoDB propia (`infra/leads.ts`), **separada de las tablas de la demo**: no la toca la fábrica de mundos, la capacidad `WORLDS` no la incluye, no tiene `clockId` ni `world`, y ninguna exportación, métrica, bitácora ni reporte de la demo la lee. Es la única tabla con PII real y valor comercial: tiene **`deletionProtectionEnabled = true`** (excepción declarada a la política `remove` del stage: para borrarla, el operador la apaga primero, con confirmación explícita) y **sin recuperación a un punto en el tiempo** (PITR apagado), así un dato borrado a pedido o vencido no sobrevive 35 días en un respaldo. `infra/leads-spec.test.ts` verifica las dos cosas.
+
+| Item | PK | SK | Atributos | GSI | TTL |
+|---|---|---|---|---|---|
+| Lead | `LEAD#<emailHash>` (HMAC con la subclave `email-hash` del email normalizado: minúsculas, sin espacios) | `META` | `leadId` (ULID), `email` (la dirección tal como la escribió el visitante: es el dato de contacto), `name?`, `company?`, `jobTitle?`, `locale`, `originPoc: "cuadrilla"`, `origin: WEB \| QA` (lo decide el servidor, ADR-0025 §7), `utm{…}?`, `referrerOrigin?`, `consents{TERMS_PRIVACY, CONTACT}` y `consentHistory[]`, `abuseHash` (ADR-0025 §3), `pendingUsernames[]` (usuarios `gst-*` sin confirmar, a lo sumo 3), `status` (**ausente mientras el lead está pendiente**, el estado `PENDING` de los demás documentos; `CONFIRMED` lo escribe solo el post-confirmation), `signupStartedAt` (primer inicio), `confirmedAt?`, `lastLoginAt?`, `cognitoSub?`, `cognitoUsername?`, `userId?`, `notifiedAt?`, `notifyOutcome?` (`SENT` \| `SUPPRESSED_QA` \| `FAILED`), `version` | `GSI1` `subKey` = `SUB#<sub>` (sparse, desde la confirmación) | `expiresAt`: pendiente, a los 7 días del primer inicio (no se extiende); `CONFIRMED`, a los 24 meses del último ingreso (lo renueva post-authentication) |
+| Bitácora de leads | `LEADLOG#<yyyy-mm>` | `<ts>#<ulid>` | `kind` (`LEAD_DELETED`, `LEAD_EXPIRED`, `CONTACT_WITHDRAWN`, `SIGNUP_CONFIRM_IGNORED`, `DELETION_REFUSED`), `leadId?` (el ULID del lead, que no se vincula con una persona una vez borrado el lead), `actor` (`GUEST`, `OPERATOR`, `TTL`, `SYSTEM`), `reason?`; **nunca el email ni el `emailHash`** | — | 24 meses |
+| Evento del lead | `LEAD#<emailHash>` | `EVT#<ts>#<ulid>` | `kind` (`STARTED`, `CONFIRMED`, `LOGIN`, `NOTIFIED`, `EXPORTED`, `CONTACT_WITHDRAWN`, `DELETION_REQUESTED`), `actor`; **nunca** el email | — | Igual que su lead |
+
+Stream `NEW_AND_OLD_IMAGES` con filtros de la fuente de eventos sobre los items `META`.
+
+**Un lead pendiente que recibe otro inicio** (mismo email): `signup.start` agrega el usuario nuevo a `pendingUsernames` (con 3 responde `RATE_LIMITED`), conserva `signupStartedAt` y su `expiresAt`, y reemplaza los datos del formulario, la atribución y los consentimientos vigentes por los del último inicio (el anterior queda en `consentHistory`).
+
+## Aviso a Craftech por cada lead nuevo
+
+- Lambda `LeadStream` (`packages/bff/src/handlers/lead-stream.ts`) suscrita al stream con filtro `MODIFY` de un `META` sin `status` que pasa a `status CONFIRMED` (y a `REMOVE` por TTL, abajo), destino de falla en una cola `LeadStreamDlq` con alarma.
+- Envía un email por SES desde `"Cuadrilla · Leads" <leads@cuadrilla.demo.craftech.io>` a los destinatarios de la **configuración** `LeadConfig` (secreto `sst.Secret`, zod: `{notifyRecipients: string[1..5], privacyContact?: string}`); el valor inicial lo carga el operador con la casilla que indicó el CTO. **Nunca se escribe en el código ni en los tests** (los tests usan direcciones `@craftech.io` de fixture).
+- **Cerco propio del aviso** (`packages/bff/src/leads/notify-fence.ts`, mismo parser RFC 5322 que el cerco de la demo): solo destinatarios de dominio exacto `craftech.io` (sin subdominios, sin sufijos engañosos); el zod del secreto lo exige al cargar y el envío lo reverifica; la capacidad IAM `SEND_LEAD_NOTIFY` fija `ses:FromAddress = leads@…` y `ForAllValues:StringLike ses:Recipients = *@craftech.io`. El cerco de la demo (`CP-RECIPIENT-FENCE`) no cambia y nunca admite `craftech.io`.
+- Contenido neutral, es-MX, sin datos sensibles más allá del contacto: referencia `leadId`, nombre, empresa, cargo, email, idioma, consentimiento de contacto (sí/no, con versión), origen y UTM, fecha de alta. Texto en `packages/bff/src/copy/lead-notify.ts`. **Los campos del visitante no son confiables** y el aviso llega a una casilla interna desde un dominio de Craftech: se rotulan "declarados por el visitante, sin verificar"; el HTML se genera escapando todo valor y sin convertir nada en link; toda URL o dominio dentro de un campo se neutraliza (`ejemplo[.]com`, sin esquema). Si `CONTACT` no está aceptado, el asunto y la primera línea dicen **"NO CONTACTAR"**.
+- Los leads `origin: QA` (direcciones `success+qa-…@simulator.amazonses.com` de la costura de QA, ADR-0025 §7) no se avisan: `notifyOutcome SUPPRESSED_QA`. Para probar el envío real, el operador corre `npm run leads:notify-test` (un aviso marcado "PRUEBA" con datos ficticios a la configuración vigente).
+- En el mismo `MODIFY` a `CONFIRMED`, `LeadStream` borra de Cognito los demás usuarios de `pendingUsernames` (nunca podrían confirmarse: el email ya es alias de la cuenta confirmada) y vacía la lista.
+
+## Exportación y baja del contacto para el operador
+
+- `npm run leads:export -- --out <ruta fuera del repo>` (`scripts/leads/export.ts`, SDK v3 con el profile del operador, nunca en CI): lee la tabla y escribe un CSV UTF-8 con las columnas `leadId,email,name,company,jobTitle,locale,contactConsent,contactConsentVersion,termsVersion,originPoc,utm_source,utm_medium,utm_campaign,utm_term,utm_content,referrerOrigin,signupAt,confirmedAt,lastLoginAt`. **Por defecto solo leads contactables**: `CONFIRMED`, `origin: WEB` y `CONTACT` vigente aceptado; `--all` suma los no contactables (con `contactConsent = no`, solo para conteos internos, nunca para contactarlos). Se niega a escribir dentro del árbol del repo (y `*.local.*` está bloqueado por CI), escapa las celdas contra inyección de fórmulas (`=`, `+`, `-`, `@` al inicio) y registra `EXPORTED` en cada lead sin el email. Un CSV exportado es temporal: se borra después de usarlo y a más tardar a los 30 días. Nunca hay una vista de leads para invitados; una vista interna para roles internos queda fuera de alcance.
+- `npm run leads:unsubscribe` (`scripts/leads/unsubscribe.ts`, profile del operador): **retira el consentimiento de contacto sin borrar la cuenta** (art. 27 de la Ley 25.326): agrega a `consentHistory` un registro `CONTACT` con `accepted: false`, la hora real y la versión vigente, y registra `CONTACT_WITHDRAWN`. El lead deja de salir en la exportación por defecto.
+- Los dos scripts, como `leads:delete`, leen la dirección de la persona por entrada estándar o `--email-file <ruta>`, nunca como argumento (no queda en el historial del shell).
+
+## Borrado a pedido y retención
+
+- **Autoservicio**: "Borrar mi cuenta" en la portada del invitado de origen `SIGNUP` (`account.deleteGuest`, login ≤ 15 min, confirmación escrita).
+- **A pedido**: el operador corre `npm run leads:delete` (email por entrada estándar o archivo; profile del operador) al recibir el pedido por la vía que publica la política de privacidad.
+- Los dos invocan la Lambda `GuestAccountDeletion`, que verifica su objetivo (ADR-0025 §6) y borra con el **usuario `gst-*` guardado** (nunca con el email: una llamada de Cognito con el email como `Username` lo dejaría en CloudTrail): el usuario de Cognito confirmado y los de `pendingUsernames`, el lead y sus eventos, la fila `Isps/USER#`, `Runtime/GUESTACCOUNT#` y `SIGNUPSUB#`, y destruye la generación vigente del mundo, con sus prefijos de media y evidencia y su Memory (las anteriores ya vencen por TTL). Registra `LEAD_DELETED` con el `leadId` y la hora en la bitácora de leads. Idempotente.
+- **Fuera de la tabla**, el operador completa el pedido en el mismo día: borra el aviso de ese lead de las casillas que lo recibieron (se busca por el `leadId`) y la fila de cualquier CSV exportado que todavía exista. Una vez por mes revisa la bitácora (`LEAD_EXPIRED`, `LEAD_DELETED`) y borra los avisos de esos `leadId`.
+- **Vencimiento**:
+  - Lead pendiente: cuando DynamoDB lo borra por TTL, `LeadStream` recibe el `REMOVE` y borra de Cognito cada usuario de `pendingUsernames` (usuarios `UNCONFIRMED` que guardan el email) y registra `LEAD_EXPIRED`.
+  - Lead `CONFIRMED`: el `REMOVE` hace que `LeadStream` invoque `GuestAccountDeletion` con el `userId` de la imagen vieja: se van el usuario, el registro, `GUESTACCOUNT#` y el mundo vigente, no solo el usuario.
+  - **Red de seguridad**: una vez por día, `LeadStream` (invocada por su schedule) lista con `ListUsers` y el filtro `cognito:user_status = "UNCONFIRMED"` y borra los usuarios `gst-*` creados hace más de 7 días. Cognito no borra solo a los usuarios sin confirmar.
+- **Retención** (lo que dice el aviso de privacidad): lead pendiente y sus usuarios sin confirmar, 7 días desde el primer inicio (8 como máximo por el barrido diario); lead confirmado y su cuenta, 24 meses desde el último ingreso; bitácora de leads, 24 meses, sin datos que identifiquen a la persona; contadores del alta con la IP y el email en hash, 48 horas; contenido del mundo del invitado (mensajes escritos, notas de voz grabadas, fotos subidas, actas), hasta 9 días desde la creación de la generación (también en `Media` y `Evidence`, `docs/architecture.md` §6), la memoria del agente hasta 30 días, y los logs, enmascarados, 30 días.
+
+## PII
+
+- Los emails de leads son datos personales: nunca en logs (el enmascarador de `lib/log.ts` ya redacta emails; los handlers del alta loguean `emailHash[0:8]`), nunca en `AuditLog` de la demo, en `Conversations`, en métricas, en trazas, en los reportes del ejecutor ni en las exportaciones de la demo. Los atributos de Cognito (`email`, `name`, `locale`) viven en el pool; la tabla `Leads` guarda la copia para el contacto.
+- **Errores del alta**: el router `signup` usa un formateador de errores propio que nunca devuelve el `input` ni los valores de los issues de zod (solo el código y la ruta del campo), y el `onError` del handler nunca loguea el input. `routers/signup.test.ts` manda un pedido inválido con un email y verifica que ni los logs capturados, ni el cuerpo del error, ni las métricas contienen una dirección con `@`.
+- La contraseña nunca pasa por el app (ADR-0025 §3).
+- IAM (`docs/architecture.md` §14): solo `Bff` (`signup.start`), los triggers, `LeadStream` y `GuestAccountDeletion` tocan `Leads`. El `Bff` solo `PutItem`/`UpdateItem` sobre claves `LEAD#*` y solo con los atributos del formulario (`dynamodb:Attributes`: nunca `status`, `cognitoSub`, `cognitoUsername`, `userId`, `notifiedAt` ni `notifyOutcome`); que el lead siga pendiente (`attribute_not_exists(status)`) es una condición del código, porque IAM no condiciona por el valor de un atributo. El `QaDriver` solo lee leads `origin: QA` (cerco de código) y borra a través de `GuestAccountDeletion`.
+
+## Política de privacidad y términos
+
+`/legal/privacy.html` y `/legal/terms.html` (es-MX con versión en inglés en la misma página, estáticos, WP-59). La versión de cada página coincide con la `textVersion` de `TERMS_PRIVACY`. El aviso de privacidad dice, en este orden:
+
+1. **Responsable**: Craftech, con su domicilio legal (lo confirma el CTO en `P-06`; la página no se publica en ninguna promoción pública sin él).
+2. **Qué se trata**: los datos del formulario (email, y nombre, empresa y cargo si se dieron), idioma, los consentimientos con fecha y versión, el origen y las etiquetas de campaña (UTM) y el sitio de referencia, las fechas de alta y de último ingreso; la **IP**, que procesa AWS WAF para proteger el alta y que la app guarda solo como hash por 48 horas; la **cookie `aws-waf-token`** que pone AWS WAF y el **`sessionStorage`** del navegador donde la landing guarda la atribución hasta el alta; y el **contenido que el invitado crea en la demo** (mensajes escritos, notas de voz grabadas con su micrófono, que llevan su voz real, fotos que sube y las actas que resultan), con su retención.
+3. **Encargados y lugares**: Amazon Web Services en la región `us-east-1` (Estados Unidos) para toda la infraestructura; el modelo del agente y de la validación de fotos corre con la **inferencia global** de Amazon Bedrock (perfil `global.*`, no limitado a Estados Unidos) y puede procesar el texto, las transcripciones y las fotos del invitado en otras regiones de AWS; Amazon Transcribe convierte las notas de voz en texto; la casilla de Craftech que recibe el aviso de cada lead.
+4. **Transferencia internacional** (art. 12 de la Ley 25.326): a Estados Unidos (región `us-east-1`) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global (perfil `global.anthropic.claude-opus-5`, `docs/architecture.md` §1), con base en el consentimiento expreso que la persona da con la casilla `TERMS_PRIVACY`, cuyo texto nombra esa transferencia ("Formulario y consentimientos").
+5. **Finalidades**: dar acceso a la demo y operar su mundo sintético; proteger el servicio contra abuso; con el consentimiento de contacto, que Craftech la contacte por esta solución.
+6. **Retención**: la de "Borrado a pedido y retención".
+7. **Derechos** de acceso (gratuito, respuesta en 10 días corridos, a intervalos de 6 meses salvo interés legítimo), rectificación, actualización y supresión (5 días hábiles), y retiro del consentimiento de contacto sin borrar la cuenta; cómo ejercerlos (borrar la cuenta desde la consola o escribir a la vía de contacto de privacidad); y el texto obligatorio sobre la **Agencia de Acceso a la Información Pública** como órgano de control de la Ley 25.326, ante la que se pueden presentar denuncias y reclamos.
+8. **Canal de contacto**: la vía de privacidad de `P-06` (`docs/pending.md`); mientras no esté confirmada, `https://craftech.io/contact/`. `P-06` se cierra antes de cualquier promoción pública de la demo.
+9. Que los datos de la demo son sintéticos y que un invitado nunca debe cargar datos reales de terceros.
+
+## Considered options
+
+- **Guardar el lead en las tablas de la demo** (`Isps`, `People`): mezcla datos reales con sintéticos y los expondría a la fábrica de mundos, al reinicio y a las exportaciones de la demo.
+- **Solo Cognito como fuente de leads** (`ListUsers`): no guarda consentimientos versionados ni atribución, y exportar con `ListUsers` exige permisos amplios sobre el pool.
+- **Aviso por Slack**: suma un secreto de terceros y un canal que no está en la cuenta; SES ya está verificado para el dominio del app.
+- **PITR encendido en `Leads`**: recupera un borrado accidental, pero conserva 35 días los datos que se borraron a pedido y obliga a declararlo; se prefiere la protección contra borrado de la tabla.
+- **Perfil de inferencia solo de Estados Unidos para los mundos de invitado** (y el aviso limitado a Estados Unidos): suma un segundo modelo y un segundo perfil que ADR-0020 no mide ni presupuesta, y dos caminos del Harness y del validador según el tipo de mundo. Se prefiere el perfil global con la transferencia declarada en el aviso y nombrada en la casilla `TERMS_PRIVACY`.
+- **Tabla propia con stream, aviso por SES y cerco `@craftech.io`** (elegida).
+
+## Consequences
+
+- Flujos FL-115 a FL-119 y FL-121 en `docs/flows-catalog.md`; `SC-20` en `docs/test-plan.md` §4.5 (WP-45).
+- Secreto nuevo `LeadConfig` (`docs/architecture.md` §3) y pendiente `P-06` (domicilio del responsable, vía de contacto de privacidad y validación legal, incluida la eventual inscripción de la base ante la autoridad de control).
+- `security` revisa el alta y los leads antes del merge de la ola 2b (`docs/test-plan.md` §8, fila "Alta y leads").
