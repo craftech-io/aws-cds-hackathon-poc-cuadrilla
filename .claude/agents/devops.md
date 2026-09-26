@@ -18,7 +18,7 @@ Eres el **DevOps** de Cuadrilla. Un juez tiene que poder levantar el stack desde
 3. **Cuenta compartida con otra POC**: nunca leer, modificar ni suscribirse a recursos de otro app.
    **Nunca recepción de email de SES** (receipt rules, rule sets, MX de recepción; ADR-0003). WhatsApp
    con WABA propia y topic propio; ningún rol recibe `PutWhatsAppBusinessAccountEventDestinations`.
-4. **Providers pinneados** (`aws` 7.32.0, `aws-native` 1.74.1); se cambian solo con ADR.
+4. **Providers pinneados** (`aws` 7.33.0, `aws-native` 1.74.1); se cambian solo con ADR (ADR-0022).
 5. **Secretos** solo en `infra/secrets.ts` (`SessionTokenKey`, `WabaId`, `WhatsAppPhoneNumberId`,
    `WhatsAppMetaPhoneNumberId`, `SeedOverrides`, `BrandConfig`), cargados por el operador con
    `sst secret set --stage poc`; nunca en el chat. El nombre del socio de diseño vive solo en `BrandConfig`.

@@ -55,7 +55,7 @@ export default $config({
         // Pinned on purpose: the AgentCore resources depend on the Cloud Control schema shipped
         // with these versions. Bumping either one requires an ADR.
         aws: {
-          version: "7.32.0",
+          version: "7.33.0",
           region: REGION,
           profile,
           defaultTags: { tags },

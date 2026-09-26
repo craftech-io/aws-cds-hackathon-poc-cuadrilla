@@ -21,7 +21,7 @@ Vocabulario en `CONTEXT.md`; diseño en `docs/design-brief.md`; topología en `d
 - **Todo por IaC.** Ningún recurso AWS a mano. Lecturas (`describe-*`, `list-*`, `get-*`) sí. Lo que ningún provider modela va a "configuración manual declarada" (`docs/architecture.md` §17) con su comando de verificación.
 - **Un solo stage, `poc`, y `sst deploy` solo desde CI** (push a `main`). **Nunca `sst dev`** ni deploy local. **Nunca `sst remove`** sin confirmación explícita del operador en el momento.
 - **Cuenta compartida con otra POC.** Nunca leer, modificar ni suscribirse a recursos de otro app. **Nunca usar recepción de email de SES** (receipt rules, rule sets, MX de recepción): el único rule set activo de la cuenta es de la otra POC (ADR-0003). WhatsApp va por una **WABA propia** con su topic estándar como único destino de eventos (P-01, opción A); igual, todo evento de otro número se descarta antes de leerlo, comparando con el id de Meta del número (`WhatsAppMetaPhoneNumberId`), nunca con el id de AWS (`WhatsAppPhoneNumberId`, que solo sirve para enviar, bajar media e IAM) (ADR-0002).
-- **Providers pinneados**: `aws` 7.32.0, `aws-native` 1.74.1. Se cambian solo con ADR.
+- **Providers pinneados**: `aws` 7.33.0, `aws-native` 1.74.1. Se cambian solo con ADR (ADR-0022).
 - **`Resource` de SST, nunca `process.env`** en Lambdas (salvo `STAGE` y `NODE_ENV`); `/// <reference path=".../sst-env.d.ts" />` en cada archivo que use `Resource`; recursos con `readLinked(nombre, zod)` y secretos con `secretValue(nombre)`.
 - **Secretos con `sst.Secret`**, declarados una sola vez en `infra/secrets.ts`. Nada en el repo, en `.env`, en `environment` ni en el chat.
 - **Removal `remove`** en todos los stages.
