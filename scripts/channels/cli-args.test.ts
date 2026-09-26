@@ -5,7 +5,7 @@ describe("parseFlags", () => {
   it("hands each flag its value and repeats a flag as often as it is given", () => {
     const isps: string[] = [];
     let apply = false;
-    parseFlags(["--isp", "isp-demo", "--apply", "--isp", "isp-judge-01"], {
+    parseFlags(["--isp", "isp-demo", "--apply", "--isp", "isp-guest-01"], {
       "--isp": (value) => {
         isps.push(value());
       },
@@ -13,7 +13,7 @@ describe("parseFlags", () => {
         apply = true;
       },
     });
-    expect(isps).toEqual(["isp-demo", "isp-judge-01"]);
+    expect(isps).toEqual(["isp-demo", "isp-guest-01"]);
     expect(apply).toBe(true);
   });
 

@@ -1,6 +1,6 @@
 // `/`: the public welcome page of the demo, with the brand line of BrandMark (neutral "Cuadrilla ·
 // Powered by Craftech" until WP-44 reads the stage's brand from `brand.get`, ADR-0018), in Spanish or
-// English. No login: it tells the story, says what is real and what is simulated, and sends judges
+// English. No login: it tells the story, says what is real and what is simulated, and sends guests
 // to the console. A signed-in visitor still lands here, with the call to action pointing to the
 // console. WP-44 adds the video, the scenes of the demo and the gallery of real captures.
 import { CuadrillaWordmark, PoweredByCraftech } from "../../components/brand/Brand";

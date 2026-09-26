@@ -7,7 +7,7 @@
 // What the fence recognises, anywhere in the input (nested objects and arrays included):
 //
 //   an operator id (`isp-…`)                       must be the principal's operator
-//   a world (`GLOBAL#…`, `JUDGE#…`; `qa-…` and    must be the principal's world
+//   a world (`GLOBAL#…`, `GUEST#…`; `qa-…` and    must be the principal's world
 //     `eval-…` under a `clockId` field)
 //   an order, case, installer, supervisor, zone    its stored operator must be the principal's
 //     chief or customer id (`wo-`, `case-`, `inst-`, `sup-`, `zc-`, `cust-`)

@@ -1,5 +1,5 @@
 // English gloss of every fixed text and template (ADR-0013): the simulator shows it under an "EN"
-// toggle so a judge who does not read Spanish follows the story. It is never sent to anyone; the
+// toggle so a guest who does not read Spanish follows the story. It is never sent to anyone; the
 // staff always receive es-MX.ts. Same interface, so a text added in Spanish without its gloss is a
 // compile error.
 import type { PhotoItem, RejectReason, TemplateName } from "@cuadrilla/shared";

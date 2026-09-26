@@ -11,7 +11,7 @@ const NOW = new Date("2026-10-20T15:20:00.000Z");
 const NOW_ISO = NOW.toISOString();
 const GLOBAL = { turnsPerDay: 1500, validationsPerDay: 400, transcribeSecondsPerDay: 5400 };
 const COUNTERS: CapCounter[] = planCounters(
-  { world: { clockId: "JUDGE#isp-judge-07", settings: { turnCaps: { perHour: 200, perDay: 1000 } } }, resource: "turns", amount: 1, reserve: ["OPERATOR", "GLOBAL"] },
+  { world: { clockId: "GUEST#isp-guest-07", settings: { turnCaps: { perHour: 200, perDay: 1000 } } }, resource: "turns", amount: 1, reserve: ["OPERATOR", "GLOBAL"] },
   GLOBAL,
   NOW,
 );
@@ -51,13 +51,13 @@ describe("DynamoDB runtime store: cap counters", () => {
 
   it("reports the counter whose condition failed, with the value it had", async () => {
     docMock.on(TransactWriteCommand).rejects(awsError("TransactionCanceledException", { CancellationReasons: [{ Code: "None" }, { Code: "ConditionalCheckFailed", Item: { used: { N: "1000" } } }, { Code: "None" }] }));
-    expect(await store().reserve(COUNTERS, { nowIso: NOW_ISO })).toEqual({ ok: false, failedKey: "TURNCAP#isp-judge-07#2026-10-20", used: 1000 });
+    expect(await store().reserve(COUNTERS, { nowIso: NOW_ISO })).toEqual({ ok: false, failedKey: "TURNCAP#isp-guest-07#2026-10-20", used: 1000 });
     expect(docMock.commandCalls(TransactWriteCommand)).toHaveLength(1);
   });
 
   it("refuses a counter with no room at all without calling DynamoDB", async () => {
     const zero = COUNTERS.map((counter, index) => (index === 1 ? { ...counter, limit: 0 } : counter));
-    expect(await store().reserve(zero, { nowIso: NOW_ISO })).toEqual({ ok: false, failedKey: "TURNCAP#isp-judge-07#2026-10-20" });
+    expect(await store().reserve(zero, { nowIso: NOW_ISO })).toEqual({ ok: false, failedKey: "TURNCAP#isp-guest-07#2026-10-20" });
     expect(docMock.commandCalls(TransactWriteCommand)).toHaveLength(0);
   });
 

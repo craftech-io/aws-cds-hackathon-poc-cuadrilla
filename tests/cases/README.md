@@ -1,4 +1,4 @@
-# Casos de QA (FL-001 a FL-103)
+# Casos de QA (FL-001 a FL-122)
 
 Un archivo `FL-XXX.md` por flujo de `docs/flows-catalog.md`, con el mismo id y el mismo título. Cada caso dice qué entra, qué pasos se corren, qué resultado se verifica sin leer código, con qué oráculo se acepta un paso que depende del modelo y qué evidencia se guarda. Las pruebas que cita cada caso son las de la matriz de `docs/test-plan.md` §2.2; los escenarios, los de §4.5; los oráculos, los de §4.3; los umbrales de evaluación, los de §5.
 
@@ -8,21 +8,25 @@ Un archivo `FL-XXX.md` por flujo de `docs/flows-catalog.md`, con el mismo id y e
 |---|---|
 | Encabezado | Área, actores y canal, disparador, reglas y pruebas por nivel (`U`, `LF`, `UI`, `SR`, `SMK`, `EV`), copiadas de la línea "Prueba" del catálogo |
 | Entrada | Mundo, fixtures (`docs/seed-spec.md`), presets de `world.create` (`docs/tool-catalog.md`), identidad que actúa y mensaje, botón o acción que dispara el flujo |
-| Pasos | Pasos `SR`/`SMK` con su id (`SC-nn/m` o la parte `SC-nn/m.p`), su tipo `[det]`/`[agent]` y, cuando §4.5 lo fija, su `after`; después, qué asierta cada nivel local (`U`, `LF`, `UI`) |
+| Costura de QA | Solo en los casos del área L con `SR`: cómo entra la costura de ADR-0025 §7 (direcciones QA, `signup.start` por el `appRouter` con contadores de la corrida, `auth.signUp`, `auth.confirmQaSignup`, `auth.qaLogin`, `auth.cleanupQaSignup`, `guest.*` de prueba) y qué deja fuera del `SR` |
+| Pasos | Pasos `SR`/`SMK` con su id (`SC-nn/m` o la parte `SC-nn/m.p`), su tipo `[det]`/`[agent]` y, cuando §4.5 lo fija, su `after`; después, qué asierta cada nivel local (`U`, `LF`, `UI`) y, en las superficies públicas, qué agrega la verificación desplegada de `docs/test-plan.md` §6.1 |
 | Resultado esperado | Asserts sobre estado persistido (`snapshot`), bitácora (`AuditLog` con `decision`, `action`, `ruleIds`), salientes (`Message OUT` con `kind`, `templateName`, `refs`) y efectos externos (SES, Transcribe, Scheduler), nunca sobre la redacción del modelo |
 | Oráculo | Fila de `docs/test-plan.md` §4.3 que decide cada paso `agent`, según su precedencia; "no aplica" cuando todos los pasos del flujo son `det` |
 | Evidencia | Qué guarda el reporte de la corrida por paso |
 
 ## Reglas comunes
 
-- **Mundos.** Los pasos `SR` corren sobre clones en mundos `qa-<runId>-<escenario>` congelados, cada uno con su operadora `isp-qa-<runId>-<escenario>`; `SC-18` y `SC-19` usan `JUDGE#isp-judge-test` con el principal `JUDGE` del `QaDriver`; `EV-01` y `EV-02`, mundos `eval-<runId>`. Ningún escenario toca `GLOBAL#isp-demo`. Los ids de personas, órdenes y clientes de los casos son los de las órdenes modelo; en un mundo clonado llevan el sufijo del mundo.
+- **Mundos.** Los pasos `SR` corren sobre clones en mundos `qa-<runId>-<escenario>` congelados, cada uno con su operadora `isp-qa-<runId>-<escenario>`; `SC-18` y `SC-19` usan `GUEST#isp-guest-test` con el principal `GUEST` del `QaDriver`; `SC-20` crea cuentas de alta propia con direcciones `success+qa-<runId>-<n>@simulator.amazonses.com`, cada una con su mundo `GUEST#isp-guest-s<yymmdd><5>` (una generación por creación); `EV-01` y `EV-02`, mundos `eval-<runId>`. Ningún escenario toca `GLOBAL#isp-demo`. Los ids de personas, órdenes y clientes de los casos son los de las órdenes modelo; en un mundo clonado llevan el sufijo del mundo.
 - **Nombre de la operadora.** Ningún caso ni oráculo usa un nombre literal de operadora: se lee de `Isps/META.displayName` del mundo (ADR-0018).
 - **Tipos de paso.** Un paso o parte `det` pasa 3 de 3 corridas y nunca depende de un paso `agent`; un paso o parte `agent` pasa su oráculo en ≥ 2 de 3 corridas, cada uno por separado (`docs/test-plan.md` §1 y §4.3). Un paso `agent` que pasa 1 de 3 no está probado.
 - **Quiescencia.** Todo assert negativo o de cantidad exacta corre después de `installer.settle(installerId)` o, sin instalador, de `world.settle(clockId)` (§4.3).
 - **Normalizador único.** Los oráculos de palabras y cifras usan `packages/bff/src/outbound/verify/normalize.ts`, el mismo del pipeline de salida.
-- **Patrones prohibidos comunes** de todo saliente de un paso `agent` (§4.3): montos (`\$\s?\d`), porcentajes, cifras de potencia o seriales que no están en `Runtime/TURN#`, emails, teléfonos, URLs, CURP/RFC y verbos de promesa ("te lo regalo", "sin costo" fuera de una cita a §COM-04/§COM-01).
+- **Patrones prohibidos comunes** de todo saliente de un paso `agent` (§4.3): montos (`\$\s?\d`), porcentajes, cifras de potencia o seriales que no están en `Runtime/TURN#`, emails, teléfonos, URLs, CURP/RFC, verbos de promesa ("te lo regalo", "sin costo" fuera de una cita a §COM-04/§COM-01) y cualquier palabra de la lista de ADR-0023 (las respuestas del modelo no pasan por `lint:neutral-surfaces`).
 - **Origen de un bloqueo.** Todo paso con contenido hostil o denegado informa de dónde vino el bloqueo: pre-filtro G1, G1 del Harness, Cedar, una cerca `LAM-*`, la verificación de salida, un chequeo `VAL-*` o la negativa del modelo.
 - **Evidencia.** La evidencia de una corrida vive en los artefactos del run de CI (`scenario-report.json` y `.md`, reporte de vitest y de Playwright), nunca en el repo. Sin PII ni secretos: teléfonos solo como `phoneHash` o enmascarados, emails enmascarados salvo el dominio, textos salientes pasados por `lib/mask.ts`, transcripciones reducidas a las palabras del oráculo y su confianza, sin HAR con encabezados, sin tokens ni `sessionToken`, sin imágenes de la conversación más allá de los ids de foto del set. Cada paso guarda su duración, su resultado (`PASS`, `FAIL`, `SKIPPED_PENDING_P01`) y, si es `agent`, la tasa de las 3 corridas.
+- **Costura de QA del alta** (ADR-0025 §7). Nadie lee el código que manda Cognito: `SC-20` confirma con `auth.confirmQaSignup` e ingresa con `auth.qaLogin` (cliente `QaProbe`) solo cuentas cuyo email **en Cognito** (leído con `AdminGetUser`, nunca del input) cumple `^success\+qa-[a-z0-9-]{1,60}@simulator\.amazonses\.com$`; `signup.start` corre por el `appRouter` dentro del `QaDriver` (contexto `qa.runId`, contadores `…#qa-<runId>#…`), nunca por HTTP público; el servidor decide `origin QA` y el aviso a Craftech se suprime (`SUPPRESSED_QA`); `auth.cleanupQaSignup` limpia en `finally` todas las direcciones de la corrida. La verificación desplegada de §6.1 usa `npm run qa:confirm-signup` con el mismo cerco, va por el camino público con sus límites reales y en el orden que fija §6.1, y limpia con `npm run leads:delete`. Nunca un email real ni una contraseña en un secreto de CI.
+- **Leads en la evidencia.** Ningún reporte incluye el email de un lead salvo enmascarado (`s***@simulator…`), ni su `emailHash` completo; los usuarios `gst-*` y los `sub` van recortados a sus primeros 8 caracteres; nunca contraseñas, tickets de alta, códigos de verificación ni el valor de `OriginVerifyKey`.
+- **Vocabulario.** Los casos dicen "invitado"/`GUEST` (ADR-0024); todo texto visible esperado usa el vocabulario de producto y, para lo que el producto mide, "medición" (ADR-0023 §4). "Evaluación" queda solo en los ids internos (`EV-01`, `EV-02`) y en los títulos del catálogo, nunca como texto visible esperado.
 - **Latencias.** `FirstReplyLatency`, `TranscribeLatency`, `PhotoValidationLatency` y `SafetyAlertLatency` se registran por paso y se compuertan como p95 del agregado de las 3 corridas (§7), nunca con una sola muestra.
 - **Pendientes de P-01.** Los pasos de `SC-17` devuelven `SKIPPED_PENDING_P01` mientras `live` no está en los transportes del stage; su caso está escrito completo y su fila de oráculo se exige igual.
 
@@ -112,13 +116,13 @@ Un archivo `FL-XXX.md` por flujo de `docs/flows-catalog.md`, con el mismo id y e
 | [FL-080](FL-080.md) | Órdenes del día y detalle con línea de tiempo | `SC-13/5` |
 | [FL-081](FL-081.md) | Aislamiento entre operadoras y mundos | `SC-13/4`, `SC-16/3` |
 | [FL-082](FL-082.md) | Simulador de teléfono | `SC-18/3..12`, `SC-17/8` |
-| [FL-083](FL-083.md) | Topes del simulador para jurados | `SC-12/9`, `SC-12/10` |
+| [FL-083](FL-083.md) | Topes del simulador para invitados | `SC-12/9`, `SC-12/10` |
 | [FL-084](FL-084.md) | Reloj de demo y controles | `SC-18/2`, `SC-18/8`, `SC-18/10`, `SC-18/12`, `SC-19/2`, `SC-06/9` |
 | [FL-085](FL-085.md) | Mundo ocupado | `SC-18/4.a` |
 | [FL-086](FL-086.md) | Reiniciar la demo | `SC-15/3`, `SC-19/4` |
 | [FL-087](FL-087.md) | Métricas con rótulos y evaluación | `SC-16/4`, `SC-18/13`, `EV-01/3`, `EV-02/3` |
 | [FL-088](FL-088.md) | Bitácora | `SC-16/5` |
-| [FL-089](FL-089.md) | Landing bilingüe, alta y legales | `SMK/1` |
+| [FL-089](FL-089.md) | Landing comercial, `/join` y legales | `SMK/1` |
 | [FL-090](FL-090.md) | Buzón de salida y visor del manual | `SC-05/3` |
 | [FL-091](FL-091.md) | WhatsApp vivo: eventos entrantes | `SC-17/2..4` |
 | [FL-092](FL-092.md) | WhatsApp vivo: envíos y estados | `SC-17/1`, `SC-17/5..6` |
@@ -130,6 +134,25 @@ Un archivo `FL-XXX.md` por flujo de `docs/flows-catalog.md`, con el mismo id y e
 | [FL-098](FL-098.md) | Rate limit y tope de turnos | `SC-12/7..8`, `SC-12/10` |
 | [FL-099](FL-099.md) | Fallas: turno, validador, Transcribe y evento en la DLQ | `SC-14/1..4` |
 | [FL-100](FL-100.md) | Corte de emergencia y modos de canal | `SC-14/5` |
-| [FL-101](FL-101.md) | Alta por código de un teléfono real en un mundo de jurado | `SC-17/9.a` |
+| [FL-101](FL-101.md) | Alta por código de un teléfono real en un mundo de invitado | `SC-17/9.a` |
 | [FL-102](FL-102.md) | Acuse de lectura con indicador de escritura | `SC-02/1` |
 | [FL-103](FL-103.md) | Reacción al veredicto de una foto | `SC-04/2` |
+| [FL-104](FL-104.md) | Alta propia con código por email | `SC-20/1`, `SC-20/2` |
+| [FL-105](FL-105.md) | Confirmación del código y alta del invitado | `SC-20/3` |
+| [FL-106](FL-106.md) | Reenvío del código | — (excepción §2.1) |
+| [FL-107](FL-107.md) | Mundo del invitado sembrado | `SC-20/3` |
+| [FL-108](FL-108.md) | Ingreso de un invitado con su email | `SC-20/5` |
+| [FL-109](FL-109.md) | Recuperación de contraseña | — (excepción §2.1) |
+| [FL-110](FL-110.md) | Cierre de sesión | — (verificación desplegada §6.1) |
+| [FL-111](FL-111.md) | Recreación del mundo después del TTL | `SC-20/6` |
+| [FL-112](FL-112.md) | Topes del alta y de los mundos de invitado | `SC-20/7` |
+| [FL-113](FL-113.md) | Límites de frecuencia del alta | `SC-20/8` |
+| [FL-114](FL-114.md) | Protección contra bots | `SC-20/2`, `SC-20/10`, `SMK/9`, `SMK/10` |
+| [FL-115](FL-115.md) | Registro del lead con consentimientos | `SC-20/1`, `SC-20/3` |
+| [FL-116](FL-116.md) | Aviso de lead nuevo a Craftech | `SC-20/3` |
+| [FL-117](FL-117.md) | Exportación de leads y baja del contacto | — (excepción §2.1) |
+| [FL-118](FL-118.md) | Borrado de la cuenta y del lead | `SC-20/9` |
+| [FL-119](FL-119.md) | Aviso de privacidad y términos | `SMK/1` |
+| [FL-120](FL-120.md) | Guard de superficies neutrales | — (sin AWS) |
+| [FL-121](FL-121.md) | Email ya registrado | `SC-20/4` |
+| [FL-122](FL-122.md) | Roles internos solo por invitación | `SC-20/5` |

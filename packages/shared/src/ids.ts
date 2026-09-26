@@ -2,7 +2,7 @@
 // `wo-24817` or `ph-label-06` reads on its own in a flow, a log or an audit entry. Each kind has one
 // body pattern; `isId`, `idSchema` and `makeId` enforce the same one. Tables shared by every world
 // (`People`, `WorkOrders`) need distinct ids per world: a cloned order or customer carries the clock
-// tag of its world (`wo-24817-j03`, see clock-ids.ts), and QA people embed their run and scenario.
+// tag of its world (`wo-24817-g03`, see clock-ids.ts), and QA people embed their run and scenario.
 import { z } from "zod";
 import { ManualCategory, PersonRole, PhotoItem } from "./enums";
 import { ULID_BODY } from "./ulid";
@@ -11,7 +11,7 @@ import { ULID_BODY } from "./ulid";
 const SLUG = "[a-z0-9]+(?:-[a-z0-9]+)*";
 // QA ids embed the run id, which may be `local-<ULID>` (upper case): `inst-qa-local-01J9ZQ-sc-02-a`.
 const TOKEN = "[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*";
-// A 5-digit number, plus the suffix of a cloned world: the clock tag of a judge world (`-j03`), or
+// A 5-digit number, plus the suffix of a cloned world: the clock tag of a guest world (`-g03`), or
 // a run-scoped token where a QA world clones a numbered entity it does not lease.
 const NUMBERED = `\\d{5}(?:-${TOKEN})?`;
 const PHOTO_ITEMS = PhotoItem.options.join("|");
@@ -127,8 +127,8 @@ export const WorkOrderNumber = z.string().regex(/^\d{5}$/, "expected a 5-digit w
 export type WorkOrderNumber = z.infer<typeof WorkOrderNumber>;
 
 /**
- * Number ranges (docs/architecture.md §5): the demo world and every judge world use 24800-24899 (so
- * judge clones carry a clock tag), QA worlds lease 70000-79999 and evaluation runs use 80000-89999.
+ * Number ranges (docs/architecture.md §5): the demo world and every guest world use 24800-24899 (so
+ * guest clones carry a clock tag), QA worlds lease 70000-79999 and evaluation runs use 80000-89999.
  */
 export const WORK_ORDER_NUMBER_RANGES = {
   demo: { min: 24800, max: 24899 },
@@ -144,7 +144,7 @@ export function workOrderNumberRange(workOrderNumber: string): WorkOrderNumberRa
   );
 }
 
-/** `wo-24817`, or `wo-24817-j03` for the clone of a model order in a judge world. */
+/** `wo-24817`, or `wo-24817-g03` for the clone of a model order in a guest world. */
 export function workOrderId(workOrderNumber: string, clockTag?: string): WorkOrderId {
   const number = WorkOrderNumber.parse(workOrderNumber);
   return clockTag === undefined ? makeId("workOrder", number) : makeId("workOrder", number, clockTag);

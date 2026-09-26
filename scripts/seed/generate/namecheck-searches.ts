@@ -142,5 +142,7 @@ export const RECORDED_SEARCHES: Readonly<Record<string, readonly RecordedSearch[
   "+52 55 0103 0xxx": phoneBlock("55 0103 0000-55 0103 0999"),
   "+52 55 0199 0001": phoneBlock("55 0199 0001"),
   "+52 55 02nn 0xxx": phoneBlock("55 0200 0000-55 0299 0999"),
+  // The signup block lies inside the range the plan's check already covers whole (no provider holds 55 0…).
+  "+52 55 0300 0xxx": phoneBlock("55 0000 0000-55 0999 9999"),
   "+52 55 09xx xxxx": phoneBlock("55 0900 0000-55 0999 9999"),
 };

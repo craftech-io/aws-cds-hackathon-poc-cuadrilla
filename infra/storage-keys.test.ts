@@ -103,13 +103,16 @@ function documentedTables(): Map<string, TableSpec> {
   return tables;
 }
 
+/** What §5 and §6 already document for wave 2b.2 (WP-56); each entry leaves in the change that declares it. */
+const PLANNED_TABLES: readonly string[] = ["Leads"];
+const PLANNED_PREFIXES: Partial<Record<BucketName, readonly string[]>> = { Media: ["guest/"], Evidence: ["guest/"] };
+
 describe("DynamoDB tables of docs/architecture.md §5", () => {
   const documented = documentedTables();
-
-  it("declares every table of §5 except the two the mocks own", () => {
-    expect(documented.size).toBe(11);
+  it("declares every table of §5 except the two the mocks own and the planned ones", () => {
     expect([...MOCK_TABLES]).toEqual(["Network", "Dispatch"]);
-    expect([...STORAGE_TABLES, ...MOCK_TABLES].sort()).toEqual([...documented.keys()].sort());
+    for (const name of PLANNED_TABLES) expect(STORAGE_TABLES as readonly string[], `${name} is declared: remove it from PLANNED_TABLES`).not.toContain(name);
+    expect([...STORAGE_TABLES, ...MOCK_TABLES, ...PLANNED_TABLES].sort()).toEqual([...documented.keys()].sort());
   });
 
   it.each(STORAGE_TABLES)("keeps the GSIs and the TTL of %s exactly as §5", (name) => {
@@ -208,7 +211,9 @@ describe("S3 buckets of docs/architecture.md §6", () => {
   });
 
   it.each(STORAGE_BUCKETS)("keeps the key layout of %s as the docs state it", (name) => {
-    const inTable = documented.get(name)?.prefixes ?? [];
+    const planned = PLANNED_PREFIXES[name] ?? [];
+    for (const prefix of planned) expect(spec(name).prefixes, `${name}/${prefix} is declared: remove it from PLANNED_PREFIXES`).not.toContain(prefix);
+    const inTable = (documented.get(name)?.prefixes ?? []).filter((key) => !planned.some((prefix) => key.startsWith(prefix)));
     expect(inTable.length).toBeGreaterThan(0);
     for (const key of inTable) expect(spec(name).prefixes.some((prefix) => key.startsWith(prefix)), key).toBe(true);
     for (const prefix of spec(name).prefixes) {

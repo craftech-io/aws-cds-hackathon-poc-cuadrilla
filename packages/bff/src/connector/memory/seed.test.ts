@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CASE_1, CLOCK, HASH_A, ISP, openCase, testConnector } from "../testing";
 
 const meta = { createdAt: "2026-09-26T00:00:00.000Z", updatedAt: "2026-09-26T00:00:00.000Z", version: 1, synthetic: true };
-const JUDGE_ROW = { PK: `CASE#${CASE_1}`, SK: "META", entity: "Case", ...meta, ...openCase({ ispId: "isp-judge-07", clockId: "JUDGE#isp-judge-07" }) };
+const GUEST_ROW = { PK: `CASE#${CASE_1}`, SK: "META", entity: "Case", ...meta, ...openCase({ ispId: "isp-guest-07", clockId: "GUEST#isp-guest-07" }) };
 
 describe("seed store", () => {
   it("loads valid rows at the key their codec computes and recomputes the index keys", async () => {
@@ -21,8 +21,8 @@ describe("seed store", () => {
 
   it("stores sort-key instants in UTC and scopes rows of cloned worlds", async () => {
     const world = testConnector();
-    await world.connector.seed.loadItems("Cases", [JUDGE_ROW]);
-    expect(await world.connector.seed.getItem("Cases", { PK: `CASE#${CASE_1}`, SK: "META" })).toMatchObject({ createdAtSim: "2026-10-13T17:50:00.000Z", world: "judge", ispStatusKey: "ISP#isp-judge-07#OPEN" });
+    await world.connector.seed.loadItems("Cases", [GUEST_ROW]);
+    expect(await world.connector.seed.getItem("Cases", { PK: `CASE#${CASE_1}`, SK: "META" })).toMatchObject({ createdAtSim: "2026-10-13T17:50:00.000Z", world: "guest", ispStatusKey: "ISP#isp-guest-07#OPEN" });
   });
 
   it("refuses a row of another table, an invalid row or one stored at the wrong key, writing nothing", async () => {

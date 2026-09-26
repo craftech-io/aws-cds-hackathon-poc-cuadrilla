@@ -18,7 +18,7 @@ const createAppCaller = createCallerFactory(appRouter);
 
 export type AppCaller = ReturnType<typeof createAppCaller>;
 
-/** The console router as the `QaDriver`'s `SUPERVISOR`, `OPS` or `JUDGE` of one world. */
+/** The console router as the `QaDriver`'s `SUPERVISOR`, `OPS` or `GUEST` of one world. */
 export function createQaCaller(options: ServerCallOptions, deps: ContextDeps = defaultDeps()): AppCaller {
   return createAppCaller(createServerContext(options, deps));
 }

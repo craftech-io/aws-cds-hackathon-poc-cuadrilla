@@ -11,7 +11,7 @@ describe("[FL-026] faults of a world", () => {
   it("[FL-026] exist only for qa-* clocks", () => {
     expect(mayHaveFaults("qa-812-1-sc-02")).toBe(true);
     expect(mayHaveFaults("qa-local-01J9ZQX-sc04-dup")).toBe(true);
-    for (const clockId of ["GLOBAL#isp-demo", "JUDGE#isp-judge-07", "JUDGE#isp-judge-test", "eval-812-1", "qa-", "nonsense"]) expect(mayHaveFaults(clockId)).toBe(false);
+    for (const clockId of ["GLOBAL#isp-demo", "GUEST#isp-guest-07", "GUEST#isp-guest-test", "eval-812-1", "qa-", "nonsense"]) expect(mayHaveFaults(clockId)).toBe(false);
   });
 
   it("[FL-026] reads the network attribute of Runtime/FAULTS#<clockId>", async () => {

@@ -1,9 +1,9 @@
 // World scoping of stored items (docs/architecture.md §5, docs/seed-spec.md §13): which cloned world
 // an item belongs to and when DynamoDB may expire it. QA and evaluation worlds expire 48 h after
-// each write; `JUDGE#isp-judge-test` is tagged `qa` without expiry; other judge worlds live for the
+// each write; `GUEST#isp-guest-test` is tagged `qa` without expiry; other guest worlds live for the
 // evaluation window (the world janitor resets them); the demo world keeps its items. Conversations
 // keep 90 days and the audit log 12 months everywhere. The world factory may pass its own policy.
-import { parseClockId, JUDGE_TEST_CLOCK_ID } from "@cuadrilla/shared";
+import { parseClockId, GUEST_TEST_CLOCK_ID } from "@cuadrilla/shared";
 import type { WorldTag } from "../domain/common";
 import type { Table } from "./table-client";
 
@@ -40,6 +40,6 @@ export const defaultWorldPolicy: WorldPolicy = (clockId, table, now) => {
     const world = parsed.kind === "QA" ? "qa" : "eval";
     return { world, expiresAt: earliest(tableExpiry, epoch(now, WORLD_TTL_SECONDS[world])) as number };
   }
-  const world: WorldTag = clockId === JUDGE_TEST_CLOCK_ID ? "qa" : "judge";
+  const world: WorldTag = clockId === GUEST_TEST_CLOCK_ID ? "qa" : "guest";
   return tableExpiry === undefined ? { world } : { world, expiresAt: tableExpiry };
 };

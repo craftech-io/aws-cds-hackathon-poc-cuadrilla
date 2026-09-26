@@ -83,6 +83,6 @@ describe("loading the records the policy reads", () => {
 
   it("refuses a world without settings", async () => {
     const world = await policyWorld();
-    await expect(loadPolicyRecords(world.connector, { ispId: "isp-judge-07", at: when })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(loadPolicyRecords(world.connector, { ispId: "isp-guest-07", at: when })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

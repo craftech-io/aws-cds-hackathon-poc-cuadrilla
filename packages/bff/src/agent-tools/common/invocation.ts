@@ -8,7 +8,7 @@
 //             worker, the channel and the console import the target and call it in process (`invoke`);
 //             the only principal besides the Gateway that may invoke the Lambda is the QaDriver, so a
 //             direct invocation of the Lambda takes a `caller` of kind `QA` (fenced to `qa-*`, `eval-*`
-//             and the judge test world) or a verified session, never a CHANNEL, CONSOLE, WORKER or
+//             and the guest test world) or a verified session, never a CHANNEL, CONSOLE, WORKER or
 //             SCHEDULER caller: `caller` does not authenticate, and the Lambda entry refuses what only
 //             the in-process callers may claim to be.
 import { z } from "zod";

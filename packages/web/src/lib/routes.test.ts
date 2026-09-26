@@ -34,7 +34,7 @@ describe("route table", () => {
   });
 
   it("lists the detail views under the view they come from", () => {
-    expect(navRoutes("JUDGE").map((route) => route.id)).not.toContain("order-detail");
+    expect(navRoutes("GUEST").map((route) => route.id)).not.toContain("order-detail");
     expect(activeNavId("/app/orders/wo-24817")).toBe("orders");
     expect(activeNavId("/app/cases/case-01")).toBe("cases");
     expect(activeNavId("/nowhere")).toBeUndefined();
@@ -42,7 +42,7 @@ describe("route table", () => {
 
   it("opens every view to the three console roles and none to a principal without role", () => {
     for (const route of ROUTES) {
-      for (const role of ["SUPERVISOR", "OPS", "JUDGE"] as const) expect(routeAllows(route, role)).toBe(true);
+      for (const role of ["SUPERVISOR", "OPS", "GUEST"] as const) expect(routeAllows(route, role)).toBe(true);
       expect(routeAllows(route, undefined)).toBe(false);
     }
     expect(navRoutes(undefined)).toEqual([]);

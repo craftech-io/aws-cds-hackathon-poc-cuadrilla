@@ -1,7 +1,7 @@
 // Principals the `QaDriver` builds on the server for its `console.*` actions (ADR-0007,
 // docs/tool-catalog.md "Acciones del QaDriver"): `appRouter.createCaller(ctx)` runs the real
 // middlewares with a `SUPERVISOR` (`usr-qa-sup`) or `OPS` (`usr-qa-ops`) of the scenario's QA
-// operator, or the `JUDGE` `usr-qa-judge` of `isp-judge-test`, always bound to the world the call
+// operator, or the `GUEST` `usr-qa-guest` of `isp-guest-test`, always bound to the world the call
 // names. No password, no token: nothing a request carries can produce one of these (routers/trpc.ts
 // builds principals from requests only out of verified id tokens).
 import { Caller, type ConsoleRole, ispIdOfClock, parseClockId } from "@cuadrilla/shared";
@@ -12,7 +12,7 @@ import type { Principal } from "./principal";
 export const QA_USER_BY_ROLE = {
   SUPERVISOR: "usr-qa-sup",
   OPS: "usr-qa-ops",
-  JUDGE: "usr-qa-judge",
+  GUEST: "usr-qa-guest",
 } as const satisfies Record<ConsoleRole, string>;
 
 /** `sub` and username of every QA principal: never a Cognito identity. */
@@ -20,7 +20,7 @@ export const QA_SUBJECT = "qa-driver";
 
 export interface QaPrincipalInput {
   readonly role: ConsoleRole;
-  /** The world the call names: `qa-*`, `eval-*`, or `JUDGE#isp-judge-test` (as `JUDGE` only). */
+  /** The world the call names: `qa-*`, `eval-*`, or `GUEST#isp-guest-test` (as `GUEST` only). */
   readonly clockId: string;
   /** Epoch seconds of the "sign-in"; defaults to now (a recent login). `SC-13/2` sets it 20 min back. */
   readonly authTime?: number;
@@ -30,7 +30,7 @@ export interface QaPrincipalInput {
 
 /**
  * The principal of one `QaDriver` call. The world rules are the shared `QA` caller's (qa-*, eval-*
- * and `JUDGE#isp-judge-test` as `JUDGE` only); anything else is `ROLE_NOT_ALLOWED`.
+ * and `GUEST#isp-guest-test` as `GUEST` only); anything else is `ROLE_NOT_ALLOWED`.
  */
 export function qaPrincipal(input: QaPrincipalInput, now: Date): Principal {
   if (parseClockId(input.clockId) === undefined) throw new AuthError(AUTH_REASON.ROLE_NOT_ALLOWED, "the QA principal needs a valid world");
@@ -49,7 +49,7 @@ export function qaPrincipal(input: QaPrincipalInput, now: Date): Principal {
     ispId,
     clockId: input.clockId,
     role: input.role,
-    isJudge: input.role === "JUDGE",
+    isGuest: input.role === "GUEST",
     authTime,
     sessionId: input.sessionId ?? `qa-${userId}`,
   };

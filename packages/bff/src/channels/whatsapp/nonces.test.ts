@@ -4,7 +4,7 @@ import { testConnector } from "../../connector/testing";
 import { processInboundEvent } from "./inbound";
 import { INSTALLER_BUTTONS, SUPERVISOR_BUTTONS } from "./keywords";
 import { type NonceDeps, isIssuedNonce, issueNonce, resolveNonce } from "./nonces";
-import { DEMO, JUDGE, NONCE_KEY, PEOPLE, REAL_NOW, hashOf, inboundHarness, liveEvent, nonceFor, seedWorlds, waReply } from "./testing";
+import { DEMO, GUEST, NONCE_KEY, PEOPLE, REAL_NOW, hashOf, inboundHarness, liveEvent, nonceFor, seedWorlds, waReply } from "./testing";
 
 const SEVEN_DAYS_MS = 7 * 24 * 3600 * 1000;
 const ROGELIO = PEOPLE.rogelio;
@@ -32,7 +32,7 @@ describe("button nonces", () => {
   it("[FL-094] another person's button, or the same phone in another world, is foreign", async () => {
     const { deps, nonce } = await setup();
     expect(await resolveNonce({ ...asRogelio(nonce), phoneHash: hashOf(PEOPLE.julian.phone) }, deps)).toEqual({ ok: false, reason: "NONCE_FOREIGN" });
-    expect(await resolveNonce({ ...asRogelio(nonce), clockId: JUDGE }, deps)).toEqual({ ok: false, reason: "NONCE_FOREIGN" });
+    expect(await resolveNonce({ ...asRogelio(nonce), clockId: GUEST }, deps)).toEqual({ ok: false, reason: "NONCE_FOREIGN" });
   });
 
   it("[FL-094] a button of another role is refused: an installer cannot tap a supervisor's action", async () => {

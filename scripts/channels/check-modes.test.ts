@@ -74,8 +74,8 @@ describe("checkModes [FL-100]", () => {
 describe("world templates and overrides example [FL-100]", () => {
   it("fails a world template that is not simulated, wherever the field is", () => {
     expect(checkWorldTemplates([["demo.json", JSON.stringify({ isp: { settings: { whatsappMode: "simulated" } } })]])).toEqual([]);
-    const errors = checkWorldTemplates([["judge.json", JSON.stringify({ isps: [{ settings: { whatsappMode: "live" } }] })]]);
-    expect(errors).toEqual(['judge.json: $.isps[0].settings.whatsappMode must be "simulated"; a world goes live only through SeedOverrides.liveWorldClockId.']);
+    const errors = checkWorldTemplates([["guest.json", JSON.stringify({ isps: [{ settings: { whatsappMode: "live" } }] })]]);
+    expect(errors).toEqual(['guest.json: $.isps[0].settings.whatsappMode must be "simulated"; a world goes live only through SeedOverrides.liveWorldClockId.']);
     expect(checkWorldTemplates([["broken.json", "{"]])).toEqual(["broken.json: not valid JSON."]);
   });
 

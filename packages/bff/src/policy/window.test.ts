@@ -60,7 +60,7 @@ describe("[FL-057] a supervisor's answer with the installer's window closed", ()
 });
 
 describe("[FL-072] (c) a real phone in a simulated world: real clock and lastInboundAtReal", () => {
-  // A judge world paused on 13/10 09:21 for weeks; the judge's own phone is bound by code.
+  // A guest world paused on 13/10 09:21 for weeks; the guest's own phone is bound by code.
   const realNow = "2026-11-02T18:00:00.000Z";
   const leased = (lastInboundAtReal: string) => supervisor("sup-hector", { route: "PHONE_LEASE", lastInboundAtSim: mx("2026-10-13 09:20"), lastInboundAtReal });
   const paused = facts({ now: { sim: mx("2026-10-13 09:21"), real: realNow }, caseState: openCase });
@@ -91,7 +91,7 @@ describe("[FL-072] (c) a real phone in a simulated world: real clock and lastInb
     const atNight = facts({ now: { sim: mx("2026-10-13 09:21"), real: nightReal }, caseState: { caseId: CASE_ID, status: "CLOSED" } });
     const proactive = system("CASE_TAKEN_NOTICE", { text: "Ya lo tomó Héctor.", caseId: CASE_ID });
     const onLease = decide({ message: proactive, recipient: leased(plus(nightReal, -1)), facts: atNight });
-    expect(ruleEntry(onLease, "CP-QUIET-HOURS")).toEqual({ ruleId: "CP-QUIET-HOURS", result: "NOT_APPLICABLE_LEASE", detail: "phone bound by code to a judge world" });
+    expect(ruleEntry(onLease, "CP-QUIET-HOURS")).toEqual({ ruleId: "CP-QUIET-HOURS", result: "NOT_APPLICABLE_LEASE", detail: "phone bound by code to a guest world" });
     expect(summary(onLease)).toBe("ALLOW");
     const livePhone = supervisor("sup-hector", { route: "LIVE_WORLD", lastInboundAtReal: plus(nightReal, -1) });
     const onLive = decide({ message: proactive, recipient: livePhone, facts: atNight });

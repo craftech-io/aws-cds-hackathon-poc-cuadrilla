@@ -5,7 +5,7 @@
 //     hash and the time, in the audit log). In a simulated world it gets one fixed reply per number and
 //     simulated day; live, at most one per number and real day and never more than 20 a day for the
 //     whole stage (`UNKNOWN#GLOBAL`), so nobody can make our number write to many phones.
-//   - "ALTA <código>" from a real phone binds it to a person of a judge's world (lease.ts); its replies
+//   - "ALTA <código>" from a real phone binds it to a person of a guest's world (lease.ts); its replies
 //     to a phone that is not bound yet count against the same limits as any unknown number.
 //   - Staff without opt-in get "Para activar Cuadrilla envía ALTA"; staff who opted out get nothing.
 import { ispIdOfClock } from "@cuadrilla/shared";

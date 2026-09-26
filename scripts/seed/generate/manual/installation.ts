@@ -1,5 +1,5 @@
 // Manual v1, sections INS and MED (docs/seed-spec.md §8): the installation step by step and how the
-// received power is measured and judged per optical class. Written from scratch with general public
+// received power is measured and checked per optical class. Written from scratch with general public
 // knowledge of FTTH/GPON; the acceptance ranges are the operator's (B+ −8 to −25 dBm, C+ −8 to −28 dBm).
 import type { ManualSection } from "./types";
 

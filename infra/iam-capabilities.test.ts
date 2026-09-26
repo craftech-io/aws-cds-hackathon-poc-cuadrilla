@@ -40,11 +40,27 @@ const ROLES = [...LAMBDAS, ...(Object.keys(SERVICE_ROLES) as RoleName[])];
 const everyGrant = (): Array<[RoleName, Grant]> => ROLES.flatMap((role) => expectedGrants(role).map((grant) => [role, grant] as [RoleName, Grant]));
 const AWS_PHONE_ID = `phone-number-id-${"0123456789abcdef".repeat(2)}`;
 
+/**
+ * Lambdas of §14 for the own sign-up, the guest worlds and the leads that WP-56 (wave 2b.2) declares.
+ * Each name leaves this list in the change that adds it to LAMBDA_CAPABILITIES.
+ */
+const PLANNED_LAMBDAS: readonly string[] = [
+  "AuthCustomMessage",
+  "AuthPostAuthentication",
+  "AuthPostConfirmation",
+  "AuthPreSignUp",
+  "GuestAccountDeletion",
+  "GuestWorlds",
+  "LeadStream",
+];
+
 describe("capabilities table", () => {
   it("has one entry per Lambda of docs/architecture.md §14 and nothing else", () => {
     const documented = documentedLambdas();
     expect(documented.length).toBeGreaterThan(15);
-    expect([...LAMBDAS].sort()).toEqual([...documented].sort());
+    expect(documented).toEqual(expect.arrayContaining([...PLANNED_LAMBDAS]));
+    for (const name of PLANNED_LAMBDAS) expect(LAMBDAS as readonly string[], `${name} is declared: remove it from PLANNED_LAMBDAS`).not.toContain(name);
+    expect([...LAMBDAS].sort()).toEqual(documented.filter((name) => !PLANNED_LAMBDAS.includes(name)).sort());
   });
 
   it("builds PIPELINE from both senders, the output guardrails and the timers", () => {
@@ -164,10 +180,10 @@ describe("WORLDS fences per role", () => {
     expect(holders.sort()).toEqual(Object.keys(WORLDS_LEADING_KEYS).sort());
   });
 
-  it("keeps the QA driver on QA, evaluation and the test judge, and the others off them", () => {
-    for (const key of WORLDS_LEADING_KEYS.QaDriver) expect(key).toMatch(/qa-|eval-|isp-judge-test#/);
+  it("keeps the QA driver on QA, evaluation and the test guest, and the others off them", () => {
+    for (const key of WORLDS_LEADING_KEYS.QaDriver) expect(key).toMatch(/qa-|eval-|isp-guest-test#/);
     for (const key of [...WORLDS_LEADING_KEYS.Bff, ...WORLDS_LEADING_KEYS.WorldJanitor]) expect(key).not.toMatch(/qa-|eval-/);
-    for (const key of WORLDS_LEADING_KEYS.WorldJanitor) expect(key).toContain("isp-judge-");
+    for (const key of WORLDS_LEADING_KEYS.WorldJanitor) expect(key).toContain("isp-guest-");
   });
 });
 

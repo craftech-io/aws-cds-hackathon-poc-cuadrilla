@@ -6,8 +6,8 @@
 //   *@simulator.amazonses.com                   every world (SES delivers it and emits the event we
 //                                               expect, with no mailbox to read and no reputation hit)
 //   SeedOverrides.demoRecipients.emails         only the operator's demo world (`GLOBAL#…`, which is
-//                                               also the only world that can be live); never JUDGE,
-//                                               QA nor EVAL, so a judge who edits a person's email
+//                                               also the only world that can be live); never GUEST,
+//                                               QA nor EVAL, so a guest who edits a person's email
 //                                               cannot aim an alert at a real mailbox
 //   cuadrilla.demo.craftech.io and subdomains   never: the domain has no mailboxes (ADR-0003)
 //   demo.craftech.io and subdomains             never: the shared demo zone hosts other apps of the

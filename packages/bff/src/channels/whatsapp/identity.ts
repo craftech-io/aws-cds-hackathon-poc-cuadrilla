@@ -3,7 +3,7 @@
 // (`ADDR#<clockId>#<phoneHash>`), so identity is always (world, phoneHash):
 //
 //   simulated  the world of the signed envelope; the person registered with that phone in it
-//   live       a valid `PHONELEASE#<phoneHash>` (a real phone bound to a judge's world by code) →
+//   live       a valid `PHONELEASE#<phoneHash>` (a real phone bound to a guest's world by code) →
 //              its world and person; otherwise the person with that phone in the single live world
 //              (`Runtime/LIVEWORLD`); otherwise an unknown number of the live world
 //

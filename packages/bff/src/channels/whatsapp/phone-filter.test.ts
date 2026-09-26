@@ -9,7 +9,7 @@ import {
   AWS_ID,
   DEMO,
   FOREIGN_META_ID,
-  JUDGE,
+  GUEST,
   META_ID,
   PEOPLE,
   SIM_KEY,
@@ -33,13 +33,13 @@ function deps(overrides: Partial<PhoneFilterDeps> = {}): PhoneFilterDeps {
     simEnvelopeKey: SIM_KEY,
     numberIds: () => ({ phoneNumberId: AWS_ID, metaPhoneNumberId: META_ID }),
     stageTransports: () => ["simulated", "live"],
-    worldMode: async (clockId) => (clockId === JUDGE ? "simulated" : clockId === DEMO ? "live" : undefined),
+    worldMode: async (clockId) => (clockId === GUEST ? "simulated" : clockId === DEMO ? "live" : undefined),
     ...overrides,
   };
 }
 
 function simulated(clockId: string, key: Uint8Array = SIM_KEY) {
-  const [record] = buildSimulatedEvent({ clockId, from: PEOPLE.rogelioJ07.phone, wamid: "wamid.SIM.01J9ZQX0000000000000000001", content: { type: "text", body: "hola" }, sentAtReal: new Date("2026-10-13T15:20:00Z") }, key).Records;
+  const [record] = buildSimulatedEvent({ clockId, from: PEOPLE.rogelioG07.phone, wamid: "wamid.SIM.01J9ZQX0000000000000000001", content: { type: "text", body: "hola" }, sentAtReal: new Date("2026-10-13T15:20:00Z") }, key).Records;
   if (record === undefined) throw new Error("no record");
   return record;
 }
@@ -111,12 +111,12 @@ describe("number filter with the real shape of the event", () => {
   });
 
   it("[FL-095] accepts a signed simulated envelope only from a simulated world, and never a forged one", async () => {
-    expect(await screenRecord(simulated(JUDGE), deps())).toMatchObject({ verdict: "ACCEPT", origin: "SIMULATED", clockId: JUDGE });
+    expect(await screenRecord(simulated(GUEST), deps())).toMatchObject({ verdict: "ACCEPT", origin: "SIMULATED", clockId: GUEST });
     expect(await screenRecord(simulated(DEMO), deps())).toEqual({ verdict: "REJECT", reason: "SIM_WORLD_NOT_SIMULATED" });
-    expect(await screenRecord(simulated("JUDGE#isp-judge-09"), deps())).toEqual({ verdict: "REJECT", reason: "SIM_WORLD_NOT_SIMULATED" });
-    expect(await screenRecord(simulated(JUDGE, new Uint8Array(32).fill(1)), deps())).toEqual({ verdict: "REJECT", reason: "BAD_SIM_SIGNATURE" });
-    const record = simulated(JUDGE);
-    const moved = { ...record, Sns: { ...record.Sns, MessageAttributes: { "sim-clock-id": { Type: "String", Value: "JUDGE#isp-judge-08" } } } };
+    expect(await screenRecord(simulated("GUEST#isp-guest-09"), deps())).toEqual({ verdict: "REJECT", reason: "SIM_WORLD_NOT_SIMULATED" });
+    expect(await screenRecord(simulated(GUEST, new Uint8Array(32).fill(1)), deps())).toEqual({ verdict: "REJECT", reason: "BAD_SIM_SIGNATURE" });
+    const record = simulated(GUEST);
+    const moved = { ...record, Sns: { ...record.Sns, MessageAttributes: { "sim-clock-id": { Type: "String", Value: "GUEST#isp-guest-08" } } } };
     expect(await screenRecord(moved, deps())).toEqual({ verdict: "REJECT", reason: "BAD_SIM_SIGNATURE" });
   });
 
@@ -126,7 +126,7 @@ describe("number filter with the real shape of the event", () => {
     for (const input of inputs) await expect(screenRecord(input, deps())).resolves.toMatchObject({ verdict: expect.stringMatching(/REJECT|RETRY/) });
     const failing = deps({ verifier: { verify: async () => Promise.reject(new Error("boom")) } });
     await expect(screenRecord(record, failing)).resolves.toEqual({ verdict: "RETRY", reason: "SCREEN_FAILED" });
-    await expect(screenRecord(simulated(JUDGE), deps({ worldMode: async () => Promise.reject(new Error("down")) }))).resolves.toEqual({ verdict: "RETRY", reason: "WORLD_MODE_UNAVAILABLE" });
+    await expect(screenRecord(simulated(GUEST), deps({ worldMode: async () => Promise.reject(new Error("down")) }))).resolves.toEqual({ verdict: "RETRY", reason: "WORLD_MODE_UNAVAILABLE" });
     const body = JSON.parse(record.Sns.Message) as Record<string, unknown>;
     const { Signature: _signature, ...unsigned } = record.Sns;
     const brokenEntry = { ...record, Sns: signSns({ ...unsigned, Message: JSON.stringify({ ...body, whatsAppWebhookEntry: "{broken" }) }) };

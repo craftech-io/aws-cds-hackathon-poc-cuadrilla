@@ -8,19 +8,19 @@ const EVENT_ID = "evt_01K7F0000000000000000000A1";
 const LATER_ID = "evt_01K7F0000000000000000000B2";
 
 const META = DispatchOrderItem.parse({
-  PK: "DWO#isp-judge-03#24817",
+  PK: "DWO#isp-guest-03#24817",
   SK: "META",
   entity: "DispatchOrder",
-  ispId: "isp-judge-03",
+  ispId: "isp-guest-03",
   workOrderNumber: "24817",
-  workOrderId: "wo-24817-j03",
+  workOrderId: "wo-24817-g03",
   installerId: "inst-rogelio",
   appointmentWindow: { start: "2026-10-13T09:00:00-06:00", end: "2026-10-13T11:00:00-06:00" },
   status: "SCHEDULED",
   createdAt: "2026-10-12T12:00:00.000Z",
   updatedAt: "2026-10-12T12:00:00.000Z",
   version: 3,
-  clockId: "JUDGE#isp-judge-03",
+  clockId: "GUEST#isp-guest-03",
   expiresAt: 1_760_600_000,
 });
 
@@ -30,12 +30,12 @@ function cancelledEvent(eventId: string, occurredAtSim: string): DispatchEventIt
     SK: dispatchEventSk(occurredAtSim, eventId),
     entity: "DispatchEvent",
     type: "WorkOrderCancelled",
-    detail: { eventId, ispId: "isp-judge-03", workOrderNumber: "24817", reason: "CUSTOMER_REQUEST", occurredAtSim },
+    detail: { eventId, ispId: "isp-guest-03", workOrderNumber: "24817", reason: "CUSTOMER_REQUEST", occurredAtSim },
     idempotencyKey: `key-${eventId}`,
     createdAt: "2026-10-13T16:00:00.000Z",
     updatedAt: "2026-10-13T16:00:00.000Z",
     version: 1,
-    clockId: "JUDGE#isp-judge-03",
+    clockId: "GUEST#isp-guest-03",
   });
 }
 
@@ -57,18 +57,18 @@ describe("dynamoDispatchStore.load", () => {
     const later = cancelledEvent(LATER_ID, "2026-10-13T12:00:00-06:00");
     const earlier = cancelledEvent(EVENT_ID, "2026-10-13T10:00:00-06:00");
     const client = fakeClient((_command, call) => (call === 1 ? { Items: [later], LastEvaluatedKey: { PK: META.PK, SK: later.SK } } : { Items: [META, earlier] }));
-    const record = await dynamoDispatchStore(client, "dispatch-table").load("isp-judge-03", "24817");
+    const record = await dynamoDispatchStore(client, "dispatch-table").load("isp-guest-03", "24817");
     expect(record?.order).toEqual(META);
     expect(record?.events.map((event) => event.detail.eventId)).toEqual([EVENT_ID, LATER_ID]);
     const [first, second] = client.calls as [QueryCommand, QueryCommand];
-    expect(first.input).toMatchObject({ TableName: "dispatch-table", KeyConditionExpression: "PK = :pk", ExpressionAttributeValues: { ":pk": "DWO#isp-judge-03#24817" }, ConsistentRead: true });
+    expect(first.input).toMatchObject({ TableName: "dispatch-table", KeyConditionExpression: "PK = :pk", ExpressionAttributeValues: { ":pk": "DWO#isp-guest-03#24817" }, ConsistentRead: true });
     expect(second.input.ExclusiveStartKey).toEqual({ PK: META.PK, SK: later.SK });
   });
 
   it("returns undefined without a META row and rejects a malformed row", async () => {
-    expect(await dynamoDispatchStore(fakeClient(() => ({ Items: [] })), "t").load("isp-judge-03", "24817")).toBeUndefined();
+    expect(await dynamoDispatchStore(fakeClient(() => ({ Items: [] })), "t").load("isp-guest-03", "24817")).toBeUndefined();
     const broken = fakeClient(() => ({ Items: [{ ...META, status: "CLOSED" }] }));
-    await expect(dynamoDispatchStore(broken, "t").load("isp-judge-03", "24817")).rejects.toThrow();
+    await expect(dynamoDispatchStore(broken, "t").load("isp-guest-03", "24817")).rejects.toThrow();
   });
 });
 

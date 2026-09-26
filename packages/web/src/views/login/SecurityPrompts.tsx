@@ -3,7 +3,7 @@
 //               on), which gives a fresh `auth_time`; the tokens are swapped and the old refresh
 //               token revoked.
 //   enrollTotp  the optional TOTP: associate a software token with the session's access token,
-//               scan, verify, make it the preferred factor. Never offered to a judge.
+//               scan, verify, make it the preferred factor. Never offered to a guest.
 // Opened from ApiErrorNotice through the session context; mounted once by app.tsx.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/Button";

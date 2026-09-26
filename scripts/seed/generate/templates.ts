@@ -1,7 +1,7 @@
-// The five world templates (docs/seed-spec.md §3, lib/worlds.ts): `demo` and `judge` item by item,
+// The five world templates (docs/seed-spec.md §3, lib/worlds.ts): `demo` and `guest` item by item,
 // `models` with every order of §7 and its people, `qa-min` and `eval` as the operations the world
 // factory clones from the models. All of them run `whatsappMode: simulated`.
-import { judgeBlock } from "../lib/synthetic";
+import { guestBlock } from "../lib/synthetic";
 import type { SeedItem, WorldTable } from "../lib/tables";
 import type { EvalQuestionDef } from "../lib/questions";
 import { TEMPLATE_VERSION, type EvalTemplate, type ModelOrder, type ModelsTemplate, type QaMinTemplate, type WorldTablesTemplate } from "../lib/worlds";
@@ -12,9 +12,9 @@ import { scriptedKpi } from "./metrics";
 import { worldSettings } from "./org";
 import { isClosedHistory } from "./orders";
 import type { CustomerDef } from "./people";
-import { judgeScenes, judgeTour } from "./scenes";
+import { guestScenes, guestTour } from "./scenes";
 import { DAYS, WORLD_START_SIM } from "./time";
-import { TEMPLATE_JUDGE, type WorldSpec } from "./world";
+import { TEMPLATE_GUEST, type WorldSpec } from "./world";
 
 const HEADER = { templateVersion: TEMPLATE_VERSION, generator: GENERATOR, generatorVersion: GENERATOR_VERSION, seed: 20260926, startAtSim: WORLD_START_SIM, whatsappMode: "simulated" } as const;
 
@@ -33,13 +33,13 @@ export function worldTemplate(world: WorldSpec, tables: Readonly<Record<WorldTab
     tables: Object.fromEntries(Object.entries(tables).map(([table, items]) => [table, [...items]])) as WorldTablesTemplate["tables"],
   };
   if (world.kind === "DEMO") return base;
-  const tokens = judgeBlock(TEMPLATE_JUDGE);
+  const tokens = guestBlock(TEMPLATE_GUEST);
   return {
     ...base,
-    placeholders: { judgeNumber: "00", clockTag: "j00", ispId: world.ispId, clockId: world.clockId, phoneBlock: tokens.phoneBlock, emailTag: "j00" },
-    judgeTest: { simulatorCaps: { messagesPerRealHourPerIdentity: 80, turnsPerHour: 180, emailsPerDay: 60 }, consoleUsers: [{ userId: "usr-qa-judge", role: "JUDGE", name: "Jurado de QA" }] },
-    tour: judgeTour(world),
-    scenes: judgeScenes(world),
+    placeholders: { guestNumber: "00", clockTag: "g00", ispId: world.ispId, clockId: world.clockId, phoneBlock: tokens.phoneBlock, emailTag: "g00" },
+    guestTest: { simulatorCaps: { messagesPerRealHourPerIdentity: 80, turnsPerHour: 180, emailsPerDay: 60 }, consoleUsers: [{ userId: "usr-qa-guest", role: "GUEST", name: "Invitado de QA" }] },
+    tour: guestTour(world),
+    scenes: guestScenes(world),
   };
 }
 

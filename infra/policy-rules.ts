@@ -19,7 +19,7 @@
 // What the engine imposes (docs/architecture.md §9.2 and §16):
 //   - a statement may not exceed 10,000 characters once each action is qualified with the Gateway, so
 //     the permit and the session forbid are one policy per target;
-//   - automated reasoning judges the whole engine: a forbid created while no permit covers its action is
+//   - automated reasoning checks the whole engine: a forbid created while no permit covers its action is
 //     "Overly Restrictive", so the permits are created first and every forbid depends on all of them
 //     (`creationPlan`, applied by infra/policy.ts);
 //   - a policy name another engine of the account already holds is refused (ConflictException "Policy
@@ -190,7 +190,7 @@ function render(id: CedarStatementId, effect: CedarEffect, inputs: CedarPolicyIn
 /**
  * The Cedar policies, permits first. Every statement is scoped to the Gateway ARN (so the engine
  * validates it against that Gateway's schemas) and every forbid names the Harness principal: it is the
- * only principal a permit allows, so the scope changes no decision, and the analyzer does not judge
+ * only principal a permit allows, so the scope changes no decision, and the analyzer does not check
  * principal types that no permit covers. Every field a forbid reads is guarded by `has` first, even a
  * required one: a schema that loses the field must not turn the forbid into an evaluation error.
  */
@@ -262,7 +262,7 @@ export interface PolicyCreationStep {
 }
 
 /**
- * Permits first, every forbid after all the permits, and one policy at a time: the analyzer judges each
+ * Permits first, every forbid after all the permits, and one policy at a time: the analyzer checks each
  * new policy against those already in the engine, so each step also waits for the one before it and
  * that set never depends on which concurrent create lands first.
  */

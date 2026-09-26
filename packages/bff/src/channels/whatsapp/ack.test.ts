@@ -3,7 +3,7 @@ import { setKillSwitch } from "../../ops/kill-switch";
 import { acknowledgeInbound } from "./ack";
 import { processInboundEvent } from "./inbound";
 import { renderReadAck } from "./render";
-import { JUDGE, PEOPLE, UNKNOWN_PHONE, inboundHarness, liveEvent, quietLogger, simEvent, waText } from "./testing";
+import { GUEST, PEOPLE, UNKNOWN_PHONE, inboundHarness, liveEvent, quietLogger, simEvent, waText } from "./testing";
 
 const ROGELIO = PEOPLE.rogelio;
 
@@ -28,8 +28,8 @@ describe("read receipt with the typing indicator", () => {
 
   it("[FL-102] simulated: the simulator draws it from the READ status, nothing goes to End User Messaging Social", async () => {
     const h = await inboundHarness();
-    await processInboundEvent(simEvent(JUDGE, PEOPLE.rogelioJ07.phone, "wamid.SIM.R2", { type: "text", body: "Ya llegué" }), h.deps);
-    const [stored] = await h.world.connector.conversations.listMessages(PEOPLE.rogelioJ07.personId);
+    await processInboundEvent(simEvent(GUEST, PEOPLE.rogelioG07.phone, "wamid.SIM.R2", { type: "text", body: "Ya llegué" }), h.deps);
+    const [stored] = await h.world.connector.conversations.listMessages(PEOPLE.rogelioG07.personId);
     expect(stored?.status).toBe("READ");
     expect(h.rec.sent).toEqual([]);
   });

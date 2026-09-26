@@ -1,7 +1,8 @@
 // Shape of a copy pack: every fixed text the product sends or shows to the staff, in one language.
 // `es-MX.ts` is the pack that is sent; `en-gloss.ts` is its English gloss for the simulator and the
-// judges (ADR-0013). Both implement this interface, so a text missing from either one is a compile
-// error instead of a blank bubble. No tool, adapter, worker or prompt carries an inline string.
+// readers of the glossary (ADR-0013). Both implement this interface, so a text missing from either
+// one is a compile error instead of a blank bubble. No tool, adapter, worker or prompt carries an
+// inline string.
 import type { CaseReason, ChecklistItem, HazardCategory, PersonRole, PhotoItem, RejectReason, Symptom } from "@cuadrilla/shared";
 import type { PrefilterBlockKind } from "../lib/mask";
 
@@ -104,7 +105,7 @@ export interface CopyPack {
   readonly joinCodeInvalid: string;
   /** The phone is already bound to another world or registered in the live world (FL-101). */
   readonly leaseInUse: string;
-  /** The phone is now bound to a person of a judge's world (FL-101). */
+  /** The phone is now bound to a person of a guest's world (FL-101). */
   leaseBound(personFirstName: string, hours: number): string;
 
   // ---- Safety (ADR-0016) ------------------------------------------------------------------------

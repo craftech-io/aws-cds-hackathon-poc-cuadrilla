@@ -1,4 +1,4 @@
-// The judges' tour on the `judge` template (docs/design-brief.md §15, docs/seed-spec.md §3): the tour
+// The guided tour on the `guest` template (docs/design-brief.md §15, docs/seed-spec.md §3): the tour
 // window of 13/10 (07:00-15:30) over Rogelio's three orders, and one scene of "Saltar a escena" before
 // every step that needs one, so no step depends on earlier turns of the model. A scene resets the
 // world, advances the clock to its instant firing the due timers in order (the 07:30 day start) and
@@ -10,7 +10,7 @@ import type { WorldSpec } from "./world";
 
 const at = (time: string): string => sim(DAYS.demo, time);
 
-export function judgeTour(world: WorldSpec): Tour {
+export function guestTour(world: WorldSpec): Tour {
   return {
     installerId: world.personId("inst-rogelio"),
     workOrderIds: ["24817", "24818", "24819"].map((number) => world.workOrderId(number)),
@@ -19,7 +19,7 @@ export function judgeTour(world: WorldSpec): Tour {
   };
 }
 
-export function judgeScenes(world: WorldSpec): Scene[] {
+export function guestScenes(world: WorldSpec): Scene[] {
   const personId = world.personId("inst-rogelio");
   const [first, second, third] = ["24817", "24818", "24819"].map((number) => world.workOrderId(number)) as [string, string, string];
   const onSite = (time: string, activeWorkOrderId: string) => ({ personId, activeWorkOrderId, lastInboundAtSim: addMinutes(at(time), -3) });
@@ -32,7 +32,7 @@ export function judgeScenes(world: WorldSpec): Scene[] {
       advanceToSim: at("07:00"),
       installer: { personId },
       orders: {},
-      description: "The world as the judge first sees it: clock paused at 07:00, every day start pending at 07:30.",
+      description: "The world as the guest first sees it: clock paused at 07:00, every day start pending at 07:30.",
     },
     {
       sceneId: "ordenes-del-dia",

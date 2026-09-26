@@ -21,8 +21,8 @@ describe("parseKeyword (docs/architecture-integrations.md §4.6)", () => {
   });
 
   it("[FL-101] ALTA with a join code, written with a hyphen, a space or together", () => {
-    for (const text of ["ALTA J07-4F2K", "alta j07-4f2k", "Alta J07 4F2K", "ALTA J074F2K", "  alta   J07-4F2K  "]) {
-      expect(parseKeyword(text)).toEqual({ kind: "ALTA_CODE", code: "J07-4F2K" });
+    for (const text of ["ALTA G07-4F2K", "alta g07-4f2k", "Alta G07 4F2K", "ALTA G074F2K", "  alta   G07-4F2K  "]) {
+      expect(parseKeyword(text)).toEqual({ kind: "ALTA_CODE", code: "G07-4F2K" });
     }
     expect(parseKeyword("ALTA JT-ABCD")).toEqual({ kind: "ALTA_CODE", code: "JT-ABCD" });
   });

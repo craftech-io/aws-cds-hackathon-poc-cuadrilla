@@ -477,17 +477,24 @@ Resources:
           - Sid: AgentCoreUntaggableChildren
             Effect: Allow
             Action:
-              - bedrock-agentcore:CreatePolicy
-              - bedrock-agentcore:DeletePolicy
-              - bedrock-agentcore:GetPolicy
-              - bedrock-agentcore:UpdatePolicy
               - bedrock-agentcore:CreateWorkloadIdentity
               - bedrock-agentcore:DeleteWorkloadIdentity
               - bedrock-agentcore:GetWorkloadIdentity
               - bedrock-agentcore:UpdateWorkloadIdentity
             Resource:
-              - !Sub "arn:${AWS::Partition}:bedrock-agentcore:${Region}:${AWS::AccountId}:policy-engine/*/policy/*"
               - !Sub "arn:${AWS::Partition}:bedrock-agentcore:${Region}:${AWS::AccountId}:workload-identity-directory/default*"
+          # Cedar policies are untaggable children of the engine, and their names are unique across every
+          # engine of the account: only this app's engine (named ${AgentNamePrefix}_${DeployStage} by
+          # infra/policy-rules.ts), the engine ARN itself included, never another app's.
+          - Sid: CedarPoliciesOfThisAppsEngine
+            Effect: Allow
+            Action:
+              - bedrock-agentcore:CreatePolicy
+              - bedrock-agentcore:DeletePolicy
+              - bedrock-agentcore:GetPolicy
+              - bedrock-agentcore:UpdatePolicy
+            Resource:
+              - !Sub "arn:${AWS::Partition}:bedrock-agentcore:${Region}:${AWS::AccountId}:policy-engine/${AgentNamePrefix}_${DeployStage}*"
           - Sid: ReadModelCatalog
             Effect: Allow
             Action:

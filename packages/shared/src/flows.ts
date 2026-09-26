@@ -1,11 +1,11 @@
-// Flow ids of docs/flows-catalog.md (`FL-001` … `FL-103`), their areas, the test levels of the
+// Flow ids of docs/flows-catalog.md (`FL-001` … `FL-122`), their areas, the test levels of the
 // traceability matrix (docs/test-plan.md §2) and the grammar of scenario steps (§4.3, ADR-0021).
 // Tests tag every `describe`/`it` that proves a flow with `[FL-xxx]`; every scenario step without
 // parts, and every part of a step with parts, declares `flows`, one `kind` and one `after`.
 import { z } from "zod";
 
 /** Flows of the catalog; a flow id outside 1..FLOW_COUNT is a typo, not a new flow. */
-export const FLOW_COUNT = 103;
+export const FLOW_COUNT = 122;
 
 export const FlowId = z
   .string()
@@ -32,6 +32,7 @@ export const FLOW_AREAS = {
   I: "Policy, window and templates",
   J: "Console and surfaces",
   K: "Live channel and robustness",
+  L: "Own sign-up, access and leads",
 } as const;
 
 export const FlowArea = z.enum(Object.keys(FLOW_AREAS) as [keyof typeof FLOW_AREAS, ...Array<keyof typeof FLOW_AREAS>]);
@@ -57,7 +58,7 @@ export function flowTagsIn(text: string): string[] {
 export const StepKind = z.enum(["det", "agent"]);
 export type StepKind = z.infer<typeof StepKind>;
 
-/** Scenarios of the runner (`SC-00` … `SC-19`) and evaluation runs (`EV-01`, `EV-02`). */
+/** Scenarios of the runner (`SC-00` … `SC-20`) and evaluation runs (`EV-01`, `EV-02`). */
 export const ScenarioId = z.string().regex(/^(?:SC|EV)-\d{2}$/, "expected SC-00 or EV-01");
 export type ScenarioId = z.infer<typeof ScenarioId>;
 

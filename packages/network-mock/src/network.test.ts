@@ -6,7 +6,7 @@ import { handleNetworkRequest, type MockDeps, type MockResponse } from "./routes
 import { InMemoryOnuStore } from "./store";
 
 const DEMO = "GLOBAL#isp-demo";
-const JUDGE = "JUDGE#isp-judge-07";
+const GUEST = "GUEST#isp-guest-07";
 const QA = "qa-812-1-sc-02";
 const EVAL = "eval-812-1";
 const AT = "2026-10-13T09:20:00-06:00";
@@ -102,7 +102,7 @@ describe("[FL-019] reading an ONU never changes it", () => {
     expect(status(await read({ clockId: QA })).operState).toBe("ONLINE");
     expect(status(await read({ clockId: DEMO })).operState).toBe("LOS");
     // A world that was not seeded with this ONU does not know it.
-    expect((await read({ clockId: JUDGE })).status).toBe(404);
+    expect((await read({ clockId: GUEST })).status).toBe(404);
   });
 });
 
@@ -232,8 +232,8 @@ describe("faults only in qa-* worlds", () => {
     expect(deps.sleep).toHaveBeenLastCalledWith(FAULT_LATENCY_MS);
   });
 
-  it("ignores a fault header in demo, judge and evaluation worlds", async () => {
-    for (const clockId of [DEMO, JUDGE, EVAL]) {
+  it("ignores a fault header in demo, guest and evaluation worlds", async () => {
+    for (const clockId of [DEMO, GUEST, EVAL]) {
       if (clockId !== DEMO) seed([{ behaviour: "ONLINE_OK", clockId }]);
       expect(status(await read({ clockId, headers: { "X-Fault": "ERROR_503" } })).operState).toBe("ONLINE");
     }

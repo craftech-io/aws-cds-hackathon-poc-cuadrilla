@@ -5,7 +5,7 @@
 //   ispProcedure          a verified principal of an active registry user, bound to its operator's
 //                         world; every id of the input is fenced to that operator (auth/fence.ts):
 //                         an id of another one → 403 + `AuditLog DENY CROSS_ISP`
-//   supervisorProcedure   + role SUPERVISOR or JUDGE (a judge acts as supervisor in its own world)
+//   supervisorProcedure   + role SUPERVISOR or GUEST (a guest acts as supervisor in its own world)
 //   recentLoginProcedure  + an interactive sign-in at most 15 minutes old (manual validation, ADR-0011)
 //
 // `ispId`, `role` and the world come from the principal, never from the input. A request's principal
@@ -228,9 +228,9 @@ function enforceRole(ctx: IspContext, path: string, roles: readonly ConsoleRole[
   refuse(ctx.log, path, new AuthError(AUTH_REASON.ROLE_NOT_ALLOWED, `this procedure needs one of: ${roles.join(", ")}`));
 }
 
-/** Operator + role SUPERVISOR or JUDGE. */
+/** Operator + role SUPERVISOR or GUEST. */
 export const supervisorProcedure = ispProcedure.use(({ ctx, next, path }) => {
-  enforceRole(ctx, path, ["SUPERVISOR", "JUDGE"]);
+  enforceRole(ctx, path, ["SUPERVISOR", "GUEST"]);
   return next();
 });
 

@@ -87,7 +87,7 @@ describe("row codecs", () => {
       key: { PK: "PERSON#inst-rogelio", SK: "MSG#2026-10-13T15:20:00.000Z#m1" },
       gsi: { workOrderKey: "WO#wo-24817", sentAtSim: "2026-10-13T15:20:00.000Z" },
     });
-    expect(encodeRow("Timer", { home: { kind: "CASE", id: "case-x" }, kind: "CASE_TIMEOUT", timerId: "PRIMARY", clockId: "JUDGE#isp-judge-07", status: "FIRED", dueAtSim: "2026-10-13T12:00:00-06:00" })).toMatchObject({
+    expect(encodeRow("Timer", { home: { kind: "CASE", id: "case-x" }, kind: "CASE_TIMEOUT", timerId: "PRIMARY", clockId: "GUEST#isp-guest-07", status: "FIRED", dueAtSim: "2026-10-13T12:00:00-06:00" })).toMatchObject({
       table: "Cases",
       key: { PK: "CASE#case-x", SK: "TIMER#CASE_TIMEOUT#PRIMARY" },
       gsi: {},
@@ -101,15 +101,15 @@ describe("row codecs", () => {
 });
 
 describe("world policy", () => {
-  it("scopes QA and evaluation worlds for 48 h, tags judge worlds and keeps the demo world", () => {
+  it("scopes QA and evaluation worlds for 48 h, tags guest worlds and keeps the demo world", () => {
     const qa = defaultWorldPolicy("qa-812-1-sc-02", "WorkOrders", NOW);
     expect(qa).toEqual({ world: "qa", expiresAt: EPOCH_NOW + 48 * 3600 });
     expect(defaultWorldPolicy("eval-812-1", "Cases", NOW)).toEqual({ world: "eval", expiresAt: EPOCH_NOW + 48 * 3600 });
-    expect(defaultWorldPolicy("JUDGE#isp-judge-test", "People", NOW)).toEqual({ world: "qa" });
-    expect(defaultWorldPolicy("JUDGE#isp-judge-07", "People", NOW)).toEqual({ world: "judge" });
+    expect(defaultWorldPolicy("GUEST#isp-guest-test", "People", NOW)).toEqual({ world: "qa" });
+    expect(defaultWorldPolicy("GUEST#isp-guest-07", "People", NOW)).toEqual({ world: "guest" });
     expect(defaultWorldPolicy("GLOBAL#isp-demo", "WorkOrders", NOW)).toEqual({});
     expect(defaultWorldPolicy("GLOBAL#isp-demo", "Conversations", NOW)).toEqual({ expiresAt: EPOCH_NOW + 90 * 86400 });
-    expect(defaultWorldPolicy("JUDGE#isp-judge-07", "AuditLog", NOW)).toEqual({ world: "judge", expiresAt: EPOCH_NOW + 365 * 86400 });
+    expect(defaultWorldPolicy("GUEST#isp-guest-07", "AuditLog", NOW)).toEqual({ world: "guest", expiresAt: EPOCH_NOW + 365 * 86400 });
     expect(defaultWorldPolicy(undefined, "Runtime", NOW)).toEqual({});
     expect(defaultWorldPolicy("qa-812-1-sc-02", "Reference", NOW)).toEqual({});
   });
@@ -122,7 +122,7 @@ describe("rows ops/ writes in Runtime", () => {
     expect(CapCounter.shape.period.options).toEqual(CapPeriod.options);
     expect(KillSwitch.shape.state.options).toEqual(KillState.options);
     expect(KillSwitch.shape.setBy.options).toEqual(KillActor.options);
-    const counter = { PK: "SIMCAP#JUDGE#isp-judge-07#turns#2026-10-13", SK: "META", entity: "CapCounter", used: 3, ledger: "SIMULATOR", resource: "turns", period: "DAY", capLimit: 300, expiresAt: EPOCH_NOW, createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() };
+    const counter = { PK: "SIMCAP#GUEST#isp-guest-07#turns#2026-10-13", SK: "META", entity: "CapCounter", used: 3, ledger: "SIMULATOR", resource: "turns", period: "DAY", capLimit: 300, expiresAt: EPOCH_NOW, createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() };
     expect(checkEntity("Runtime", counter)).toMatchObject({ ok: true, entity: "CapCounter" });
     expect(encodeRow("CapCounter", counter).key).toEqual({ PK: counter.PK, SK: "META" });
     const record = KillSwitchRecord.parse({ scope: "AGENT", clockId: "qa-812-1-sc-02", state: "on", setBy: "QA", setAtReal: NOW.toISOString() });

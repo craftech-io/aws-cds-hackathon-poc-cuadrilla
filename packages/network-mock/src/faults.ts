@@ -1,5 +1,5 @@
 // Faults of a world (docs/architecture-integrations.md §6): `ERROR_503`, `TIMEOUT` and `LATENCY`, only
-// for `qa-*` clocks, never for `GLOBAL#*` or `JUDGE#*`. The `QaDriver` writes them in
+// for `qa-*` clocks, never for `GLOBAL#*` or `GUEST#*`. The `QaDriver` writes them in
 // `Runtime/FAULTS#<clockId>`; the client reads that item for `qa-*` clocks and asks for the fault with
 // `X-Fault`, the way a proxy's fault-injection header works, so this Lambda needs no table besides
 // `Network`. The header of any other world is ignored. Faults apply to the contract's read only:

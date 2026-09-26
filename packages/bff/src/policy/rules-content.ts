@@ -4,7 +4,7 @@
 //                        address; the caller passes its verdict) and within the world's daily cap
 //   CP-CERT-EVIDENCE     the certificate only for a CLOSED order, with the stored PDF's SHA-256
 //   CP-NO-SENSITIVE-ASK  no text asks for IDs, bank or card data, passwords or payments (a person's
-//                        text on the bridge is masked, not judged)
+//                        text on the bridge is masked, not censored)
 //   CP-NO-FOREIGN-LINKS  no link, domain, email or phone; the console link of its own case is the
 //                        one URL a zone chief alert may carry
 //   CP-CITATION          an agent reply with policy or procedure statements cites a section that
@@ -61,7 +61,7 @@ function textOf(message: PolicyMessage): string | undefined {
 function noSensitiveAsk({ message }: PolicyInput): RuleOutcome {
   const text = textOf(message);
   if (text === undefined) return notApplicable();
-  if (message.author === "PERSON") return notApplicable({ detail: "a person's text is masked, not judged" });
+  if (message.author === "PERSON") return notApplicable({ detail: "a person's text is masked, not censored" });
   const pattern = findSensitiveAsk(text);
   return pattern === null ? pass() : fail("SENSITIVE_ASK", { detail: `pattern ${pattern}` });
 }

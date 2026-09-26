@@ -5,12 +5,12 @@
 //              `simulated` and, once P-01 is closed, `live`;
 //   world      `Isps/SETTINGS.whatsappMode`: `live` only for the single live world;
 //   recipient  a real phone of the live world (registered by the operator in `SeedOverrides`, the
-//              only way a real phone enters it), or one bound to a judge world by a join code
+//              only way a real phone enters it), or one bound to a guest world by a join code
 //              (`PHONELEASE#`), goes out through End User Messaging Social; every synthetic identity
 //              (the `+52 55 0xxx xxxx` block of docs/seed-spec.md §2), and any other number, through
 //              the simulated transport.
 //
-// So a judge keeps the phone simulator while the stage has the live channel, and nothing reaches a
+// So a guest keeps the phone simulator while the stage has the live channel, and nothing reaches a
 // phone live unless it was proved real (registered by the operator, or bound by a code sent from that
 // very phone). The transports come from their adapters as factories (channels/email,
 // channels/whatsapp): the registry builds each one once, never imports a channel SDK, and refuses a

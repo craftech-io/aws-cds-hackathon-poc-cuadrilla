@@ -4,7 +4,7 @@ import { processInboundEvent } from "./inbound";
 import {
   DEMO,
   JPEG,
-  JUDGE,
+  GUEST,
   OGG,
   PEOPLE,
   UNKNOWN_PHONE,
@@ -22,7 +22,7 @@ import {
 } from "./testing";
 
 const ROGELIO = PEOPLE.rogelio;
-const ROGELIO_J07 = PEOPLE.rogelioJ07;
+const ROGELIO_G07 = PEOPLE.rogelioG07;
 
 /** What the channel stored of a message, without what only the transport changes. */
 function essence(message: Message | undefined) {
@@ -39,9 +39,9 @@ describe("inbound message with the real shape of End User Messaging Social", () 
     const live = await inboundHarness();
     const sim = await inboundHarness();
     const liveButton = await nonceFor(live, "rogelio", "CHOOSE_ITEM", { kind: "ITEM", id: "ROSETTE_PHOTO" });
-    const simButton = await nonceFor(sim, "rogelioJ07", "CHOOSE_ITEM", { kind: "ITEM", id: "ROSETTE_PHOTO" });
+    const simButton = await nonceFor(sim, "rogelioG07", "CHOOSE_ITEM", { kind: "ITEM", id: "ROSETTE_PHOTO" });
     const liveReply = await nonceFor(live, "rogelio", "NO_THANKS", { kind: "MESSAGE", id: "wamid.OUT1" });
-    const simReply = await nonceFor(sim, "rogelioJ07", "NO_THANKS", { kind: "MESSAGE", id: "wamid.OUT1" });
+    const simReply = await nonceFor(sim, "rogelioG07", "NO_THANKS", { kind: "MESSAGE", id: "wamid.OUT1" });
     await simUpload(sim, "up-voice-01", "VOICE", OGG(), "audio/ogg");
     await simUpload(sim, "up-photo-01", "PHOTO", JPEG(), "image/jpeg");
 
@@ -62,35 +62,35 @@ describe("inbound message with the real shape of End User Messaging Social", () 
 
     for (const [index, message] of liveMessages.entries()) {
       const liveResult = await processInboundEvent(liveEvent({ messages: [message] }), live.deps);
-      const simResult = await processInboundEvent(simEvent(JUDGE, ROGELIO_J07.phone, `wamid.SIM.S${index}`, simContents[index] ?? { type: "text", body: "" }), sim.deps);
+      const simResult = await processInboundEvent(simEvent(GUEST, ROGELIO_G07.phone, `wamid.SIM.S${index}`, simContents[index] ?? { type: "text", body: "" }), sim.deps);
       expect(await outcomes(liveResult)).toEqual(await outcomes(simResult));
       expect(await outcomes(liveResult)).toEqual([index === 1 || index === 2 ? "BUTTON" : "QUEUED"]);
       const [liveStored] = await live.world.connector.conversations.listMessages(ROGELIO.personId, { descending: true, limit: 1 });
-      const [simStored] = await sim.world.connector.conversations.listMessages(ROGELIO_J07.personId, { descending: true, limit: 1 });
+      const [simStored] = await sim.world.connector.conversations.listMessages(ROGELIO_G07.personId, { descending: true, limit: 1 });
       expect(essence(liveStored)).toEqual(essence(simStored));
       expect(liveStored).toMatchObject({ transport: "live", simulated: false, clockId: DEMO });
-      expect(simStored).toMatchObject({ transport: "simulated", simulated: true, clockId: JUDGE });
+      expect(simStored).toMatchObject({ transport: "simulated", simulated: true, clockId: GUEST });
     }
     const [first] = await live.world.connector.conversations.listMessages(ROGELIO.personId, { limit: 1 });
     expect(first?.text).toContain("[TELEFONO]");
     expect(first?.text).not.toContain("5512345678");
     expect(live.rec.queued.map((event) => event.type)).toEqual(["INBOUND_MESSAGE", "INBOUND_MESSAGE", "INBOUND_MESSAGE", "INBOUND_MESSAGE", "INBOUND_MESSAGE"]);
     expect(live.rec.queued.every((event) => event.installerId === ROGELIO.personId && event.clockId === DEMO)).toBe(true);
-    expect(sim.rec.queued.every((event) => event.installerId === ROGELIO_J07.personId && event.clockId === JUDGE)).toBe(true);
+    expect(sim.rec.queued.every((event) => event.installerId === ROGELIO_G07.personId && event.clockId === GUEST)).toBe(true);
   });
 
   it("[FL-091] a live phone enters its world by its lease first, otherwise by the live world", async () => {
     const h = await inboundHarness();
-    const code = await h.world.connector.worlds.createJoinCode({ code: "J07-4F2K", clockId: JUDGE, personId: ROGELIO_J07.personId, userId: "usr-judge-07" });
-    const judgePhone = "+12025550101";
-    await h.world.connector.worlds.bindPhoneLease(code.code, hashOf(judgePhone));
-    await processInboundEvent(liveEvent({ messages: [waText(judgePhone, "wamid.J1", "Hola, ya llegué")] }), h.deps);
+    const code = await h.world.connector.worlds.createJoinCode({ code: "G07-4F2K", clockId: GUEST, personId: ROGELIO_G07.personId, userId: "usr-guest-07" });
+    const guestPhone = "+12025550101";
+    await h.world.connector.worlds.bindPhoneLease(code.code, hashOf(guestPhone));
+    await processInboundEvent(liveEvent({ messages: [waText(guestPhone, "wamid.J1", "Hola, ya llegué")] }), h.deps);
     await processInboundEvent(liveEvent({ messages: [waText(ROGELIO.phone, "wamid.D1", "Hola, ya llegué")] }), h.deps);
     expect(h.rec.queued.map((event) => [event.clockId, event.installerId])).toEqual([
-      [JUDGE, ROGELIO_J07.personId],
+      [GUEST, ROGELIO_G07.personId],
       [DEMO, ROGELIO.personId],
     ]);
-    const lease = await h.world.connector.worlds.getPhoneLease(hashOf(judgePhone));
+    const lease = await h.world.connector.worlds.getPhoneLease(hashOf(guestPhone));
     expect(lease?.lastInboundAtReal).toBe("2026-10-13T15:20:00.000Z");
   });
 });
@@ -117,19 +117,19 @@ describe("who gets past the channel", () => {
 
   it("[FL-004] simulated unknown number: one fixed reply per number and simulated day, no turn, no body kept", async () => {
     const h = await inboundHarness();
-    const unknownJ07 = "+525502079999";
-    await processInboundEvent(simEvent(JUDGE, unknownJ07, "wamid.SIM.U1", { type: "text", body: "Mi CURP es de prueba" }), h.deps);
-    await processInboundEvent(simEvent(JUDGE, unknownJ07, "wamid.SIM.U2", { type: "text", body: "¿Hola?" }), h.deps);
-    expect(h.rec.notices).toMatchObject([{ notice: "unknownNumber", text: "Este número es de uso interno de la operadora.", recipient: { phoneHash: hashOf(unknownJ07) } }]);
+    const unknownG07 = "+525502079999";
+    await processInboundEvent(simEvent(GUEST, unknownG07, "wamid.SIM.U1", { type: "text", body: "Mi CURP es de prueba" }), h.deps);
+    await processInboundEvent(simEvent(GUEST, unknownG07, "wamid.SIM.U2", { type: "text", body: "¿Hola?" }), h.deps);
+    expect(h.rec.notices).toMatchObject([{ notice: "unknownNumber", text: "Este número es de uso interno de la operadora.", recipient: { phoneHash: hashOf(unknownG07) } }]);
     expect(h.rec.notices[0]?.recipient.personId).toBeUndefined();
     expect(h.rec.queued).toEqual([]);
-    const denials = await h.world.connector.audit.listByDecision("isp-judge-07", "DENY");
+    const denials = await h.world.connector.audit.listByDecision("isp-guest-07", "DENY");
     expect(denials).toHaveLength(2);
-    expect(denials[0]).toMatchObject({ action: "UNKNOWN_SENDER", ruleIds: ["CP-ALLOWLIST"], detail: { phoneHash: hashOf(unknownJ07), replied: true } });
+    expect(denials[0]).toMatchObject({ action: "UNKNOWN_SENDER", ruleIds: ["CP-ALLOWLIST"], detail: { phoneHash: hashOf(unknownG07), replied: true } });
     expect(JSON.stringify(denials)).not.toContain("CURP");
-    const clock = await h.world.connector.runtime.getClock(JUDGE);
-    await h.world.connector.runtime.updateClock(JUDGE, { pausedSimNow: "2026-10-14T08:00:00-06:00" }, clock?.version ?? 0);
-    await processInboundEvent(simEvent(JUDGE, unknownJ07, "wamid.SIM.U3", { type: "text", body: "Hola de nuevo" }), h.deps);
+    const clock = await h.world.connector.runtime.getClock(GUEST);
+    await h.world.connector.runtime.updateClock(GUEST, { pausedSimNow: "2026-10-14T08:00:00-06:00" }, clock?.version ?? 0);
+    await processInboundEvent(simEvent(GUEST, unknownG07, "wamid.SIM.U3", { type: "text", body: "Hola de nuevo" }), h.deps);
     expect(h.rec.notices).toHaveLength(2);
   });
 
@@ -161,7 +161,7 @@ describe("who gets past the channel", () => {
     const event = liveEvent({ messages: [waText(ROGELIO.phone, "wamid.DUP", "Ya limpié el conector")] });
     expect(await outcomes(await processInboundEvent(event, h.deps))).toEqual(["QUEUED"]);
     expect(await outcomes(await processInboundEvent(event, h.deps))).toEqual(["DUPLICATE"]);
-    const sim = simEvent(JUDGE, ROGELIO_J07.phone, "wamid.SIM.DUP", { type: "text", body: "Ya limpié el conector" });
+    const sim = simEvent(GUEST, ROGELIO_G07.phone, "wamid.SIM.DUP", { type: "text", body: "Ya limpié el conector" });
     await processInboundEvent(sim, h.deps);
     expect(await outcomes(await processInboundEvent(sim, h.deps))).toEqual(["DUPLICATE"]);
     expect(await h.world.connector.conversations.listMessages(ROGELIO.personId)).toHaveLength(1);

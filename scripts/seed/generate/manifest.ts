@@ -6,7 +6,7 @@ import { fingerprint, type Manifest } from "../lib/manifest";
 import { SEED_TABLES, TableFile } from "../lib/tables";
 import { TEMPLATE_NAMES } from "../lib/worlds";
 import { SEED, sha256Hex } from "../photos/prng";
-import { APP, GENERATOR, GENERATOR_VERSION, SEED_CLOCK } from "./context";
+import { GENERATOR, GENERATOR_VERSION, PRODUCT, SEED_CLOCK } from "./context";
 import type { Media } from "./media";
 import { WORLD_START_SIM } from "./time";
 
@@ -28,7 +28,7 @@ export function buildManifest(files: ReadonlyMap<string, string>, media: Media, 
   const photos = required(files, DATA_LAYOUT.photos);
   const disk = (path: string): string => sha256Hex(readFileSync(fromRoot(path)));
   return {
-    app: APP,
+    product: PRODUCT,
     generator: GENERATOR,
     generatorVersion: GENERATOR_VERSION,
     seed: SEED,

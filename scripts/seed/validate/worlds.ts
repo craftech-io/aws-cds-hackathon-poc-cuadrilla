@@ -1,6 +1,6 @@
 // Invariants of the work of a world (docs/seed-spec.md §14): 1 checklist, ONU and history of every
 // order; 2 numbers, serials and story photos; 4 opt-in of the people who receive WhatsApp; 5 rosters
-// and zone chiefs; 19 the judge template's tour window, scenes and day-start timers.
+// and zone chiefs; 19 the guest template's tour window, scenes and day-start timers.
 import { ChecklistItem, WORK_ORDER_NUMBER_RANGES } from "@cuadrilla/shared";
 import { DAYS, DAY_START_TIME, sim } from "../generate/time";
 import type { SeedItem } from "../lib/tables";
@@ -129,36 +129,36 @@ function dayStarts(world: SeedWorld): string[] {
   return errors;
 }
 
-function judgeTour(bundle: SeedBundle): string[] {
+function guestTour(bundle: SeedBundle): string[] {
   const errors = worldsOf(bundle).flatMap(dayStarts);
-  const judge = bundle.judge;
-  if (judge?.tour === undefined || judge.scenes === undefined) return [...errors, "judge: the template declares no tour or no scenes"];
-  if (judge.placeholders === undefined || judge.judgeTest === undefined) errors.push("judge: the template declares no placeholders or no judge-test overrides");
+  const guest = bundle.guest;
+  if (guest?.tour === undefined || guest.scenes === undefined) return [...errors, "guest: the template declares no tour or no scenes"];
+  if (guest.placeholders === undefined || guest.guestTest === undefined) errors.push("guest: the template declares no placeholders or no guest-test overrides");
   const idFields: ReadonlyArray<readonly [string, string]> = [
     ["Person", "personId"],
     ["Customer", "customerId"],
     ["WorkOrder", "workOrderId"],
   ];
-  for (const item of [...judge.tables.People, ...judge.tables.WorkOrders]) {
+  for (const item of [...guest.tables.People, ...guest.tables.WorkOrders]) {
     const field = idFields.find(([entity]) => entity === item.entity)?.[1];
-    if (field !== undefined && !str(item, field).endsWith("-j00")) errors.push(`judge: ${str(item, field)} does not carry the placeholder tag j00`);
+    if (field !== undefined && !str(item, field).endsWith("-g00")) errors.push(`guest: ${str(item, field)} does not carry the placeholder tag g00`);
   }
-  const { windowStartSim, windowEndSim } = judge.tour;
+  const { windowStartSim, windowEndSim } = guest.tour;
   const inWindow = (instant: string): boolean => Date.parse(instant) >= Date.parse(windowStartSim) && Date.parse(instant) <= Date.parse(windowEndSim);
-  const timers = [...judge.tables.WorkOrders, ...judge.tables.People, ...judge.tables.Cases].filter((item) => item.entity === "Timer");
-  for (const timer of timers) if (timer.kind !== "DAY_START" && inWindow(str(timer, "dueAtSim"))) errors.push(`judge: timer ${String(timer.timerId)} inside the tour window`);
-  const orders = new Map(judge.tables.WorkOrders.filter((item) => item.entity === "WorkOrder").map((order) => [str(order, "workOrderId"), order]));
-  const installers = new Set(judge.tables.People.filter((item) => item.entity === "Person" && item.role === "INSTALLER").map((person) => str(person, "personId")));
-  for (const id of judge.tour.workOrderIds) if (orders.get(id)?.installerId !== judge.tour.installerId) errors.push(`judge: tour order ${id} is not an order of ${judge.tour.installerId}`);
+  const timers = [...guest.tables.WorkOrders, ...guest.tables.People, ...guest.tables.Cases].filter((item) => item.entity === "Timer");
+  for (const timer of timers) if (timer.kind !== "DAY_START" && inWindow(str(timer, "dueAtSim"))) errors.push(`guest: timer ${String(timer.timerId)} inside the tour window`);
+  const orders = new Map(guest.tables.WorkOrders.filter((item) => item.entity === "WorkOrder").map((order) => [str(order, "workOrderId"), order]));
+  const installers = new Set(guest.tables.People.filter((item) => item.entity === "Person" && item.role === "INSTALLER").map((person) => str(person, "personId")));
+  for (const id of guest.tour.workOrderIds) if (orders.get(id)?.installerId !== guest.tour.installerId) errors.push(`guest: tour order ${id} is not an order of ${guest.tour.installerId}`);
   for (const track of ["express", "full"] as const) {
-    for (const step of duplicates(judge.scenes.flatMap((scene) => scene.steps[track]))) errors.push(`judge: step ${step} of the ${track} tour has two scenes`);
+    for (const step of duplicates(guest.scenes.flatMap((scene) => scene.steps[track]))) errors.push(`guest: step ${step} of the ${track} tour has two scenes`);
   }
-  for (const scene of judge.scenes) {
-    if (!inWindow(scene.advanceToSim)) errors.push(`judge scene ${scene.sceneId}: ${scene.advanceToSim} outside the tour window`);
-    if (!installers.has(scene.installer.personId)) errors.push(`judge scene ${scene.sceneId}: unknown installer ${scene.installer.personId}`);
+  for (const scene of guest.scenes) {
+    if (!inWindow(scene.advanceToSim)) errors.push(`guest scene ${scene.sceneId}: ${scene.advanceToSim} outside the tour window`);
+    if (!installers.has(scene.installer.personId)) errors.push(`guest scene ${scene.sceneId}: unknown installer ${scene.installer.personId}`);
     const active = scene.installer.activeWorkOrderId;
-    if (active !== undefined && orders.get(active)?.installerId !== scene.installer.personId) errors.push(`judge scene ${scene.sceneId}: active order ${active} is not the installer's`);
-    for (const id of Object.keys(scene.orders)) if (!orders.has(id)) errors.push(`judge scene ${scene.sceneId}: unknown order ${id}`);
+    if (active !== undefined && orders.get(active)?.installerId !== scene.installer.personId) errors.push(`guest scene ${scene.sceneId}: active order ${active} is not the installer's`);
+    for (const id of Object.keys(scene.orders)) if (!orders.has(id)) errors.push(`guest scene ${scene.sceneId}: unknown order ${id}`);
   }
   return errors;
 }
@@ -168,5 +168,5 @@ export const WORLD_INVARIANTS: readonly Invariant[] = [
   { id: 2, title: "Unique numbers in range and serials; serials of the story photos", check: (bundle) => finding(numbersAndSerials(bundle)) },
   { id: 4, title: "Opt-in of everyone who receives WhatsApp, except inst-julian and inst-ernesto", check: (bundle) => finding(optIn(bundle)) },
   { id: 5, title: "Roster with two supervisors of the crew for every day with orders; a chief per zone", check: (bundle) => finding(rosters(bundle)) },
-  { id: 19, title: "Judge template: DAY_START per active installer, no other timer in the tour window, scenes that exist", check: (bundle) => finding(judgeTour(bundle)) },
+  { id: 19, title: "Guest template: DAY_START per active installer, no other timer in the tour window, scenes that exist", check: (bundle) => finding(guestTour(bundle)) },
 ];

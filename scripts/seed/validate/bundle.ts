@@ -10,9 +10,9 @@ import { QuestionsFile } from "../lib/questions";
 import { SEED_TABLES, TableFile, WORLD_TABLES, emptyTables, type SeedItem, type SeedTable, type WorldTable } from "../lib/tables";
 import { EvalTemplate, ModelsTemplate, QaMinTemplate, WorldTablesTemplate } from "../lib/worlds";
 
-/** One world of the seed item by item: the demo world of the table files, or the judge template. */
+/** One world of the seed item by item: the demo world of the table files, or the guest template. */
 export interface SeedWorld {
-  readonly name: "demo" | "judge";
+  readonly name: "demo" | "guest";
   readonly tables: Readonly<Record<WorldTable, readonly SeedItem[]>>;
 }
 
@@ -20,7 +20,7 @@ export interface SeedBundle {
   readonly files: ReadonlyMap<string, string>;
   readonly tables: Readonly<Record<SeedTable, readonly SeedItem[]>>;
   readonly demo?: WorldTablesTemplate;
-  readonly judge?: WorldTablesTemplate;
+  readonly guest?: WorldTablesTemplate;
   readonly models?: ModelsTemplate;
   readonly qaMin?: QaMinTemplate;
   readonly evalTemplate?: EvalTemplate;
@@ -75,7 +75,7 @@ export function bundleOf(files: ReadonlyMap<string, string>, media: Media = read
     tables[table] = file.items;
   }
   const demo = parse(files, worldFile("demo"), WorldTablesTemplate, problems);
-  const judge = parse(files, worldFile("judge"), WorldTablesTemplate, problems);
+  const guest = parse(files, worldFile("guest"), WorldTablesTemplate, problems);
   const models = parse(files, worldFile("models"), ModelsTemplate, problems);
   const qaMin = parse(files, worldFile("qa-min"), QaMinTemplate, problems);
   const evalTemplate = parse(files, worldFile("eval"), EvalTemplate, problems);
@@ -86,7 +86,7 @@ export function bundleOf(files: ReadonlyMap<string, string>, media: Media = read
     media,
     problems,
     ...(demo === undefined ? {} : { demo }),
-    ...(judge === undefined ? {} : { judge }),
+    ...(guest === undefined ? {} : { guest }),
     ...(models === undefined ? {} : { models }),
     ...(qaMin === undefined ? {} : { qaMin }),
     ...(evalTemplate === undefined ? {} : { evalTemplate }),
@@ -94,10 +94,10 @@ export function bundleOf(files: ReadonlyMap<string, string>, media: Media = read
   };
 }
 
-/** The worlds whose items the invariants check: the demo world of the table files and the judge template. */
+/** The worlds whose items the invariants check: the demo world of the table files and the guest template. */
 export function worldsOf(bundle: SeedBundle): SeedWorld[] {
   const demoTables = Object.fromEntries(WORLD_TABLES.map((table) => [table, bundle.tables[table]])) as Record<WorldTable, readonly SeedItem[]>;
-  return [{ name: "demo", tables: demoTables }, ...(bundle.judge === undefined ? [] : [{ name: "judge" as const, tables: bundle.judge.tables }])];
+  return [{ name: "demo", tables: demoTables }, ...(bundle.guest === undefined ? [] : [{ name: "guest" as const, tables: bundle.guest.tables }])];
 }
 
 /** Items of one entity in a world. */

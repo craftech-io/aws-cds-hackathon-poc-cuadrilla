@@ -42,7 +42,7 @@ export const ErrorCode = z.enum([
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
 /** Console roles, in precedence order (docs/architecture.md §10). */
-export const ConsoleRole = z.enum(["SUPERVISOR", "JUDGE", "OPS"]);
+export const ConsoleRole = z.enum(["SUPERVISOR", "GUEST", "OPS"]);
 export type ConsoleRole = z.infer<typeof ConsoleRole>;
 
 export const Weekday = z.enum(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]);
@@ -183,8 +183,8 @@ export type ClockMode = z.infer<typeof ClockMode>;
 
 // ---- Closed sets of docs/architecture.md that cross packages ------------------------------------
 
-/** `Isp.kind` (docs/architecture.md §5): the operator of the demo, a judge's copy, a QA or an evaluation world. */
-export const IspKind = z.enum(["DEMO", "JUDGE", "QA", "EVAL"]);
+/** `Isp.kind` (docs/architecture.md §5): the operator of the demo, a guest's copy, a QA or an evaluation world. */
+export const IspKind = z.enum(["DEMO", "GUEST", "QA", "EVAL"]);
 export type IspKind = z.infer<typeof IspKind>;
 
 /** People of an operator by role (`People` GSI2 `ispKindKey`, docs/architecture.md §5). */

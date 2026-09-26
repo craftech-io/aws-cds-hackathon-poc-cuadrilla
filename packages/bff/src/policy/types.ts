@@ -83,8 +83,8 @@ export type PolicyMessage = z.output<typeof PolicyMessage>;
  * How a WhatsApp recipient is reached (ADR-0002); it fixes the clock of the time rules:
  *   SIMULATED    a synthetic identity of any world: simulated transport, the world's clock
  *   LIVE_WORLD   a real phone of the live world (`SeedOverrides.personPhones`): EUM Social, real clock
- *   PHONE_LEASE  a real phone bound by code to a judge world (`PHONELEASE#`): EUM Social, real clock
- *                and no quiet hours (`NOT_APPLICABLE_LEASE`: the judge is talking to it right then)
+ *   PHONE_LEASE  a real phone bound by code to a guest world (`PHONELEASE#`): EUM Social, real clock
+ *                and no quiet hours (`NOT_APPLICABLE_LEASE`: the guest is talking to it right then)
  */
 export const WhatsAppRoute = z.enum(["SIMULATED", "LIVE_WORLD", "PHONE_LEASE"]);
 export type WhatsAppRoute = z.infer<typeof WhatsAppRoute>;

@@ -36,7 +36,7 @@ export function duplicates(values: readonly string[]): string[] {
   return [...repeated];
 }
 
-/** The id of a person or customer without the placeholder judge tag (`inst-rogelio-j00` → `inst-rogelio`). */
+/** The id of a person or customer without the placeholder guest tag (`inst-rogelio-g00` → `inst-rogelio`). */
 export function baseId(id: string): string {
-  return id.replace(/-j00$/, "");
+  return id.replace(/-g00$/, "");
 }

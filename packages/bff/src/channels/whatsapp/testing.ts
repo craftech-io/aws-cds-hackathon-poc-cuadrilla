@@ -3,7 +3,7 @@
 // signed with SHA256withRSA (a key generated per run stands for SNS's certificate), `context` with the
 // Meta id and the ARN of the AWS id, and `whatsAppWebhookEntry` as a JSON string. The two ids of the
 // number always differ, as they do in reality. People and numbers are the synthetic ones of
-// docs/seed-spec.md (demo block `+52 55 0101 …`, judge world 07 block `+52 55 0207 …`).
+// docs/seed-spec.md (demo block `+52 55 0101 …`, guest world 07 block `+52 55 0207 …`).
 import { createSign, generateKeyPairSync } from "node:crypto";
 import type { WaButtonAction, WhatsAppMode } from "@cuadrilla/shared";
 import { testConnector } from "../../connector/testing";
@@ -35,7 +35,7 @@ export const REAL_NOW = "2026-10-13T15:20:00.000Z";
 export const SIM_START = "2026-10-13T07:00:00-06:00";
 
 export const DEMO = "GLOBAL#isp-demo";
-export const JUDGE = "JUDGE#isp-judge-07";
+export const GUEST = "GUEST#isp-guest-07";
 
 /** Staff of the two worlds: [personId, role, phone, consent]. */
 export const PEOPLE = {
@@ -43,8 +43,8 @@ export const PEOPLE = {
   julian: { personId: "inst-julian", clockId: DEMO, role: "INSTALLER", firstName: "Julián", phone: "+525501010003", consent: undefined },
   ernesto: { personId: "inst-ernesto", clockId: DEMO, role: "INSTALLER", firstName: "Ernesto", phone: "+525501010006", consent: "REVOKED" },
   adriana: { personId: "sup-adriana", clockId: DEMO, role: "SUPERVISOR", firstName: "Adriana", phone: "+525501020001", consent: "GRANTED" },
-  rogelioJ07: { personId: "inst-rogelio-j07", clockId: JUDGE, role: "INSTALLER", firstName: "Rogelio", phone: "+525502070001", consent: "GRANTED" },
-  hectorJ07: { personId: "sup-hector-j07", clockId: JUDGE, role: "SUPERVISOR", firstName: "Héctor", phone: "+525502070102", consent: "GRANTED" },
+  rogelioG07: { personId: "inst-rogelio-g07", clockId: GUEST, role: "INSTALLER", firstName: "Rogelio", phone: "+525502070001", consent: "GRANTED" },
+  hectorG07: { personId: "sup-hector-g07", clockId: GUEST, role: "SUPERVISOR", firstName: "Héctor", phone: "+525502070102", consent: "GRANTED" },
 } as const;
 export type PersonKey = keyof typeof PEOPLE;
 
@@ -134,9 +134,9 @@ export const liveEvent = (options: LiveRecordOptions = {}) => ({ Records: [liveR
 
 export async function seedWorlds(world: ReturnType<typeof testConnector>, liveWorld: boolean = true): Promise<void> {
   const { connector } = world;
-  const worlds: ReadonlyArray<readonly [string, string, "DEMO" | "JUDGE", WhatsAppMode]> = [
+  const worlds: ReadonlyArray<readonly [string, string, "DEMO" | "GUEST", WhatsAppMode]> = [
     [DEMO, "isp-demo", "DEMO", liveWorld ? "live" : "simulated"],
-    [JUDGE, "isp-judge-07", "JUDGE", "simulated"],
+    [GUEST, "isp-guest-07", "GUEST", "simulated"],
   ];
   for (const [clockId, ispId, kind, whatsappMode] of worlds) {
     await connector.runtime.createClock({ clockId, ispId, kind, mode: "PAUSED", offsetMs: 0, pausedSimNow: SIM_START, worldEpoch: 3 });
@@ -154,7 +154,7 @@ export async function seedWorlds(world: ReturnType<typeof testConnector>, liveWo
   }
   if (liveWorld) await connector.worlds.setLiveWorld(DEMO, "OPERATOR");
   for (const person of Object.values(PEOPLE)) {
-    const ispId = person.clockId === DEMO ? "isp-demo" : "isp-judge-07";
+    const ispId = person.clockId === DEMO ? "isp-demo" : "isp-guest-07";
     await connector.people.createPerson({ personId: person.personId, ispId, clockId: person.clockId, role: person.role, firstName: person.firstName, lastName: "Ficticio", phone: person.phone, phoneHash: hashOf(person.phone), active: true });
     if (person.consent === undefined) continue;
     await connector.people.grantConsent({ personId: person.personId, clockId: person.clockId, medium: "SEED", textVersion: "v001" }, { actor: "SEED", atSim: SIM_START });
@@ -324,10 +324,10 @@ export function nonceFor(h: Harness, key: PersonKey, action: WaButtonAction, obj
   return issueNonce(input, { runtime: h.world.connector.runtime, nonceKey: NONCE_KEY, realClock: { now: async () => h.world.now() } });
 }
 
-/** A simulator upload of the judge world (epoch 3): the `UPLOAD#` row and the object at its key. */
+/** A simulator upload of the guest world (epoch 3): the `UPLOAD#` row and the object at its key. */
 export async function simUpload(h: Harness, uploadId: string, kind: "VOICE" | "PHOTO", bytes: Uint8Array, contentType: string): Promise<string> {
-  const key = simMediaKey(JUDGE, 3, uploadId);
-  await h.world.connector.worlds.createUpload({ uploadId, userId: "usr-judge-07", clockId: JUDGE, key, kind, maxBytes: 3_670_016 });
+  const key = simMediaKey(GUEST, 3, uploadId);
+  await h.world.connector.worlds.createUpload({ uploadId, userId: "usr-guest-07", clockId: GUEST, key, kind, maxBytes: 3_670_016 });
   h.store.put(key, bytes, contentType);
   return key;
 }

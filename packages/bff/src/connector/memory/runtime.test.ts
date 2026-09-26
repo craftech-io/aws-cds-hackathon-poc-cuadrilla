@@ -4,7 +4,7 @@ import { CLOCK, HASH_A, HASH_B, ISP, QA_CLOCK, QA_ISP, testConnector } from "../
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
-const JUDGE = "JUDGE#isp-judge-07";
+const GUEST = "GUEST#isp-guest-07";
 const session = { sessionId: "01J9ZQX0000000000000000000", turnId: "turn-1", ispId: ISP, installerId: "inst-rogelio", workOrderId: "wo-24817", trigger: "INSTALLER_MESSAGE" as const, clockId: CLOCK, eventAtSim: "2026-10-13T09:20:00-06:00" };
 
 describe("runtime state over the memory connector", () => {
@@ -73,25 +73,25 @@ describe("runtime state over the memory connector", () => {
   });
 
   it("reserves plain counters all or nothing, gives them back, and refuses cost-cap keys", async () => {
-    const jump = { counterKey: COUNTER_KEYS.jump(JUDGE, "2026-10-13T13"), kind: "JUMP" as const, by: 1, max: 2 };
-    const rate = { counterKey: COUNTER_KEYS.rateReal(JUDGE, HASH_A, "2026-10-13T13"), kind: "RATE" as const, by: 1, max: 20 };
+    const jump = { counterKey: COUNTER_KEYS.jump(GUEST, "2026-10-13T13"), kind: "JUMP" as const, by: 1, max: 2 };
+    const rate = { counterKey: COUNTER_KEYS.rateReal(GUEST, HASH_A, "2026-10-13T13"), kind: "RATE" as const, by: 1, max: 20 };
     expect(await world.connector.runtime.reserve([jump, rate])).toEqual({ ok: true, values: [1, 1] });
     expect(await world.connector.runtime.reserve([jump])).toEqual({ ok: true, values: [2] });
     expect(await world.connector.runtime.reserve([rate, jump])).toEqual({ ok: false, blockedBy: jump.counterKey });
     expect((await world.connector.runtime.getCounter(rate.counterKey))?.count).toBe(1);
     await world.connector.runtime.release([jump]);
     expect((await world.connector.runtime.getCounter(jump.counterKey))?.count).toBe(1);
-    await expect(world.connector.runtime.reserve([{ counterKey: `SIMCAP#${JUDGE}#turns#2026-10-13`, kind: "COUNTER", by: 1 }])).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(world.connector.runtime.reserve([{ counterKey: `SIMCAP#${GUEST}#turns#2026-10-13`, kind: "COUNTER", by: 1 }])).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
   it("reads the cost-cap counters ops/cost-caps.ts keeps, until they expire", async () => {
-    const key = `SIMCAP#${JUDGE}#turns#2026-10-13`;
+    const key = `SIMCAP#${GUEST}#turns#2026-10-13`;
     const epoch = Math.floor(world.now().getTime() / 1000);
     await world.client.put("Runtime", { PK: key, SK: "META", entity: "CapCounter", used: 12, ledger: "SIMULATOR", resource: "turns", period: "DAY", capLimit: 300, expiresAt: epoch + 3600 });
     expect(await world.connector.runtime.getCapCounter(key)).toMatchObject({ used: 12, capLimit: 300 });
     world.advance(HOUR);
     expect(await world.connector.runtime.getCapCounter(key)).toBeUndefined();
-    await expect(world.connector.runtime.getCapCounter(COUNTER_KEYS.jump(JUDGE, "2026-10-13T13"))).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(world.connector.runtime.getCapCounter(COUNTER_KEYS.jump(GUEST, "2026-10-13T13"))).rejects.toMatchObject({ code: "VALIDATION" });
   });
 });
 
@@ -149,24 +149,24 @@ describe("world runtime state over the memory connector", () => {
   });
 
   it("binds a real phone once with a one-use code, lists it in the world and frees it", async () => {
-    await world.connector.worlds.createJoinCode({ code: "J07-4F2K", clockId: JUDGE, personId: "inst-rogelio-j07", userId: "usr-judge-07" });
-    const lease = await world.connector.worlds.bindPhoneLease("J07-4F2K", HASH_A);
-    expect(lease).toMatchObject({ clockId: JUDGE, personId: "inst-rogelio-j07", joinCode: "J07-4F2K" });
-    await expect(world.connector.worlds.bindPhoneLease("J07-4F2K", HASH_B)).rejects.toMatchObject({ code: "CONFLICT" });
-    await world.connector.worlds.createJoinCode({ code: "J03-7QPM", clockId: "JUDGE#isp-judge-03", personId: "inst-rogelio-j03", userId: "usr-judge-03" });
-    await expect(world.connector.worlds.bindPhoneLease("J03-7QPM", HASH_A)).rejects.toMatchObject({ code: "CONFLICT" });
-    expect((await world.connector.worlds.getJoinCode("J03-7QPM"))?.usedAtReal).toBeUndefined();
+    await world.connector.worlds.createJoinCode({ code: "G07-4F2K", clockId: GUEST, personId: "inst-rogelio-g07", userId: "usr-guest-07" });
+    const lease = await world.connector.worlds.bindPhoneLease("G07-4F2K", HASH_A);
+    expect(lease).toMatchObject({ clockId: GUEST, personId: "inst-rogelio-g07", joinCode: "G07-4F2K" });
+    await expect(world.connector.worlds.bindPhoneLease("G07-4F2K", HASH_B)).rejects.toMatchObject({ code: "CONFLICT" });
+    await world.connector.worlds.createJoinCode({ code: "G03-7QPM", clockId: "GUEST#isp-guest-03", personId: "inst-rogelio-g03", userId: "usr-guest-03" });
+    await expect(world.connector.worlds.bindPhoneLease("G03-7QPM", HASH_A)).rejects.toMatchObject({ code: "CONFLICT" });
+    expect((await world.connector.worlds.getJoinCode("G03-7QPM"))?.usedAtReal).toBeUndefined();
     expect((await world.connector.worlds.touchPhoneLease(HASH_A, "2026-10-13T13:05:00.000Z")).lastInboundAtReal).toBe("2026-10-13T13:05:00.000Z");
-    expect((await world.connector.worlds.listPhoneLeases(JUDGE)).map((listed) => listed.phoneHash)).toEqual([HASH_A]);
+    expect((await world.connector.worlds.listPhoneLeases(GUEST)).map((listed) => listed.phoneHash)).toEqual([HASH_A]);
     await world.connector.worlds.deletePhoneLease(HASH_A);
     expect(await world.connector.worlds.getPhoneLease(HASH_A)).toBeUndefined();
-    expect(await world.connector.worlds.listPhoneLeases(JUDGE)).toEqual([]);
+    expect(await world.connector.worlds.listPhoneLeases(GUEST)).toEqual([]);
     world.advance(31 * MINUTE);
-    await expect(world.connector.worlds.bindPhoneLease("J03-7QPM", HASH_B)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(world.connector.worlds.bindPhoneLease("G03-7QPM", HASH_B)).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("uses a simulator upload once and only while it is valid", async () => {
-    const upload = { uploadId: "up-1", userId: "usr-judge-07", clockId: JUDGE, key: "sim/abcd-e1/up-1", kind: "PHOTO" as const, maxBytes: 3_500_000 };
+    const upload = { uploadId: "up-1", userId: "usr-guest-07", clockId: GUEST, key: "sim/abcd-e1/up-1", kind: "PHOTO" as const, maxBytes: 3_500_000 };
     await world.connector.worlds.createUpload(upload);
     expect((await world.connector.worlds.useUpload("up-1")).usedAtReal).toBeDefined();
     await expect(world.connector.worlds.useUpload("up-1")).rejects.toMatchObject({ code: "CONFLICT" });
@@ -178,15 +178,15 @@ describe("world runtime state over the memory connector", () => {
   it("keeps a single live world", async () => {
     await world.connector.worlds.setLiveWorld(CLOCK, "OPERATOR");
     expect((await world.connector.worlds.setLiveWorld(CLOCK, "OPERATOR")).clockId).toBe(CLOCK);
-    await expect(world.connector.worlds.setLiveWorld(JUDGE, "OPERATOR")).rejects.toMatchObject({ code: "CONFLICT" });
-    await expect(world.connector.worlds.clearLiveWorld(JUDGE)).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(world.connector.worlds.setLiveWorld(GUEST, "OPERATOR")).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(world.connector.worlds.clearLiveWorld(GUEST)).rejects.toMatchObject({ code: "CONFLICT" });
     await world.connector.worlds.clearLiveWorld(CLOCK);
     expect(await world.connector.worlds.getLiveWorld()).toBeUndefined();
   });
 
   it("writes tombstones and probes idempotently, and faults only for qa-* worlds", async () => {
-    await world.connector.worlds.putTombstone({ clockId: JUDGE, worldEpoch: 3, reason: "RESET", atReal: world.now().toISOString() });
-    expect((await world.connector.worlds.getTombstone(JUDGE, 3))?.reason).toBe("RESET");
+    await world.connector.worlds.putTombstone({ clockId: GUEST, worldEpoch: 3, reason: "RESET", atReal: world.now().toISOString() });
+    expect((await world.connector.worlds.getTombstone(GUEST, 3))?.reason).toBe("RESET");
     expect(await world.connector.worlds.putProbe("foreign#wamid.X")).toBe(true);
     expect(await world.connector.worlds.putProbe("foreign#wamid.X")).toBe(false);
     expect(await world.connector.worlds.getProbe("foreign#wamid.X")).toBeDefined();

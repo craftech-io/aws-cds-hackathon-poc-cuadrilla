@@ -1,5 +1,5 @@
 {
-  "count": 255,
+  "count": 256,
   "generatedAt": "2026-09-26T00:00:00.000Z",
   "items": [
     {
@@ -3691,6 +3691,47 @@
       ],
       "synthetic": true,
       "term": "+52 55 02nn 0xxx",
+      "updatedAt": "2026-09-26T00:00:00.000Z",
+      "version": 1,
+      "webSearch": "RECORDED"
+    },
+    {
+      "PK": "REF#NAMECHECK#GLOBAL",
+      "SK": "+52 55 0300 0xxx",
+      "basis": "Mexico City number in 55 0000 0000-55 0999 9999, a range where the IFT's published numbering plan assigns no block to any provider; nothing is ever sent to it",
+      "checkedAt": "2026-09-26",
+      "createdAt": "2026-09-26T00:00:00.000Z",
+      "entity": "NameCheck",
+      "kind": "PHONE_BLOCK",
+      "result": "CLEAR",
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "The plan of 1996 excluded local numbers starting with 0 (c ≠ 0 in the 8-digit local numbers of Mexico City); the plan in force since 3 August 2019 (DOF 11/05/2018) replaced local numbers with 10-digit national numbers",
+          "query": "Plan Técnico Fundamental de Numeración IFT número local primer dígito no podrá ser 0",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "ITU communication of Mexico of 5.VII.2024: national numbers A b c d e f g h i j with A = 2-9, b = 1-9 and c-j = 0-9, so 55 0… is well formed today; the block is safe because no provider holds it (next check), not because of its shape",
+          "query": "ITU national numbering plan Mexico +52 communication T0202 pdf",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "None. Of 178,172 geographic blocks, 13,460 are in zone 55 and the lowest starts at 55 1000 0000: no provider holds any number in 55 0000 0000-55 0999 9999. Read from a public normalized copy of that publication (the SNS portal serves the file only through its download form)",
+          "query": "IFT Plan Nacional de Numeración, publication of 05/09/2026: geographic blocks overlapping 55 0000 0000-55 0999 9999",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "8,314 series in NIR 55, the lowest 1000 (55 1000 xxxx): no series starting with 0 then either",
+          "query": "IFT numbering plan snapshot of 2022-06-12: series of NIR 55",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
+      "synthetic": true,
+      "term": "+52 55 0300 0xxx",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
       "webSearch": "RECORDED"

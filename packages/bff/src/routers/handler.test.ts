@@ -75,8 +75,8 @@ describe("BFF Lambda handler", () => {
     const ops = await call("/api/session.supervisorOnly", { headers: bearer({ role: "OPS", "cognito:groups": ["OPS"] }) });
     expect(ops.status).toBe(403);
     expect(ops.body.error?.data).toMatchObject({ reason: AUTH_REASON.ROLE_NOT_ALLOWED });
-    const judge = await call("/api/session.supervisorOnly", { headers: bearer({ role: "JUDGE", ispId: "isp-judge-03", isJudge: "true", "cognito:groups": ["JUDGE"] }) });
-    expect(judge.status).toBe(200);
+    const guest = await call("/api/session.supervisorOnly", { headers: bearer({ role: "GUEST", ispId: "isp-guest-03", isGuest: "true", "cognito:groups": ["GUEST"] }) });
+    expect(guest.status).toBe(200);
     const old = Math.floor(Date.now() / 1000) - 16 * 60;
     const stale = await call("/api/session.validate", { method: "POST", body: "{}", headers: { ...bearer({ auth_time: old }), "content-type": "application/json" } });
     expect(stale.status).toBe(403);

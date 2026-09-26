@@ -22,7 +22,7 @@ function claims(overrides: Record<string, unknown> = {}): IdTokenClaims {
     ispId: "isp-demo",
     userId: "usr-adriana",
     role: "SUPERVISOR",
-    isJudge: "false",
+    isGuest: "false",
     ...overrides,
   };
   for (const [claim, value] of Object.entries(payload)) if (value === undefined) delete payload[claim];
@@ -41,21 +41,21 @@ describe("principal of a console token [FL-079]", () => {
       ispId: "isp-demo",
       clockId: "GLOBAL#isp-demo",
       role: "SUPERVISOR",
-      isJudge: false,
+      isGuest: false,
       authTime: NOW,
       sessionId: "origin-a",
     });
     expect(principalFromClaims(claims({ role: "OPS", userId: "usr-ops-lina", "cognito:groups": ["OPS"] }))).toMatchObject({ role: "OPS", userId: "usr-ops-lina" });
   });
 
-  it("[FL-079] binds a judge to its own judge world", () => {
-    const judge = principalFromClaims(claims({ ispId: "isp-judge-07", userId: "usr-judge-07", role: "JUDGE", isJudge: "true", "cognito:groups": ["JUDGE"] }));
-    expect(judge).toMatchObject({ ispId: "isp-judge-07", clockId: "JUDGE#isp-judge-07", role: "JUDGE", isJudge: true });
-    expect(principalFromClaims(claims({ ispId: "isp-judge-test", userId: "usr-judge-test", role: "JUDGE", isJudge: undefined })).clockId).toBe("JUDGE#isp-judge-test");
+  it("[FL-079] binds a guest to its own guest world", () => {
+    const guest = principalFromClaims(claims({ ispId: "isp-guest-07", userId: "usr-guest-07", role: "GUEST", isGuest: "true", "cognito:groups": ["GUEST"] }));
+    expect(guest).toMatchObject({ ispId: "isp-guest-07", clockId: "GUEST#isp-guest-07", role: "GUEST", isGuest: true });
+    expect(principalFromClaims(claims({ ispId: "isp-guest-test", userId: "usr-guest-test", role: "GUEST", isGuest: undefined })).clockId).toBe("GUEST#isp-guest-test");
   });
 
   it("[FL-079] never reads the informative custom:ispId attribute nor the Cognito groups", () => {
-    const principal = principalFromClaims(claims({ "custom:ispId": "isp-judge-99", "cognito:groups": ["JUDGE", "OPS"] }));
+    const principal = principalFromClaims(claims({ "custom:ispId": "isp-guest-99", "cognito:groups": ["GUEST", "OPS"] }));
     expect(principal).toMatchObject({ ispId: "isp-demo", role: "SUPERVISOR" });
     expect(() => principalFromClaims(claims({ ispId: undefined, "custom:ispId": "isp-demo" }))).toThrowError(incomplete);
     // A role the registry did not stamp is not taken from the groups.
@@ -69,14 +69,14 @@ describe("principal of a console token [FL-079]", () => {
     expect(() => principalFromClaims(claims({ role: "ADMIN" }))).toThrowError(incomplete);
   });
 
-  it("[FL-079] refuses what the trigger never stamps: judges outside judge operators, staff inside them, QA and evaluation operators", () => {
-    expect(() => principalFromClaims(claims({ role: "JUDGE", isJudge: "true" }))).toThrowError(incomplete);
-    expect(() => principalFromClaims(claims({ ispId: "isp-judge-03" }))).toThrowError(incomplete);
+  it("[FL-079] refuses what the trigger never stamps: guests outside guest operators, staff inside them, QA and evaluation operators", () => {
+    expect(() => principalFromClaims(claims({ role: "GUEST", isGuest: "true" }))).toThrowError(incomplete);
+    expect(() => principalFromClaims(claims({ ispId: "isp-guest-03" }))).toThrowError(incomplete);
     expect(() => principalFromClaims(claims({ ispId: "isp-qa-812-1-sc-13" }))).toThrowError(incomplete);
     expect(() => principalFromClaims(claims({ ispId: "isp-eval-812-1" }))).toThrowError(incomplete);
-    expect(() => principalFromClaims(claims({ isJudge: "true" }))).toThrowError(incomplete);
-    expect(roleWorldMismatch("JUDGE", "JUDGE")).toBeUndefined();
-    expect(roleWorldMismatch("OPS", "JUDGE")).toBeDefined();
+    expect(() => principalFromClaims(claims({ isGuest: "true" }))).toThrowError(incomplete);
+    expect(roleWorldMismatch("GUEST", "GUEST")).toBeUndefined();
+    expect(roleWorldMismatch("OPS", "GUEST")).toBeDefined();
   });
 
   it("[FL-079] tells sign-ins apart by origin_jti, and falls back to the sign-in instant", () => {
@@ -106,23 +106,23 @@ describe("principals the QaDriver builds on the server [FL-079] [FL-081]", () =>
       ispId: "isp-qa-812-1-sc-13",
       clockId: "qa-812-1-sc-13",
       role: "SUPERVISOR",
-      isJudge: false,
+      isGuest: false,
       authTime: NOW,
       sessionId: "qa-usr-qa-sup",
     });
     expect(qaPrincipal({ role: "OPS", clockId: "eval-812-1" }, now)).toMatchObject({ userId: "usr-qa-ops", ispId: "isp-eval-812-1" });
   });
 
-  it("[FL-079] binds the JUDGE principal to isp-judge-test, with the sign-in time and session the scenario sets", () => {
-    const judge = qaPrincipal({ role: "JUDGE", clockId: "JUDGE#isp-judge-test", authTime: NOW - 1200, sessionId: "B" }, now);
-    expect(judge).toMatchObject({ userId: "usr-qa-judge", ispId: "isp-judge-test", role: "JUDGE", isJudge: true, authTime: NOW - 1200, sessionId: "B" });
+  it("[FL-079] binds the GUEST principal to isp-guest-test, with the sign-in time and session the scenario sets", () => {
+    const guest = qaPrincipal({ role: "GUEST", clockId: "GUEST#isp-guest-test", authTime: NOW - 1200, sessionId: "B" }, now);
+    expect(guest).toMatchObject({ userId: "usr-qa-guest", ispId: "isp-guest-test", role: "GUEST", isGuest: true, authTime: NOW - 1200, sessionId: "B" });
   });
 
   it("[FL-081] refuses any other world or role", () => {
     expect(() => qaPrincipal({ role: "SUPERVISOR", clockId: "GLOBAL#isp-demo" }, now)).toThrowError(notAllowed);
-    expect(() => qaPrincipal({ role: "JUDGE", clockId: "JUDGE#isp-judge-07" }, now)).toThrowError(notAllowed);
-    expect(() => qaPrincipal({ role: "JUDGE", clockId: "qa-812-1-sc-13" }, now)).toThrowError(notAllowed);
-    expect(() => qaPrincipal({ role: "SUPERVISOR", clockId: "JUDGE#isp-judge-test" }, now)).toThrowError(notAllowed);
+    expect(() => qaPrincipal({ role: "GUEST", clockId: "GUEST#isp-guest-07" }, now)).toThrowError(notAllowed);
+    expect(() => qaPrincipal({ role: "GUEST", clockId: "qa-812-1-sc-13" }, now)).toThrowError(notAllowed);
+    expect(() => qaPrincipal({ role: "SUPERVISOR", clockId: "GUEST#isp-guest-test" }, now)).toThrowError(notAllowed);
     expect(() => qaPrincipal({ role: "OPS", clockId: "not-a-world" }, now)).toThrowError(notAllowed);
   });
 });

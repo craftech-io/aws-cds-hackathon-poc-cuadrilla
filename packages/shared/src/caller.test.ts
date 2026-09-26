@@ -6,7 +6,7 @@ const SIGNATURE = "a".repeat(43);
 const TOKEN = `sess-01J9ZQX.turn-01.1790000000.${SIGNATURE}`;
 const WORLD = { ispId: "isp-demo", clockId: "GLOBAL#isp-demo" } as const;
 const QA_WORLD = { ispId: "isp-qa-812-1-sc-02", clockId: "qa-812-1-sc-02" } as const;
-const JUDGE_TEST = { ispId: "isp-judge-test", clockId: "JUDGE#isp-judge-test" } as const;
+const GUEST_TEST = { ispId: "isp-guest-test", clockId: "GUEST#isp-guest-test" } as const;
 
 describe("caller", () => {
   it("has the kinds and fields of docs/tool-catalog.md (Invocación directa)", () => {
@@ -23,10 +23,10 @@ describe("caller", () => {
     expect(Caller.safeParse({ kind: "SCHEDULER" }).success).toBe(true);
     expect(Caller.safeParse({ kind: "SCHEDULER", ...WORLD }).success).toBe(true);
     expect(Caller.safeParse({ kind: "CONSOLE", ...WORLD, userId: "usr-adriana", role: "SUPERVISOR" }).success).toBe(true);
-    expect(Caller.safeParse({ kind: "CONSOLE", ispId: "isp-judge-07", clockId: "JUDGE#isp-judge-07", userId: "usr-judge-07", role: "JUDGE" }).success).toBe(true);
+    expect(Caller.safeParse({ kind: "CONSOLE", ispId: "isp-guest-07", clockId: "GUEST#isp-guest-07", userId: "usr-guest-07", role: "GUEST" }).success).toBe(true);
     expect(Caller.safeParse({ kind: "QA", ...QA_WORLD }).success).toBe(true);
     expect(Caller.safeParse({ kind: "QA", ...QA_WORLD, userId: "usr-qa-sup", role: "SUPERVISOR" }).success).toBe(true);
-    expect(Caller.safeParse({ kind: "QA", ...JUDGE_TEST, userId: "usr-qa-judge", role: "JUDGE" }).success).toBe(true);
+    expect(Caller.safeParse({ kind: "QA", ...GUEST_TEST, userId: "usr-qa-guest", role: "GUEST" }).success).toBe(true);
   });
 
   it("rejects the Harness, unknown keys and ids of the wrong kind", () => {
@@ -42,8 +42,8 @@ describe("caller", () => {
       expect(Caller.safeParse({ kind, userId: "usr-qa-sup", role: "SUPERVISOR" }).success, kind).toBe(false);
     }
     expect(Caller.safeParse({ kind: "WORKER", ispId: "isp-demo" }).success).toBe(false);
-    expect(Caller.safeParse({ kind: "WORKER", ispId: "isp-judge-07", clockId: "GLOBAL#isp-demo" }).success).toBe(false);
-    expect(Caller.safeParse({ kind: "SCHEDULER", ispId: "isp-judge-07", clockId: "JUDGE#isp-judge-03" }).success).toBe(false);
+    expect(Caller.safeParse({ kind: "WORKER", ispId: "isp-guest-07", clockId: "GLOBAL#isp-demo" }).success).toBe(false);
+    expect(Caller.safeParse({ kind: "SCHEDULER", ispId: "isp-guest-07", clockId: "GUEST#isp-guest-03" }).success).toBe(false);
   });
 
   it("only console and QA callers carry a user and a role", () => {
@@ -53,18 +53,18 @@ describe("caller", () => {
     expect(Caller.safeParse({ kind: "CONSOLE", ...WORLD, userId: "usr-adriana" }).success).toBe(false);
   });
 
-  it("a judge acts only in a judge world, and a judge world has only judges", () => {
-    expect(Caller.safeParse({ kind: "CONSOLE", ...WORLD, userId: "usr-judge-07", role: "JUDGE" }).success).toBe(false);
-    expect(Caller.safeParse({ kind: "CONSOLE", ispId: "isp-judge-07", clockId: "JUDGE#isp-judge-07", userId: "usr-adriana", role: "SUPERVISOR" }).success).toBe(false);
+  it("a guest acts only in a guest world, and a guest world has only guests", () => {
+    expect(Caller.safeParse({ kind: "CONSOLE", ...WORLD, userId: "usr-guest-07", role: "GUEST" }).success).toBe(false);
+    expect(Caller.safeParse({ kind: "CONSOLE", ispId: "isp-guest-07", clockId: "GUEST#isp-guest-07", userId: "usr-adriana", role: "SUPERVISOR" }).success).toBe(false);
   });
 
-  it("QA reaches only qa-*, eval-* and the judge rehearsal world, with its own principals", () => {
+  it("QA reaches only qa-*, eval-* and the guest rehearsal world, with its own principals", () => {
     expect(Caller.safeParse({ kind: "QA", ...WORLD }).success).toBe(false);
-    expect(Caller.safeParse({ kind: "QA", ispId: "isp-judge-07", clockId: "JUDGE#isp-judge-07" }).success).toBe(false);
+    expect(Caller.safeParse({ kind: "QA", ispId: "isp-guest-07", clockId: "GUEST#isp-guest-07" }).success).toBe(false);
     expect(Caller.safeParse({ kind: "QA", ispId: "isp-eval-812-1", clockId: "eval-812-1" }).success).toBe(true);
     expect(Caller.safeParse({ kind: "QA", ...QA_WORLD, userId: "usr-adriana", role: "SUPERVISOR" }).success).toBe(false);
-    expect(Caller.safeParse({ kind: "QA", ...QA_WORLD, userId: "usr-qa-judge", role: "JUDGE" }).success).toBe(false);
-    expect(Caller.safeParse({ kind: "QA", ...JUDGE_TEST, userId: "usr-qa-sup", role: "SUPERVISOR" }).success).toBe(false);
+    expect(Caller.safeParse({ kind: "QA", ...QA_WORLD, userId: "usr-qa-guest", role: "GUEST" }).success).toBe(false);
+    expect(Caller.safeParse({ kind: "QA", ...GUEST_TEST, userId: "usr-qa-sup", role: "SUPERVISOR" }).success).toBe(false);
   });
 });
 

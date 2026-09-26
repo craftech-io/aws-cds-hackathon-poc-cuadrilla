@@ -19,7 +19,7 @@ import { rateCardItems } from "./ratecard";
 import { evalPhoto, referenceItems } from "./reference";
 import { evalTemplate, modelsTemplate, qaMinTemplate, worldTemplate } from "./templates";
 import { dayStartTimers } from "./timers";
-import { demoWorld, judgeWorld, type WorldSpec } from "./world";
+import { demoWorld, guestWorld, type WorldSpec } from "./world";
 
 export interface BuiltSeed {
   /** Every file of the data directory but the manifest, by its path inside the directory. */
@@ -59,7 +59,7 @@ export function buildSeed(): BuiltSeed {
   const photos = historyPhotosByOrder(media);
   const readings = historyReadings(media);
   const demo = demoWorld(readings);
-  const judge = judgeWorld(readings);
+  const guest = guestWorld(readings);
   const customers = customerCatalog(demo.orders);
   const customersByNumber = new Map(customers.map((customer) => [customer.customer, customer]));
   const manual = manualFiles();
@@ -76,7 +76,7 @@ export function buildSeed(): BuiltSeed {
   files.set(DATA_LAYOUT.questions, stableJson({ setVersion: "v001", manualVersion: "v001", generator: GENERATOR, seed: SEED, questions }));
   files.set(DATA_LAYOUT.photos, stableJson({ setVersion: "v001", generator: GENERATOR, seed: SEED, photos: media.set.map(evalPhoto) }));
   files.set(worldFile("demo"), stableJson(worldTemplate(demo, demoTables)));
-  files.set(worldFile("judge"), stableJson(worldTemplate(judge, worldTables(judge, customers, photos))));
+  files.set(worldFile("guest"), stableJson(worldTemplate(guest, worldTables(guest, customers, photos))));
   files.set(worldFile("models"), stableJson(modelsTemplate(demo, customersByNumber)));
   files.set(worldFile("qa-min"), stableJson(qaMinTemplate()));
   files.set(worldFile("eval"), stableJson(evalTemplate(questions, media.set)));

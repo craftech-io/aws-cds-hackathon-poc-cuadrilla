@@ -1,5 +1,5 @@
-// A real phone in a judge's world, bound by a one-use code (docs/architecture-integrations.md §4.4.1,
-// FL-101). The console shows "ALTA J07-4F2K" (30 minutes, one use, bound to a person of the world);
+// A real phone in a guest's world, bound by a one-use code (docs/architecture-integrations.md §4.4.1,
+// FL-101). The console shows "ALTA G07-4F2K" (30 minutes, one use, bound to a person of the world);
 // sending it from a real phone proves the number belongs to whoever sends it, and binds that phone to
 // the person for 48 hours (`Runtime/PHONELEASE#<phoneHash>`, created with `attribute_not_exists`: a
 // phone lives in one world at a time). A phone registered in the live world is refused. Resetting the
@@ -16,15 +16,15 @@ export const JOIN_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 export const JOIN_CODE_SUFFIX_LENGTH = 4;
 export const LEASE_HOURS = RUNTIME_TTL_SECONDS.phoneLease / 3600;
 
-/** The world's prefix of a code: `J07` for `JUDGE#isp-judge-07`, `JTST` for the rehearsal world, `QA` in scenarios. */
+/** The world's prefix of a code: `G07` for `GUEST#isp-guest-07`, `GTST` for the rehearsal world, `QA` in scenarios. */
 export function joinCodePrefix(clockId: string): string {
   const world = parseClockId(clockId);
-  if (world?.kind === "JUDGE") {
-    const suffix = world.ispId.slice("isp-judge-".length);
-    return suffix === "test" ? "JTST" : `J${suffix}`;
+  if (world?.kind === "GUEST") {
+    const suffix = world.ispId.slice("isp-guest-".length);
+    return suffix === "test" ? "GTST" : `G${suffix}`;
   }
   if (world?.kind === "QA") return "QA";
-  throw new RangeError("join codes exist only for judge and QA worlds");
+  throw new RangeError("join codes exist only for guest and QA worlds");
 }
 
 export function newJoinCode(clockId: string, random: (max: number) => number = randomInt): string {
@@ -50,7 +50,7 @@ export interface IssueJoinCodeInput {
 /** `simulator.joinCode` (with the live transport in the stage): a fresh one-use code for a person of the world. */
 export async function issueJoinCode(input: IssueJoinCodeInput, deps: LeaseDeps): Promise<JoinCode> {
   const kind = ispKindOfClock(input.clockId);
-  if (kind !== "JUDGE" && kind !== "QA") throw new ConnectorError("VALIDATION", "join codes exist only for judge and QA worlds");
+  if (kind !== "GUEST" && kind !== "QA") throw new ConnectorError("VALIDATION", "join codes exist only for guest and QA worlds");
   const person = await deps.people.getPerson(input.personId);
   if (person === undefined || person.clockId !== input.clockId || !person.active || (person.role !== "INSTALLER" && person.role !== "SUPERVISOR")) {
     throw new ConnectorError("NOT_FOUND", "no such person in this world");

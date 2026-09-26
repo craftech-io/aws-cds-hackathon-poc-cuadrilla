@@ -9,7 +9,7 @@ describe("parseEmailAddress", () => {
       ok: true,
       address: { localPart: "success+c10421", domain: "simulator.amazonses.com", normalized: "success+c10421@simulator.amazonses.com" },
     });
-    expect(parseEmailAddress("Success+J07-C10421@Simulator.AmazonSES.com")).toMatchObject({ ok: true, address: { domain: "simulator.amazonses.com", normalized: "success+j07-c10421@simulator.amazonses.com" } });
+    expect(parseEmailAddress("Success+G07-C10421@Simulator.AmazonSES.com")).toMatchObject({ ok: true, address: { domain: "simulator.amazonses.com", normalized: "success+g07-c10421@simulator.amazonses.com" } });
     expect(parseEmailAddress("o'neil.x_y=z@mail.co.mx")).toMatchObject({ ok: true });
   });
 

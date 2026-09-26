@@ -87,7 +87,7 @@ describe("keyed digests and runtimeSessionId", () => {
       runtimeSessionId(key, workOrder),
       runtimeSessionId(key, { ...workOrder, worldEpoch: 2 }),
       runtimeSessionId(key, { ...workOrder, sessionEpoch: 1 }),
-      runtimeSessionId(key, { ...workOrder, clockId: "JUDGE#isp-judge-07" }),
+      runtimeSessionId(key, { ...workOrder, clockId: "GUEST#isp-guest-07" }),
       runtimeSessionId(key, { ...workOrder, workOrderId: "wo-24818" }),
       runtimeSessionId(deriveSubkey(MASTER, "session"), workOrder),
       runtimeSessionId(key, day),
@@ -117,11 +117,11 @@ describe("tokens and ids", () => {
 
   it("signs in base64url and verifies in constant time", () => {
     const key = deriveSubkey(MASTER, "sim-envelope");
-    const signature = hmacSha256Base64Url(key, '{"clockId":"JUDGE#isp-judge-07"}');
+    const signature = hmacSha256Base64Url(key, '{"clockId":"GUEST#isp-guest-07"}');
     expect(signature).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(verifyHmacBase64Url(key, '{"clockId":"JUDGE#isp-judge-07"}', signature)).toBe(true);
+    expect(verifyHmacBase64Url(key, '{"clockId":"GUEST#isp-guest-07"}', signature)).toBe(true);
     expect(verifyHmacBase64Url(key, '{"clockId":"GLOBAL#isp-demo"}', signature)).toBe(false);
-    expect(verifyHmacBase64Url(deriveSubkey(MASTER, "session"), '{"clockId":"JUDGE#isp-judge-07"}', signature)).toBe(false);
+    expect(verifyHmacBase64Url(deriveSubkey(MASTER, "session"), '{"clockId":"GUEST#isp-guest-07"}', signature)).toBe(false);
     expect(safeEqual("abc", "abc")).toBe(true);
     expect(safeEqual("abc", "abd")).toBe(false);
     expect(safeEqual("abc", "abcd")).toBe(false);

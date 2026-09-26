@@ -97,7 +97,7 @@ describe("re-evaluating a sent message with the records of its instant (PolicyAu
     const world = await policyWorld();
     const { cases, conversations, isps } = world.connector;
     const sent = await conversations.appendMessage(dayStartMessage("msg-ds-plan-b", "2026-10-13 07:30"));
-    await isps.setTemplateStatus(ISP, "ordenes_del_dia", "REJECTED", { actor: "USER:usr-judge-test", atSim: mx("2026-10-13 09:00") });
+    await isps.setTemplateStatus(ISP, "ordenes_del_dia", "REJECTED", { actor: "USER:usr-guest-test", atSim: mx("2026-10-13 09:00") });
     expect(await reevaluate(world, sent)).toBe("ALLOW");
 
     await cases.createCase(openCase({ caseId: CASE_ID, workOrderId: "wo-24817", createdAtSim: mx("2026-10-13 11:50") }));

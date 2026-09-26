@@ -1,5 +1,5 @@
 // Console accounts of a spec, one per role (docs/architecture.md §10): a supervisor and operations
-// staff of the demo operator, and a judge of its own world. They live in a fake user pool
+// staff of the demo operator, and a guest of its own world. They live in a fake user pool
 // (src/lib/auth/testing/fake-cognito.ts: real SRP, real TOTP codes) whose id tokens carry the claims
 // the pre-token trigger stamps and are signed with the run's ephemeral key. Passwords and TOTP
 // secrets are generated per test and exist only in memory: no credential is written anywhere.
@@ -12,7 +12,7 @@ import { signIdToken } from "./tokens";
 export const E2E_POOL_ID = "us-east-1_E2eFakePool";
 export const E2E_CLIENT_ID = "e2e-console-client";
 
-export type AccountRole = "SUPERVISOR" | "OPS" | "JUDGE";
+export type AccountRole = "SUPERVISOR" | "OPS" | "GUEST";
 
 export interface Account {
   readonly email: string;
@@ -30,8 +30,8 @@ export interface AccountInit {
   readonly name?: string;
 }
 
-/** Operators of the accounts: the demo operator, and a judge's own one (`isp-judge-<nn>`). */
-const ISP_OF_ROLE: Readonly<Record<AccountRole, string>> = { SUPERVISOR: "isp-demo", OPS: "isp-demo", JUDGE: "isp-judge-07" };
+/** Operators of the accounts: the demo operator, and a guest's own one (`isp-guest-<nn>`). */
+const ISP_OF_ROLE: Readonly<Record<AccountRole, string>> = { SUPERVISOR: "isp-demo", OPS: "isp-demo", GUEST: "isp-guest-07" };
 
 /** A password the pool's policy accepts (12+ characters, lower, upper, digit, symbol), new every call. */
 export function randomPassword(): string {

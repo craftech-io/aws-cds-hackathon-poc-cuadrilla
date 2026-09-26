@@ -1,5 +1,5 @@
 // The guided-tour panel of the shell (docs/design-brief.md §6 and §15): a column docked beside the
-// view, not a modal, so a judge reads the step and works the simulator at the same time. Its content
+// view, not a modal, so a guest reads the step and works the simulator at the same time. Its content
 // is the panel of the tour view (`views/tour/panel.tsx`, lib/view-registry.ts); until that exists the
 // dock says what is coming.
 import { Suspense } from "react";

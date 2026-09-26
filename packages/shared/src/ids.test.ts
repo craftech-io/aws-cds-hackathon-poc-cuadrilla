@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEMO_CLOCK_ID,
-  JUDGE_TEST_CLOCK_ID,
+  GUEST_TEST_CLOCK_ID,
   clockIdOfIsp,
   clockTagOf,
   evalClockId,
@@ -9,7 +9,7 @@ import {
   ispIdOfClock,
   ispKindOfClock,
   ispKindOfIspId,
-  judgeClockId,
+  guestClockId,
   parseClockId,
   qaClockId,
 } from "./clock-ids";
@@ -67,7 +67,7 @@ describe("prefixes", () => {
     expect(makeId("workOrder", "24817")).toBe("wo-24817");
     expect(makeId("question", "A", "07")).toBe("q-A-07");
     expect(() => makeId("customer", "1042")).toThrow(RangeError);
-    expect(isId("customer", "cust-10421-j03")).toBe(true);
+    expect(isId("customer", "cust-10421-g03")).toBe(true);
     expect(isId("customer", "cust-10421-local-01J9ZQX-sc-02")).toBe(true);
     expect(isId("workOrder", "wo-24817-")).toBe(false);
     expect(isId("installer", "inst-qa-local-01J9ZQX-sc-02-a")).toBe(true);
@@ -83,14 +83,14 @@ describe("prefixes", () => {
     expect(personRoleOfId("zc-marisol")).toBe("ZONE_CHIEF");
     expect(personRoleOfId("cust-10421")).toBe("CUSTOMER");
     expect(personRoleOfId("usr-adriana")).toBeUndefined();
-    expect(PersonId.safeParse("inst-rogelio-j03").success).toBe(true);
+    expect(PersonId.safeParse("inst-rogelio-g03").success).toBe(true);
     expect(PersonId.safeParse("cust-10421").success).toBe(false);
   });
 });
 
 describe("work orders", () => {
   it("number ranges of docs/architecture.md §5", () => {
-    const match = /demo `(\d+)-(\d+)`, jurado los mismos por mundo, QA `(\d+)-(\d+)` por lease, evaluación `(\d+)-(\d+)`/.exec(readDoc("docs/architecture.md"));
+    const match = /demo `(\d+)-(\d+)`, invitado los mismos por mundo, QA `(\d+)-(\d+)` por lease, evaluación `(\d+)-(\d+)`/.exec(readDoc("docs/architecture.md"));
     expect(match?.slice(1).map(Number)).toEqual([
       WORK_ORDER_NUMBER_RANGES.demo.min,
       WORK_ORDER_NUMBER_RANGES.demo.max,
@@ -118,9 +118,9 @@ describe("work orders", () => {
 
   it("clones carry the clock tag of their world", () => {
     expect(workOrderId("24817")).toBe("wo-24817");
-    expect(workOrderId("24817", clockTagOf(judgeClockId(3)))).toBe("wo-24817-j03");
-    expect(workOrderId("24817", clockTagOf(JUDGE_TEST_CLOCK_ID))).toBe("wo-24817-jtest");
-    expect(workOrderNumberOf("wo-24817-j03")).toBe("24817");
+    expect(workOrderId("24817", clockTagOf(guestClockId(3)))).toBe("wo-24817-g03");
+    expect(workOrderId("24817", clockTagOf(GUEST_TEST_CLOCK_ID))).toBe("wo-24817-gtest");
+    expect(workOrderNumberOf("wo-24817-g03")).toBe("24817");
     expect(() => workOrderId("2481")).toThrow();
   });
 });
@@ -163,8 +163,8 @@ describe("clock ids", () => {
   it("each clock belongs to one operator and back", () => {
     const cases = [
       ["GLOBAL#isp-demo", "DEMO", "isp-demo"],
-      ["JUDGE#isp-judge-07", "JUDGE", "isp-judge-07"],
-      ["JUDGE#isp-judge-test", "JUDGE", "isp-judge-test"],
+      ["GUEST#isp-guest-07", "GUEST", "isp-guest-07"],
+      ["GUEST#isp-guest-test", "GUEST", "isp-guest-test"],
       ["qa-812-1-sc-02", "QA", "isp-qa-812-1-sc-02"],
       ["qa-local-01J9ZQXV6M-sc04-dup", "QA", "isp-qa-local-01J9ZQXV6M-sc04-dup"],
       ["eval-812-1", "EVAL", "isp-eval-812-1"],
@@ -179,34 +179,34 @@ describe("clock ids", () => {
   });
 
   it("rejects clocks of the wrong operator kind", () => {
-    for (const clockId of ["GLOBAL#isp-qa-812-sc-02", "GLOBAL#isp-judge-07", "JUDGE#isp-demo", "JUDGE#isp-judge-abc", "GLOBAL#", "qa-", "eval-", "isp-demo", "SIM#isp-demo", "qa-a b"]) {
+    for (const clockId of ["GLOBAL#isp-qa-812-sc-02", "GLOBAL#isp-guest-07", "GUEST#isp-demo", "GUEST#isp-guest-abc", "GLOBAL#", "qa-", "eval-", "isp-demo", "SIM#isp-demo", "qa-a b"]) {
       expect(parseClockId(clockId), clockId).toBeUndefined();
     }
     expect(() => ispKindOfClock("isp-demo")).toThrow(RangeError);
   });
 
   it("builders and the concrete clocks the docs cite", () => {
-    expect(judgeClockId(7)).toBe("JUDGE#isp-judge-07");
-    expect(judgeClockId("test")).toBe(JUDGE_TEST_CLOCK_ID);
+    expect(guestClockId(7)).toBe("GUEST#isp-guest-07");
+    expect(guestClockId("test")).toBe(GUEST_TEST_CLOCK_ID);
     expect(qaClockId("812-1", "sc-02")).toBe("qa-812-1-sc-02");
     expect(evalClockId("local-01J9ZQXV6M")).toBe("eval-local-01J9ZQXV6M");
     expect(DEMO_CLOCK_ID).toBe(clockIdOfIsp("isp-demo"));
-    const cited = concreteTokens(/`((?:GLOBAL|JUDGE)#[^`\s]+)`/g).map(({ token }) => token);
+    const cited = concreteTokens(/`((?:GLOBAL|GUEST)#[^`\s]+)`/g).map(({ token }) => token);
     expect(cited).toContain("GLOBAL#isp-demo");
     expect(cited.filter((clockId) => parseClockId(clockId) === undefined)).toEqual([]);
   });
 
-  it("clock tags: judge worlds only", () => {
-    expect(clockTagOf("JUDGE#isp-judge-03")).toBe("j03");
+  it("clock tags: guest worlds only", () => {
+    expect(clockTagOf("GUEST#isp-guest-03")).toBe("g03");
     expect(clockTagOf(DEMO_CLOCK_ID)).toBeUndefined();
     expect(clockTagOf("qa-812-1-sc-02")).toBeUndefined();
   });
 
-  it("the QaDriver reaches its own worlds and the judge rehearsal world only", () => {
+  it("the QaDriver reaches its own worlds and the guest rehearsal world only", () => {
     expect(isQaReachableClock("qa-812-1-sc-02")).toBe(true);
     expect(isQaReachableClock("eval-812-1")).toBe(true);
-    expect(isQaReachableClock(JUDGE_TEST_CLOCK_ID)).toBe(true);
-    expect(isQaReachableClock("JUDGE#isp-judge-07")).toBe(false);
+    expect(isQaReachableClock(GUEST_TEST_CLOCK_ID)).toBe(true);
+    expect(isQaReachableClock("GUEST#isp-guest-07")).toBe(false);
     expect(isQaReachableClock(DEMO_CLOCK_ID)).toBe(false);
   });
 });

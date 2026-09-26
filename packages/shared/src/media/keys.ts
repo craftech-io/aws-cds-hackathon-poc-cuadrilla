@@ -7,7 +7,7 @@
 //   transcripts/<seg>/<sha256(messageId)[0:32]>/<jobName>.json        Transcribe output, one per message
 //   seg = mediaKeySegment(clockId, worldEpoch) = sha256(clockId)[0:16] + "-e" + worldEpoch
 //
-// Clock ids carry `#` (`GLOBAL#isp-demo`, `JUDGE#isp-judge-07`), which opens a fragment in an `s3://`
+// Clock ids carry `#` (`GLOBAL#isp-demo`, `GUEST#isp-guest-07`), which opens a fragment in an `s3://`
 // URI and is outside what Transcribe accepts as `OutputKey`; a live `wamid` is base64 and may carry
 // `=`, `+` or `/`. So no raw clock id, `wamid` or media id ever reaches a key: they are hashed.
 // This module uses node:crypto and lives on its own subpath (`@cuadrilla/shared/media/keys`), outside

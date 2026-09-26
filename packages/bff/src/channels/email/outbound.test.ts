@@ -9,7 +9,7 @@ import { applyEmailEvent } from "./events";
 import { encodeWords } from "./mime";
 import { CASE_ID, CUSTOMER, DEMO_MAILBOX, OPS_MAILBOX, PDF, PDF_KEY, PDF_SHA, ZONE_CHIEF, alertRequest, certificateRequest, emailWorld } from "./testing";
 
-const JUDGE = "JUDGE#isp-judge-07";
+const GUEST = "GUEST#isp-guest-07";
 const QA = "qa-812-1-sc11-fence";
 
 describe("certificate emails [FL-048]", () => {
@@ -138,8 +138,8 @@ describe("zone chief alerts [FL-061]", () => {
 
 describe("recipient fence inside the client [FL-076]", () => {
   it("[FL-076] denies a recipient outside the world's fence before SES, audited, with no outbox row or pending mark", async () => {
-    const world = await emailWorld({ clockId: JUDGE });
-    const outcome = await world.client.send(certificateRequest(world.clockId, { to: DEMO_MAILBOX, workOrderId: "wo-24817-j07" }));
+    const world = await emailWorld({ clockId: GUEST });
+    const outcome = await world.client.send(certificateRequest(world.clockId, { to: DEMO_MAILBOX, workOrderId: "wo-24817-g07" }));
     expect(outcome).toEqual({ ok: false, code: "RECIPIENT_NOT_ALLOWED", reason: "DEMO_RECIPIENT_OUTSIDE_DEMO_WORLD", retryable: false });
     expect(outcome.ok ? undefined : toSendToolFailure(outcome)).toEqual({ ok: false, error: { code: "RECIPIENT_NOT_ALLOWED", message: "the recipient is outside this world's fence", reason: "DEMO_RECIPIENT_OUTSIDE_DEMO_WORLD" } });
     expect(world.sent()).toEqual([]);
@@ -147,7 +147,7 @@ describe("recipient fence inside the client [FL-076]", () => {
     expect((await world.connector.worlds.listPendingMail(world.clockId)).open).toEqual([]);
     const denials = await world.connector.audit.listByDecision(world.ispId, "DENY");
     expect(denials).toHaveLength(1);
-    expect(denials[0]).toMatchObject({ action: "SEND_EMAIL", ruleIds: ["CP-RECIPIENT-FENCE"], reason: "DEMO_RECIPIENT_OUTSIDE_DEMO_WORLD", refs: { workOrderId: "wo-24817-j07", mailId: "mail-test-001" } });
+    expect(denials[0]).toMatchObject({ action: "SEND_EMAIL", ruleIds: ["CP-RECIPIENT-FENCE"], reason: "DEMO_RECIPIENT_OUTSIDE_DEMO_WORLD", refs: { workOrderId: "wo-24817-g07", mailId: "mail-test-001" } });
     expect(JSON.stringify(denials[0])).not.toContain(DEMO_MAILBOX);
   });
 
@@ -159,8 +159,8 @@ describe("recipient fence inside the client [FL-076]", () => {
   });
 
   it("[FL-076] respects the world's email cap per real day, audited, and frees it the next day", async () => {
-    const world = await emailWorld({ clockId: JUDGE, emailsPerDay: 2 });
-    const send = () => world.client.send(certificateRequest(world.clockId, { workOrderId: "wo-24817-j07" }));
+    const world = await emailWorld({ clockId: GUEST, emailsPerDay: 2 });
+    const send = () => world.client.send(certificateRequest(world.clockId, { workOrderId: "wo-24817-g07" }));
     expect((await send()).ok).toBe(true);
     expect((await send()).ok).toBe(true);
     expect(await send()).toEqual({ ok: false, code: "CAP_REACHED", reason: "SIMULATOR", retryable: false, resetsAtReal: "2026-10-14T00:00:00.000Z" });

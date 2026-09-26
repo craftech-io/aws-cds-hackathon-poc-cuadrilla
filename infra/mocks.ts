@@ -4,7 +4,7 @@
 // packages/dispatch-mock.
 //
 // Tables. `Network` (`ONU#<clockId>#<serial>` / `META`) and `Dispatch` (`DWO#<ispId>#<number>` /
-// `META`, `EVT#<ts>`): PK + SK strings, no GSI, TTL `expiresAt` (QA, evaluation and judge worlds),
+// `META`, `EVT#<ts>`): PK + SK strings, no GSI, TTL `expiresAt` (QA, evaluation and guest worlds),
 // on-demand, encrypted, no stream. Each mock writes only its own table; `DispatchMock` also puts its
 // events on the `Feeds` bus (`events:PutEvents` on it, nothing else). The world factory writes both
 // tables directly (WORLDS), fenced by `dynamodb:LeadingKeys` per role (`WORLDS_LEADING_KEYS`).

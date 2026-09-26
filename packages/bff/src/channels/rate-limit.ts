@@ -9,7 +9,7 @@
 //
 // A message over either limit is not counted (the reservation changes nothing), gets the fixed
 // answer and `DENY RATE_LIMIT` from the caller, and never reaches a turn. `<hash>` is the keyed hash
-// of the sender's phone, never the phone. Resetting a judge world or jumping to a scene deletes the
+// of the sender's phone, never the phone. Resetting a guest world or jumping to a scene deletes the
 // simulated-hour counters and keeps the real-hour ones (docs/architecture.md §8).
 import { z } from "zod";
 import { ClockId } from "@cuadrilla/shared";
@@ -39,7 +39,7 @@ export interface RateLimits {
 
 /**
  * The two limits of a world. Without `rateLimitPerHour` both windows use the real-hour cap of the
- * simulator (20 per identity in judge worlds); with it, it bounds the real hour too, so a world set
+ * simulator (20 per identity in guest worlds); with it, it bounds the real hour too, so a world set
  * to 3 per hour cannot send a fourth message by moving its clock forward (`SC-12/7`).
  */
 export function rateLimitsOf(settings: unknown): RateLimits {

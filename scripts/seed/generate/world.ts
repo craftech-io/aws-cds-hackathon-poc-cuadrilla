@@ -1,23 +1,23 @@
 // The two worlds the generator writes rows for (docs/seed-spec.md §3): the operator's demo world and
-// the `judge` template. Both tell the same story; the template carries the placeholder judge number
-// `00` in every id, phone and email of its world (`inst-rogelio-j00`, `wo-24817-j00`, `+52 55 0200
-// 0001`, `success+j00-c10421@…`), which the world factory replaces with the judge's own tokens
-// (`judgeBlock` of lib/synthetic.ts). Nothing of a world names the operator (ADR-0018).
-import { judgeClockId } from "@cuadrilla/shared";
-import { judgeBlock, simulatorEmail, type SimulatorOutcome } from "../lib/synthetic";
+// the `guest` template. Both tell the same story; the template carries the placeholder guest number
+// `00` in every id, phone and email of its world (`inst-rogelio-g00`, `wo-24817-g00`, `+52 55 0200
+// 0001`, `success+g00-c10421@…`), which the world factory replaces with the guest world's own tokens
+// (`guestBlock` of lib/synthetic.ts). Nothing of a world names the operator (ADR-0018).
+import { guestClockId } from "@cuadrilla/shared";
+import { guestBlock, simulatorEmail, type SimulatorOutcome } from "../lib/synthetic";
 import { DAY_ORDERS, DEMO_CLOCK, DEMO_ISP, HISTORY_ORDERS, NEXT_DAY_ORDERS, STAFF, type OrderDef, type StaffDef } from "./catalog";
 
-export type WorldKind = "DEMO" | "JUDGE";
+export type WorldKind = "DEMO" | "GUEST";
 
 export interface WorldSpec {
-  readonly name: "demo" | "judge";
+  readonly name: "demo" | "guest";
   readonly kind: WorldKind;
   readonly ispId: string;
   readonly clockId: string;
   readonly staff: readonly StaffDef[];
   /** Orders of the world, each with its received power already resolved for the history. */
   readonly orders: readonly OrderDef[];
-  readonly consoleUsers: ReadonlyArray<{ readonly userId: string; readonly role: "SUPERVISOR" | "OPS" | "JUDGE"; readonly name: string }>;
+  readonly consoleUsers: ReadonlyArray<{ readonly userId: string; readonly role: "SUPERVISOR" | "OPS" | "GUEST"; readonly name: string }>;
   readonly opsMailbox: string;
   readonly unknownNumber: string;
   personId(base: string): string;
@@ -36,8 +36,8 @@ export function supervisorUser(world: WorldSpec): { readonly userId: string; rea
   return user;
 }
 
-/** Placeholder judge of the `judge` template. */
-export const TEMPLATE_JUDGE = 0;
+/** Placeholder guest of the `guest` template. */
+export const TEMPLATE_GUEST = 0;
 
 function phone(block: string, slot: number): string {
   return `${block}${String(slot).padStart(4, "0")}`;
@@ -73,27 +73,27 @@ export function demoWorld(historyRx: ReadonlyMap<string, number>): WorldSpec {
   };
 }
 
-/** Staff of the curated judge template (docs/seed-spec.md §3): crew Norte 3 complete, crew Sur 1 reduced. */
-export const JUDGE_STAFF = ["inst-rogelio", "inst-karina", "inst-julian", "inst-beatriz", "sup-adriana", "sup-hector", "sup-paola", "sup-daniel", "zc-marisol", "zc-ricardo"] as const;
+/** Staff of the curated guest template (docs/seed-spec.md §3): crew Norte 3 complete, crew Sur 1 reduced. */
+export const GUEST_STAFF = ["inst-rogelio", "inst-karina", "inst-julian", "inst-beatriz", "sup-adriana", "sup-hector", "sup-paola", "sup-daniel", "zc-marisol", "zc-ricardo"] as const;
 
-/** Orders of the judge template: the day of crew Norte 3 and its 12/10 history, Beatriz's two, and 14/10. */
-export const JUDGE_ORDERS = ["24801", "24802", "24803", "24804", "24805", "24806", "24817", "24818", "24819", "24820", "24821", "24822", "24830", "24831", "24840", "24842", "24850", "24851", "24852", "24853"] as const;
+/** Orders of the guest template: the day of crew Norte 3 and its 12/10 history, Beatriz's two, and 14/10. */
+export const GUEST_ORDERS = ["24801", "24802", "24803", "24804", "24805", "24806", "24817", "24818", "24819", "24820", "24821", "24822", "24830", "24831", "24840", "24842", "24850", "24851", "24852", "24853"] as const;
 
-export function judgeWorld(historyRx: ReadonlyMap<string, number>): WorldSpec {
-  const tokens = judgeBlock(TEMPLATE_JUDGE);
+export function guestWorld(historyRx: ReadonlyMap<string, number>): WorldSpec {
+  const tokens = guestBlock(TEMPLATE_GUEST);
   const tag = tokens.clockTag;
-  const clockId = judgeClockId(TEMPLATE_JUDGE);
+  const clockId = guestClockId(TEMPLATE_GUEST);
   const all = [...withHistoryRx(historyRx), ...DAY_ORDERS, ...NEXT_DAY_ORDERS];
   return {
-    name: "judge",
-    kind: "JUDGE",
-    ispId: clockId.slice("JUDGE#".length),
+    name: "guest",
+    kind: "GUEST",
+    ispId: clockId.slice("GUEST#".length),
     clockId,
-    staff: STAFF.filter((person) => (JUDGE_STAFF as readonly string[]).includes(person.personId)),
-    orders: all.filter((order) => (JUDGE_ORDERS as readonly string[]).includes(order.number)),
+    staff: STAFF.filter((person) => (GUEST_STAFF as readonly string[]).includes(person.personId)),
+    orders: all.filter((order) => (GUEST_ORDERS as readonly string[]).includes(order.number)),
     // The supervisor's user signs the manual validations of the 12/10 history; nobody logs in with it.
     consoleUsers: [
-      { userId: `usr-judge-${tokens.number}`, role: "JUDGE", name: "Jurado" },
+      { userId: `usr-guest-${tokens.number}`, role: "GUEST", name: "Invitado" },
       { userId: `usr-adriana-${tag}`, role: "SUPERVISOR", name: "Adriana Solís" },
     ],
     opsMailbox: simulatorEmail("success", `ops-${tag}`),

@@ -5,7 +5,7 @@ import { simMediaKey, waMediaKey } from "@cuadrilla/shared/media/keys";
 import { createSocialMessaging } from "./client";
 import { processInboundEvent } from "./inbound";
 import { type MediaDeps, contentOf, fetchInboundMedia, sniffMediaType } from "./media";
-import { AWS_ID, JPEG, JUDGE, OGG, PEOPLE, inboundHarness, liveEvent, memoryMediaStore, recorder, fakeSocial, simEvent, simUpload, waAudio, waImage, waOther } from "./testing";
+import { AWS_ID, JPEG, GUEST, OGG, PEOPLE, inboundHarness, liveEvent, memoryMediaStore, recorder, fakeSocial, simEvent, simUpload, waAudio, waImage, waOther } from "./testing";
 
 const socialMock = mockClient(SocialMessagingClient);
 const ROGELIO = PEOPLE.rogelio;
@@ -93,9 +93,9 @@ describe("inbound media, simulated", () => {
   it("[FL-017] sim-media:<uploadId> resolves to simMediaKey of the world through UPLOAD#, never a key from the client", async () => {
     const h = await inboundHarness();
     const key = await simUpload(h, "up-voice-02", "VOICE", OGG(), "audio/ogg");
-    expect(key).toBe(simMediaKey(JUDGE, 3, "up-voice-02"));
-    await processInboundEvent(simEvent(JUDGE, PEOPLE.rogelioJ07.phone, "wamid.SIM.V1", { type: "voice", uploadId: "up-voice-02", mimeType: "audio/ogg" }), h.deps);
-    const [stored] = await h.world.connector.conversations.listMessages(PEOPLE.rogelioJ07.personId);
+    expect(key).toBe(simMediaKey(GUEST, 3, "up-voice-02"));
+    await processInboundEvent(simEvent(GUEST, PEOPLE.rogelioG07.phone, "wamid.SIM.V1", { type: "voice", uploadId: "up-voice-02", mimeType: "audio/ogg" }), h.deps);
+    const [stored] = await h.world.connector.conversations.listMessages(PEOPLE.rogelioG07.personId);
     expect(stored).toMatchObject({ content: "VOICE", media: { kind: "AUDIO", s3Key: key, mime: "audio/ogg" } });
     expect(key).not.toContain("#");
     expect(h.rec.queued).toHaveLength(1);
@@ -107,9 +107,9 @@ describe("inbound media, simulated", () => {
     const mp4 = Uint8Array.from([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x4d, 0x34, 0x41, 0x20]);
     await simUpload(h, "up-voice-05", "VOICE", webm, "audio/webm");
     await simUpload(h, "up-voice-06", "VOICE", mp4, "audio/mp4");
-    await processInboundEvent(simEvent(JUDGE, PEOPLE.rogelioJ07.phone, "wamid.SIM.W1", { type: "voice", uploadId: "up-voice-05", mimeType: "audio/webm;codecs=opus" }), h.deps);
-    await processInboundEvent(simEvent(JUDGE, PEOPLE.rogelioJ07.phone, "wamid.SIM.W2", { type: "voice", uploadId: "up-voice-06", mimeType: "audio/mp4" }), h.deps);
-    const stored = await h.world.connector.conversations.listMessages(PEOPLE.rogelioJ07.personId);
+    await processInboundEvent(simEvent(GUEST, PEOPLE.rogelioG07.phone, "wamid.SIM.W1", { type: "voice", uploadId: "up-voice-05", mimeType: "audio/webm;codecs=opus" }), h.deps);
+    await processInboundEvent(simEvent(GUEST, PEOPLE.rogelioG07.phone, "wamid.SIM.W2", { type: "voice", uploadId: "up-voice-06", mimeType: "audio/mp4" }), h.deps);
+    const stored = await h.world.connector.conversations.listMessages(PEOPLE.rogelioG07.personId);
     expect(stored.map((message) => message.media?.mime)).toEqual(["audio/webm", "audio/mp4"]);
     expect(h.rec.queued).toHaveLength(2);
   });
@@ -117,12 +117,12 @@ describe("inbound media, simulated", () => {
   it("[FL-017] an upload of another world, of another kind or of an old epoch is refused", async () => {
     const h = await inboundHarness();
     await simUpload(h, "up-photo-02", "PHOTO", JPEG(), "image/jpeg");
-    const voiceFromPhoto = simEvent(JUDGE, PEOPLE.rogelioJ07.phone, "wamid.SIM.V2", { type: "voice", uploadId: "up-photo-02", mimeType: "audio/ogg" });
+    const voiceFromPhoto = simEvent(GUEST, PEOPLE.rogelioG07.phone, "wamid.SIM.V2", { type: "voice", uploadId: "up-photo-02", mimeType: "audio/ogg" });
     expect((await processInboundEvent(voiceFromPhoto, h.deps)).records[0]?.messages).toEqual(["MEDIA_REFUSED"]);
-    const oldKey = simMediaKey(JUDGE, 2, "up-voice-03");
-    await h.world.connector.worlds.createUpload({ uploadId: "up-voice-03", userId: "usr-judge-07", clockId: JUDGE, key: oldKey, kind: "VOICE", maxBytes: 1_000_000 });
+    const oldKey = simMediaKey(GUEST, 2, "up-voice-03");
+    await h.world.connector.worlds.createUpload({ uploadId: "up-voice-03", userId: "usr-guest-07", clockId: GUEST, key: oldKey, kind: "VOICE", maxBytes: 1_000_000 });
     h.store.put(oldKey, OGG(), "audio/ogg");
-    const oldEpoch = simEvent(JUDGE, PEOPLE.rogelioJ07.phone, "wamid.SIM.V3", { type: "voice", uploadId: "up-voice-03", mimeType: "audio/ogg" });
+    const oldEpoch = simEvent(GUEST, PEOPLE.rogelioG07.phone, "wamid.SIM.V3", { type: "voice", uploadId: "up-voice-03", mimeType: "audio/ogg" });
     expect((await processInboundEvent(oldEpoch, h.deps)).records[0]?.messages).toEqual(["MEDIA_REFUSED"]);
     expect(h.rec.notices.map((notice) => notice.notice)).toEqual(["voiceFailed", "voiceFailed"]);
     expect(h.rec.queued).toEqual([]);
@@ -131,9 +131,9 @@ describe("inbound media, simulated", () => {
   it("[FL-018] [FL-046] an upload over its limit or of an unsupported type is deleted and answered", async () => {
     const h = await inboundHarness();
     const big = await simUpload(h, "up-photo-03", "PHOTO", JPEG(4 * MB), "image/jpeg");
-    await processInboundEvent(simEvent(JUDGE, PEOPLE.rogelioJ07.phone, "wamid.SIM.P1", { type: "photo", uploadId: "up-photo-03", mimeType: "image/jpeg" }), h.deps);
+    await processInboundEvent(simEvent(GUEST, PEOPLE.rogelioG07.phone, "wamid.SIM.P1", { type: "photo", uploadId: "up-photo-03", mimeType: "image/jpeg" }), h.deps);
     const mp3 = await simUpload(h, "up-voice-04", "VOICE", Uint8Array.from([0x49, 0x44, 0x33, 0x04, 0, 0, 0, 0]), "audio/mpeg");
-    await processInboundEvent(simEvent(JUDGE, PEOPLE.rogelioJ07.phone, "wamid.SIM.P2", { type: "voice", uploadId: "up-voice-04", mimeType: "audio/mpeg" }), h.deps);
+    await processInboundEvent(simEvent(GUEST, PEOPLE.rogelioG07.phone, "wamid.SIM.P2", { type: "voice", uploadId: "up-voice-04", mimeType: "audio/mpeg" }), h.deps);
     expect(h.rec.notices.map((notice) => notice.notice)).toEqual(["imageTooLarge", "unsupportedMedia"]);
     expect(h.store.keys()).not.toContain(big);
     expect(h.store.keys()).not.toContain(mp3);

@@ -8,10 +8,10 @@ import type { SeedItem } from "../lib/tables";
 import { entities, str, worldsOf, type SeedBundle, type SeedWorld } from "./bundle";
 import { duplicates, finding, type Invariant } from "./types";
 
-/** Blocks each world may use (docs/seed-spec.md §2). */
+/** Blocks each world may use (docs/seed-spec.md §2): the guest template is cloned into invited, rehearsal and signup worlds. */
 const WORLD_BLOCKS: Readonly<Record<SeedWorld["name"], readonly PhoneBlock[]>> = {
   demo: ["demoInstallers", "demoSupervisors", "demoCustomers", "unknownNumber"],
-  judge: ["judgeWorlds"],
+  guest: ["guestWorlds", "signupWorlds"],
 };
 
 const RESERVED_DOMAINS = /(?:^|\.)(?:example\.(?:com|net|org)|test|invalid|localhost|craftech\.io)$/;
@@ -41,7 +41,7 @@ function addressesOf(world: SeedWorld, unknownNumber: string | undefined): { pho
 
 function uniqueAddresses(bundle: SeedBundle): string[] {
   const errors: string[] = [];
-  const unknown = { demo: bundle.demo?.unknownNumber, judge: bundle.judge?.unknownNumber };
+  const unknown = { demo: bundle.demo?.unknownNumber, guest: bundle.guest?.unknownNumber };
   const all = worldsOf(bundle).map((world) => addressesOf(world, unknown[world.name]));
   const phones = all.flatMap((entry) => entry.phones);
   const emails = all.flatMap((entry) => entry.emails);
@@ -81,7 +81,7 @@ const CURP = /\b([A-Z]{4})(\d{6})([HMX])([A-Z]{2})([A-Z]{3})([A-Z0-9])(\d)\b/;
 function syntheticCurp(bundle: SeedBundle): string[] {
   const errors: string[] = [];
   for (const world of worldsOf(bundle)) {
-    const customer = entities(world, "People", "Customer").find((item) => /^cust-10425(?:-j00)?$/.test(str(item, "customerId")));
+    const customer = entities(world, "People", "Customer").find((item) => /^cust-10425(?:-g00)?$/.test(str(item, "customerId")));
     const match = CURP.exec(str(customer ?? {}, "note"));
     if (customer === undefined || match === null) {
       errors.push(`${world.name}: cust-10425 has no synthetic CURP in its note`);

@@ -33,7 +33,7 @@ export const IdTokenClaims = z.looseObject({
   ispId: z.string().optional(),
   userId: z.string().optional(),
   role: z.string().optional(),
-  isJudge: z.enum(["true", "false"]).optional(),
+  isGuest: z.enum(["true", "false"]).optional(),
   email: z.string().optional(),
   name: z.string().optional(),
 });

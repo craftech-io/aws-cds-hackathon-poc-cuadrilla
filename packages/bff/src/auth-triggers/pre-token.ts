@@ -3,13 +3,13 @@
 // the console user of the token's `sub` in the registry (`Isps/USER#`, GSI1 `SUB#<sub>`) and stamps
 // what the BFF trusts (auth/principal.ts):
 //
-//   ispId, userId, role, isJudge    from the registry row, never from the `custom:ispId` attribute
+//   ispId, userId, role, isGuest    from the registry row, never from the `custom:ispId` attribute
 //   cognito:groups                  overridden with the registry role, so the token tells one story
 //   custom:ispId                    suppressed from the id token: nothing downstream can read it
 //
 // A `custom:ispId` that differs from the registry is ignored and audited (`AuditLog DENY
 // CUSTOM_ISP_ID_IGNORED` in the registry operator; FL-081). A `sub` with no row, with two rows, or
-// with a row that breaks the console's rules (a judge outside a judge operator, a user of a QA or
+// with a row that breaks the console's rules (a guest outside a guest operator, a user of a QA or
 // evaluation operator) gets no operator and no role: its token opens nothing (PRINCIPAL_INCOMPLETE).
 // An inactive user is stamped like any other; the BFF refuses it on every request (USER_INACTIVE).
 // Registry or audit failures fail the sign-in (Cognito waits 5 s; the deadline here is shorter).
@@ -69,7 +69,7 @@ export function overrideDetails(decision: TokenDecision): ClaimsAndScopeOverride
   const { user } = decision;
   return {
     idTokenGeneration: {
-      claimsToAddOrOverride: { ispId: user.ispId, userId: user.userId, role: user.role, isJudge: String(user.role === "JUDGE") },
+      claimsToAddOrOverride: { ispId: user.ispId, userId: user.userId, role: user.role, isGuest: String(user.role === "GUEST") },
       claimsToSuppress: [CUSTOM_ISP_ID_ATTRIBUTE],
     },
     groupOverrideDetails: { groupsToOverride: [user.role] },

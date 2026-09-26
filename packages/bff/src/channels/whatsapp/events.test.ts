@@ -4,7 +4,7 @@ import { testConnector } from "../../connector/testing";
 import { type StatusDeps, applyStatuses, isForward, recordLiveInbound } from "./events";
 import { resolveSender } from "./identity";
 import { processInboundEvent } from "./inbound";
-import { DEMO, JUDGE, PEOPLE, PHONE_KEY, REAL_NOW, fakeFallback, hashOf, inboundHarness, liveEvent, quietLogger, recorder, seedWorlds, waIdOf, waText } from "./testing";
+import { DEMO, GUEST, PEOPLE, PHONE_KEY, REAL_NOW, fakeFallback, hashOf, inboundHarness, liveEvent, quietLogger, recorder, seedWorlds, waIdOf, waText } from "./testing";
 
 const T = (iso: string): string => String(Math.floor(Date.parse(iso) / 1000));
 
@@ -120,15 +120,15 @@ describe("statuses of what we sent", () => {
 });
 
 describe("the real clock of a real phone's window", () => {
-  it("[FL-072] a live event of a phone bound to a judge's world updates PHONELEASE#.lastInboundAtReal with Meta's timestamp", async () => {
+  it("[FL-072] a live event of a phone bound to a guest's world updates PHONELEASE#.lastInboundAtReal with Meta's timestamp", async () => {
     const h = await inboundHarness();
     const phone = "+12025550103";
-    const code = await h.world.connector.worlds.createJoinCode({ code: "J07-9XYZ", clockId: JUDGE, personId: PEOPLE.rogelioJ07.personId, userId: "usr-judge-07" });
+    const code = await h.world.connector.worlds.createJoinCode({ code: "G07-9XYZ", clockId: GUEST, personId: PEOPLE.rogelioG07.personId, userId: "usr-guest-07" });
     await h.world.connector.worlds.bindPhoneLease(code.code, hashOf(phone));
     const message = { ...waText(phone, "wamid.L-1", "Ya llegué"), timestamp: T("2026-10-13T15:19:30Z") };
     await processInboundEvent(liveEvent({ messages: [message] }), h.deps);
     expect((await h.world.connector.worlds.getPhoneLease(hashOf(phone)))?.lastInboundAtReal).toBe("2026-10-13T15:19:30.000Z");
-    const person = await h.world.connector.people.getPerson(PEOPLE.rogelioJ07.personId);
+    const person = await h.world.connector.people.getPerson(PEOPLE.rogelioG07.personId);
     expect(person?.lastInboundAtReal).toBeUndefined();
     expect(person?.lastInboundAtSim).toBeDefined();
   });
@@ -140,8 +140,8 @@ describe("the real clock of a real phone's window", () => {
     const live = await resolveSender({ origin: "LIVE", waId: waIdOf(PEOPLE.rogelio.phone) }, deps);
     await recordLiveInbound(live, T("2026-10-13T15:18:00Z"), w.connector);
     expect((await w.connector.people.getPerson(PEOPLE.rogelio.personId))?.lastInboundAtReal).toBe("2026-10-13T15:18:00.000Z");
-    const simulated = await resolveSender({ origin: "SIMULATED", clockId: JUDGE, waId: waIdOf(PEOPLE.rogelioJ07.phone) }, deps);
+    const simulated = await resolveSender({ origin: "SIMULATED", clockId: GUEST, waId: waIdOf(PEOPLE.rogelioG07.phone) }, deps);
     await recordLiveInbound(simulated, T("2026-10-13T15:18:00Z"), w.connector);
-    expect((await w.connector.people.getPerson(PEOPLE.rogelioJ07.personId))?.lastInboundAtReal).toBeUndefined();
+    expect((await w.connector.people.getPerson(PEOPLE.rogelioG07.personId))?.lastInboundAtReal).toBeUndefined();
   });
 });

@@ -24,13 +24,13 @@
 //                            TIMERS links it; no other role does.
 //
 // WorldJanitor. The world factory's background worker (capability WORLDS, the mocks' tables fenced to
-// judge worlds by dynamodb:LeadingKeys). Two entries:
+// guest worlds by dynamodb:LeadingKeys). Two entries:
 //   - MEMORY_PURGE, invoked asynchronously by Bff and QaDriver after "Reiniciar demo" or world.destroy:
 //     the second pass and the listings of the Memory purge, up to 10 minutes (docs/architecture.md §9.3),
 //     hence Lambda's maximum timeout. Its resource policy names those two roles; within one account an
 //     identity policy alone also invokes, so the fence that counts is that no other role of the app
 //     holds lambda:InvokeFunction on it (infra/iam-capabilities.ts).
-//   - The nightly reset of judge worlds idle for 24 real hours, at 04:00 America/Mexico_City
+//   - The nightly reset of guest worlds idle for 24 real hours, at 04:00 America/Mexico_City
 //     (docs/architecture.md §8): an EventBridge rule on the default bus (`sst.aws.Cron`),
 //     cron(0 10 * * ? *) in UTC, since Mexico City keeps UTC−6 all year (no daylight saving time
 //     since 2022). A rule and not a Scheduler schedule: the CI deploy role creates rules tagged with
@@ -87,7 +87,7 @@ export const WORLD_JANITOR = {
   /** 04:00 America/Mexico_City = 10:00 UTC all year; EventBridge rules run in UTC. */
   nightlySchedule: "cron(0 10 * * ? *)",
   /** Input of the nightly run (packages/bff/src/handlers/world-janitor.ts validates it with zod, WP-39). */
-  nightlyEvent: { kind: "IDLE_JUDGE_RESET" },
+  nightlyEvent: { kind: "IDLE_GUEST_RESET" },
 } as const;
 
 /** Callers of the asynchronous MEMORY_PURGE, by the export of infra/bff.ts (WP-38) that creates each one. */
@@ -191,7 +191,7 @@ export const Scheduler = new sst.Linkable("Scheduler", {
 const JANITOR: LambdaName = "WorldJanitor";
 
 export const worldJanitor = new sst.aws.Function(JANITOR, {
-  description: "Continues the Memory purge of a reset or destroyed world (MEMORY_PURGE) and resets idle judge worlds nightly.",
+  description: "Continues the Memory purge of a reset or destroyed world (MEMORY_PURGE) and resets idle guest worlds nightly.",
   handler: SCHEDULER_HANDLERS.WorldJanitor,
   timeout: `${WORLD_JANITOR.timeoutSeconds} seconds`,
   memory: `${WORLD_JANITOR.memoryMb} MB`,
@@ -203,7 +203,7 @@ export const worldJanitor = new sst.aws.Function(JANITOR, {
     // The mocks' tables, by name only.
     lateCall("scheduler", "mocks", "mockLinks", JANITOR),
   ),
-  // Its tables, WORLDS's objects (Seed templates, simulator media) and the mocks' tables of judge worlds.
+  // Its tables, WORLDS's objects (Seed templates, simulator media) and the mocks' tables of guest worlds.
   permissions: $util
     .all([storagePermissions(JANITOR), storageGrantPermissions(JANITOR), lateCall("scheduler", "mocks", "mockPermissions", JANITOR)])
     .apply((parts) => parts.flat() as Array<{ actions: string[]; resources: string[] }>),

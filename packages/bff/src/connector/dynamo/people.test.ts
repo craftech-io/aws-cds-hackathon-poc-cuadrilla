@@ -44,7 +44,7 @@ describe("people repository", () => {
 
   it("finds a person only by the phone of its own world, and never guesses between two", async () => {
     await world.connector.people.createPerson(installer());
-    expect(await world.connector.people.findByPhone("JUDGE#isp-judge-07", HASH_A)).toBeUndefined();
+    expect(await world.connector.people.findByPhone("GUEST#isp-guest-07", HASH_A)).toBeUndefined();
     // The index does not enforce uniqueness: a second row with the same identity key (a bug, a bad import).
     const row = await world.client.get("People", { PK: "PERSON#inst-rogelio", SK: "META" });
     if (row === undefined) throw new Error("fixture missing");

@@ -55,8 +55,8 @@ export async function handleKeyword(keyword: Keyword, staff: StaffMessage, conse
       await deps.notices.send(noticeTo(staff, "welcome", esMX.welcome(person.firstName, role)));
       return "CONSENT_GRANTED";
     case "BAJA": {
-      // A phone bound by a join code opts out of the judge's world by giving the person back: the
-      // synthetic person keeps its consent, so the judge's simulator keeps working.
+      // A phone bound by a join code opts out of the guest's world by giving the person back: the
+      // synthetic person keeps its consent, so the guest's simulator keeps working.
       const lease = staff.sender.lease;
       if (lease === undefined && consented) await deps.actions.revokeConsent(actionInput(staff));
       await deps.notices.send(noticeTo(staff, "optOutConfirmed", esMX.optOutConfirmed));

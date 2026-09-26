@@ -27,7 +27,7 @@ describe("operators over the memory connector", () => {
   it("keeps the operator, stamps its brand name at runtime and records template state changes", async () => {
     expect((await world.connector.isps.setDisplayName(ISP, "Operadora de prueba")).displayName).toBe("Operadora de prueba");
     expect((await world.connector.isps.setDisplayName(ISP, null)).displayName).toBeUndefined();
-    const plan = await world.connector.isps.setTemplateStatus(ISP, "caso_escalado", "PENDING", { actor: "USER:usr-judge-07", atSim: "2026-10-13T11:00:00-06:00" });
+    const plan = await world.connector.isps.setTemplateStatus(ISP, "caso_escalado", "PENDING", { actor: "USER:usr-guest-07", atSim: "2026-10-13T11:00:00-06:00" });
     expect(plan.templateStatus).toEqual({ caso_escalado: "PENDING" });
     expect(plan.history).toEqual([expect.objectContaining({ field: "templateStatus.caso_escalado", from: "APPROVED", to: "PENDING" })]);
     const updated = await world.connector.isps.updateSettings(ISP, { demoMode: false });
@@ -55,11 +55,11 @@ describe("operators over the memory connector", () => {
     await world.connector.isps.putUser({ ispId: ISP, userId: "usr-adriana", role: "SUPERVISOR", name: "Adriana Solís", cognitoSub: "" });
     expect((await world.connector.isps.getUser(ISP, "usr-adriana"))?.cognitoSub).toBe("sub-1");
     expect(await world.connector.isps.findBySub(ISP, "sub-1")).toEqual({ userId: "usr-adriana", active: true });
-    expect(await world.connector.isps.findBySub("isp-judge-07", "sub-1")).toBeUndefined();
+    expect(await world.connector.isps.findBySub("isp-guest-07", "sub-1")).toBeUndefined();
     await world.connector.isps.setUserActive(ISP, "usr-adriana", false);
     const directory = createUserDirectory(world.connector.isps, world.now);
     expect(await directory.find(ISP, "sub-1")).toEqual({ userId: "usr-adriana", active: false });
-    await world.connector.isps.putUser({ ispId: "isp-judge-07", userId: "usr-judge-07", role: "JUDGE", name: "Jurado 07", cognitoSub: "sub-1" });
+    await world.connector.isps.putUser({ ispId: "isp-guest-07", userId: "usr-guest-07", role: "GUEST", name: "Invitado 07", cognitoSub: "sub-1" });
     expect(await world.connector.isps.findUserBySub("sub-1")).toBeUndefined();
     expect((await world.connector.isps.listUsers(ISP)).map((user) => user.userId)).toEqual(["usr-adriana"]);
   });

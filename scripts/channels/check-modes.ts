@@ -62,7 +62,7 @@ export function checkModes(modesSource: string, pendingMarkdown: string): string
   }
   const unknown = transports.filter((transport) => transport !== "live" && transport !== "simulated");
   if (unknown.length > 0) errors.push(`${MODES_FILE}: unknown WhatsApp transport(s) ${unknown.map((name) => `"${name}"`).join(", ")}.`);
-  if (!transports.includes("simulated")) errors.push(`${MODES_FILE}: the "simulated" transport must stay: every judge, QA and evaluation world uses it.`);
+  if (!transports.includes("simulated")) errors.push(`${MODES_FILE}: the "simulated" transport must stay: every guest, QA and evaluation world uses it.`);
   if (!transports.includes("live")) return errors;
 
   const status = pendingStatus(pendingMarkdown, WHATSAPP_GATE);

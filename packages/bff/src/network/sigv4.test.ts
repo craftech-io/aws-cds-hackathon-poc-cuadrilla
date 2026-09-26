@@ -23,7 +23,7 @@ describe("SigV4 transport to a Function URL", () => {
     const fetch = recordingFetch();
     const transport = sigv4Transport({ baseUrl: BASE, credentials: CREDENTIALS, fetch, now: () => SIGNED_AT });
     const signal = new AbortController().signal;
-    const response = await transport({ method: "GET", path: "/v1/onus/DEMO3F2C19A0", headers: { "X-World": "JUDGE#isp-judge-07", "X-Caller": "HARNESS" } }, signal);
+    const response = await transport({ method: "GET", path: "/v1/onus/DEMO3F2C19A0", headers: { "X-World": "GUEST#isp-guest-07", "X-Caller": "HARNESS" } }, signal);
     expect(response).toEqual({ status: 200, headers: { "content-type": "application/json", "retry-after": "1" }, body: '{"status":"ok"}' });
     const headers = sentHeaders(fetch);
     expect(headers.authorization).toContain("Credential=AKIDEXAMPLE/20261013/us-east-1/lambda/aws4_request");
@@ -53,7 +53,7 @@ describe("SigV4 transport to a Function URL", () => {
     const request = (world: string) => transport({ method: "GET", path: "/v1/onus/DEMO3F2C19A0", headers: { "X-World": world } }, new AbortController().signal);
     await request("GLOBAL#isp-demo");
     await request("GLOBAL#isp-demo");
-    await request("JUDGE#isp-judge-07");
+    await request("GUEST#isp-guest-07");
     const signature = (call: number) => /Signature=([0-9a-f]{64})$/.exec(sentHeaders(fetch, call).authorization ?? "")?.[1];
     expect(signature(0)).toBe(signature(1));
     expect(signature(0)).not.toBe(signature(2));

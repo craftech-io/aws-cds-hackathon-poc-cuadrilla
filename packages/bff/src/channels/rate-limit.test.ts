@@ -3,8 +3,8 @@ import { HASH_A, HASH_B, T0, testConnector } from "../connector/testing";
 import { DEFAULT_MESSAGES_PER_HOUR, type RateAdmissionInput, admitMessage, rateLimitsOf, rateReservations } from "./rate-limit";
 
 const HOUR = 3_600_000;
-// The judge world's settings (docs/seed-spec.md §4): 20 messages per identity and real hour.
-const JUDGE_SETTINGS = { simulatorCaps: { turnsPerHour: 60, turnsPerDay: 300, validationsPerDay: 100, transcribeSecPerDay: 1800, emailsPerDay: 20, messagesPerRealHourPerIdentity: 20 } };
+// The guest world's settings (docs/seed-spec.md §4): 20 messages per identity and real hour.
+const GUEST_SETTINGS = { simulatorCaps: { turnsPerHour: 60, turnsPerDay: 300, validationsPerDay: 100, transcribeSecPerDay: 1800, emailsPerDay: 20, messagesPerRealHourPerIdentity: 20 } };
 // `sc12-rate` of SC-12: a QA world with `rateLimitPerHour 3`.
 const QA_RATE_SETTINGS = { rateLimitPerHour: 3, simulatorCaps: { messagesPerRealHourPerIdentity: 20 } };
 
@@ -31,7 +31,7 @@ async function admitTimes(admit: () => ReturnType<typeof admitMessage>, times: n
 
 describe("rateLimitsOf", () => {
   it("uses the simulator's real-hour cap for both windows, bounded by rateLimitPerHour when the world sets it", () => {
-    expect(rateLimitsOf(JUDGE_SETTINGS)).toEqual({ perSimHour: 20, perRealHour: 20 });
+    expect(rateLimitsOf(GUEST_SETTINGS)).toEqual({ perSimHour: 20, perRealHour: 20 });
     expect(rateLimitsOf(QA_RATE_SETTINGS)).toEqual({ perSimHour: 3, perRealHour: 3 });
     expect(rateLimitsOf({ simulatorCaps: { messagesPerRealHourPerIdentity: 80 } })).toEqual({ perSimHour: 80, perRealHour: 80 });
     expect(rateLimitsOf(undefined)).toEqual({ perSimHour: DEFAULT_MESSAGES_PER_HOUR, perRealHour: DEFAULT_MESSAGES_PER_HOUR });
@@ -39,7 +39,7 @@ describe("rateLimitsOf", () => {
   });
 
   it("keys the two counters by world, sender hash, simulated hour and real hour", () => {
-    const { input } = world("GLOBAL#isp-demo", JUDGE_SETTINGS);
+    const { input } = world("GLOBAL#isp-demo", GUEST_SETTINGS);
     const { sim, real } = rateReservations(input());
     expect(sim).toMatchObject({ counterKey: `RATE#GLOBAL#isp-demo#${HASH_A}#2026-10-13T15`, kind: "RATE", by: 1, max: 20 });
     expect(real).toMatchObject({ counterKey: `RATE#GLOBAL#isp-demo#${HASH_A}#REAL#2026-10-13T13`, kind: "RATE", by: 1, max: 20 });
@@ -70,21 +70,21 @@ describe("admitMessage [FL-098]", () => {
     await admitTimes(() => demo.admit(HASH_A), 3);
     expect(await demo.admit(HASH_A)).toMatchObject({ ok: false });
     expect(await demo.admit(HASH_B)).toMatchObject({ ok: true, counts: { simHour: 1, realHour: 1 } });
-    const other = world("JUDGE#isp-judge-07", QA_RATE_SETTINGS);
+    const other = world("GUEST#isp-guest-07", QA_RATE_SETTINGS);
     expect(await other.admit(HASH_A)).toMatchObject({ ok: true });
   });
 });
 
-describe("admitMessage in a judge world [FL-083]", () => {
+describe("admitMessage in a guest world [FL-083]", () => {
   it("[FL-083] allows 20 messages per identity and hour and denies the 21st", async () => {
-    const { admit } = world("JUDGE#isp-judge-07", JUDGE_SETTINGS);
+    const { admit } = world("GUEST#isp-guest-07", GUEST_SETTINGS);
     const outcomes = await admitTimes(admit, 21);
     expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(20);
     expect(outcomes[20]).toMatchObject({ ok: false, ruleId: "RATE_LIMIT", limit: 20 });
   });
 
-  it("[FL-083] a judge cannot empty the real-hour cap by moving the clock forward", async () => {
-    const { admit, plusOneSimHour } = world("JUDGE#isp-judge-07", JUDGE_SETTINGS);
+  it("[FL-083] a guest cannot empty the real-hour cap by moving the clock forward", async () => {
+    const { admit, plusOneSimHour } = world("GUEST#isp-guest-07", GUEST_SETTINGS);
     await admitTimes(admit, 20);
     for (let hour = 0; hour < 3; hour += 1) {
       plusOneSimHour();
@@ -93,9 +93,9 @@ describe("admitMessage in a judge world [FL-083]", () => {
   });
 
   it("[FL-083] refuses an invalid world or sender hash instead of counting under a wrong key", async () => {
-    const { runtime } = world("JUDGE#isp-judge-07", JUDGE_SETTINGS);
-    const base = { simNow: new Date(T0), realNow: new Date(T0), settings: JUDGE_SETTINGS };
-    await expect(admitMessage(runtime, { ...base, clockId: "JUDGE#someone-else", addressHash: HASH_A })).rejects.toThrow();
-    await expect(admitMessage(runtime, { ...base, clockId: "JUDGE#isp-judge-07", addressHash: "+525501010001" })).rejects.toThrow();
+    const { runtime } = world("GUEST#isp-guest-07", GUEST_SETTINGS);
+    const base = { simNow: new Date(T0), realNow: new Date(T0), settings: GUEST_SETTINGS };
+    await expect(admitMessage(runtime, { ...base, clockId: "GUEST#someone-else", addressHash: HASH_A })).rejects.toThrow();
+    await expect(admitMessage(runtime, { ...base, clockId: "GUEST#isp-guest-07", addressHash: "+525501010001" })).rejects.toThrow();
   });
 });

@@ -2,7 +2,7 @@
 // world, and each clock belongs to exactly one operator, so either id derives the other:
 //
 //   GLOBAL#<ispId>             demo world of the operator (GLOBAL#isp-demo)       Isp.kind DEMO
-//   JUDGE#isp-judge-<nn|test>  a judge's own world, and the operator's rehearsal  Isp.kind JUDGE
+//   GUEST#isp-guest-<nn|test>  a guest's own world, and the operator's rehearsal  Isp.kind GUEST
 //   qa-<runId>-<scenario>      a scenario of the runner  ↔ isp-qa-<runId>-<scenario>   QA
 //   eval-<runId>               an evaluation run         ↔ isp-eval-<runId>            EVAL
 //
@@ -13,7 +13,7 @@ import { IspId } from "./ids";
 
 // QA run ids may be `<github run id>-<attempt>` or `local-<ULID>` (docs/test-plan.md §4.4).
 const TOKEN = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
-const JUDGE_ISP = /^isp-judge-(?:\d{2}|test)$/;
+const GUEST_ISP = /^isp-guest-(?:\d{2}|test)$/;
 const QA_ISP_PREFIX = "isp-qa-";
 const EVAL_ISP_PREFIX = "isp-eval-";
 
@@ -28,7 +28,7 @@ export function parseClockId(value: string): ParsedClockId | undefined {
     const scope = value.slice(0, hash);
     const ispId = value.slice(hash + 1);
     if (!IspId.safeParse(ispId).success) return undefined;
-    if (scope === "JUDGE" && JUDGE_ISP.test(ispId)) return { kind: "JUDGE", ispId };
+    if (scope === "GUEST" && GUEST_ISP.test(ispId)) return { kind: "GUEST", ispId };
     if (scope === "GLOBAL" && ispKindOfIspId(ispId) === "DEMO") return { kind: "DEMO", ispId };
     return undefined;
   }
@@ -37,7 +37,7 @@ export function parseClockId(value: string): ParsedClockId | undefined {
   return undefined;
 }
 
-export const ClockId = z.string().refine((value) => parseClockId(value) !== undefined, "expected GLOBAL#<ispId>, JUDGE#isp-judge-<nn>, qa-<runId>-<scenario> or eval-<runId>");
+export const ClockId = z.string().refine((value) => parseClockId(value) !== undefined, "expected GLOBAL#<ispId>, GUEST#isp-guest-<nn>, qa-<runId>-<scenario> or eval-<runId>");
 export type ClockId = z.infer<typeof ClockId>;
 
 function parsed(clockId: string): ParsedClockId {
@@ -60,27 +60,27 @@ export function ispKindOfIspId(ispId: string): IspKind {
   const id = IspId.parse(ispId);
   if (id.startsWith(QA_ISP_PREFIX)) return "QA";
   if (id.startsWith(EVAL_ISP_PREFIX)) return "EVAL";
-  if (id.startsWith("isp-judge-")) return "JUDGE";
+  if (id.startsWith("isp-guest-")) return "GUEST";
   return "DEMO";
 }
 
-/** Clock of an operator's world: `isp-demo` → `GLOBAL#isp-demo`, `isp-judge-07` → `JUDGE#isp-judge-07`. */
+/** Clock of an operator's world: `isp-demo` → `GLOBAL#isp-demo`, `isp-guest-07` → `GUEST#isp-guest-07`. */
 export function clockIdOfIsp(ispId: string): ClockId {
   const id = IspId.parse(ispId);
   switch (ispKindOfIspId(id)) {
     case "QA":
     case "EVAL":
       return ClockId.parse(id.slice("isp-".length));
-    case "JUDGE":
-      return ClockId.parse(`JUDGE#${id}`);
+    case "GUEST":
+      return ClockId.parse(`GUEST#${id}`);
     case "DEMO":
       return ClockId.parse(`GLOBAL#${id}`);
   }
 }
 
-export function judgeClockId(judge: number | "test"): ClockId {
-  const suffix = judge === "test" ? "test" : String(judge).padStart(2, "0");
-  return ClockId.parse(`JUDGE#isp-judge-${suffix}`);
+export function guestClockId(guest: number | "test"): ClockId {
+  const suffix = guest === "test" ? "test" : String(guest).padStart(2, "0");
+  return ClockId.parse(`GUEST#isp-guest-${suffix}`);
 }
 
 /** `qa-<runId>-<scenario>`, e.g. `qa-812-1-sc-02` or `qa-local-01J9ZQX-sc04-dup`. */
@@ -94,27 +94,27 @@ export function evalClockId(runId: string): ClockId {
 
 /**
  * Tag the ids of a cloned world carry where the table is shared and the numbers repeat
- * (docs/seed-spec.md §2): judge worlds reuse the demo numbers (`wo-24817-j03`, `wo-24817-jtest`).
+ * (docs/seed-spec.md §2): guest worlds reuse the demo numbers (`wo-24817-g03`, `wo-24817-gtest`).
  * The demo world keeps the original ids, and QA and evaluation worlds lease their own numbers.
  */
 export function clockTagOf(clockId: string): string | undefined {
   const { kind, ispId } = parsed(clockId);
-  return kind === "JUDGE" ? `j${ispId.slice("isp-judge-".length)}` : undefined;
+  return kind === "GUEST" ? `g${ispId.slice("isp-guest-".length)}` : undefined;
 }
 
 /** The demo operator and its world (docs/seed-spec.md §3-§4). */
 export const DEMO_ISP_ID: IspId = "isp-demo";
 export const DEMO_CLOCK_ID: ClockId = "GLOBAL#isp-demo";
 
-/** Operator rehearsal world, also the world of the `QaDriver`'s `JUDGE` principal (ADR-0007). */
-export const JUDGE_TEST_ISP_ID: IspId = "isp-judge-test";
-export const JUDGE_TEST_CLOCK_ID: ClockId = "JUDGE#isp-judge-test";
+/** Operator rehearsal world, also the world of the `QaDriver`'s `GUEST` principal (ADR-0007). */
+export const GUEST_TEST_ISP_ID: IspId = "isp-guest-test";
+export const GUEST_TEST_CLOCK_ID: ClockId = "GUEST#isp-guest-test";
 
 /**
  * Worlds the `QaDriver` may act on (docs/tool-catalog.md, "Acciones del QaDriver"): its own `qa-*`
- * and `eval-*` worlds, and the closed list of actions on `JUDGE#isp-judge-test`.
+ * and `eval-*` worlds, and the closed list of actions on `GUEST#isp-guest-test`.
  */
 export function isQaReachableClock(clockId: string): boolean {
   const result = parseClockId(clockId);
-  return result !== undefined && (result.kind === "QA" || result.kind === "EVAL" || clockId === JUDGE_TEST_CLOCK_ID);
+  return result !== undefined && (result.kind === "QA" || result.kind === "EVAL" || clockId === GUEST_TEST_CLOCK_ID);
 }

@@ -31,9 +31,9 @@ function citations(cell: string): string[] {
 }
 
 describe("flow ids and tags", () => {
-  it("FL-001 … FL-103 and their [FL-xxx] tags", () => {
+  it(`FL-001 … FL-${FLOW_COUNT} and their [FL-xxx] tags`, () => {
     expect(FlowId.safeParse("FL-017").success).toBe(true);
-    for (const id of ["FL-000", "FL-104", "FL-7", "F017", "fl-017"]) expect(FlowId.safeParse(id).success, id).toBe(false);
+    for (const id of ["FL-000", "FL-123", "FL-7", "F017", "fl-017"]) expect(FlowId.safeParse(id).success, id).toBe(false);
     expect(flowId(17)).toBe("FL-017");
     expect(ALL_FLOW_IDS).toHaveLength(FLOW_COUNT);
     expect(flowTag("FL-017")).toBe("[FL-017]");
@@ -59,7 +59,7 @@ describe("step declarations (docs/test-plan.md §4.3, ADR-0021)", () => {
     expect(StepDeclaration.safeParse({ id: "12", flows: ["FL-043"], kind: "det", after: "preset", expect: "DUPLICATE_EVIDENCE" }).success).toBe(true);
     expect(StepDeclaration.safeParse({ id: "X3", flows: ["FL-047"], kind: "det", after: "scene" }).success).toBe(true);
     expect(StepDeclaration.safeParse({ id: "1", flows: [], kind: "det", after: "preset" }).success).toBe(false);
-    expect(StepDeclaration.safeParse({ id: "1", flows: ["FL-104"], kind: "det", after: "preset" }).success).toBe(false);
+    expect(StepDeclaration.safeParse({ id: "1", flows: ["FL-123"], kind: "det", after: "preset" }).success).toBe(false);
     expect(StepDeclaration.safeParse({ id: "1", flows: ["FL-001", "FL-001"], kind: "det", after: "preset" }).success).toBe(false);
     expect(StepDeclaration.safeParse({ id: "1", flows: ["FL-001"], kind: "det", after: "later" }).success).toBe(false);
     expect(StepDeclaration.safeParse({ id: "2", flows: ["FL-001"], kind: "det", after: "2" }).success).toBe(false);

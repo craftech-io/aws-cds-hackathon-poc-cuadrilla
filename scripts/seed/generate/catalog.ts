@@ -1,7 +1,7 @@
 // The demo operator as data (docs/seed-spec.md §4-§7): its zones and crews, the staff with their
 // opt-in, the customers of the stories and every work order with the ONU behaviour of the network
 // orchestrator. Everything else (rows, templates, models) is built from this one catalog, so the demo
-// world, the judge template, the QA models and the evaluation worlds tell the same story.
+// world, the guest template, the QA models and the evaluation worlds tell the same story.
 import type { OpticalClass, PersonRole } from "@cuadrilla/shared";
 import type { OnuBehaviour } from "@cuadrilla/network-contract";
 import { DAYS } from "./time";

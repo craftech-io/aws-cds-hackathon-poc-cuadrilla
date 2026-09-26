@@ -2,7 +2,7 @@
 // `Seed/worlds/` for the world factory (packages/bff/src/worlds/, WP-39).
 //
 //   demo    the operator's demo world, item by item (the same items as the table files)
-//   judge   the curated world of a judge, item by item, with the placeholder judge `00` in every id,
+//   guest   the curated world of a guest, item by item, with the placeholder guest `00` in every id,
 //           phone and email of the world; the tour window and the scenes of "Saltar a escena"
 //   models  the model orders `world.create` clones into QA and evaluation worlds, with their people
 //   qa-min  two clones and the metrics fixture (SC-15, SC-16)
@@ -91,25 +91,25 @@ export type Tour = z.infer<typeof Tour>;
 
 const TablesShape = z.object(Object.fromEntries(WORLD_TABLES.map((table) => [table, z.array(SeedItem)])) as Record<(typeof WORLD_TABLES)[number], z.ZodArray<typeof SeedItem>>).strict();
 
-/** `demo` and `judge`: a whole world, item by item. */
+/** `demo` and `guest`: a whole world, item by item. */
 export const WorldTablesTemplate = z
   .object({
-    template: z.enum(["demo", "judge"]),
+    template: z.enum(["demo", "guest"]),
     ...Header,
     ispId: IspId,
     clockId: ClockId,
     unknownNumber: z.string().regex(/^\+\d{8,15}$/),
-    /** Only `judge`: the tokens of the placeholder judge the world factory replaces. */
-    placeholders: z.object({ judgeNumber: z.literal("00"), clockTag: z.literal("j00"), ispId: IspId, clockId: ClockId, phoneBlock: z.string(), emailTag: z.literal("j00") }).strict().optional(),
+    /** Only `guest`: the tokens of the placeholder guest the world factory replaces. */
+    placeholders: z.object({ guestNumber: z.literal("00"), clockTag: z.literal("g00"), ispId: IspId, clockId: ClockId, phoneBlock: z.string(), emailTag: z.literal("g00") }).strict().optional(),
     /**
-     * Only `judge`: what `isp-judge-test` (the operator's rehearsal and the `QaDriver`'s `JUDGE`
+     * Only `guest`: what `isp-guest-test` (the operator's rehearsal and the `QaDriver`'s `GUEST`
      * principal) changes over the template (docs/seed-spec.md §4): higher simulator caps, so `SC-19` and
-     * three runs of `SC-18` fit in one real hour, and the `usr-qa-judge` user bound to that world.
+     * three runs of `SC-18` fit in one real hour, and the `usr-qa-guest` user bound to that world.
      */
-    judgeTest: z
+    guestTest: z
       .object({
         simulatorCaps: z.object({ messagesPerRealHourPerIdentity: z.int(), turnsPerHour: z.int(), emailsPerDay: z.int() }).strict(),
-        consoleUsers: z.array(z.object({ userId: z.string().regex(/^usr-[a-z0-9-]+$/), role: z.literal("JUDGE"), name: z.string().min(1) }).strict()),
+        consoleUsers: z.array(z.object({ userId: z.string().regex(/^usr-[a-z0-9-]+$/), role: z.literal("GUEST"), name: z.string().min(1) }).strict()),
       })
       .strict()
       .optional(),
@@ -203,5 +203,5 @@ export const EvalTemplate = z
   .strict();
 export type EvalTemplate = z.infer<typeof EvalTemplate>;
 
-export const TEMPLATE_NAMES = ["demo", "judge", "models", "qa-min", "eval"] as const;
+export const TEMPLATE_NAMES = ["demo", "guest", "models", "qa-min", "eval"] as const;
 export type TemplateName = (typeof TEMPLATE_NAMES)[number];

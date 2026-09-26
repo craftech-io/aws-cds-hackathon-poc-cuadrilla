@@ -5,7 +5,7 @@
 // groups: a user who could change either would still land in the operator and role of the registry.
 //
 // Each operator has exactly one world (packages/shared/src/clock-ids.ts), so the principal is bound
-// to one world: `GLOBAL#isp-demo` for the demo's staff, `JUDGE#isp-judge-<nn>` for a judge. The
+// to one world: `GLOBAL#isp-demo` for the demo's staff, `GUEST#isp-guest-<nn>` for a guest. The
 // `QaDriver` builds its principals on the server instead (auth/qa-principal.ts), bound to the world
 // each call names.
 import { z } from "zod";
@@ -29,31 +29,31 @@ export interface Principal {
   /** The world of that operator, the only one this principal acts on. */
   readonly clockId: ClockId;
   readonly role: ConsoleRole;
-  /** Judge accounts act as supervisors inside their own judge world, without TOTP or password change. */
-  readonly isJudge: boolean;
+  /** Guest accounts act as supervisors inside their own guest world, without TOTP or password change. */
+  readonly isGuest: boolean;
   /** Epoch seconds of the last interactive sign-in (`auth_time`). */
   readonly authTime: number;
   /** One sign-in (`origin_jti`, kept across refreshes): "one session per world" tells two apart. */
   readonly sessionId: string;
 }
 
-/** Operators whose staff sign in to the console: the demo and each judge (QA and evaluation worlds have none). */
-export const TOKEN_OPERATOR_KINDS: readonly IspKind[] = ["DEMO", "JUDGE"];
+/** Operators whose staff sign in to the console: the demo and each guest (QA and evaluation worlds have none). */
+export const TOKEN_OPERATOR_KINDS: readonly IspKind[] = ["DEMO", "GUEST"];
 
 // What the trigger stamps; a token without all three describes no principal.
 const StampedClaims = z.object({
   ispId: IspId,
   userId: ConsoleUserId,
   role: ConsoleRole,
-  isJudge: z.enum(["true", "false"]).optional(),
+  isGuest: z.enum(["true", "false"]).optional(),
 });
 
 /**
- * A judge acts only inside a judge world, and a judge world has only judges (the same rule as the
+ * A guest acts only inside a guest world, and a guest world has only guests (the same rule as the
  * `CONSOLE` caller of packages/shared/src/caller.ts). Returns why the pair does not fit, if it does not.
  */
 export function roleWorldMismatch(role: ConsoleRole, kind: IspKind): string | undefined {
-  if ((role === "JUDGE") !== (kind === "JUDGE")) return "a judge belongs to a judge operator, and only judges do";
+  if ((role === "GUEST") !== (kind === "GUEST")) return "a guest belongs to a guest operator, and only guests do";
   return undefined;
 }
 
@@ -65,12 +65,12 @@ function incomplete(message: string): AuthError {
 export function principalFromClaims(claims: IdTokenClaims): Principal {
   const stamped = StampedClaims.safeParse(claims);
   if (!stamped.success) throw incomplete("the token carries no operator, console user or console role");
-  const { ispId, userId, role, isJudge } = stamped.data;
+  const { ispId, userId, role, isGuest } = stamped.data;
   const kind = ispKindOfIspId(ispId);
-  if (!TOKEN_OPERATOR_KINDS.includes(kind)) throw incomplete("console accounts belong to the demo operator or to a judge");
+  if (!TOKEN_OPERATOR_KINDS.includes(kind)) throw incomplete("console accounts belong to the demo operator or to a guest");
   const mismatch = roleWorldMismatch(role, kind);
   if (mismatch !== undefined) throw incomplete(mismatch);
-  if (isJudge !== undefined && (isJudge === "true") !== (role === "JUDGE")) throw incomplete("the judge flag contradicts the console role");
+  if (isGuest !== undefined && (isGuest === "true") !== (role === "GUEST")) throw incomplete("the guest flag contradicts the console role");
   return {
     origin: "COGNITO",
     sub: claims.sub,
@@ -79,7 +79,7 @@ export function principalFromClaims(claims: IdTokenClaims): Principal {
     ispId,
     clockId: clockIdOfIsp(ispId),
     role,
-    isJudge: role === "JUDGE",
+    isGuest: role === "GUEST",
     authTime: claims.auth_time,
     sessionId: claims.origin_jti ?? `auth-${claims.auth_time}`,
   };

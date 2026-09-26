@@ -31,7 +31,7 @@ describe("the system prompt (docs/design-brief.md §5.11)", () => {
   it("is one static string: no value of a turn, a world, an operator or a session", () => {
     expect(Object.keys(promptModule)).toEqual(["SYSTEM_PROMPT"]);
     expect(typeof SYSTEM_PROMPT).toBe("string");
-    for (const perTurn of [/\$\{/, /\{\{/, /\b20\d\d-\d\d/, /inbound-[0-9a-f]{3,}/, /GLOBAL#|JUDGE#|qa-\d/, /\b(?:wo|inst|isp|sup|case)-[a-z0-9]/, /\.\d{1,12}\.[A-Za-z0-9_-]{43}/]) {
+    for (const perTurn of [/\$\{/, /\{\{/, /\b20\d\d-\d\d/, /inbound-[0-9a-f]{3,}/, /GLOBAL#|GUEST#|qa-\d/, /\b(?:wo|inst|isp|sup|case)-[a-z0-9]/, /\.\d{1,12}\.[A-Za-z0-9_-]{43}/]) {
       expect(SYSTEM_PROMPT, String(perTurn)).not.toMatch(perTurn);
     }
     expect(SYSTEM_PROMPT.length).toBeLessThan(8_000);

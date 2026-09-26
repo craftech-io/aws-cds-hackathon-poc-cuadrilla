@@ -13,7 +13,7 @@ export const WORLD_START_SIM = `${DAYS.demo}T07:00:00${OFFSET}`;
 /** When `DAY_START` fires for every active installer (docs/architecture.md §8). */
 export const DAY_START_TIME = "07:30";
 
-/** Window of the judges' tour on 13/10 (docs/seed-spec.md §3). */
+/** Window of the guided tour on 13/10 (docs/seed-spec.md §3). */
 export const TOUR_WINDOW = { start: `${DAYS.demo}T07:00:00${OFFSET}`, end: `${DAYS.demo}T15:30:00${OFFSET}` } as const;
 
 function pad(value: number, width = 2): string {

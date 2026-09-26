@@ -8,7 +8,7 @@ import { normalizeForMatch } from "./helpers";
 export type Keyword =
   /** Opt-in of an allowlisted person (`record_consent`). */
   | { readonly kind: "ALTA" }
-  /** Join code of a judge's world sent from a real phone ("ALTA J07-4F2K"). */
+  /** Join code of a guest's world sent from a real phone ("ALTA G07-4F2K"). */
   | { readonly kind: "ALTA_CODE"; readonly code: string }
   /** Opt-out (`revoke_consent`). */
   | { readonly kind: "BAJA" }
@@ -30,7 +30,7 @@ const SIMPLE: Readonly<Record<string, Keyword>> = {
 };
 
 // A join code is the world's prefix (2 to 5 letters or digits) and 4 characters, written with or
-// without the hyphen: "J07-4F2K", "j07 4f2k" and "J074F2K" are the same code. Written together it
+// without the hyphen: "G07-4F2K", "g07 4f2k" and "G074F2K" are the same code. Written together it
 // needs a digit, so "alta porfavor" stays an ordinary message instead of a code "PORF-AVOR".
 const JOIN_CODE = /^alta ([a-z0-9]{2,5})( ?)([a-z0-9]{4})$/;
 

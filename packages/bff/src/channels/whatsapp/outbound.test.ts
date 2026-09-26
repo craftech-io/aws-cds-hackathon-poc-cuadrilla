@@ -102,14 +102,14 @@ describe("live transport", () => {
     const w = await world();
     socialMock.on(SendWhatsAppMessageCommand).resolves({ messageId: "wamid.OUT-2" });
     const ref = await outboundRow(w, "msg-out-0002");
-    const judgePhone = "12025550102";
-    const result = await liveTransport(w).send({ message: ref, clockId: DEMO, ispId: "isp-demo", payload: renderText(judgePhone, "Listo, quedaste dado de alta.") });
+    const guestPhone = "12025550102";
+    const result = await liveTransport(w).send({ message: ref, clockId: DEMO, ispId: "isp-demo", payload: renderText(guestPhone, "Listo, quedaste dado de alta.") });
     expect(result).toMatchObject({ ok: true });
-    expect(sentJson(0)).toMatchObject({ to: judgePhone });
+    expect(sentJson(0)).toMatchObject({ to: guestPhone });
     const stored = await w.connector.conversations.getMessage(ref);
     expect(stored?.refs?.whatsapp).toMatchObject({ type: "text", text: { body: "Listo, quedaste dado de alta." } });
     expect(stored?.refs?.whatsapp).not.toHaveProperty("to");
-    expect(JSON.stringify(stored)).not.toContain(judgePhone);
+    expect(JSON.stringify(stored)).not.toContain(guestPhone);
   });
 
   it("[FL-049] the certificate as a document: PostWhatsAppMessageMedia from the Evidence bucket, then document.id; the media id is reused", async () => {

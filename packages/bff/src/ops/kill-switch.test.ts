@@ -180,7 +180,7 @@ describe("set_kill_switch", () => {
     expect(memory.items.get(`KILL#AGENT#${QA_WORLD}`)).toMatchObject({ state: "on", clockId: QA_WORLD, expiresAt: REAL / 1000 + WORLD_KILL_TTL_SECONDS });
     for (const request of [
       { scope: "AGENT" as const, on: true, actor: "QA" as const },
-      { scope: "AGENT" as const, clockId: "JUDGE#isp-judge-test", on: true, actor: "QA" as const },
+      { scope: "AGENT" as const, clockId: "GUEST#isp-guest-test", on: true, actor: "QA" as const },
       { scope: "AGENT" as const, clockId: "GLOBAL#isp-demo", on: true, actor: "QA" as const },
       { scope: "AGENT" as const, clockId: "eval-812-1", on: true, actor: "QA" as const },
     ]) {
@@ -189,10 +189,10 @@ describe("set_kill_switch", () => {
     expect(memory.items.has("KILL#AGENT")).toBe(false);
   });
 
-  it("keeps the switches of the demo and judge worlds without TTL and refuses a world switch that is not AGENT", async () => {
+  it("keeps the switches of the demo and guest worlds without TTL and refuses a world switch that is not AGENT", async () => {
     const memory = createMemoryRuntimeStore();
-    await setKillSwitch({ store: memory }, { scope: "AGENT", clockId: "JUDGE#isp-judge-07", on: true, actor: "OPERATOR" });
-    expect(memory.items.get("KILL#AGENT#JUDGE#isp-judge-07")).not.toHaveProperty("expiresAt");
+    await setKillSwitch({ store: memory }, { scope: "AGENT", clockId: "GUEST#isp-guest-07", on: true, actor: "OPERATOR" });
+    expect(memory.items.get("KILL#AGENT#GUEST#isp-guest-07")).not.toHaveProperty("expiresAt");
     await expect(setKillSwitch({ store: memory }, { scope: "SIMULATOR", clockId: QA_WORLD, on: true, actor: "OPERATOR" })).rejects.toBeInstanceOf(ToolError);
     expect(() => killSwitchKey("ALL", QA_WORLD)).toThrow(RangeError);
     expect(() => killSwitchKey("AGENT", "tomorrow")).toThrow();

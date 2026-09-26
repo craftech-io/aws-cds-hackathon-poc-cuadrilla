@@ -6,20 +6,20 @@
 // Who gets in. Nobody signs up: `allowAdminCreateUserOnly`, and the operator creates every user with
 // AdminCreateUser through `npm run console:invite` (scripts/console/invite.ts), which sets the group
 // and the informative `custom:ispId`. Sign-in names: email is an alias, so supervisors and operations
-// sign in with the email the invitation verified, and judges (`judge-01..NN`, `judge-test`) with a
-// plain username and no email at all.
+// sign in with the email the invitation verified, and invited guests (`guest-01..NN`, `guest-test`)
+// with a plain username and no email at all.
 //
-// Tenancy. Groups SUPERVISOR, JUDGE and OPS. `custom:ispId` is readable by the web client and never
+// Tenancy. Groups SUPERVISOR, GUEST and OPS. `custom:ispId` is readable by the web client and never
 // writable by it (WEB_CLIENT_SETTINGS.writeAttributes = ["name"]), and nothing trusts it: the pre token
 // generation trigger (event V2_0, packages/bff/src/auth-triggers/pre-token.ts) stamps `ispId`, the
-// role and `isJudge` from `Isps/USER#` by GSI1 `SUB#<sub>`, and audits a `custom:ispId` that differs.
+// role and `isGuest` from `Isps/USER#` by GSI1 `SUB#<sub>`, and audits a `custom:ispId` that differs.
 // Cognito waits at most 5 s for it, hence the explicit timeout.
 //
 // Sign-in surface. The console's own screen (packages/web/src/views/login) speaks USER_SRP_AUTH,
 // REFRESH_TOKEN_AUTH, the challenges, ForgotPassword and RevokeToken to the Cognito API. The pool has
 // no domain and the client no OAuth flow, so there is no hosted UI. MFA is optional TOTP (no SMS):
-// supervisors and operations may turn it on; judge accounts are created with it off and the console
-// hides it.
+// supervisors and operations may turn it on; invited guest accounts are created with it off and the
+// console hides it.
 //
 // Email. Cognito sends the invitation and the code message with its service-linked role
 // (AWSServiceRoleForAmazonCognitoIdpEmailService, created by the first deploy that sets DEVELOPER),
@@ -28,7 +28,7 @@
 // default sender with the same templates, and the deploy log says so (auth-email.ts `emailSenderFor`).
 // The brand of both templates is resolved from the BrandConfig secret on every deploy (ADR-0018). These
 // emails bypass the app's SES client and its recipient fence: the only recipients are the addresses
-// the operator passes to console:invite (judges get no email).
+// the operator passes to console:invite (invited guests get no email).
 //
 // Permissions. The trigger is `AuthPreToken` in infra/iam-capabilities.ts: it links `Isps` and
 // `AuditLog` for their names only and gets `storagePermissions` of that entry, i.e. Query/GetItem on
@@ -45,7 +45,7 @@
 //     MfaConfiguration = OPTIONAL · UserPoolTier = ESSENTIALS · SchemaAttributes has custom:ispId ·
 //     LambdaConfig.PreTokenGenerationConfig.LambdaVersion = V2_0 · no Domain ·
 //     EmailConfiguration.EmailSendingAccount = DEVELOPER (once the SES identity is verified)
-//   aws --profile craftech-demos cognito-idp list-groups --user-pool-id <id>        SUPERVISOR, JUDGE, OPS
+//   aws --profile craftech-demos cognito-idp list-groups --user-pool-id <id>        SUPERVISOR, GUEST, OPS
 //   aws --profile craftech-demos cognito-idp describe-user-pool-client --user-pool-id <id> --client-id <clientId>
 //     ExplicitAuthFlows = [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH] · AllowedOAuthFlowsUserPoolClient = false ·
 //     AccessTokenValidity = IdTokenValidity = 15 (minutes) · RefreshTokenValidity = 12 (hours) · WriteAttributes = [name]
@@ -97,9 +97,9 @@ const emailConfiguration = $util.output(import("./messaging-email").then((module
 // without printing its value.
 const messages = BrandConfig.value.apply((raw) => cognitoMessages({ loginUrl: `${appUrl}${LOGIN_PATH}`, brandUrl: `${appUrl}/brand`, brand: emailBrandFrom(raw) }));
 
-/** Stamps `ispId`, the role and `isJudge` on the tokens from `Isps/USER#`; audits a differing `custom:ispId`. */
+/** Stamps `ispId`, the role and `isGuest` on the tokens from `Isps/USER#`; audits a differing `custom:ispId`. */
 export const preTokenTrigger = new sst.aws.Function("AuthPreToken", {
-  description: "Cognito pre token generation (V2_0): ispId, role and isJudge from Isps/USER#.",
+  description: "Cognito pre token generation (V2_0): ispId, role and isGuest from Isps/USER#.",
   handler: PRE_TOKEN_HANDLER,
   link: storageLinks("AuthPreToken"),
   permissions: storagePermissions("AuthPreToken"),

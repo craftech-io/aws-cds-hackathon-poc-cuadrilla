@@ -1,9 +1,11 @@
 // Invariants of the content (docs/seed-spec.md §14): 6 the manual; 7 the evaluation set; 11 forbidden
 // terms and the names checked in NAMECHECK; 12 the WhatsApp templates; 13 the rate card; 24 nothing
-// names the operator (the seed has no `displayName` and no text carries the default operator name).
+// names the operator (the seed has no `displayName` and no text carries the default operator name);
+// 25 no text a user reads or hears uses a word of ADR-0023 (the list of scripts/lint/neutral-terms.ts).
 import { DEFAULT_OPERATOR_NAME } from "../../../packages/bff/src/copy/brand";
 import { checkManual } from "../../manual/check";
 import { findTerms, parseTerms } from "../../lint/forbidden-terms";
+import { findNeutralTerms, type NeutralFinding } from "../../lint/neutral-terms";
 import { allVoiceTexts } from "../audio/texts";
 import { NAME_CHECKS, orphanSearches, pendingWebSearches } from "../generate/namecheck";
 import { parseOutcome } from "../lib/questions";
@@ -45,7 +47,7 @@ function questions(bundle: SeedBundle): string[] {
   return errors;
 }
 
-/** Every text the forbidden-terms and brand checks read: data files, photo texts and voice texts. */
+/** Every text the forbidden-terms, brand and neutral-surface checks read: data files, photo texts and voice texts. */
 function textSources(bundle: SeedBundle): Array<{ readonly source: string; readonly text: string }> {
   return [
     ...[...bundle.files].map(([path, text]) => ({ source: `scripts/seed/data/${path}`, text })),
@@ -115,6 +117,28 @@ function operatorNotNamed(bundle: SeedBundle): string[] {
   return errors;
 }
 
+const JSON_ESCAPE = /\\(?:u([0-9a-fA-F]{4})|(["\\/])|[bfnrt])/g;
+
+/**
+ * A JSON text with its string escapes decoded in place, as the neutral-surfaces guard reads it: a
+ * control character becomes a space, so the line numbers stay and an escape (`\n`) never glues a
+ * word to the letter before it.
+ */
+function decodedJson(text: string): string {
+  return text.replace(JSON_ESCAPE, (_escape, hex: string | undefined, literal: string | undefined) => {
+    if (literal !== undefined) return literal;
+    const code = hex === undefined ? 0 : Number.parseInt(hex, 16);
+    return code < 0x20 || code === 0x7f ? " " : String.fromCharCode(code);
+  });
+}
+
+/** Words of ADR-0023 in any text of the seed a user reads or hears: data files, photo texts and voice texts. */
+function neutralSurfaces(bundle: SeedBundle): string[] {
+  const findings: NeutralFinding[] = [];
+  for (const { source, text } of textSources(bundle)) findings.push(...findNeutralTerms(source, source.endsWith(".json") ? decodedJson(text) : text));
+  return findings.map(({ source, line, term }) => `${source}:${line} uses "${term}", a word of ADR-0023`);
+}
+
 export const CONTENT_INVARIANTS: readonly Invariant[] = [
   { id: 6, title: "Manual: 32 sections with sidecars, unique ids, within budget, §SEG-01 = safetyInstruction", check: (bundle) => finding(manual(bundle)) },
   { id: 7, title: "Evaluation set: 40 A and 10 R, cited sections exist, no phrase of the manual over 8 words", check: (bundle) => finding(questions(bundle)) },
@@ -122,4 +146,5 @@ export const CONTENT_INVARIANTS: readonly Invariant[] = [
   { id: 12, title: "Templates referred to exist, start and end with fixed text, buttons within 25 characters", check: (bundle) => finding(templates(bundle)) },
   { id: 13, title: "Every verified rate has price, source and date", check: (bundle) => finding(rateCard(bundle)) },
   { id: 24, title: "Nothing of the seed names the operator", check: (bundle) => finding(operatorNotNamed(bundle)) },
+  { id: 25, title: "No text of the seed a user reads or hears uses a word of ADR-0023", check: (bundle) => finding(neutralSurfaces(bundle)) },
 ];

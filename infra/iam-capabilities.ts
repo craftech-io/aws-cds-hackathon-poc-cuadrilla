@@ -194,9 +194,9 @@ export const CAPABILITIES: Readonly<Record<CapabilityName, Capability>> = {
 
 /** `dynamodb:LeadingKeys` of `Network` and `Dispatch` per role that holds `WORLDS` (docs/architecture.md §14). */
 export const WORLDS_LEADING_KEYS = {
-  Bff: ["ONU#GLOBAL#isp-demo#*", "ONU#JUDGE#isp-judge-*", "DWO#isp-demo#*", "DWO#isp-judge-*"],
-  WorldJanitor: ["ONU#JUDGE#isp-judge-*", "DWO#isp-judge-*"],
-  QaDriver: ["ONU#qa-*", "ONU#eval-*", "ONU#JUDGE#isp-judge-test#*", "DWO#isp-qa-*", "DWO#isp-eval-*", "DWO#isp-judge-test#*"],
+  Bff: ["ONU#GLOBAL#isp-demo#*", "ONU#GUEST#isp-guest-*", "DWO#isp-demo#*", "DWO#isp-guest-*"],
+  WorldJanitor: ["ONU#GUEST#isp-guest-*", "DWO#isp-guest-*"],
+  QaDriver: ["ONU#qa-*", "ONU#eval-*", "ONU#GUEST#isp-guest-test#*", "DWO#isp-qa-*", "DWO#isp-eval-*", "DWO#isp-guest-test#*"],
 } as const;
 
 export type WorldsRole = keyof typeof WORLDS_LEADING_KEYS;

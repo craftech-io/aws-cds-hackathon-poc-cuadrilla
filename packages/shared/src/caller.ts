@@ -5,7 +5,7 @@
 // `sessionToken` XOR `caller` union below (`LAM-CALLER`); `createToolHandler` also rejects `caller`
 // when the invocation context carries the AgentCore Gateway keys.
 import { z } from "zod";
-import { ClockId, JUDGE_TEST_CLOCK_ID, isQaReachableClock, parseClockId } from "./clock-ids";
+import { ClockId, GUEST_TEST_CLOCK_ID, isQaReachableClock, parseClockId } from "./clock-ids";
 import { ConsoleRole } from "./enums";
 import { ConsoleUserId, IspId } from "./ids";
 
@@ -48,16 +48,16 @@ export const Caller = z
     if (caller.kind === "CONSOLE") {
       if (caller.userId === undefined) issue("userId", "CONSOLE caller needs its user");
       if (caller.role === undefined) issue("role", "CONSOLE caller needs its role");
-      // A judge acts only inside a judge world, and a judge world has only judges.
-      if (caller.role !== undefined && world !== undefined && (caller.role === "JUDGE") !== (world.kind === "JUDGE")) {
-        issue("role", "JUDGE is the role of a judge world and only of a judge world");
+      // A guest acts only inside a guest world, and a guest world has only guests.
+      if (caller.role !== undefined && world !== undefined && (caller.role === "GUEST") !== (world.kind === "GUEST")) {
+        issue("role", "GUEST is the role of a guest world and only of a guest world");
       }
     }
     if (caller.kind === "QA") {
-      if (caller.clockId !== undefined && !isQaReachableClock(caller.clockId)) issue("clockId", "QA acts only on qa-*, eval-* and JUDGE#isp-judge-test");
+      if (caller.clockId !== undefined && !isQaReachableClock(caller.clockId)) issue("clockId", "QA acts only on qa-*, eval-* and GUEST#isp-guest-test");
       if (caller.userId !== undefined && !caller.userId.startsWith("usr-qa-")) issue("userId", "QA principals are usr-qa-*");
-      if (caller.role === "JUDGE" && caller.clockId !== JUDGE_TEST_CLOCK_ID) issue("role", "the QA judge principal is bound to JUDGE#isp-judge-test");
-      if (caller.clockId === JUDGE_TEST_CLOCK_ID && caller.role !== undefined && caller.role !== "JUDGE") issue("role", "QA acts on JUDGE#isp-judge-test only as JUDGE");
+      if (caller.role === "GUEST" && caller.clockId !== GUEST_TEST_CLOCK_ID) issue("role", "the QA guest principal is bound to GUEST#isp-guest-test");
+      if (caller.clockId === GUEST_TEST_CLOCK_ID && caller.role !== undefined && caller.role !== "GUEST") issue("role", "QA acts on GUEST#isp-guest-test only as GUEST");
     }
   });
 export type Caller = z.infer<typeof Caller>;

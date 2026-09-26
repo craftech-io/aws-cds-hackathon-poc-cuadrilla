@@ -3,7 +3,7 @@
 // password, FORCE_CHANGE_PASSWORD) or confirmed, with or without TOTP; the pool's MFA is OPTIONAL
 // like infra/auth.ts, or ON to exercise MFA_SETUP. Every request is recorded so a test can assert
 // what crossed the wire. Tokens last 15 minutes like the pool's; the id token carries the claims the
-// pre-token trigger stamps (`ispId`, `role`, `isJudge`) and is unsigned unless a signer is given (the
+// pre-token trigger stamps (`ispId`, `role`, `isGuest`) and is unsigned unless a signer is given (the
 // Playwright specs sign it with an ephemeral RSA key, packages/web/e2e/support/tokens.ts).
 import { type AuthResponse, type AuthenticationResult, type CognitoApi, CognitoError, TOTP_MFA } from "../cognito";
 import { missingPasswordRules } from "../credentials";
@@ -174,7 +174,7 @@ export class FakeCognito implements CognitoApi {
       "cognito:groups": [user.role],
       role: user.role,
       ispId: user.ispId,
-      isJudge: user.role === "JUDGE" ? "true" : "false",
+      isGuest: user.role === "GUEST" ? "true" : "false",
       auth_time: now,
       exp: now + ttl,
       iat: now,

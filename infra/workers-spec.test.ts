@@ -319,7 +319,7 @@ describe("timers: EventBridge Scheduler (ADR-0004)", () => {
 });
 
 describe("WorldJanitor", () => {
-  it("15 minutes; WORLDS: its tables, Seed and Media by name, the mocks' tables fenced to judge worlds, timers and Memory", async () => {
+  it("15 minutes; WORLDS: its tables, Seed and Media by name, the mocks' tables fenced to guest worlds, timers and Memory", async () => {
     const janitor = await fnArgs("WorldJanitor");
     expect(janitor).toMatchObject({ handler: "packages/bff/src/handlers/world-janitor.handler", timeout: "900 seconds", memory: "512 MB" });
     expect(linkNames(janitor.link)).toEqual([...stored("WorldJanitor"), ...["Seed", "Media", "Scheduler", "SessionTokenKey", "SeedOverrides", "BrandConfig", "Memory", "Dispatch", "Network"]]);
@@ -329,11 +329,11 @@ describe("WorldJanitor", () => {
       { actions: ["s3:PutObject"], resources: ["Media.arn/sim/*"] },
       ...mockTableStatement("WorldJanitor"),
     ]);
-    expect(JSON.stringify(mockTableStatement("WorldJanitor"))).toContain("isp-judge-");
+    expect(JSON.stringify(mockTableStatement("WorldJanitor"))).toContain("isp-guest-");
   });
 
-  it("resets idle judge worlds every night with its own event, through a tagged EventBridge rule", async () => {
-    expect(await world.args("sst.aws.Cron", "WorldJanitorNightly")).toEqual({ function: "WorldJanitor.arn", schedule: "cron(0 10 * * ? *)", event: { kind: "IDLE_JUDGE_RESET" } });
+  it("resets idle guest worlds every night with its own event, through a tagged EventBridge rule", async () => {
+    expect(await world.args("sst.aws.Cron", "WorldJanitorNightly")).toEqual({ function: "WorldJanitor.arn", schedule: "cron(0 10 * * ? *)", event: { kind: "IDLE_GUEST_RESET" } });
     expect(bootstrap).toContain("- events:PutRule");
   });
 

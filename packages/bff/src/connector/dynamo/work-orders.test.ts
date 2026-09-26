@@ -113,10 +113,10 @@ describe("work orders repository", () => {
 
   it("finds a repeated photo only within the same world and epoch", async () => {
     await world.connector.workOrders.createEvidence(evidence());
-    await world.connector.workOrders.createEvidence(evidence({ evidenceId: EV_2, workOrderId: "wo-24818", clockId: "JUDGE#isp-judge-07" }));
+    await world.connector.workOrders.createEvidence(evidence({ evidenceId: EV_2, workOrderId: "wo-24818", clockId: "GUEST#isp-guest-07" }));
     expect((await world.connector.workOrders.findEvidenceByHash(CLOCK, 1, SHA_1)).map((found) => found.evidenceId)).toEqual([EV_1]);
     expect(await world.connector.workOrders.findEvidenceByHash(CLOCK, 2, SHA_1)).toEqual([]);
-    expect(await world.connector.workOrders.findEvidenceByHash("JUDGE#isp-judge-07", 1, SHA_1)).toHaveLength(1);
+    expect(await world.connector.workOrders.findEvidenceByHash("GUEST#isp-guest-07", 1, SHA_1)).toHaveLength(1);
     expect((await world.connector.workOrders.listEvidence("wo-24817")).map((found) => found.evidenceId)).toEqual([EV_1]);
     await expect(world.connector.workOrders.createEvidence(evidence())).rejects.toMatchObject({ code: "CONFLICT" });
   });

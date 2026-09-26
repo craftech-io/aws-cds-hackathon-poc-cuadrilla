@@ -93,9 +93,9 @@ describe("first login after an invitation (NEW_PASSWORD_REQUIRED → optional TO
     expect(cognito.user("operaciones@example.test").totpEnabled).toBe(false);
   });
 
-  it("never offers TOTP to a JUDGE", async () => {
-    await cognito.addUser({ email: "judge-01@example.test", password: PASSWORD, role: "JUDGE" });
-    const done = expectStep(await run(INITIAL_STATE, { type: "signIn", email: "judge-01@example.test", password: PASSWORD }), "done");
+  it("never offers TOTP to a GUEST", async () => {
+    await cognito.addUser({ email: "guest-01@example.test", password: PASSWORD, role: "GUEST" });
+    const done = expectStep(await run(INITIAL_STATE, { type: "signIn", email: "guest-01@example.test", password: PASSWORD }), "done");
     expect(done.totpVerified).toBe(false);
     expect(cognito.calls.map((call) => call.operation)).not.toContain("AssociateSoftwareToken");
   });

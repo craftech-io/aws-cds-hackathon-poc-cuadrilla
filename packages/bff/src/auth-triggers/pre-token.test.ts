@@ -8,7 +8,7 @@ import { createLogger } from "../lib/log";
 import { CUSTOM_ISP_ID_ATTRIBUTE, type PreTokenDeps, createPreTokenHandler, decideTokenClaims } from "./pre-token";
 
 const SUB_ADRIANA = "7f1c9d2e-0000-4000-8000-00000000ad01";
-const SUB_JUDGE = "7f1c9d2e-0000-4000-8000-00000000d707";
+const SUB_GUEST = "7f1c9d2e-0000-4000-8000-00000000d707";
 
 function event(attributes: Record<string, string>, triggerSource: PreTokenGenerationV2TriggerEvent["triggerSource"] = "TokenGeneration_Authentication"): PreTokenGenerationV2TriggerEvent {
   return {
@@ -37,44 +37,44 @@ describe("pre token generation trigger [FL-079] [FL-081]", () => {
       newLogger: () => createLogger({ level: "debug", sink: (line) => void lines.push(line) }),
     };
     await data.isps.putUser({ ispId: "isp-demo", userId: "usr-adriana", role: "SUPERVISOR", name: "Adriana Solís", cognitoSub: SUB_ADRIANA });
-    await data.isps.putUser({ ispId: "isp-judge-07", userId: "usr-judge-07", role: "JUDGE", name: "Jurado 07", cognitoSub: SUB_JUDGE });
+    await data.isps.putUser({ ispId: "isp-guest-07", userId: "usr-guest-07", role: "GUEST", name: "Invitado 07", cognitoSub: SUB_GUEST });
   });
 
   const run = (attributes: Record<string, string>, triggerSource?: PreTokenGenerationV2TriggerEvent["triggerSource"]) =>
     createPreTokenHandler(() => deps)(event(attributes, triggerSource));
 
-  it("[FL-079] stamps operator, user, role and judge flag from Isps/USER# by the token's sub", async () => {
+  it("[FL-079] stamps operator, user, role and guest flag from Isps/USER# by the token's sub", async () => {
     const result = await run({ sub: SUB_ADRIANA, email: "adriana@example.test" });
     expect(result.response.claimsAndScopeOverrideDetails).toEqual({
       idTokenGeneration: {
-        claimsToAddOrOverride: { ispId: "isp-demo", userId: "usr-adriana", role: "SUPERVISOR", isJudge: "false" },
+        claimsToAddOrOverride: { ispId: "isp-demo", userId: "usr-adriana", role: "SUPERVISOR", isGuest: "false" },
         claimsToSuppress: [CUSTOM_ISP_ID_ATTRIBUTE],
       },
       groupOverrideDetails: { groupsToOverride: ["SUPERVISOR"] },
     });
-    const judge = await run({ sub: SUB_JUDGE }, "TokenGeneration_RefreshTokens");
-    expect(judge.response.claimsAndScopeOverrideDetails.idTokenGeneration?.claimsToAddOrOverride).toEqual({ ispId: "isp-judge-07", userId: "usr-judge-07", role: "JUDGE", isJudge: "true" });
-    expect(judge.response.claimsAndScopeOverrideDetails.groupOverrideDetails).toEqual({ groupsToOverride: ["JUDGE"] });
+    const guest = await run({ sub: SUB_GUEST }, "TokenGeneration_RefreshTokens");
+    expect(guest.response.claimsAndScopeOverrideDetails.idTokenGeneration?.claimsToAddOrOverride).toEqual({ ispId: "isp-guest-07", userId: "usr-guest-07", role: "GUEST", isGuest: "true" });
+    expect(guest.response.claimsAndScopeOverrideDetails.groupOverrideDetails).toEqual({ groupsToOverride: ["GUEST"] });
     expect(lines.join("\n")).not.toContain("adriana@example.test");
   });
 
   it("[FL-081] ignores a custom:ispId that differs from the registry and audits it in the registry's operator", async () => {
-    const result = await run({ sub: SUB_JUDGE, [CUSTOM_ISP_ID_ATTRIBUTE]: "isp-judge-03" });
-    expect(result.response.claimsAndScopeOverrideDetails.idTokenGeneration?.claimsToAddOrOverride?.ispId).toBe("isp-judge-07");
+    const result = await run({ sub: SUB_GUEST, [CUSTOM_ISP_ID_ATTRIBUTE]: "isp-guest-03" });
+    expect(result.response.claimsAndScopeOverrideDetails.idTokenGeneration?.claimsToAddOrOverride?.ispId).toBe("isp-guest-07");
     expect(result.response.claimsAndScopeOverrideDetails.idTokenGeneration?.claimsToSuppress).toContain(CUSTOM_ISP_ID_ATTRIBUTE);
-    const [row, ...others] = await data.audit.listByDecision("isp-judge-07", "DENY");
+    const [row, ...others] = await data.audit.listByDecision("isp-guest-07", "DENY");
     expect(others).toEqual([]);
     expect(row).toMatchObject({
-      ispId: "isp-judge-07",
-      clockId: "JUDGE#isp-judge-07",
+      ispId: "isp-guest-07",
+      clockId: "GUEST#isp-guest-07",
       decision: "DENY",
       action: "CUSTOM_ISP_ID_IGNORED",
-      actor: "USER:usr-judge-07",
-      refs: { userId: "usr-judge-07" },
-      detail: { attributeIspId: "isp-judge-03" },
+      actor: "USER:usr-guest-07",
+      refs: { userId: "usr-guest-07" },
+      detail: { attributeIspId: "isp-guest-03" },
     });
     // Nothing is written to the operator the attribute named.
-    expect(await data.audit.listByDecision("isp-judge-03", "DENY")).toEqual([]);
+    expect(await data.audit.listByDecision("isp-guest-03", "DENY")).toEqual([]);
     expect(lines.some((line) => line.includes("auth.pretoken.custom_ispid_ignored"))).toBe(true);
   });
 
@@ -87,11 +87,11 @@ describe("pre token generation trigger [FL-079] [FL-081]", () => {
 
   it("[FL-079] a changed custom:ispId never changes the operator the BFF sees", async () => {
     const issuer = createTestIssuer();
-    const result = await run({ sub: SUB_JUDGE, [CUSTOM_ISP_ID_ATTRIBUTE]: "isp-demo" });
+    const result = await run({ sub: SUB_GUEST, [CUSTOM_ISP_ID_ATTRIBUTE]: "isp-demo" });
     const stamped = result.response.claimsAndScopeOverrideDetails.idTokenGeneration?.claimsToAddOrOverride ?? {};
-    const token = issuer.idToken({ sub: SUB_JUDGE, "custom:ispId": "isp-demo", "cognito:groups": ["JUDGE"], ...stamped });
+    const token = issuer.idToken({ sub: SUB_GUEST, "custom:ispId": "isp-demo", "cognito:groups": ["GUEST"], ...stamped });
     const principal = principalFromClaims(await issuer.verifier().verify(token));
-    expect(principal).toMatchObject({ ispId: "isp-judge-07", clockId: "JUDGE#isp-judge-07", role: "JUDGE", userId: "usr-judge-07" });
+    expect(principal).toMatchObject({ ispId: "isp-guest-07", clockId: "GUEST#isp-guest-07", role: "GUEST", userId: "usr-guest-07" });
   });
 
   it("[FL-079] gives no operator nor role to a sub without a row, with two rows, or with a row that breaks the rules", async () => {
@@ -101,16 +101,16 @@ describe("pre token generation trigger [FL-079] [FL-081]", () => {
       const result = await run({ sub, [CUSTOM_ISP_ID_ATTRIBUTE]: "isp-demo" });
       expect(result.response.claimsAndScopeOverrideDetails).toEqual({ idTokenGeneration: { claimsToSuppress: [CUSTOM_ISP_ID_ATTRIBUTE] }, groupOverrideDetails: { groupsToOverride: [] } });
       // The token Cognito issues with that answer: nothing stamped, no groups, no custom:ispId.
-      const claims = await verifier.verify(issuer.idToken({ sub, ispId: undefined, userId: undefined, role: undefined, isJudge: undefined, "cognito:groups": [] }));
+      const claims = await verifier.verify(issuer.idToken({ sub, ispId: undefined, userId: undefined, role: undefined, isGuest: undefined, "cognito:groups": [] }));
       expect(() => principalFromClaims(claims)).toThrowError(expect.objectContaining({ reason: AUTH_REASON.PRINCIPAL_INCOMPLETE }));
     };
 
     await expectNoPrincipal("7f1c9d2e-0000-4000-8000-00000000beef");
     // A second row with the same sub would let a token pick its operator.
-    await data.isps.putUser({ ispId: "isp-judge-03", userId: "usr-judge-03", role: "JUDGE", name: "Jurado 03", cognitoSub: SUB_ADRIANA });
+    await data.isps.putUser({ ispId: "isp-guest-03", userId: "usr-guest-03", role: "GUEST", name: "Invitado 03", cognitoSub: SUB_ADRIANA });
     await expectNoPrincipal(SUB_ADRIANA);
     const SUB_MISPLACED = "7f1c9d2e-0000-4000-8000-00000000b0b0";
-    await data.isps.putUser({ ispId: "isp-demo", userId: "usr-judge-99", role: "JUDGE", name: "Jurado fuera de lugar", cognitoSub: SUB_MISPLACED });
+    await data.isps.putUser({ ispId: "isp-demo", userId: "usr-guest-99", role: "GUEST", name: "Invitado fuera de lugar", cognitoSub: SUB_MISPLACED });
     await expectNoPrincipal(SUB_MISPLACED);
     const SUB_QA = "7f1c9d2e-0000-4000-8000-00000000c0c0";
     await data.isps.putUser({ ispId: "isp-qa-812-1-sc-13", userId: "usr-qa-sup", role: "SUPERVISOR", name: "QA", cognitoSub: SUB_QA });
@@ -128,7 +128,7 @@ describe("pre token generation trigger [FL-079] [FL-081]", () => {
     const failing: PreTokenDeps = { ...deps, findUserBySub: () => Promise.reject(new Error("dynamodb unreachable")) };
     await expect(createPreTokenHandler(() => failing)(event({ sub: SUB_ADRIANA }))).rejects.toThrow("dynamodb unreachable");
     const noAudit: PreTokenDeps = { ...deps, audit: { append: () => Promise.reject(new Error("audit unavailable")) } };
-    await expect(createPreTokenHandler(() => noAudit)(event({ sub: SUB_JUDGE, [CUSTOM_ISP_ID_ATTRIBUTE]: "isp-judge-03" }))).rejects.toThrow("audit unavailable");
+    await expect(createPreTokenHandler(() => noAudit)(event({ sub: SUB_GUEST, [CUSTOM_ISP_ID_ATTRIBUTE]: "isp-guest-03" }))).rejects.toThrow("audit unavailable");
     await expect(run({})).rejects.toThrow("unexpected event");
     expect(lines.some((line) => line.includes("auth.pretoken.failed"))).toBe(true);
   });
@@ -138,8 +138,8 @@ describe("pre token generation trigger [FL-079] [FL-081]", () => {
     const row = { ...user, entity: "ConsoleUser" as const, createdAt: "2026-10-13T13:00:00.000Z", updatedAt: "2026-10-13T13:00:00.000Z", version: 1, synthetic: false };
     expect(decideTokenClaims(row, undefined)).toEqual({ kind: "STAMP", user: row });
     expect(decideTokenClaims(row, "")).toEqual({ kind: "STAMP", user: row });
-    expect(decideTokenClaims(row, "isp-judge-01")).toEqual({ kind: "STAMP", user: row, ignoredIspId: "isp-judge-01" });
+    expect(decideTokenClaims(row, "isp-guest-01")).toEqual({ kind: "STAMP", user: row, ignoredIspId: "isp-guest-01" });
     expect(decideTokenClaims(undefined, "isp-demo")).toEqual({ kind: "NO_PRINCIPAL", why: "UNREGISTERED" });
-    expect(decideTokenClaims({ ...row, role: "JUDGE" }, undefined)).toEqual({ kind: "NO_PRINCIPAL", why: "INCONSISTENT" });
+    expect(decideTokenClaims({ ...row, role: "GUEST" }, undefined)).toEqual({ kind: "NO_PRINCIPAL", why: "INCONSISTENT" });
   });
 });

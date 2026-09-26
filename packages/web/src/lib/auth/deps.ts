@@ -7,10 +7,10 @@ import type { AuthFlowDeps, FlowMode } from "./flow";
 import type { SrpClient } from "./srp";
 import type { TokenSet } from "./tokens";
 
-/** TOTP is optional for supervisors and operations and never offered to judges (docs/architecture.md §10). */
+/** TOTP is optional for supervisors and operations and never offered to guests (docs/architecture.md §10). */
 export function offersTotp(tokens: TokenSet): boolean {
   try {
-    return !principalFromIdToken(tokens.idToken).isJudge;
+    return !principalFromIdToken(tokens.idToken).isGuest;
   } catch {
     return false;
   }

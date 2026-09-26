@@ -80,7 +80,7 @@ export function createTestIssuer(options: { kid?: string; now?: () => Date } = {
         ispId: "isp-demo",
         userId: "usr-sup-01",
         role: "SUPERVISOR",
-        isJudge: "false",
+        isGuest: "false",
         email: "supervisor@example.test",
         ...overrides,
       };

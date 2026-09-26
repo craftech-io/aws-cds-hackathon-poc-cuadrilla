@@ -11,7 +11,7 @@
 //     `ordenes_del_dia`); any other kind waits for the next inbound. Both are audited `WINDOW_FALLBACK`.
 //
 // It also keeps the real clock of the 24 h window of a real phone: every live message updates
-// `lastInboundAtReal` on its lease (a judge's phone) or on the person (the live world).
+// `lastInboundAtReal` on its lease (a guest's phone) or on the person (the live world).
 import { createHash } from "node:crypto";
 import { ConnectorError, type TemplateName } from "@cuadrilla/shared";
 import type { AuditPort, ConversationsPort, PeoplePort, RuntimePort, WorldRuntimePort } from "../../connector/ports";
@@ -144,7 +144,7 @@ export interface LiveInboundDeps {
 
 /**
  * `lastInboundAtReal` of a real phone, from Meta's `timestamp` (ADR-0002): on the lease of a phone
- * bound to a judge's world, or on the person of the live world. The clock of `CP-WA-24H` for it.
+ * bound to a guest's world, or on the person of the live world. The clock of `CP-WA-24H` for it.
  */
 export async function recordLiveInbound(sender: SenderIdentity, metaTimestamp: string, deps: LiveInboundDeps): Promise<void> {
   if (sender.transport !== "live") return;

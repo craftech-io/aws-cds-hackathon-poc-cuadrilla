@@ -2,7 +2,7 @@
 // `mailId`, `kind` and `stage`, whose values come back in each SES event so `ChannelEvents` can route
 // it to the queue of the order's installer. SES accepts only `[A-Za-z0-9_-]` and 256 characters in a
 // tag name or value; one function normalizes every value (anything else becomes `-`), so an id of any
-// world (`GLOBAL#isp-demo`, `JUDGE#isp-judge-07`, `qa-812-1-sc-02`) never fails a send. The app's
+// world (`GLOBAL#isp-demo`, `GUEST#isp-guest-07`, `qa-812-1-sc-02`) never fails a send. The app's
 // own ids are already in that alphabet, so they come back unchanged and parse with their zod schema.
 import type { MessageTag } from "@aws-sdk/client-sesv2";
 

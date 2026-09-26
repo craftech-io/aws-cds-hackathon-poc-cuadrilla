@@ -222,7 +222,7 @@ describe("PII: G1 is the second layer of the normalizer, G3 is PII only", () => 
       ...serials,
       "DEMO12345678",
       "DEMO3F2C19A0",
-      "Orden 24817 (wo-24817, wo-24817-j03), cliente cust-10421, operadora isp-judge-07, instalador inst-rogelio",
+      "Orden 24817 (wo-24817, wo-24817-g03), cliente cust-10421, operadora isp-guest-07, instalador inst-rogelio",
       "Potencia −22,8 dBm a 1490 nm, clase B+ (de −8 a −25 dBm), puerto OLT-N3/1/4",
       "Manual v1, §DIAG-02 y §COM-04; foto ph-label-06, nota vn-01, pregunta q-A-14",
       "hoy 11:30 a 13:30 · 2026-10-13T09:20:00-06:00 · Fibra 200",

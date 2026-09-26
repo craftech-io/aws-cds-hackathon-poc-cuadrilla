@@ -46,7 +46,7 @@ describe("Cognito id token verification [FL-079]", () => {
 
   it("rejects a token whose payload was edited after signing", async () => {
     const [header, , signature] = issuer.idToken().split(".");
-    const [, forgedPayload] = issuer.idToken({ ispId: "isp-judge-07" }).split(".");
+    const [, forgedPayload] = issuer.idToken({ ispId: "isp-guest-07" }).split(".");
     const tampered = `${header}.${forgedPayload}.${signature}`;
     expect(await reasonOf(verifier.verify(tampered))).toBe(AUTH_REASON.TOKEN_INVALID);
   });

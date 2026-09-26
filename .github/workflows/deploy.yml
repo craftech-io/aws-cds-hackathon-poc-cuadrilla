@@ -10,9 +10,10 @@
 # emits `sub = repo:<org>/<repo>:environment:<name>` and AssumeRoleWithWebIdentity fails. The fix is
 # never a wildcard in the trust policy.
 #
-# Order (docs/architecture.md §15 step 5): the checks of ci.yml, then assume the deploy role, prove
-# who we are, deploy, load the seed (idempotent: uploads the manual and ingests the Knowledge Base
-# only when its fingerprint changed), smoke. This app never receives email, so there is no SES
+# Order (docs/architecture.md §15 step 5): the checks of ci.yml (the forbidden terms and the neutral
+# public surfaces of ADR-0023 included, on the sources and on the web build), then assume the deploy
+# role, prove who we are, deploy, load the seed (idempotent: uploads the manual and ingests the
+# Knowledge Base only when its fingerprint changed), smoke. This app never receives email, so there is no SES
 # receipt rule set to check (ADR-0003). Steps whose script is not in the repository yet print a
 # notice and pass (never the forbidden terms).
 name: Deploy poc
@@ -88,15 +89,24 @@ jobs:
           npm run channels:check-modes
           run_if scripts/network/contract-check.ts network:contract
 
+      - name: Forbidden terms (tree, commit messages, PDFs, photo texts, manual and seed)
+        env:
+          FORBIDDEN_TERMS: ${{ secrets.FORBIDDEN_TERMS }}
+        run: npm run lint:forbidden
+
+      - name: Neutral public surfaces (visible sources, rendered auth emails, PDFs and product README)
+        run: npm run lint:neutral-surfaces
+
       - name: Build the console
         run: npm run build -w packages/web
 
-      - name: Forbidden terms (tree, commit messages, PDFs, photo texts, manual, seed and web build)
+      - name: Forbidden terms in the web build
         env:
           FORBIDDEN_TERMS: ${{ secrets.FORBIDDEN_TERMS }}
-        run: |
-          npm run lint:forbidden
-          npm run lint:forbidden -- --dist
+        run: npm run lint:forbidden -- --dist
+
+      - name: Neutral public surfaces in the web build (before any AWS credential)
+        run: npm run lint:neutral-surfaces -- --dist
 
       - name: Assume the deploy role (OIDC, no access keys)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0

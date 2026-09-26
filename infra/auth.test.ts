@@ -246,7 +246,7 @@ describe("infra/auth.ts on a recording SST runtime [FL-079]", () => {
     expect([settings.idTokenValidity, settings.accessTokenValidity, settings.tokenValidityUnits.idToken]).toEqual([15, 15, "minutes"]);
   });
 
-  it("creates the groups SUPERVISOR, JUDGE and OPS on the pool, with their precedence", async () => {
+  it("creates the groups SUPERVISOR, GUEST and OPS on the pool, with their precedence", async () => {
     const { created } = await evaluate({ brandConfig: NEUTRAL });
     const groups = await Promise.all(created.filter((entry) => entry.type === "aws.cognito.UserGroup").map((entry) => resolveDeep(entry.args)));
     expect(groups).toEqual(

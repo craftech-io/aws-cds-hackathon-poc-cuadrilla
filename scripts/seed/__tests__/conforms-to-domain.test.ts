@@ -1,5 +1,5 @@
 // Every seeded item against the product's own schemas (docs/seed-spec.md §1, §15): each item of each
-// table file and of the demo and judge templates is a valid entity of its table, stored at the key and
+// table file and of the demo and guest templates is a valid entity of its table, stored at the key and
 // with the GSI attributes its codec computes, and the connector's seed store (the one `seed:load`
 // and the world factory use) accepts it once the loader stamps the world epoch. The mock tables are
 // rows their mocks read, and the model templates only point to orders, questions and photos that exist.
@@ -14,7 +14,7 @@ import { bundleOf, readDataDir } from "../validate/bundle";
 const bundle = bundleOf(readDataDir(fromRoot(DATA_DIR)));
 const worlds: ReadonlyArray<{ readonly name: string; readonly tables: Partial<Record<string, readonly SeedItem[]>> }> = [
   { name: "table files", tables: bundle.tables },
-  { name: "judge template", tables: bundle.judge?.tables ?? {} },
+  { name: "guest template", tables: bundle.guest?.tables ?? {} },
 ];
 
 describe("seed items conform to the domain", () => {
@@ -27,8 +27,8 @@ describe("seed items conform to the domain", () => {
     expect(checkTable(table, bundle.tables[table])).toEqual([]);
   });
 
-  it.each(WORLD_TABLES.map((table) => [table] as const))("every item of %s in the judge template is a valid row of its table", (table) => {
-    const items = bundle.judge?.tables[table] ?? [];
+  it.each(WORLD_TABLES.map((table) => [table] as const))("every item of %s in the guest template is a valid row of its table", (table) => {
+    const items = bundle.guest?.tables[table] ?? [];
     expect(checkTable(table, items)).toEqual([]);
   });
 

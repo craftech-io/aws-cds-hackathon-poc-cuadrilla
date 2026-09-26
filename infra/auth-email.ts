@@ -24,7 +24,7 @@ export const PRODUCT_NAME = "Cuadrilla";
 /** Console roles, one Cognito group each; the lowest precedence wins in `cognito:preferred_role`. */
 export const CONSOLE_GROUPS = {
   SUPERVISOR: { precedence: 10, description: "Crew supervisor: sees and acts, takes cases and validates evidence by hand" },
-  JUDGE: { precedence: 20, description: "Hackathon judge: supervisor permissions inside the judge's own demo world, no TOTP" },
+  GUEST: { precedence: 20, description: "Guest: supervisor permissions inside the guest's own demo world" },
   OPS: { precedence: 30, description: "Operations: sees orders, cases, evidence and certificates, never validates" },
 } as const;
 
@@ -79,7 +79,8 @@ export const WEB_CLIENT_SETTINGS = {
 /**
  * What infra/auth.ts lays over SST's pool defaults, besides the messages. ESSENTIALS is the feature
  * plan that runs the pre token generation trigger V2_0 (free up to 10,000 monthly active users,
- * nothing billed by the hour). Recovery goes only through the verified email (judges have none).
+ * nothing billed by the hour). Recovery goes only through the verified email (invited guests have
+ * none).
  */
 export function userPoolSettings() {
   return {

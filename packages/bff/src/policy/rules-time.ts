@@ -31,7 +31,7 @@ function quietExemption(message: PolicyMessage, facts: PolicyFacts): string | un
 function quietHoursRule({ message, recipient, facts }: PolicyInput): RuleOutcome {
   if (recipient.kind === "EMAIL") return notApplicable();
   const clock = quietClockOf(recipient.route);
-  if (clock === "NOT_APPLICABLE_LEASE") return { result: "NOT_APPLICABLE_LEASE", detail: "phone bound by code to a judge world" };
+  if (clock === "NOT_APPLICABLE_LEASE") return { result: "NOT_APPLICABLE_LEASE", detail: "phone bound by code to a guest world" };
   const exemption = quietExemption(message, facts);
   if (exemption !== undefined) return notApplicable({ clock, detail: `exempt: ${exemption}` });
   const state = quietStateOf(recipient.route, facts);

@@ -49,7 +49,7 @@ describe("CP-NO-SENSITIVE-ASK and CP-NO-FOREIGN-LINKS: what no text may carry", 
     expect(summary(decide({ message: reply({ text: "Nunca le pidas su INE al cliente." }) }))).toBe("ALLOW");
   });
 
-  it("judges a person's text on the bridge only for links: it is masked, not censored", () => {
+  it("checks a person's text on the bridge only for links: it is masked, not censored", () => {
     const relay = (text: string) => system("RELAY", { author: "PERSON", text, caseId: CASE_ID });
     expect(entryOf({ message: relay("Pásame tu contraseña del portal") }, "CP-NO-SENSITIVE-ASK")).toMatchObject({ result: "NOT_APPLICABLE" });
     expect(summary(decide({ message: relay("Revisa https://ejemplo-falso.xyz/guia") }))).toBe("DENY CP-NO-FOREIGN-LINKS FOREIGN_LINK");

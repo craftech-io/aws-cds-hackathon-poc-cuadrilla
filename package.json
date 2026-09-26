@@ -2,7 +2,7 @@
   "name": "aws-cds-hackathon-poc-cuadrilla",
   "version": "0.1.0",
   "private": true,
-  "description": "Cuadrilla: a field copilot on WhatsApp for fiber (FTTH) installers of a Latin American ISP (AWS CDS Agentic AI Partner Hackathon submission by Craftech)",
+  "description": "Cuadrilla: a field copilot on WhatsApp for fiber (FTTH) installers of a Latin American ISP, by Craftech",
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
@@ -23,6 +23,7 @@
     "lint": "tsx scripts/lint/max-lines.ts && tsx scripts/lint/no-intl.ts",
     "lint:duplicates": "tsx scripts/lint/duplicates.ts",
     "lint:forbidden": "tsx scripts/lint/forbidden-terms.ts",
+    "lint:neutral-surfaces": "tsx scripts/lint/neutral-surfaces.ts",
     "lint:wp-ownership": "tsx scripts/lint/wp-ownership.ts",
     "flows:check": "tsx scripts/flows/check.ts",
     "tour:check": "tsx scripts/tour/check.ts",

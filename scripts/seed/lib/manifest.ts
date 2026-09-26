@@ -12,7 +12,7 @@ const Counted = z.object({ count: z.int().min(0), sha256: Sha }).strict();
 
 export const Manifest = z
   .object({
-    app: z.literal("aws-cds-hackathon-poc-cuadrilla"),
+    product: z.literal("cuadrilla"),
     generator: z.string().min(1),
     generatorVersion: z.string().min(1),
     seed: z.literal(20260926),
@@ -27,7 +27,8 @@ export const Manifest = z
         voices: z.object({ datasheet: Sha, notes: z.int() }).strict(),
       })
       .strict(),
-    validation: z.object({ passed: z.literal(true), invariants: z.array(z.int().min(1).max(24)) }).strict(),
+    /** Ids of the invariants of docs/seed-spec.md §14 (1-26) that passed. */
+    validation: z.object({ passed: z.literal(true), invariants: z.array(z.int().min(1).max(26)) }).strict(),
   })
   .strict();
 export type Manifest = z.infer<typeof Manifest>;

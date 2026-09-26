@@ -1,5 +1,5 @@
 // `Isps` table (docs/architecture.md §5): the operator of a world, its settings, zones, field crews,
-// shift rosters and console users. Each world has its own operator (`isp-demo`, `isp-judge-<nn>`,
+// shift rosters and console users. Each world has its own operator (`isp-demo`, `isp-guest-<nn>`,
 // `isp-qa-<runId>-<scenario>`, `isp-eval-<runId>`), so `ispId` also scopes everything to one world.
 import { z } from "zod";
 import {

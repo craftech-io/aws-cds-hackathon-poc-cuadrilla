@@ -59,7 +59,7 @@ export const NameCheck = defineEntity("NameCheck", {
 }).loose();
 export type NameCheck = z.infer<typeof NameCheck>;
 
-/** `REF#RUBRIC#v<nnn>` · `<item>`: what a photo of the item must show and how it is judged. */
+/** `REF#RUBRIC#v<nnn>` · `<item>`: what a photo of the item must show and how it is checked. */
 export const Rubric = defineEntity("Rubric", {
   rubricVersion: VersionTag,
   item: PhotoItem,

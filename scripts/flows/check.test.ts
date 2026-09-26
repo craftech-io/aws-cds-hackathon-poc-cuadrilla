@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { FLOW_COUNT } from "@cuadrilla/shared";
 import {
   CATALOG_FILE,
   TEST_PLAN_FILE,
@@ -65,7 +66,7 @@ describe("catalog and matrix", () => {
 
   it("keeps the committed matrix of docs/test-plan.md in step with docs/flows-catalog.md", () => {
     const flows = parseCatalog(readFileSync(resolve(process.cwd(), CATALOG_FILE), "utf8"));
-    expect(flows).toHaveLength(103);
+    expect(flows).toHaveLength(FLOW_COUNT);
     expect(committedMatrix(readFileSync(resolve(process.cwd(), TEST_PLAN_FILE), "utf8"))).toBe(renderMatrix(flows));
   });
 });

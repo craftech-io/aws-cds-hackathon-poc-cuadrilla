@@ -51,7 +51,7 @@ export const copy = {
   roles: {
     SUPERVISOR: "Supervisor",
     OPS: "Operaciones",
-    JUDGE: "Jurado",
+    GUEST: "Invitado",
   },
   login: {
     unconfiguredTitle: "Consola sin configurar",

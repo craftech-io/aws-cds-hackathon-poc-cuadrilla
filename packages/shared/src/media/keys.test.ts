@@ -4,7 +4,7 @@ import { OUTPUT_KEY_PATTERN, mediaFileUri, mediaKeySegment, simMediaKey, transcr
 
 // docs/test-plan.md §3: the clock forms of every kind of world, a QA run id with upper case, and live
 // `wamid`s, which are base64 and carry `=`, `+` and `/`.
-const CLOCKS = ["GLOBAL#isp-demo", "JUDGE#isp-judge-07", "JUDGE#isp-judge-test", "qa-812-1-sc-02", "qa-local-01J9ZQXV6M3B-sc-02", "eval-812-1"];
+const CLOCKS = ["GLOBAL#isp-demo", "GUEST#isp-guest-07", "GUEST#isp-guest-test", "qa-812-1-sc-02", "qa-local-01J9ZQXV6M3B-sc-02", "eval-812-1"];
 const WAMIDS = ["wamid.HBgNNTIxNTUwMTAxMDAwMRUCABIYFjNFQjBDMEYzQzU+RjE5QjI4MUE5NwA=", "wamid.HBg/NTIx+NTUw/MTAx==", "wamid.SIM.0f3c9a1b2d"];
 const MEDIA_IDS = ["1234567890123456", "sim-media:01J9ZQXV6M3B2Y8N4T5R7K0C1D", "a+b/c=="];
 const BUCKET = "aws-cds-hackathon-poc-cuadrilla-poc-mediabucket-x7k2q9";
@@ -57,7 +57,7 @@ describe("[FL-017] media keys for Transcribe and End User Messaging Social", () 
 
   it("follows the formulas of docs/architecture.md §6", () => {
     expect(mediaKeySegment("GLOBAL#isp-demo", 3)).toBe(`${sha256Hex("GLOBAL#isp-demo").slice(0, 16)}-e3`);
-    expect(simMediaKey("JUDGE#isp-judge-test", 2, "upl_01J9")).toBe(`sim/${sha256Hex("JUDGE#isp-judge-test").slice(0, 16)}-e2/upl_01J9`);
+    expect(simMediaKey("GUEST#isp-guest-test", 2, "upl_01J9")).toBe(`sim/${sha256Hex("GUEST#isp-guest-test").slice(0, 16)}-e2/upl_01J9`);
     expect(waMediaKey("wamid.A+B/C=", "987")).toBe(`wa/${sha256Hex("wamid.A+B/C=").slice(0, 32)}/${sha256Hex("987").slice(0, 16)}`);
     expect(transcriptOutputKey("qa-812-1-sc-02", 0, "wamid.A+B/C=", JOB)).toBe(
       `transcripts/${sha256Hex("qa-812-1-sc-02").slice(0, 16)}-e0/${sha256Hex("wamid.A+B/C=").slice(0, 32)}/${JOB}.json`,

@@ -1,6 +1,6 @@
 // `Runtime` table, world state (docs/architecture.md §5, §7, docs/architecture-integrations.md §4.4.1):
 // what keeps an installer or a world busy (quiescence), the emails waiting for their first SES event,
-// number leases of QA worlds, real phones bound to a judge world by code, simulator uploads, the
+// number leases of QA worlds, real phones bound to a guest world by code, simulator uploads, the
 // single live world, tombstones of reset epochs, probes and the fault switches of QA worlds.
 import { z } from "zod";
 import { ClockId, ConsoleUserId, IsoInstant, PersonId, WorkOrderId } from "@cuadrilla/shared";
@@ -52,7 +52,7 @@ export const Lease = defineEntity("Lease", {
 });
 export type Lease = z.infer<typeof Lease>;
 
-/** A real phone bound to a person of a judge world by a join code (48 h; unique per phone). */
+/** A real phone bound to a person of a guest world by a join code (48 h; unique per phone). */
 export const PhoneLease = defineEntity("PhoneLease", {
   phoneHash: HexHash,
   clockId: ClockId,
@@ -64,9 +64,9 @@ export const PhoneLease = defineEntity("PhoneLease", {
 });
 export type PhoneLease = z.infer<typeof PhoneLease>;
 
-/** One-use join code ("ALTA J07-4F2K"), 30 minutes, bound to a person of the judge's world. */
+/** One-use join code ("ALTA G07-4F2K"), 30 minutes, bound to a person of the guest's world. */
 export const JoinCode = defineEntity("JoinCode", {
-  code: z.string().regex(/^[A-Z0-9]{2,5}-[A-Z0-9]{4}$/, "expected a join code such as J07-4F2K"),
+  code: z.string().regex(/^[A-Z0-9]{2,5}-[A-Z0-9]{4}$/, "expected a join code such as G07-4F2K"),
   clockId: ClockId,
   personId: PersonId,
   userId: ConsoleUserId,

@@ -14,11 +14,11 @@ import { sha256Hex, stableJson } from "../photos/prng";
 import type { SeedBundle } from "./bundle";
 import { finding, type Invariant } from "./types";
 
-/** Every item of the seed: the table files and the items of the demo and judge templates. */
+/** Every item of the seed: the table files and the items of the demo and guest templates. */
 function allItems(bundle: SeedBundle): Array<{ readonly where: string; readonly item: SeedItem }> {
   const out: Array<{ where: string; item: SeedItem }> = [];
   for (const table of SEED_TABLES) for (const item of bundle.tables[table]) out.push({ where: tableFile(table), item });
-  for (const template of [bundle.demo, bundle.judge]) {
+  for (const template of [bundle.demo, bundle.guest]) {
     if (template === undefined) continue;
     for (const table of WORLD_TABLES) for (const item of template.tables[table]) out.push({ where: worldFile(template.template), item });
   }

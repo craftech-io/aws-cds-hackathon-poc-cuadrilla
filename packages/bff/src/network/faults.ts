@@ -1,6 +1,6 @@
 // Faults of a world for the orchestrator (docs/architecture-integrations.md §6, docs/tool-catalog.md
 // `network.setFaults`): the `QaDriver` writes `Runtime/FAULTS#<clockId>` / `META` with a `network`
-// attribute, and clients read faults only for `qa-*` clocks, so a demo or judge world never pays the
+// attribute, and clients read faults only for `qa-*` clocks, so a demo or guest world never pays the
 // read nor can be faulted. The client forwards the fault to the mock as `X-Fault`.
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { NetworkFault } from "@cuadrilla/network-contract";
@@ -17,7 +17,7 @@ export function faultsKey(clockId: string): { readonly PK: string; readonly SK: 
 /** The `network` attribute of the faults item; other clients' attributes pass through untouched. */
 export const NetworkFaultsItem = z.looseObject({ network: NetworkFault.optional() });
 
-/** Only QA worlds can have faults (`qa-<runId>-<scenario>`); evaluation, demo and judge worlds never. */
+/** Only QA worlds can have faults (`qa-<runId>-<scenario>`); evaluation, demo and guest worlds never. */
 export function mayHaveFaults(clockId: string): boolean {
   return parseClockId(clockId)?.kind === "QA";
 }

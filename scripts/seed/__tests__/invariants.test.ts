@@ -1,7 +1,7 @@
 // The invariants of docs/seed-spec.md §14 on the committed seed, and that each check would catch the
 // fault it is written for. Invariant 10 runs here with the real contact policy
 // (packages/bff/src/policy/): every outbound message of the history of the demo world and of the
-// judge template, re-evaluated at the instant it left with the records of that instant, is allowed,
+// guest template, re-evaluated at the instant it left with the records of that instant, is allowed,
 // and carries its ALLOW decision in the audit log.
 import { describe, expect, it } from "vitest";
 import type { Consent, Person } from "../../../packages/bff/src/domain/people";
@@ -37,7 +37,7 @@ async function errorsOf(files: ReadonlyMap<string, string>, id: number): Promise
 }
 
 const itemsOf = (json: Record<string, unknown>): SeedItem[] => json.items as SeedItem[];
-const judgeTables = (json: Record<string, unknown>): Record<string, SeedItem[]> => json.tables as Record<string, SeedItem[]>;
+const guestTables = (json: Record<string, unknown>): Record<string, SeedItem[]> => json.tables as Record<string, SeedItem[]>;
 
 describe("seed invariants on the committed seed (docs/seed-spec.md §14)", () => {
   it("parses every file with its schema", () => {
@@ -120,6 +120,16 @@ describe("each invariant catches its fault", () => {
     expect(errors).toEqual(expect.arrayContaining([expect.stringMatching(/phone outside the synthetic blocks/), expect.stringMatching(/used more than once/)]));
   });
 
+  it("3: the guest template takes phones of the invited and signup blocks, never one of the demo world", async () => {
+    const withPhone = (phone: string): Map<string, string> =>
+      mutated(worldFile("guest"), (json) => {
+        const person = guestTables(json).People?.find((item) => item.entity === "Person" && item.personId === "inst-karina-g00");
+        if (person !== undefined) person.phone = phone;
+      });
+    expect(await errorsOf(withPhone("+525503000001"), 3)).toEqual([]);
+    expect(await errorsOf(withPhone("+525501010099"), 3)).toEqual(["guest inst-karina-g00: phone outside the synthetic blocks of its world"]);
+  });
+
   it("5: a crew without its roster for a day with orders", async () => {
     const files = mutated(tableFile("Isps"), (json) => {
       json.items = itemsOf(json).filter((item) => !(item.entity === "ShiftRoster" && item.crewId === "crew-s1" && item.date === "2026-10-13"));
@@ -173,17 +183,46 @@ describe("each invariant catches its fault", () => {
     expect(await errorsOf(files, 18)).toEqual(["demo: the synthetic CURP has a valid check digit"]);
   });
 
-  it("19 and 20: a timer inside the tour window and a live world in the judge template", async () => {
-    const files = mutated(worldFile("judge"), (json) => {
-      const timer = judgeTables(json).WorkOrders?.find((item) => item.entity === "Timer");
+  it("19 and 20: a timer inside the tour window and a live world in the guest template", async () => {
+    const files = mutated(worldFile("guest"), (json) => {
+      const timer = guestTables(json).WorkOrders?.find((item) => item.entity === "Timer");
       if (timer !== undefined) {
         timer.kind = "CASE_TIMEOUT";
         timer.dueAtSim = "2026-10-13T18:00:00.000Z";
       }
-      const settings = judgeTables(json).Isps?.find((item) => item.entity === "IspSettings");
+      const settings = guestTables(json).Isps?.find((item) => item.entity === "IspSettings");
       if (settings !== undefined) settings.whatsappMode = "live";
     });
     expect(await errorsOf(files, 19)).toEqual(expect.arrayContaining([expect.stringMatching(/inside the tour window/)]));
     expect(await errorsOf(files, 20)).toEqual(expect.arrayContaining([expect.stringMatching(/whatsappMode/)]));
+  });
+
+  it("25: a word of ADR-0023 in a seeded message, after an escape in a customer's note, in the guest template and in the manual", async () => {
+    const message = mutated(tableFile("Conversations"), (json) => {
+      const inbound = itemsOf(json).find((item) => item.entity === "Message" && item.direction === "IN");
+      if (inbound !== undefined) inbound.text = "Ya hice la evaluación del riesgo en el poste.";
+    });
+    expect(await errorsOf(message, 25)).toEqual(['scripts/seed/data/Conversations.json:1 uses "evaluacion", a word of ADR-0023']);
+    const note = mutated(tableFile("People"), (json) => {
+      const customer = itemsOf(json).find((item) => item.customerId === "cust-10421");
+      if (customer !== undefined) customer.note = "Revisión lista.\nPremio al mejor instalador.";
+    });
+    expect(await errorsOf(note, 25)).toEqual(['scripts/seed/data/People.json:1 uses "premio", a word of ADR-0023']);
+    const template = mutated(worldFile("guest"), (json) => {
+      const [first] = json.scenes as Array<{ description: string }>;
+      if (first !== undefined) first.description = "The world as the jury first sees it.";
+    });
+    expect(await errorsOf(template, 25)).toEqual(['scripts/seed/data/worlds/guest.json:1 uses "jury", a word of ADR-0023']);
+    const section = `${DATA_LAYOUT.manual}/GEN-01.md`;
+    const manual = new Map(committed).set(section, `${committed.get(section) ?? ""}\nEste manual no es parte de ningún CONCURSO.\n`);
+    expect(await errorsOf(manual, 25)).toEqual([expect.stringMatching(/^scripts\/seed\/data\/manual\/v001\/GEN-01\.md:\d+ uses "concurso", a word of ADR-0023$/)]);
+  });
+
+  it("25: product words that only look like a word of ADR-0023 pass", async () => {
+    const files = mutated(tableFile("Conversations"), (json) => {
+      const inbound = itemsOf(json).find((item) => item.entity === "Message" && item.direction === "IN");
+      if (inbound !== undefined) inbound.text = "Hago la valoración del riesgo, voy a evaluar la caja y la medición sale bien, sin prejuicio del cliente.";
+    });
+    expect(await errorsOf(files, 25)).toEqual([]);
   });
 });

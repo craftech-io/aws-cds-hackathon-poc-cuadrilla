@@ -19,7 +19,7 @@ const NEW_WINDOW = { start: "2026-10-14T09:00:00-06:00", end: "2026-10-14T11:00:
 
 function order(overrides: Partial<Record<string, unknown>> = {}): DispatchOrderItem {
   const ispId = (overrides.ispId as string | undefined) ?? "isp-demo";
-  const clockId = ispId === "isp-demo" ? "GLOBAL#isp-demo" : ispId.startsWith("isp-judge-") ? `JUDGE#${ispId}` : ispId.slice(4);
+  const clockId = ispId === "isp-demo" ? "GLOBAL#isp-demo" : ispId.startsWith("isp-guest-") ? `GUEST#${ispId}` : ispId.slice(4);
   return DispatchOrderItem.parse({
     PK: `DWO#${ispId}#24818`,
     SK: "META",
@@ -89,12 +89,12 @@ describe("[FL-014] dispatch mock routes (docs/architecture-integrations.md §7)"
   });
 
   it("returns the master data of an order by operator and number", async () => {
-    const { get } = world([order(), order({ ispId: "isp-judge-03", workOrderId: "wo-24818-j03", installerId: "inst-karina" })]);
+    const { get } = world([order(), order({ ispId: "isp-guest-03", workOrderId: "wo-24818-g03", installerId: "inst-karina" })]);
     const demo = await get(workOrderPath("24818"), { isp: "isp-demo" });
     expect(demo.statusCode).toBe(200);
     expect(DispatchOrderView.parse(demo.json)).toMatchObject({ workOrderId: "wo-24818", installerId: "inst-rogelio", status: "SCHEDULED", events: [] });
-    // Numbers repeat across judge worlds; the operator tells them apart.
-    expect(DispatchOrderView.parse((await get(workOrderPath("24818"), { isp: "isp-judge-03" })).json).workOrderId).toBe("wo-24818-j03");
+    // Numbers repeat across guest worlds; the operator tells them apart.
+    expect(DispatchOrderView.parse((await get(workOrderPath("24818"), { isp: "isp-guest-03" })).json).workOrderId).toBe("wo-24818-g03");
   });
 
   it("rejects what is not a route, an operator or a work order number", async () => {
@@ -102,7 +102,7 @@ describe("[FL-014] dispatch mock routes (docs/architecture-integrations.md §7)"
     expect((await get(workOrderPath("24818"))).statusCode).toBe(400);
     expect((await get(workOrderPath("24818"), { isp: "demo" })).statusCode).toBe(400);
     expect((await get(workOrderPath("24899"), { isp: "isp-demo" })).statusCode).toBe(404);
-    expect((await get(workOrderPath("24818"), { isp: "isp-judge-07" })).statusCode).toBe(404);
+    expect((await get(workOrderPath("24818"), { isp: "isp-guest-07" })).statusCode).toBe(404);
     expect((await get("/v1/work-orders/2481", { isp: "isp-demo" })).statusCode).toBe(400);
     expect((await post("/v1/work-orders/24818/close", cancel())).statusCode).toBe(404);
     expect((await get("/v1/orders/24818", { isp: "isp-demo" })).statusCode).toBe(404);
@@ -328,7 +328,7 @@ describe("event ids and the Function URL adapter", () => {
     const id = await dispatchEventId("isp-demo", "24818", "k", AT_SIM);
     expect(id).toMatch(/^evt_[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
     expect(await dispatchEventId("isp-demo", "24818", "k", AT_SIM)).toBe(id);
-    expect(await dispatchEventId("isp-judge-03", "24818", "k", AT_SIM)).not.toBe(id);
+    expect(await dispatchEventId("isp-guest-03", "24818", "k", AT_SIM)).not.toBe(id);
     expect(await dispatchEventId("isp-demo", "24818", "k2", AT_SIM)).not.toBe(id);
     expect(ulidTime(id.slice(4))).toBe(Date.parse(AT_SIM));
     expect(dispatchEventSk(AT_SIM, id)).toBe(`EVT#2026-10-13T16:40:00.000Z#${id}`);

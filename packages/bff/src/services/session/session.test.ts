@@ -114,8 +114,8 @@ describe("resolveSession", () => {
     expect(await reason(resolveSession(KEY, token, store({ session: { ...RECORD, workOrderId: "24817" } }), NOW))).toBe("SESSION_INVALID");
     expect(await reason(resolveSession(KEY, token, store({ session: { ...RECORD, turnId: "01JB8Z9Q2W3E4R5T6Y7V8X9XXX" } }), NOW))).toBe("SESSION_INVALID");
     expect(await reason(resolveSession(KEY, token, store({ session: { ...RECORD, sessionId: "01JB8Z9Q2W3E4R5T6Y7V8X9XXX" } }), NOW))).toBe("SESSION_INVALID");
-    // The operator must be the one of the world: a record cannot pair a judge's clock with the demo operator.
-    expect(await reason(resolveSession(KEY, token, store({ session: { ...RECORD, clockId: "JUDGE#isp-judge-07" } }), NOW))).toBe("SESSION_INVALID");
+    // The operator must be the one of the world: a record cannot pair a guest's clock with the demo operator.
+    expect(await reason(resolveSession(KEY, token, store({ session: { ...RECORD, clockId: "GUEST#isp-guest-07" } }), NOW))).toBe("SESSION_INVALID");
   });
 
   it("accepts a day session without an active order or a source message", async () => {
@@ -140,6 +140,6 @@ describe("openSession", () => {
   it("refuses to open a session whose operator is not the world's", async () => {
     const { sessionId: _unused, ...fields } = RECORD;
     const putSession = async () => undefined;
-    await expect(openSession({ sessionKey: KEY, nowMs: NOW, store: { putSession } }, { ...fields, ispId: "isp-judge-07" })).rejects.toThrow();
+    await expect(openSession({ sessionKey: KEY, nowMs: NOW, store: { putSession } }, { ...fields, ispId: "isp-guest-07" })).rejects.toThrow();
   });
 });

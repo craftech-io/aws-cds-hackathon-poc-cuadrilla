@@ -6,7 +6,7 @@
 //   LIVE_WORLD     real clock, `lastInboundAtReal`        real clock (America/Mexico_City)
 //   PHONE_LEASE    real clock, the lease's `lastInboundAtReal`   NOT_APPLICABLE_LEASE
 //
-// A judge's world is paused for days between sessions while Meta measures the window of a leased
+// A guest's world is paused for days between sessions while Meta measures the window of a leased
 // phone in real time: measuring it with the world clock would send free text outside the real
 // window (`131047`) and log an ALLOW. Both windows are exported for the modules that need to know
 // them before composing a message (the bridge, the certificate deliveries).
@@ -22,7 +22,7 @@ export function windowClockOf(route: WhatsAppRoute): PolicyClock {
   return route === "SIMULATED" ? "WORLD" : "REAL";
 }
 
-/** The clock quiet hours are measured with, or none for a phone bound by code to a judge world. */
+/** The clock quiet hours are measured with, or none for a phone bound by code to a guest world. */
 export function quietClockOf(route: WhatsAppRoute): PolicyClock | "NOT_APPLICABLE_LEASE" {
   if (route === "PHONE_LEASE") return "NOT_APPLICABLE_LEASE";
   return route === "SIMULATED" ? "WORLD" : "REAL";

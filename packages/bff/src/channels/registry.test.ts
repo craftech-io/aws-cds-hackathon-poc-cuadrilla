@@ -25,7 +25,7 @@ function setup(transports: WhatsAppTransport[]) {
 // Synthetic block of docs/seed-spec.md §2, and a number outside it standing for a real phone: a
 // North American 555-01xx number, a range reserved for fiction, so no fixture names a real line.
 const SYNTHETIC = "+525501010001";
-const JUDGE_BLOCK = "+525502070001";
+const GUEST_BLOCK = "+525502070001";
 const REAL = "+12025550143";
 const REGISTERED = new Set([REAL]);
 const recipient = (overrides: Partial<WhatsAppRecipient>): WhatsAppRecipient => ({ clockId: "GLOBAL#isp-demo", phone: SYNTHETIC, worldMode: "simulated", registeredRealPhones: REGISTERED, ...overrides });
@@ -33,10 +33,10 @@ const recipient = (overrides: Partial<WhatsAppRecipient>): WhatsAppRecipient => 
 describe("whatsAppRouteOf", () => {
   it("sends every synthetic identity through the simulated transport, also in the live world", () => {
     expect(isSyntheticPhone(SYNTHETIC)).toBe(true);
-    expect(isSyntheticPhone(JUDGE_BLOCK)).toBe(true);
+    expect(isSyntheticPhone(GUEST_BLOCK)).toBe(true);
     expect(isSyntheticPhone(REAL)).toBe(false);
     expect(whatsAppRouteOf(recipient({ worldMode: "live" }))).toEqual({ transport: "simulated", source: "SYNTHETIC_PHONE" });
-    expect(whatsAppRouteOf(recipient({ clockId: "JUDGE#isp-judge-07", phone: JUDGE_BLOCK }))).toEqual({ transport: "simulated", source: "SYNTHETIC_PHONE" });
+    expect(whatsAppRouteOf(recipient({ clockId: "GUEST#isp-guest-07", phone: GUEST_BLOCK }))).toEqual({ transport: "simulated", source: "SYNTHETIC_PHONE" });
   });
 
   it("sends a real phone the operator registered for the live world live, and measures its window in real time", () => {
@@ -49,10 +49,10 @@ describe("whatsAppRouteOf", () => {
     expect(whatsAppRouteOf(recipient({ phone: REAL, worldMode: "live", registeredRealPhones: new Set() }))).toEqual({ transport: "simulated", source: "UNREGISTERED_PHONE" });
   });
 
-  it("sends a phone bound by a join code live in its judge world, only in that world", () => {
-    const judge = { clockId: "JUDGE#isp-judge-07", phone: REAL, worldMode: "simulated" as const, registeredRealPhones: new Set<string>() };
-    expect(whatsAppRouteOf({ ...judge, lease: { clockId: "JUDGE#isp-judge-07" } })).toEqual({ transport: "live", source: "PHONE_LEASE" });
-    expect(whatsAppRouteOf({ ...judge, lease: { clockId: "JUDGE#isp-judge-03" } })).toEqual({ transport: "simulated", source: "SIMULATED_WORLD" });
+  it("sends a phone bound by a join code live in its guest world, only in that world", () => {
+    const guest = { clockId: "GUEST#isp-guest-07", phone: REAL, worldMode: "simulated" as const, registeredRealPhones: new Set<string>() };
+    expect(whatsAppRouteOf({ ...guest, lease: { clockId: "GUEST#isp-guest-07" } })).toEqual({ transport: "live", source: "PHONE_LEASE" });
+    expect(whatsAppRouteOf({ ...guest, lease: { clockId: "GUEST#isp-guest-03" } })).toEqual({ transport: "simulated", source: "SIMULATED_WORLD" });
   });
 
   it("never reaches a real phone live from a simulated world without a lease", () => {

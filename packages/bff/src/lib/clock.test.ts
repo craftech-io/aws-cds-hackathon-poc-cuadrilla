@@ -97,7 +97,7 @@ describe("worldClock", () => {
   const realClock = fixedClock(new Date(REAL));
 
   it("reads the world's state on every call, so another writer's move is seen", async () => {
-    let stored = { ...paused, world: "judge", settings: { demoMode: true }, version: 4 } as WorldClockInput;
+    let stored = { ...paused, world: "guest", settings: { demoMode: true }, version: 4 } as WorldClockInput;
     const clock = worldClock("GLOBAL#isp-demo", { readClock: async () => stored, realClock });
     expect((await clock.now()).toISOString()).toBe(START_SIM);
     stored = { ...stored, ...moveTo(stored, new Date("2026-10-13T13:30:00.000Z"), REAL) };
@@ -105,15 +105,15 @@ describe("worldClock", () => {
     expect(await clock.snapshot()).toEqual({ clockId: "GLOBAL#isp-demo", mode: "PAUSED", simNow: new Date("2026-10-13T13:30:00.000Z"), worldEpoch: 3 });
   });
 
-  it("keeps each world on its own clock: moving a judge's world never moves the demo", async () => {
+  it("keeps each world on its own clock: moving a guest's world never moves the demo", async () => {
     const worlds = new Map<string, WorldClockInput>([
       ["GLOBAL#isp-demo", { ...paused }],
-      ["JUDGE#isp-judge-07", { ...paused, clockId: "JUDGE#isp-judge-07", worldEpoch: 1 }],
+      ["GUEST#isp-guest-07", { ...paused, clockId: "GUEST#isp-guest-07", worldEpoch: 1 }],
     ]);
     const deps = { readClock: async (id: string) => worlds.get(id), realClock };
-    const judge = worlds.get("JUDGE#isp-judge-07") as WorldClockInput;
-    worlds.set("JUDGE#isp-judge-07", { ...judge, ...moveTo(judge, new Date("2026-10-13T18:00:00.000Z"), REAL) });
-    expect((await worldClock("JUDGE#isp-judge-07", deps).now()).toISOString()).toBe("2026-10-13T18:00:00.000Z");
+    const guest = worlds.get("GUEST#isp-guest-07") as WorldClockInput;
+    worlds.set("GUEST#isp-guest-07", { ...guest, ...moveTo(guest, new Date("2026-10-13T18:00:00.000Z"), REAL) });
+    expect((await worldClock("GUEST#isp-guest-07", deps).now()).toISOString()).toBe("2026-10-13T18:00:00.000Z");
     expect((await worldClock("GLOBAL#isp-demo", deps).now()).toISOString()).toBe(START_SIM);
   });
 
@@ -125,7 +125,7 @@ describe("worldClock", () => {
 
   it("fails on an unknown world, a mismatched item and an invalid clock id", async () => {
     await expect(worldClock("qa-812-1-sc-02", { readClock: async () => undefined, realClock }).now()).rejects.toMatchObject({ code: "NOT_FOUND" });
-    await expect(worldClock("JUDGE#isp-judge-01", { readClock: async () => paused, realClock }).now()).rejects.toBeInstanceOf(ConnectorError);
+    await expect(worldClock("GUEST#isp-guest-01", { readClock: async () => paused, realClock }).now()).rejects.toBeInstanceOf(ConnectorError);
     expect(() => worldClock("tomorrow", { readClock: async () => paused })).toThrow();
   });
 });

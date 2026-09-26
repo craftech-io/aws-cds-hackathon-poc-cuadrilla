@@ -74,7 +74,7 @@ describe("MemoryTableClient", () => {
   });
 
   it("increments atomically, creates the row with defaults and honours the ceiling", async () => {
-    const key = { PK: "JUMP#JUDGE#isp-judge-07#2026-10-13T13", SK: "META" };
+    const key = { PK: "JUMP#GUEST#isp-guest-07#2026-10-13T13", SK: "META" };
     expect(await client.increment("Runtime", key, "count", 1, { updatedAt: NOW, max: 2, defaults: { entity: "Counter", expiresAt: 5 } })).toBe(1);
     expect(await client.increment("Runtime", key, "count", 1, { updatedAt: NOW, max: 2 })).toBe(2);
     await expect(client.increment("Runtime", key, "count", 1, { updatedAt: NOW, max: 2 })).rejects.toMatchObject({ code: "CONFLICT" });

@@ -77,7 +77,7 @@ export const EntityName = z.enum([
 export type EntityName = z.infer<typeof EntityName>;
 
 /** Which cloned world an item belongs to (docs/seed-spec.md §13); absent in the demo world. */
-export const WorldTag = z.enum(["qa", "eval", "judge"]);
+export const WorldTag = z.enum(["qa", "eval", "guest"]);
 export type WorldTag = z.infer<typeof WorldTag>;
 
 /** DynamoDB TTL value: epoch SECONDS (a Number; infra/storage-keys.ts). */

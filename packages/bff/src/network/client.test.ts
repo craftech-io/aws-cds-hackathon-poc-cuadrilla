@@ -7,7 +7,7 @@ import { MAX_RETRY_AFTER_MS, NETWORK_RETRIES, NETWORK_TIMEOUT_MS, createNetworkC
 import { sigv4Transport, type HttpRequest, type HttpResponse } from "./sigv4";
 
 const DEMO = "GLOBAL#isp-demo";
-const JUDGE = "JUDGE#isp-judge-07";
+const GUEST = "GUEST#isp-guest-07";
 const QA = "qa-812-1-sc-02";
 const EVAL = "eval-812-1";
 const SERIAL = "DEMO3F2C19A0";
@@ -191,11 +191,11 @@ describe("[FL-026] faults are read only for qa-* worlds", () => {
     expect(requests.every((request) => request.headers["X-Fault"] === "ERROR_503")).toBe(true);
   });
 
-  it("[FL-026] never reads faults for demo, judge or evaluation worlds", async () => {
+  it("[FL-026] never reads faults for demo, guest or evaluation worlds", async () => {
     const { transport, requests } = scripted(json(200, LOS));
     const { instance, networkFault } = client(transport);
     networkFault.mockResolvedValue("ERROR_503");
-    for (const clockId of [DEMO, JUDGE, EVAL]) expect((await instance.getOnuStatus(read(clockId))).kind).toBe("OK");
+    for (const clockId of [DEMO, GUEST, EVAL]) expect((await instance.getOnuStatus(read(clockId))).kind).toBe("OK");
     expect(networkFault).not.toHaveBeenCalled();
     expect(requests.some((request) => "X-Fault" in request.headers)).toBe(false);
   });

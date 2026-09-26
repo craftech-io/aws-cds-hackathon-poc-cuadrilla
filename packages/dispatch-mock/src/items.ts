@@ -17,7 +17,7 @@ import {
 export const DISPATCH_META_SK = "META";
 export const DISPATCH_EVENT_SK_PREFIX = "EVT#";
 
-/** Partition of an order: `DWO#isp-demo#24817`. Work order numbers repeat across judge worlds, operators do not. */
+/** Partition of an order: `DWO#isp-demo#24817`. Work order numbers repeat across guest worlds, operators do not. */
 export function dispatchOrderPk(ispId: string, workOrderNumber: string): string {
   return `DWO#${IspId.parse(ispId)}#${WorkOrderNumber.parse(workOrderNumber)}`;
 }
@@ -43,7 +43,7 @@ function mismatch(actual: unknown, compute: () => string): boolean {
 }
 
 // Attributes every item carries (docs/architecture.md §5). `createdAt`/`updatedAt` are real time;
-// `expiresAt` is the TTL in epoch seconds (QA, evaluation and judge worlds).
+// `expiresAt` is the TTL in epoch seconds (QA, evaluation and guest worlds).
 const ItemBase = {
   PK: z.string().startsWith("DWO#"),
   createdAt: ZonedInstant,

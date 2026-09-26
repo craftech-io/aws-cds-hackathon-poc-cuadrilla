@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { esMX } from "../../copy/es-MX";
 import { openCase, workOrder } from "../../connector/testing";
 import { processInboundEvent } from "./inbound";
-import { DEMO, JUDGE, PEOPLE, SIM_START, hashOf, inboundHarness, liveEvent, nonceFor, simEvent, waButton, waReply, waText } from "./testing";
+import { DEMO, GUEST, PEOPLE, SIM_START, hashOf, inboundHarness, liveEvent, nonceFor, simEvent, waButton, waReply, waText } from "./testing";
 
 const ROGELIO = PEOPLE.rogelio;
 const JULIAN = PEOPLE.julian;
@@ -47,12 +47,12 @@ describe("ALTA and BAJA", () => {
 
   it("[FL-005] BAJA from a phone bound by a join code releases the lease and leaves the world's person as it was", async () => {
     const h = await inboundHarness();
-    const judgePhone = "+12025550102";
-    const code = await h.world.connector.worlds.createJoinCode({ code: "J07-7QRT", clockId: JUDGE, personId: PEOPLE.rogelioJ07.personId, userId: "usr-judge-07" });
-    await h.world.connector.worlds.bindPhoneLease(code.code, hashOf(judgePhone));
-    await processInboundEvent(say(judgePhone, "wamid.B3", "BAJA"), h.deps);
-    expect(await h.world.connector.worlds.getPhoneLease(hashOf(judgePhone))).toBeUndefined();
-    expect(await h.world.connector.audit.listByDecision("isp-judge-07", "ACTION")).toMatchObject([{ action: "PHONE_LEASE_EXPIRED", reason: "OPT_OUT" }]);
+    const guestPhone = "+12025550102";
+    const code = await h.world.connector.worlds.createJoinCode({ code: "G07-7QRT", clockId: GUEST, personId: PEOPLE.rogelioG07.personId, userId: "usr-guest-07" });
+    await h.world.connector.worlds.bindPhoneLease(code.code, hashOf(guestPhone));
+    await processInboundEvent(say(guestPhone, "wamid.B3", "BAJA"), h.deps);
+    expect(await h.world.connector.worlds.getPhoneLease(hashOf(guestPhone))).toBeUndefined();
+    expect(await h.world.connector.audit.listByDecision("isp-guest-07", "ACTION")).toMatchObject([{ action: "PHONE_LEASE_EXPIRED", reason: "OPT_OUT" }]);
     expect(h.rec.actions).toEqual([]);
     expect(h.rec.notices).toMatchObject([{ notice: "optOutConfirmed", recipient: { transport: "live" } }]);
   });
@@ -162,7 +162,7 @@ describe("deterministic buttons", () => {
 
   it("[FL-082] a join code from a simulated identity is an ordinary message of the world", async () => {
     const h = await inboundHarness();
-    await processInboundEvent(simEvent(JUDGE, PEOPLE.rogelioJ07.phone, "wamid.SIM.K1", { type: "text", body: "ALTA J07-4F2K" }), h.deps);
-    expect(h.rec.queued).toMatchObject([{ type: "INBOUND_MESSAGE", installerId: PEOPLE.rogelioJ07.personId }]);
+    await processInboundEvent(simEvent(GUEST, PEOPLE.rogelioG07.phone, "wamid.SIM.K1", { type: "text", body: "ALTA G07-4F2K" }), h.deps);
+    expect(h.rec.queued).toMatchObject([{ type: "INBOUND_MESSAGE", installerId: PEOPLE.rogelioG07.personId }]);
   });
 });

@@ -129,8 +129,10 @@ aws --profile craftech-demos iam simulate-principal-policy \
 ```
 
 Repeat with `cloudfront:UpdateFunction` on a function ARN of another project, with
-`budgets:ModifyBudget` on another budget and with `transcribe:DeleteVocabulary` on a vocabulary
-outside `cuadrilla-poc-*`. `simulate-principal-policy` does not model every condition key, so a real
+`budgets:ModifyBudget` on another budget, with `transcribe:DeleteVocabulary` on a vocabulary
+outside `cuadrilla-poc-*`, and with `bedrock-agentcore:CreatePolicy`, `UpdatePolicy` and
+`DeletePolicy` on a policy engine (and one of its policies) whose name does not start with
+`aws_cds_hackathon_poc_cuadrilla_poc`. `simulate-principal-policy` does not model every condition key, so a real
 deploy is the final check.
 
 ## Residual risks

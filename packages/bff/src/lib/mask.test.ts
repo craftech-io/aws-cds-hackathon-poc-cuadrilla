@@ -105,7 +105,7 @@ describe("maskSensitive", () => {
 
   it("leaves field data alone: orders, serials, readings, times, sections, ids and hashes", () => {
     const text = [
-      "OT 24817 (wo-24817-j03), ONU DEMO3F2C19A0 en OLT-N3/1/4, −21,4 dBm a 1490 nm, rango −8 a −25 dBm,",
+      "OT 24817 (wo-24817-g03), ONU DEMO3F2C19A0 en OLT-N3/1/4, −21,4 dBm a 1490 nm, rango −8 a −25 dBm,",
       "ventana 09:00-11:00 (2026-10-13T09:20:00-06:00), Fibra 300, hasta 15 m de cable, sección COM-04,",
       "ev-01J7ABCDEFGHJKMNPQRSTVWXYZ, sha 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08, vn-01, ph-meter-01.",
     ].join(" ");

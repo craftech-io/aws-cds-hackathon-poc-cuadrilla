@@ -141,7 +141,7 @@ describe("principals of each tool (docs/tool-catalog.md, invocan)", () => {
   it("refuses a principal the tool does not list, a malformed caller and QA outside qa-*/eval-* worlds", async () => {
     expect(reason(await evidence().invoke("update_checklist", { caller: worker, item: "ONU_ONLINE", status: "PASSED" }))).toEqual(["FORBIDDEN", "PRINCIPAL_NOT_ALLOWED"]);
     expect(reason(await cases().invoke("close_installation", { caller: { kind: "CHANNEL", ispId: ISP }, outcome: "INSTALLED" }))).toEqual(["FORBIDDEN", "CALLER_INVALID"]);
-    const qaHere = { kind: "QA", ispId: "isp-judge-test", clockId: "JUDGE#isp-judge-test", role: "JUDGE", userId: "usr-qa-judge" };
+    const qaHere = { kind: "QA", ispId: "isp-guest-test", clockId: "GUEST#isp-guest-test", role: "GUEST", userId: "usr-qa-guest" };
     expect(reason(await evidence().invoke("validate_install_photo", { caller: qaHere, candidateId: "ec_01", item: "ONU_LABEL_PHOTO" }))).toEqual(["FORBIDDEN", "PRINCIPAL_NOT_ALLOWED"]);
     const qa = await evidence().invoke("validate_install_photo", { caller: { kind: "QA", ispId: QA_ISP, clockId: QA_CLOCK }, candidateId: "ec_01", item: "ONU_LABEL_PHOTO" });
     expect(qa.ok).toBe(true);

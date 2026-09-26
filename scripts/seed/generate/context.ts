@@ -9,7 +9,8 @@ import { CHECK_EPOCH, LOADER_STAMPED } from "../lib/conformance";
 import type { SeedItem } from "../lib/tables";
 import { createRng, seedFor, sha256Hex, type Rng } from "../photos/prng";
 
-export const APP = "aws-cds-hackathon-poc-cuadrilla";
+/** The product the seed belongs to (docs/seed-spec.md §1): never the SST app's name (ADR-0023). */
+export const PRODUCT = "cuadrilla";
 export const GENERATOR = "scripts/seed/generate.ts";
 export const GENERATOR_VERSION = "1.0.0";
 

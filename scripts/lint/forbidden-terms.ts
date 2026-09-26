@@ -18,6 +18,9 @@
 //
 // Fails closed: with CI=true an absent or empty list fails the job. The output never prints a term,
 // only where it was found and the term's position in the list.
+//
+// The neutral-surfaces guard (scripts/lint/neutral-surfaces.ts, ADR-0023) reuses the accent folding,
+// the whole-word pattern and the file and PDF readers exported here.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -47,6 +50,16 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Whole-word pattern of `text` (letters, digits and `_` make a word; a hyphen separates), the words of
+ * a name joined by any run of whitespace. With `ignoreAccents` the term is folded here and the caller
+ * folds the line with `stripAccents` before testing it.
+ */
+export function termPattern(text: string, options: { readonly ignoreCase: boolean; readonly ignoreAccents: boolean }): RegExp {
+  const body = (options.ignoreAccents ? stripAccents(text) : text).split(/\s+/).map(escapeRegExp).join("\\s+");
+  return new RegExp(`(?<!${WORD})${body}(?!${WORD})`, options.ignoreCase ? "iu" : "u");
+}
+
 export function parseTerms(raw: string): ForbiddenTerm[] {
   const terms: ForbiddenTerm[] = [];
   for (const line of raw.split(/\r?\n/)) {
@@ -60,8 +73,7 @@ export function parseTerms(raw: string): ForbiddenTerm[] {
     const flags = hasFlags ? entry.slice(bar + 1) : multiWord ? "ce" : "ia";
     const ignoreCase = flags.includes("i") && !flags.includes("c");
     const ignoreAccents = flags.includes("a") && !flags.includes("e");
-    const body = (ignoreAccents ? stripAccents(text) : text).split(/\s+/).map(escapeRegExp).join("\\s+");
-    terms.push({ index: terms.length + 1, ignoreAccents, pattern: new RegExp(`(?<!${WORD})${body}(?!${WORD})`, ignoreCase ? "iu" : "u") });
+    terms.push({ index: terms.length + 1, ignoreAccents, pattern: termPattern(text, { ignoreCase, ignoreAccents }) });
   }
   return terms;
 }
@@ -94,7 +106,7 @@ export function listFromEnv(env: NodeJS.ProcessEnv): ListStatus {
 
 // ---- Sources -----------------------------------------------------------------------------------
 
-function isBinary(buffer: Buffer): boolean {
+export function isBinary(buffer: Buffer): boolean {
   return buffer.subarray(0, 8000).includes(0);
 }
 
@@ -102,11 +114,12 @@ function git(cwd: string, args: readonly string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
 }
 
-function treeFiles(cwd: string): string[] {
+/** Tracked and untracked-but-not-ignored files of the working tree, relative to `cwd`. */
+export function treeFiles(cwd: string): string[] {
   return git(cwd, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"]).split("\0").filter((file) => file !== "" && existsSync(join(cwd, file)));
 }
 
-function distFiles(dir: string, out: string[] = []): string[] {
+export function distFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) distFiles(path, out);
@@ -115,7 +128,8 @@ function distFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-async function pdfText(bytes: Buffer): Promise<string> {
+/** Text and metadata of a PDF, one string. */
+export async function pdfText(bytes: Buffer): Promise<string> {
   const { extractText, getMeta, getDocumentProxy } = await import("unpdf");
   const pdf = await getDocumentProxy(new Uint8Array(bytes));
   const { text } = await extractText(pdf, { mergePages: true });

@@ -67,7 +67,7 @@ describe("groups and the informative attribute", () => {
   it("has one group per console role, in the precedence order of @cuadrilla/shared", () => {
     const byPrecedence = [...CONSOLE_GROUP_NAMES].sort((a, b) => CONSOLE_GROUPS[a].precedence - CONSOLE_GROUPS[b].precedence);
     expect(byPrecedence).toEqual(ConsoleRole.options);
-    expect([...CONSOLE_GROUP_NAMES].sort()).toEqual(["JUDGE", "OPS", "SUPERVISOR"]);
+    expect([...CONSOLE_GROUP_NAMES].sort()).toEqual(["GUEST", "OPS", "SUPERVISOR"]);
     expect(new Set(CONSOLE_GROUP_NAMES.map((group) => CONSOLE_GROUPS[group].precedence)).size).toBe(CONSOLE_GROUP_NAMES.length);
   });
 

@@ -1,6 +1,6 @@
 // FL-079 in the browser (docs/test-plan.md §2.1: the only level where the SRP sign-in, the initial
 // password change and TOTP run): the console's own login against a route mock of Cognito, with
-// tokens of 15 minutes signed by the run's ephemeral key, for the three roles, the judge variant
+// tokens of 15 minutes signed by the run's ephemeral key, for the three roles, the guest variant
 // included. Also the shell every later view lives in: the brand of `brand.get`, the simulated-time
 // bar with its polling and controls, the placeholders of the views and the guided-tour dock.
 import { type Page, expect, test } from "@playwright/test";
@@ -83,20 +83,20 @@ test.describe("console sign-in", () => {
     await expect(page.getByText(`${copy.app.roleLabel}: ${copy.roles.OPS}`)).toBeVisible();
   });
 
-  test("[FL-079] a judge signs in with the password alone: no password change, no TOTP, back where it was going", async ({ page }) => {
+  test("[FL-079] a guest signs in with the password alone: no password change, no TOTP, back where it was going", async ({ page }) => {
     const pool = createPool();
-    const judge = await addAccount(pool, { role: "JUDGE" });
+    const guest = await addAccount(pool, { role: "GUEST" });
     const cognito = await routeCognito(page, pool);
     // brand.get fails here: every surface stays on the neutral brand.
     await routeConsoleApi(page);
 
     await page.goto("/app/clock");
     await expect(page).toHaveURL(/\/login\?returnTo=%2Fapp%2Fclock$/);
-    await signIn(page, judge);
+    await signIn(page, guest);
 
     await expect(page).toHaveURL(/\/app\/clock$/);
     await expect(page.getByRole("heading", { name: copy.views.clock.title })).toBeVisible();
-    await expect(page.getByText(`${copy.app.roleLabel}: ${copy.roles.JUDGE}`)).toBeVisible();
+    await expect(page.getByText(`${copy.app.roleLabel}: ${copy.roles.GUEST}`)).toBeVisible();
     await expect(page.getByText(loginCopy.mfaSetup.title)).toHaveCount(0);
     expect(operations(cognito)).toEqual(["InitiateAuth", "RespondToAuthChallenge"]);
 
@@ -133,13 +133,13 @@ test.describe("console sign-in", () => {
 
   test("[FL-079] tokens of 15 minutes refresh silently, and signing out revokes them", async ({ page }) => {
     const pool = createPool();
-    const judge = await addAccount(pool, { role: "JUDGE" });
+    const guest = await addAccount(pool, { role: "GUEST" });
     const cognito = await routeCognito(page, pool);
     await routeConsoleApi(page, { brand: NEUTRAL_BRAND });
     await page.clock.install();
 
     await page.goto("/login");
-    await signIn(page, judge);
+    await signIn(page, guest);
     await expect(page.getByRole("heading", { name: copy.views.orders.title })).toBeVisible();
     expect(refreshes(cognito)).toBe(0);
 
@@ -159,7 +159,7 @@ test.describe("console sign-in", () => {
 test.describe("console shell", () => {
   test("co-branding from brand.get, and the simulated-time bar with its polling and controls", async ({ page }) => {
     const pool = createPool();
-    const judge = await addAccount(pool, { role: "JUDGE" });
+    const guest = await addAccount(pool, { role: "GUEST" });
     await routeCognito(page, pool);
     const api = await routeConsoleApi(page, {
       brand: COBRAND,
@@ -167,7 +167,7 @@ test.describe("console shell", () => {
     });
 
     await page.goto("/login");
-    await signIn(page, judge);
+    await signIn(page, guest);
     await expect(page.getByRole("heading", { name: copy.views.orders.title })).toBeVisible();
 
     const navigation = page.getByRole("navigation", { name: "Cuadrilla" });

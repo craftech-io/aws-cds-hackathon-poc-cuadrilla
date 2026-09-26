@@ -3,11 +3,11 @@ import { acceptsDemoRecipients, fenceEmailRecipient, isReservedDomain, normalize
 
 // Worlds of every kind (docs/seed-spec.md §3).
 const DEMO = "GLOBAL#isp-demo";
-const JUDGE = "JUDGE#isp-judge-07";
-const JUDGE_TEST = "JUDGE#isp-judge-test";
+const GUEST = "GUEST#isp-guest-07";
+const GUEST_TEST = "GUEST#isp-guest-test";
 const QA = "qa-812-1-sc11-fence";
 const EVAL = "eval-812-1";
-const WORLDS = [DEMO, JUDGE, JUDGE_TEST, QA, EVAL];
+const WORLDS = [DEMO, GUEST, GUEST_TEST, QA, EVAL];
 
 // A registered demo mailbox (`SeedOverrides.demoRecipients.emails`); the domain is invented for the test.
 const DEMO_MAILBOX = "bandeja@equipo-demo-ficticio.mx";
@@ -15,7 +15,7 @@ const OPTIONS = { demoRecipients: [DEMO_MAILBOX, "not an address"] };
 
 describe("fenceEmailRecipient [FL-076]", () => {
   it.each(WORLDS)("[FL-076] admits the SES mailbox simulator in %s, with its success, bounce and complaint tags", (clockId) => {
-    for (const address of ["success+c10421@simulator.amazonses.com", "bounce+c10431@simulator.amazonses.com", "complaint+j07-c10433@simulator.amazonses.com", "success+zc-marisol@simulator.amazonses.com"]) {
+    for (const address of ["success+c10421@simulator.amazonses.com", "bounce+c10431@simulator.amazonses.com", "complaint+g07-c10433@simulator.amazonses.com", "success+zc-marisol@simulator.amazonses.com"]) {
       expect(fenceEmailRecipient(address, clockId, OPTIONS)).toEqual({ allowed: true, ruleId: "CP-RECIPIENT-FENCE", address, recipientClass: "SES_SIMULATOR" });
     }
   });
@@ -27,11 +27,11 @@ describe("fenceEmailRecipient [FL-076]", () => {
   it("[FL-076] admits the registered demo mailboxes only in the operator's demo world", () => {
     expect(fenceEmailRecipient(DEMO_MAILBOX, DEMO, OPTIONS)).toEqual({ allowed: true, ruleId: "CP-RECIPIENT-FENCE", address: DEMO_MAILBOX, recipientClass: "DEMO_RECIPIENT" });
     expect(fenceEmailRecipient("Bandeja@Equipo-Demo-Ficticio.MX", DEMO, OPTIONS)).toMatchObject({ allowed: true, recipientClass: "DEMO_RECIPIENT" });
-    for (const clockId of [JUDGE, JUDGE_TEST, QA, EVAL]) {
+    for (const clockId of [GUEST, GUEST_TEST, QA, EVAL]) {
       expect(fenceEmailRecipient(DEMO_MAILBOX, clockId, OPTIONS)).toEqual({ allowed: false, ruleId: "CP-RECIPIENT-FENCE", reason: "DEMO_RECIPIENT_OUTSIDE_DEMO_WORLD" });
     }
     expect(acceptsDemoRecipients(DEMO)).toBe(true);
-    expect(acceptsDemoRecipients(JUDGE)).toBe(false);
+    expect(acceptsDemoRecipients(GUEST)).toBe(false);
     expect(normalizedDemoRecipients(OPTIONS.demoRecipients)).toEqual(new Set([DEMO_MAILBOX]));
   });
 
@@ -76,6 +76,6 @@ describe("fenceEmailRecipient [FL-076]", () => {
 
   it("[FL-076] refuses any other address in every world, and an invalid world outright", () => {
     for (const clockId of WORLDS) expect(fenceEmailRecipient("alguien@correo-cualquiera.mx", clockId, OPTIONS)).toMatchObject({ allowed: false, reason: "NOT_ALLOWED" });
-    expect(() => fenceEmailRecipient("success@simulator.amazonses.com", "JUDGE#otro")).toThrow();
+    expect(() => fenceEmailRecipient("success@simulator.amazonses.com", "GUEST#otro")).toThrow();
   });
 });

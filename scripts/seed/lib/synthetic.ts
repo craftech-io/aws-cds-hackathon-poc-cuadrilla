@@ -2,7 +2,7 @@
 // part starts with 0, which the numbering plan does not assign to subscribers, in one block per use;
 // and addresses of the SES mailbox simulator, so nothing the demo sends reaches a person. The
 // generator builds addresses with these blocks, the validator checks every one against them
-// (invariants 3 and 17) and the world factory takes a judge world's block from `judgeBlock`.
+// (invariants 3 and 17) and the world factory takes a guest world's block from `guestBlock`.
 import { z } from "zod";
 
 /** Country and area code of every synthetic phone: Mexico, Mexico City. */
@@ -14,7 +14,10 @@ export const PHONE_BLOCKS = {
   demoSupervisors: { label: "+52 55 0102 00xx", pattern: /^\+5255010200\d{2}$/ },
   demoCustomers: { label: "+52 55 0103 0xxx", pattern: /^\+52550103[0]\d{3}$/ },
   unknownNumber: { label: "+52 55 0199 0001", pattern: /^\+525501990001$/ },
-  judgeWorlds: { label: "+52 55 02nn 0xxx", pattern: /^\+525502\d{2}0\d{3}$/ },
+  /** A world of an invited guest (`INVITED`) or of the operator's rehearsal (`TEST`, `nn = 99`): one block per world. */
+  guestWorlds: { label: "+52 55 02nn 0xxx", pattern: /^\+525502\d{2}0\d{3}$/ },
+  /** Every world of an own signup (`SIGNUP`, ADR-0025) shares one block: an identity is unique per world. */
+  signupWorlds: { label: "+52 55 0300 0xxx", pattern: /^\+525503000\d{3}$/ },
   qaLeases: { label: "+52 55 09xx xxxx", pattern: /^\+525509\d{6}$/ },
 } as const;
 export type PhoneBlock = keyof typeof PHONE_BLOCKS;
@@ -41,12 +44,12 @@ export function isSimulatorEmail(email: string): boolean {
 }
 
 /**
- * Tokens of a judge world's copy of the `judge` template (docs/seed-spec.md §2-§3): its number in
- * ids (`inst-rogelio-j07`, `wo-24817-j07`), its operator and clock, and its phone block `+52 55 02nn`
+ * Tokens of an invited guest's copy of the `guest` template (docs/seed-spec.md §2-§3): its number in
+ * ids (`inst-rogelio-g07`, `wo-24817-g07`), its operator and clock, and its phone block `+52 55 02nn`
  * (`test`, the operator's rehearsal world, takes `99`).
  */
-export function judgeBlock(judge: number | "test"): { readonly number: string; readonly clockTag: string; readonly phoneBlock: string } {
-  if (judge !== "test" && (!Number.isInteger(judge) || judge < 0 || judge > 98)) throw new RangeError(`judge number out of range: ${judge}`);
-  const number = judge === "test" ? "test" : String(judge).padStart(2, "0");
-  return { number, clockTag: `j${number}`, phoneBlock: `${PHONE_PREFIX}02${judge === "test" ? "99" : number}` };
+export function guestBlock(guest: number | "test"): { readonly number: string; readonly clockTag: string; readonly phoneBlock: string } {
+  if (guest !== "test" && (!Number.isInteger(guest) || guest < 0 || guest > 98)) throw new RangeError(`guest number out of range: ${guest}`);
+  const number = guest === "test" ? "test" : String(guest).padStart(2, "0");
+  return { number, clockTag: `g${number}`, phoneBlock: `${PHONE_PREFIX}02${guest === "test" ? "99" : number}` };
 }
