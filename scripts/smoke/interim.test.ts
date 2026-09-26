@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { healthVerdict, rootProblems } from "./interim";
+import { healthVerdict, rootProblems, stateInventory } from "./interim";
 
 const SECURE = {
   "content-security-policy": "default-src 'self'; script-src 'self'; frame-ancestors 'none'",
@@ -30,5 +30,28 @@ describe("interim smoke", () => {
     expect(healthVerdict(503, "application/json", "{}")).toBe("failed");
     expect(healthVerdict(200, "application/json", "not json")).toBe("failed");
     expect(healthVerdict(200, "application/json", JSON.stringify({ result: { data: { ok: false } } }))).toBe("failed");
+  });
+
+  it("reads table and function names from the app's own SST state, nothing else", () => {
+    const state = {
+      stack: "organization/app/poc",
+      latest: {
+        resources: [
+          { type: "aws:dynamodb/table:Table", outputs: { name: "app-poc-WorldsTable-b" } },
+          { type: "aws:dynamodb/table:Table", outputs: { name: "app-poc-CasesTable-a" } },
+          { type: "aws:lambda/function:Function", outputs: { name: "app-poc-BffFunction-c" } },
+          { type: "aws:s3/bucket:Bucket", outputs: { bucket: "app-poc-media" } },
+          { type: "aws:lambda/function:Function", outputs: {} },
+          { type: "pulumi:pulumi:Stack" },
+        ],
+      },
+    };
+    expect(stateInventory(state)).toEqual({
+      tables: ["app-poc-CasesTable-a", "app-poc-WorldsTable-b"],
+      functions: ["app-poc-BffFunction-c"],
+    });
+    expect(stateInventory({ latest: { resources: [] } })).toEqual({ tables: [], functions: [] });
+    expect(() => stateInventory({ stack: "x" })).toThrow(/latest.resources/);
+    expect(() => stateInventory(null)).toThrow(/latest.resources/);
   });
 });

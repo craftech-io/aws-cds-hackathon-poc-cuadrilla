@@ -7,11 +7,18 @@
 //   3. GET /api/health     the BFF's health probe. Before WP-38 deploys the BFF the Router serves
 //                          the console's index.html there: reported, not failed, unless
 //                          `--expect-api` says the BFF must be up.
-//   4. Inventory (`--aws`): the DynamoDB tables and Lambda functions of the app that exist so far,
-//                          read with the credentials of the environment (the deploy role in CI).
+//   4. Inventory (`--aws`): the DynamoDB tables and Lambda functions of the app that exist so far.
+//                          Their names come from this app's own SST state (`sst state export`),
+//                          never from an account-wide listing: the account is shared with another
+//                          project and the deploy role has no `dynamodb:ListTables` nor
+//                          `lambda:ListFunctions`. Each one is then described with the credentials
+//                          of the environment (the deploy role in CI). The state is parsed in memory
+//                          and never printed.
 //
 //   npx tsx scripts/smoke/interim.ts [--base-url https://cuadrilla.demo.craftech.io] [--expect-api] [--aws]
+import { execFile } from "node:child_process";
 import { resolve } from "node:path";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { parseFlags } from "../channels/cli-args";
 
@@ -70,27 +77,54 @@ async function get(url: string): Promise<{ status: number; headers: Record<strin
   throw new Error(`${url} did not answer after ${ATTEMPTS} attempts`, { cause: lastError });
 }
 
-async function inventory(): Promise<string[]> {
-  const { DynamoDBClient, ListTablesCommand } = await import("@aws-sdk/client-dynamodb");
-  const { LambdaClient, ListFunctionsCommand } = await import("@aws-sdk/client-lambda");
+const TABLE_TYPE = "aws:dynamodb/table:Table";
+const FUNCTION_TYPE = "aws:lambda/function:Function";
+
+export interface StateInventory {
+  readonly tables: readonly string[];
+  readonly functions: readonly string[];
+}
+
+/** Names of the tables and functions in an `sst state export` document (a Pulumi checkpoint). */
+export function stateInventory(state: unknown): StateInventory {
+  const resources = (state as { latest?: { resources?: unknown } } | null)?.latest?.resources;
+  if (!Array.isArray(resources)) throw new Error("sst state export: no latest.resources in the checkpoint");
+  const names = (type: string): string[] =>
+    resources
+      .filter((resource: { type?: unknown }) => resource.type === type)
+      .map((resource: { outputs?: { name?: unknown } }) => resource.outputs?.name)
+      .filter((name): name is string => typeof name === "string" && name.length > 0)
+      .sort();
+  return { tables: names(TABLE_TYPE), functions: names(FUNCTION_TYPE) };
+}
+
+async function exportState(): Promise<unknown> {
+  const { stdout } = await promisify(execFile)("npx", ["sst", "state", "export", "--stage", "poc"], {
+    maxBuffer: 256 * 1024 * 1024,
+    timeout: 5 * 60_000,
+  });
+  return JSON.parse(stdout);
+}
+
+async function inventory(): Promise<{ lines: string[]; problems: string[] }> {
+  const { DynamoDBClient, DescribeTableCommand } = await import("@aws-sdk/client-dynamodb");
+  const { LambdaClient, GetFunctionConfigurationCommand } = await import("@aws-sdk/client-lambda");
   const dynamo = new DynamoDBClient({ region: "us-east-1", maxAttempts: 3 });
   const lambda = new LambdaClient({ region: "us-east-1", maxAttempts: 3 });
-  const tables: string[] = [];
-  let startTable: string | undefined;
-  do {
-    const page = await dynamo.send(new ListTablesCommand({ ExclusiveStartTableName: startTable }));
-    tables.push(...(page.TableNames ?? []).filter((name) => name.startsWith(`${APP}-`)));
-    startTable = page.LastEvaluatedTableName;
-  } while (startTable);
-  const functions: string[] = [];
-  let marker: string | undefined;
-  do {
-    const page = await lambda.send(new ListFunctionsCommand({ Marker: marker }));
-    // Only this app's functions: the account is shared with another project of the same hackathon.
-    functions.push(...(page.Functions ?? []).map((fn) => fn.FunctionName ?? "").filter((name) => name.startsWith(`${APP}-`)));
-    marker = page.NextMarker;
-  } while (marker);
-  return [`tables: ${tables.length}`, `functions: ${functions.length}`];
+  const { tables, functions } = stateInventory(await exportState());
+  const problems: string[] = [];
+  const outside = [...tables, ...functions].filter((name) => !name.startsWith(`${APP}-`));
+  if (outside.length > 0) problems.push(`${outside.length} resource(s) in the state without the ${APP}- prefix`);
+  for (const name of tables) {
+    const status = (await dynamo.send(new DescribeTableCommand({ TableName: name }))).Table?.TableStatus;
+    if (status !== "ACTIVE" && status !== "UPDATING") problems.push(`table ${name} is ${status ?? "missing"}`);
+  }
+  for (const name of functions) {
+    // "Inactive" is an idle function Lambda reactivates on the next invoke; only "Failed" is broken.
+    const state = (await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: name }))).State;
+    if (state === undefined || state === "Failed") problems.push(`function ${name} is ${state ?? "missing"}`);
+  }
+  return { lines: [`tables: ${tables.length}`, `functions: ${functions.length}`], problems };
 }
 
 async function main(): Promise<void> {
@@ -117,7 +151,11 @@ async function main(): Promise<void> {
   const verdict = healthVerdict(health.status, health.headers["content-type"] ?? "", health.body);
   if (verdict === "failed" || (verdict === "not-deployed" && expectApi)) problems.push(`GET /api/health: ${verdict} (${health.status})`);
   console.log(`smoke:interim: / ${root.status} · /legal/privacy.html ${legal.status} · /api/health ${verdict}`);
-  if (aws) console.log(`smoke:interim: ${(await inventory()).join(" · ")}`);
+  if (aws) {
+    const found = await inventory();
+    console.log(`smoke:interim: ${found.lines.join(" · ")}`);
+    problems.push(...found.problems);
+  }
   if (problems.length > 0) {
     console.error(`smoke:interim: ${problems.length} problem(s):`);
     for (const problem of problems) console.error(`  ${problem}`);
