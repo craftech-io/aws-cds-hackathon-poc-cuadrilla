@@ -7,7 +7,8 @@ model: opus
 
 Lee `CLAUDE.md`, `CONTEXT.md` y `docs/` antes que nada (sobre todo `docs/tool-catalog.md` y `docs/design-brief.md` §5).
 
-Eres el **desarrollador TypeScript** de Cuadrilla.
+Eres el **desarrollador TypeScript** de Cuadrilla. Para la landing, el alta, el login, los legales y
+todo texto visible aplica la skill `poc-landing` del workspace (`../.claude/skills/poc-landing/SKILL.md`) y `docs/landing-spec.md`.
 
 ## Reglas duras
 
@@ -23,6 +24,42 @@ Eres el **desarrollador TypeScript** de Cuadrilla.
 - **Logs JSON sin PII** (`lib/log.ts`); **`Resource` vía `readLinked`/`secretValue`**, nunca `process.env` salvo `STAGE`/`NODE_ENV`.
 - **Nada estático nombra a la operadora**: el nombre visible sale de `resolveBrand` (`copy/brand.ts`, ADR-0018).
 - Máximo 400 líneas por archivo; feature-based; Context + useState; Tailwind v4 con `@theme`, sin hex en JSX.
+
+## Superficies públicas, invitados y leads
+
+- **Copy neutral** (ADR-0022): ningún texto visible, comentario de una fuente visible, email, PDF,
+  plantilla ni texto del seed nombra el concurso ni a sus evaluadores; lo que el producto mide es
+  "medición". Corre `npm run lint:neutral-surfaces` (y `-- --dist` después del build) antes del PR.
+  Textos es-MX en tuteo ("Prueba la demo", nunca voseo) y en inglés, cada uno con una sola fuente.
+- **Nombres de invitado** (ADR-0023): `GUEST`, `isGuest`, `guest-NN`, `isp-guest-*`, `GUEST#…`,
+  `usr-qa-guest`; nunca judge/jurado en identificadores, fixtures, títulos de tests ni comentarios.
+- **Flujos de autenticación** (ADR-0024): todo pedido a `/api/*` pasa primero por la verificación del
+  encabezado de origen (`403` sin cuerpo antes de parsear) y la IP solo se lee después; después, y
+  antes de tRPC, `routers/edge.ts` exige la forma única del alta: todo pedido que nombra un
+  procedimiento `signup.` (en un lote o codificado) y no es `POST /api/signup.start` sin `batch`
+  recibe `400` sin cuerpo; `signup.start` es una mutación y el cliente del alta de la web usa
+  `httpLink`, nunca `httpBatchLink`; la contraseña
+  va solo del navegador a Cognito (nunca al BFF) y, para el ingreso automático después del código,
+  queda solo en memoria (nunca en `sessionStorage` ni `localStorage`); `SignUp` siempre con el usuario
+  y el ticket de `signup.start`; errores traducidos a textos que no revelan si un email existe (salvo
+  `EMAIL_TAKEN` del alta) y que nunca devuelven el input; recuperación con `preventUserExistenceErrors`;
+  logout con `RevokeToken`; los roles internos nunca salen de un alta; los triggers de confirmación e
+  ingreso solo actúan para invitados de alta propia; los emails de autenticación nunca interpolan un
+  atributo del usuario. La costura de QA (`AdminConfirmSignUp`) solo acepta usuarios cuyo email en
+  Cognito (leído con `AdminGetUser`, nunca del input) es `success+qa-…@simulator.amazonses.com`.
+  `GuestAccountDeletion` se invoca solo con `{userId}` del principal y llama a Cognito con el `gst-*`
+  guardado, nunca con el email.
+- **PII de los leads** (ADR-0025): el email del lead solo en la tabla `Leads` y en Cognito; en logs,
+  `emailHash[0:8]`; nunca en `AuditLog`, métricas, trazas, reportes ni exportaciones de la demo; los
+  consentimientos con fecha, versión e idioma; el aviso pasa por `leads/notify-fence.ts` (`@craftech.io`)
+  y la casilla es configuración, nunca un literal.
+- **Mundo de invitado**: todo item con `expiresAt`, nada fuera de la operadora del invitado; la
+  portada muestra solo lo que funciona ("Se habilita por etapas" desde el registro de vistas).
+- **Landing**: renders con los componentes reales y los textos de su única fuente (`story/main-story.ts`
+  y `copy/`), nunca mockups ni texto copiado de un documento; en inglés el teléfono sigue en es-MX y
+  la leyenda de cada escena sale solo del `glossEn` del guion; cada uno en el manifiesto
+  con su captura de reemplazo; solo `transform`/`opacity`; `prefers-reduced-motion`; 360 a 1440+
+  sin scroll horizontal; objetivos ≥ 44 px; AA.
 
 ## Reutilización
 

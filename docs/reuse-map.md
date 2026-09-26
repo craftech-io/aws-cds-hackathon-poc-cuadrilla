@@ -50,7 +50,7 @@ Regla de verificación: después de cada WP que copie o adapte, `npm run lint:fo
 | `guardrail.ts`, `guardrail-policies.ts` (+ test) | A | Adaptar | G1 con tres temas denegados de este producto; G2; G3 nuevo (solo PII); regex de `lib/mask.ts` | WP-08 |
 | `policy.ts` | A | Copiar | Permits → forbids | WP-08 |
 | `policy-rules.ts` (+ test) | B | Adaptar | Statements `CED-*` de este repo, 5 targets | WP-08 |
-| `auth.ts`, `auth-email.ts` (+ test) | A | Adaptar | Grupos `SUPERVISOR`/`OPS`/`JUDGE`, `custom:ispId` informativo, `writeAttributes = ["name"]` (como la referencia A), marca | WP-10 |
+| `auth.ts`, `auth-email.ts` (+ test) | A | Adaptar | Grupos `SUPERVISOR`/`OPS`/`GUEST`, `custom:ispId` informativo, `writeAttributes = ["name"]` (como la referencia A), marca | WP-10 |
 | `messaging-email.ts`, `messaging-email-spec.ts` (+ test) | A | Adaptar | **Solo envío**: identidad, DKIM, MAIL FROM, DMARC y configuration set; **se elimina todo lo de recepción** (MX, rule set, reglas, bucket de correo entrante) | WP-20 |
 | `messaging-whatsapp.ts` | A | Adaptar | Topic `aws-cds-hackathon-poc-cuadrilla-wa-inbound` con `Deny` de publicadores ajenos, `InboundWhatsApp` sin destino de falla, `sns:Publish` del `QaDriver`; sin feature flag; el ARN del número lo arma `whatsappPhoneArn()` desde el id de AWS **sin** el prefijo `phone-number-id-` (la referencia interpolaba el valor completo), verificado contra `phoneNumbers[].arn` en P-01 | WP-24 |
 | Módulo de infra del canal que este producto no usa | A | Descartar | — | — |
@@ -93,7 +93,7 @@ Regla de verificación: después de cada WP que copie o adapte, `npm run lint:fo
 | `services/business-days.ts` | A | Adaptar → `services/business-hours/` | Horario de silencio por zona IANA | WP-12 |
 | `services/transcribe.ts`, `inbound/transcribe-client.ts` | A | Adaptar → `media/` | `es-MX`, vocabulario, `ogg`/`webm`/`mp4`, prefijo `cuadrilla-poc-`, nombre idempotente por mensaje y mundo (no por archivo), salida por mensaje y borrada al leerla | WP-31 |
 | `services/pdf.ts` | A | Adaptar → `certificates/pdf.ts` | Suma imágenes JPEG (`DCTDecode`) y tabla del checklist; sigue sin dependencias ni fecha | WP-35 |
-| `auth/**`, `auth-triggers/**` | A | Copiar / adaptar | Principal `{sub, userId, ispId, role, isJudge, authTime}` | WP-13 |
+| `auth/**`, `auth-triggers/**` | A | Copiar / adaptar | Principal `{sub, userId, ispId, role, isGuest, authTime}` | WP-13 |
 | `routers/{trpc,handler,deps,index}.ts` | A | Adaptar | `ispProcedure`, `supervisorProcedure`, `recentLoginProcedure` | WP-13 |
 | `agent/harness-client.ts` (+ test) | A | Adaptar | Endpoint `live`, sesión por orden, actor por instalador con época | WP-32 |
 | `agent-proxy/**` | A | Descartar | La consola no invoca el Harness | — |
@@ -112,7 +112,7 @@ Regla de verificación: después de cada WP que copie o adapte, `npm run lint:fo
 | `connector/{ports,index,keys,table-client}.ts`, `connector/dynamo/{client,expressions,repo}.ts`, `connector/memory/**` | A | Adaptar | Puertos de este dominio | WP-07 |
 | `agent-tools/common/{build-schemas,scope}.ts` y el wrapper (+ tests) | A | Adaptar | Sesión de instalador y orden | WP-25 |
 | `agent-tools/**` (targets), `workflows/**`, `domain/**` del producto anterior | A | Descartar | Nuevos | — |
-| Módulos de mundos, reloj y quiescencia de la referencia B (`worlds/`, `clock/`, `timers/`, `worker/settle`) | B | Adaptar | Mundos con roster y ONU; `forceCaseTimeout`; temporizadores en `WorkOrders` y `Cases`; `installer.settle` | WP-36, WP-39 |
+| Módulos de mundos, reloj y quiescencia de la referencia B (`worlds/`, `clock/`, `timers/`, `worker/settle`) | B | Adaptar | Mundos con roster y ONU; `forceCaseTimeout`; temporizadores en `WorkOrders` y `Cases`; `installer.settle` | WP-36, WP-58 (fábrica mínima), WP-39 |
 | `QaDriver` y su guarda de la referencia B | B | Adaptar | Acciones de este repo, `wa.publishForeign`, `tool.invoke`, `eval.*` | WP-45 |
 | `copy/{helpers,types,forbidden,buttons}.ts` | A | Adaptar | Textos de este repo | WP-09 |
 | `public-web/**` | A | Descartar | Sin superficie pública de carga | — |
@@ -129,12 +129,12 @@ Regla de verificación: después de cada WP que copie o adapte, `npm run lint:fo
 | `src/context/SessionContext.tsx` | A | Copiar | — | WP-11 |
 | `src/context/<contexto de alcance del producto anterior>` | A | Adaptar → `IspContext.tsx` | — | WP-11 |
 | `src/views/login/**` | A | Adaptar | Textos | WP-11 |
-| `src/views/landing/{Lightbox,gallery,MediaFigure}.tsx` | A | Copiar | — | WP-44 |
-| `src/views/landing/{LandingView,copy,media}.*` | A | Adaptar | Historia de este producto | WP-44 |
+| `src/views/landing/{Lightbox,gallery,MediaFigure}.tsx` | A | Copiar | — | WP-11 (copiados), WP-55 |
+| `src/views/landing/{LandingView,copy,media}.*` | A | Adaptar | Historia de este producto; la landing comercial nueva la define `docs/landing-spec.md` (esencia de la referencia: muestra el producto con capturas reales, dice qué es real y qué simulado, galería con zoom; estilo propio) | WP-55, WP-44 |
 | Componente de teléfono del prototipo de la referencia B | B | Adaptar → `views/simulator/` | Identidades, voz, fotos, listas | WP-43 |
 | `src/views/**` (resto) | A | Descartar | Vistas nuevas | — |
 | `public/brand/logo-craftech-*` | A | Copiar | — | WP-11 |
-| `public/legal/*.html` | A | Adaptar | Legales de esta demo | WP-44 |
+| `public/legal/*.html` | A | Adaptar | Legales de esta demo con Craftech como responsable y la Ley 25.326 (ADR-0025) | WP-59 |
 | `e2e/support/**`, `e2e/playwright.config.ts`, `e2e/tsconfig.json` | A | Copiar / adaptar | Clave efímera, sesiones por rol | WP-11 |
 | `index.html`, `vite.config.ts` | A | Adaptar | Título y marca | WP-11 |
 
@@ -153,7 +153,7 @@ Regla de verificación: después de cada WP que copie o adapte, `npm run lint:fo
 | `scripts/seed/validate/**`, `scripts/seed/lib/{tables,conformance,text}.ts` | A | Adaptar | Invariantes de `docs/seed-spec.md` §14 | WP-17 |
 | `scripts/seed/load/**`, `scripts/seed/load.ts` | A | Adaptar | Subida de fotos, voces y manual; ingesta de la KB con huella (la referencia A ya ingería su KB desde el loader) | WP-39 |
 | `scripts/seed/**` (resto: generadores, datos, documentos, media del producto anterior) | A | Descartar | — | — |
-| `scripts/landing/{capture-console,console-server,console-world,render-visuals}.ts`, `captures.json` | A | Adaptar | Capturas de este producto; `console-server` es la base de `tests/ui-server/` | WP-40, WP-44 |
+| `scripts/landing/{capture-console,console-server,console-world,render-visuals}.ts`, `captures.json` | A | Adaptar | Capturas de este producto; `console-server` es la base de `tests/ui-server/` | WP-60, WP-40, WP-44 |
 | `scripts/smoke/lib/{http,report,stage,cli,guards,probes}.ts` (+ tests) | A | Adaptar → `scripts/scenarios/lib/` | Base del ejecutor | WP-45 |
 | Ejecutor de escenarios y `steps.test.ts` de la referencia B | B | Adaptar | Escenarios de este repo | WP-45 |
 | `tests/cases/**` | A, B | Descartar | Casos nuevos | WP-16 |

@@ -1,4 +1,4 @@
-# Cuadrilla (aws-cds-hackathon-poc-cuadrilla)
+# Cuadrilla
 
 Copiloto de campo en WhatsApp para instaladores de fibra hasta el hogar (FTTH) de una operadora de internet latinoamericana: el instalador trabaja solo, en el domicilio del cliente y con las manos ocupadas; le escribe o le manda una nota de voz al agente, que lee su orden de trabajo y el estado de la ONU, lo guía con el manual de procedimientos de la operadora (citando la sección), valida las fotos de evidencia, escala al supervisor de turno cuando hace falta, da la instrucción de seguridad del manual ante un riesgo y, al cerrar, emite el acta de instalación. Este glosario fija la palabra que se usa en documentos y textos públicos (español) y el identificador que se usa en código (inglés, entre backticks). Todo dato es sintético; la operadora de la demo es ficticia o, en co-branding, el socio de diseño con políticas y datos inventados (ADR-0018).
 
@@ -7,7 +7,7 @@ Copiloto de campo en WhatsApp para instaladores de fibra hasta el hogar (FTTH) d
 ### Organización y personas
 
 **Operadora** (`Isp`, `ispId`):
-Empresa proveedora de internet por fibra que usa Cuadrilla; es el tenant. Todo dato (personal, clientes, órdenes, casos, bitácora) pertenece a una operadora y ningún usuario ve otra. En la demo (`isp-demo`) su nombre visible sale en runtime de la configuración de marca (`resolveBrand`): el socio de diseño en co-branding, que es el modo de `poc`, o **Tulvara Fibra** (ficticia) en el modo `neutral` de respaldo; ningún texto estático la nombra; cada jurado tiene una copia propia (`isp-judge-<nn>`) y cada escenario de QA una operadora propia (`isp-qa-<runId>-<escenario>`).
+Empresa proveedora de internet por fibra que usa Cuadrilla; es el tenant. Todo dato (personal, clientes, órdenes, casos, bitácora) pertenece a una operadora y ningún usuario ve otra. En la demo (`isp-demo`) su nombre visible sale en runtime de la configuración de marca (`resolveBrand`): el socio de diseño en co-branding, que es el modo de `poc`, o **Tulvara Fibra** (ficticia) en el modo `neutral` de respaldo; ningún texto estático la nombra; cada mundo de invitado tiene una copia propia (`isp-guest-<nn>`, `isp-guest-test` o, en un alta propia, `isp-guest-s<yymmdd><5>` por generación) y cada escenario de QA una operadora propia (`isp-qa-<runId>-<escenario>`).
 _Avoid_: empresa, cliente (el cliente es el del domicilio), carrier, ISP (en textos en español)
 
 **Zona** (`Zone`):
@@ -42,8 +42,8 @@ _Avoid_: suscriptor, usuario final, abonado
 Dirección de email de la operadora que recibe copia de cada acta. En la POC apunta al simulador de buzones de SES o a un buzón del equipo registrado.
 _Avoid_: mesa de control (como dirección)
 
-**Usuario de consola** (`ConsoleUser`, rol `SUPERVISOR` | `OPS` | `JUDGE`):
-Persona de la operadora que entra a la consola: `SUPERVISOR` ve y actúa (toma casos, hace la validación manual de evidencia); `OPS` ve y no valida; `JUDGE` tiene los permisos de `SUPERVISOR` solo dentro de su propio mundo.
+**Usuario de consola** (`ConsoleUser`, rol `SUPERVISOR` | `OPS` | `GUEST`):
+Persona de la operadora que entra a la consola: `SUPERVISOR` ve y actúa (toma casos, hace la validación manual de evidencia); `OPS` ve y no valida; `GUEST` tiene los permisos de `SUPERVISOR` solo dentro de su propio mundo.
 _Avoid_: admin, operador (el operador es la persona de Craftech que despliega)
 
 **Marca de la demo** (`BrandConfig`, `BrandMark`):
@@ -131,7 +131,7 @@ _Avoid_: prompt (suelto), reglas del modelo
 _Avoid_: error, falla
 
 **Validación manual** (`Override`):
-Decisión de una persona con rol `SUPERVISOR` (o `JUDGE` en su mundo), desde la consola y con login reciente, que marca un ítem `OVERRIDDEN` con motivo. Es siempre humana: el agente no tiene forma de hacerla.
+Decisión de una persona con rol `SUPERVISOR` (o `GUEST` en su mundo), desde la consola y con login reciente, que marca un ítem `OVERRIDDEN` con motivo. Es siempre humana: el agente no tiene forma de hacerla.
 _Avoid_: aprobación del agente, forzar, bypass
 
 **Acta de instalación** (`Certificate`):
@@ -164,9 +164,9 @@ _Avoid_: no sé (como estado)
 Tema que el agente nunca responde, bloqueado por el guardrail G1: cambios de precio o promociones, bonificaciones o compensaciones al cliente, instrucciones eléctricas fuera del manual.
 _Avoid_: tema prohibido (en UI)
 
-**Set de evaluación** (`EvalSet`):
-50 preguntas escritas de cero sobre el manual (40 respondibles con la sección esperada, 10 fuera de alcance o riesgosas) y 60 fotos sintéticas etiquetadas, con las que se miden las métricas del agente.
-_Avoid_: dataset de pruebas (suelto), benchmark
+**Set de medición** (`EvalSet`, corridas `EV-01` y `EV-02`):
+50 preguntas escritas de cero sobre el manual (40 respondibles con la sección esperada, 10 fuera de alcance o riesgosas) y 60 fotos sintéticas etiquetadas, con las que se miden las métricas del agente. En la consola y la landing se llama **medición** ("Medición del manual", "Medición de fotos"); los identificadores internos (`EV-01`, `EvalResult`, `eval-<runId>`) no se muestran nunca (ADR-0022).
+_Avoid_: evaluación (en superficies visibles), dataset de pruebas (suelto), benchmark
 
 ### Casos y seguridad
 
@@ -205,16 +205,16 @@ _Avoid_: emergencia (no somos un servicio de emergencias), accidente
 _Avoid_: medio, vía
 
 **Transportes y modo de canal** (`ChannelModes`, `whatsappMode`):
-El stage declara qué transportes de WhatsApp existen (`ChannelModes.whatsapp.transports`: `simulated` y, con la cuenta de WhatsApp Business conectada, `live`); cada **mundo** tiene su modo (`Isps/SETTINGS.whatsappMode`): `live` solo para el **mundo vivo** (uno solo, el del operador), `simulated` para jurados, QA y evaluación. El transporte de cada envío lo decide el destinatario (teléfono real → vivo; identidad sintética → simulado). Email corre `live`. El modo cambia el transporte, nunca el flujo.
+El stage declara qué transportes de WhatsApp existen (`ChannelModes.whatsapp.transports`: `simulated` y, con la cuenta de WhatsApp Business conectada, `live`); cada **mundo** tiene su modo (`Isps/SETTINGS.whatsappMode`): `live` solo para el **mundo vivo** (uno solo, el del operador), `simulated` para invitados, QA y evaluación. El transporte de cada envío lo decide el destinatario (teléfono real → vivo; identidad sintética → simulado). Email corre `live`. El modo cambia el transporte, nunca el flujo.
 _Avoid_: feature flag, modo prueba, "pasar todo a vivo"
 
 **Mundo vivo** (`liveWorldClockId`):
-El único mundo cuyos teléfonos reales (del equipo, por `SeedOverrides`) reciben WhatsApp de verdad. Lo fija el operador; los mundos de jurado nunca lo son.
+El único mundo cuyos teléfonos reales (del equipo, por `SeedOverrides`) reciben WhatsApp de verdad. Lo fija el operador; los mundos de invitado nunca lo son.
 _Avoid_: producción
 
 **Alta por código** (`PhoneLease`, `JOINCODE#`):
-Con el canal vivo, un jurado liga su propio teléfono a una persona de su mundo mandando por WhatsApp el código de un solo uso que ve en su consola ("ALTA J07-4F2K"); dura 48 h y un teléfono solo puede estar ligado a un mundo.
-_Avoid_: registro manual, whitelist del jurado
+Con el canal vivo, un invitado liga su propio teléfono a una persona de su mundo mandando por WhatsApp el código de un solo uso que ve en su consola ("ALTA G07-4F2K"); dura 48 h y un teléfono solo puede estar ligado a un mundo.
+_Avoid_: registro manual, whitelist del invitado
 
 **Lista de permitidos** (`allowList`):
 Teléfonos registrados en `People` de instaladores y supervisores activos de la operadora. Un número fuera de la lista recibe a lo sumo una respuesta fija por día y nunca llega al agente.
@@ -225,7 +225,7 @@ Consentimiento de una persona de la lista de permitidos para recibir mensajes de
 _Avoid_: suscripción, registro (suelto)
 
 **Ventana de 24 h** (`serviceWindow`):
-Período desde el último mensaje de la persona en el que WhatsApp admite texto libre e interactivos. Fuera de la ventana solo salen **plantillas** aprobadas. Para una identidad sintética se mide con el reloj del mundo; para un teléfono real (mundo vivo o ligado por código a un mundo de jurado) con el reloj real y el último entrante real (`lastInboundAtReal`), porque Meta la mide así.
+Período desde el último mensaje de la persona en el que WhatsApp admite texto libre e interactivos. Fuera de la ventana solo salen **plantillas** aprobadas. Para una identidad sintética se mide con el reloj del mundo; para un teléfono real (mundo vivo o ligado por código a un mundo de invitado) con el reloj real y el último entrante real (`lastInboundAtReal`), porque Meta la mide así.
 _Avoid_: sesión, conversación abierta
 
 **Plantilla** (`Template`):
@@ -253,7 +253,7 @@ _Avoid_: reglas del bot
 _Avoid_: fuera de horario (suelto)
 
 **Cerco de destinatarios** (`RecipientFence`):
-Regla por mundo dentro del único cliente de SES, reforzada por IAM y al escribir una persona: en mundos de jurado, QA y evaluación solo se envía a `*@simulator.amazonses.com`; los destinatarios de demo registrados en el secreto `SeedOverrides` valen solo en el mundo vivo o de demo del operador; nunca a nuestro propio dominio (no tiene buzones), nunca a dominios reservados.
+Regla por mundo dentro del único cliente de SES, reforzada por IAM y al escribir una persona: en mundos de invitado, QA y evaluación solo se envía a `*@simulator.amazonses.com`; los destinatarios de demo registrados en el secreto `SeedOverrides` valen solo en el mundo vivo o de demo del operador; nunca a nuestro propio dominio (no tiene buzones), nunca a dominios reservados.
 _Avoid_: allowlist de emails
 
 **Violación de política** (`PolicyViolation`):
@@ -278,6 +278,64 @@ _Avoid_: kill switch de Cedar (es la segunda capa), apagar el stack
 Recordatorio breve que el agente da a un instalador según sus errores recurrentes ("tus últimas fotos de etiqueta tuvieron reflejo: apaga el flash"), sacado de la memoria de largo plazo del instalador y del perfil medido (`InstallerProfile`).
 _Avoid_: regaño, feedback
 
+### Acceso, invitados y leads
+
+**Invitado** (`GUEST`, `isGuest`, `GuestOrigin` `INVITED` | `SIGNUP` | `TEST`):
+Persona que prueba la demo en su propio mundo, con los permisos de `SUPERVISOR` solo dentro de él (ADR-0023). `INVITED`: cuentas `guest-NN` que crea el operador (credenciales solo por vía privada); `SIGNUP`: alta propia con email verificado; `TEST`: `guest-test`, el ensayo del operador y el principal `usr-qa-guest` del ejecutor. Los roles internos (`SUPERVISOR`, `OPS`) nunca nacen de un alta propia.
+_Avoid_: jurado, juez, evaluador, judge (en código, datos y superficies visibles), demo user
+
+**Alta propia** (`signup`):
+Creación de una cuenta de invitado desde `/signup`: formulario, **ticket de alta**, `SignUp` de Cognito, **código de verificación** por email y confirmación (ADR-0024). Cada alta confirmada es un **lead**.
+_Avoid_: registro (suelto; ver "Flagged ambiguities"), onboarding
+
+**Ticket de alta** (`signupTicket`):
+Credencial de 10 minutos que emite `signup.start` después de validar el formulario, los consentimientos, el dominio del email y los límites; está ligada al email y al usuario `gst-<ULID>` que genera el mismo `signup.start`, y sirve a lo sumo dos veces para ese usuario. El trigger pre-sign-up rechaza todo `SignUp` sin uno válido para ese email y ese usuario.
+_Avoid_: token de alta, captcha
+
+**Encabezado de origen** (`x-cuadrilla-origin`, secreto `OriginVerifyKey`):
+Valor secreto que CloudFront agrega a todo pedido que manda al BFF; el BFF rechaza con `403`, antes de leer nada, un pedido que no lo trae. Es lo que hace del borde (WAF incluido) la única entrada al BFF y lo que permite confiar en la IP de `CloudFront-Viewer-Address` (ADR-0024 §3).
+_Avoid_: token, API key
+
+**Clave de abuso** (`abuseHash`):
+Hash de una forma reducida del email (sin etiqueta `+…` ni puntos de Gmail) con la que se cuentan los límites del alta por persona y las cuentas por persona. No reemplaza al email del lead, que se guarda tal como lo escribió el visitante.
+_Avoid_: email normalizado (suelto)
+
+**Corte del alta** (`KILL#SIGNUP`):
+Alcance del corte de emergencia (ADR-0019) que frena las altas nuevas y el envío de códigos cuando los emails de autenticación rebotan o reciben quejas, o ante una ráfaga de altas; lo enciende `CostGuard` y solo lo apaga el operador. Protege la reputación de SES de la cuenta compartida.
+_Avoid_: bloqueo, mantenimiento
+
+**Mundo de invitado** y **generación** (`isp-guest-s<yymmdd><5>`):
+Mundo sembrado desde la plantilla `guest` que pertenece a una sola cuenta de invitado. En un alta propia, cada creación es una **generación** con operadora y reloj nuevos; la generación vigente se guarda en `Runtime/GUESTACCOUNT#<userId>`.
+_Avoid_: sandbox, tenant, copia
+
+**TTL del mundo de invitado**:
+Vida de una generación de un alta propia: 7 días reales desde su creación. Al vencer, la cuenta y el lead siguen; en el ingreso siguiente se crea una generación nueva. Los mundos `INVITED` no tienen TTL durante la ventana de sus cuentas.
+_Avoid_: expiración de la cuenta
+
+**Portada del invitado** (`/app/home`, `guest.world`):
+Primera vista después del login de un invitado: estado de su mundo (`PROVISIONING`, `READY`, `CAP_FULL`), qué tiene sembrado, qué partes de la consola están habilitadas y, solo para un invitado de alta propia, cuándo vence su mundo y "Borrar mi cuenta".
+_Avoid_: dashboard, home
+
+**Lead** (`Lead`, tabla `Leads`):
+Registro de contacto de una persona que inició (lead **pendiente**, `PENDING`: sin `status`, vence a los 7 días) o confirmó (`CONFIRMED`) un alta propia: email, nombre, empresa y cargo si los dio, idioma, consentimientos, origen y fechas (ADR-0025). Vive en una tabla propia, separada de los datos de la demo; nunca aparece en logs, bitácoras ni exportaciones de la demo. Un lead pendiente lista sus **usuarios pendientes** (`pendingUsernames`), los usuarios de Cognito sin confirmar que guardan su email, para poder borrarlos.
+_Avoid_: cliente (es el del domicilio), contacto (suelto), usuario
+
+**Consentimiento del alta** (`TERMS_PRIVACY`, `CONTACT`):
+Aceptación explícita, separada y sin tildar por defecto, guardada con fecha, versión del texto e idioma: términos y privacidad (obligatorio) y "Acepto que Craftech me contacte por esta solución" (opcional).
+_Avoid_: opt-in (es el de WhatsApp), aceptación (suelta)
+
+**Aviso de lead** (`LeadStream`, `LeadConfig`):
+Email por SES a las casillas `@craftech.io` de la configuración `LeadConfig` por cada lead confirmado, con su propio cerco (solo `@craftech.io`), distinto del cerco de destinatarios de la demo.
+_Avoid_: notificación (suelta), alerta
+
+**Superficie visible** y **guard de superficies neutrales** (`lint:neutral-surfaces`):
+Todo texto que puede leer o escuchar una persona fuera del equipo (landing, alta, consola, legales, emails, PDF, plantillas, textos del seed que ve un usuario, build y el README antes de `## Submission notes`). Ninguna nombra el concurso ni a sus evaluadores; el guard lo verifica en CI (ADR-0022).
+_Avoid_: UI (suelto)
+
+**Costura de QA** (`auth.confirmQaSignup`, `npm run qa:confirm-signup`):
+Confirmación administrativa de un alta sin leer el código, permitida solo para usuarios cuyo email en Cognito (leído con `AdminGetUser`, nunca tomado del pedido) es `success+qa-…@simulator.amazonses.com`, y auditada; la usan el ejecutor de escenarios y las verificaciones desplegadas.
+_Avoid_: bypass, backdoor
+
 ### Tiempo y mundos
 
 **Reloj de demo** (`DemoClock`, `clockId`):
@@ -289,11 +347,11 @@ Todo lo que tiene que pasar a una hora simulada: inicio del día (`DAY_START`, u
 _Avoid_: job, cron
 
 **Modo demo** (`settings.demoMode`):
-Ajuste del mundo que acorta el vencimiento de cada escalón a 60 segundos **solo mientras el reloj corre en vivo**, para que un jurado vea la escalera completa en tiempo real; con el reloj en pausa rige el vencimiento normal (10 minutos simulados), un temporizador más que "Avanzar al próximo evento" alcanza.
+Ajuste del mundo que acorta el vencimiento de cada escalón a 60 segundos **solo mientras el reloj corre en vivo**, para que un invitado vea la escalera completa en tiempo real; con el reloj en pausa rige el vencimiento normal (10 minutos simulados), un temporizador más que "Avanzar al próximo evento" alcanza.
 _Avoid_: modo rápido
 
 **Mundo** (`World`):
-Conjunto de datos con su reloj: la demo de la operadora (`GLOBAL#isp-demo`, que puede ser el mundo vivo), el mundo de cada jurado (`JUDGE#isp-judge-<nn>`, creado en su primer login desde una plantilla curada), los mundos del ejecutor de escenarios (`qa-<runId>-<escenario>`, cada uno con su operadora) y los de la evaluación (`eval-<runId>`). Reiniciar uno no toca a otro. Un teléfono es único **dentro de un mundo**: la misma persona sintética existe en muchos mundos.
+Conjunto de datos con su reloj: la demo de la operadora (`GLOBAL#isp-demo`, que puede ser el mundo vivo), el **mundo de invitado** (`GUEST#isp-guest-<nn>` de un invitado `INVITED`, creado en su primer login; `GUEST#isp-guest-s…` de un alta propia, creado al confirmar el email; los dos desde la plantilla curada `guest`), los mundos del ejecutor de escenarios (`qa-<runId>-<escenario>`, cada uno con su operadora) y los de la evaluación (`eval-<runId>`). Reiniciar uno no toca a otro. Un teléfono es único **dentro de un mundo**: la misma persona sintética existe en muchos mundos.
 _Avoid_: sandbox, tenant
 
 **Época** (`worldEpoch`):
@@ -319,11 +377,11 @@ Vista de la consola con cada email que Cuadrilla envió (acta, alertas) tal como
 _Avoid_: bandeja de entrada, inbox
 
 **Ejecutor de escenarios** (`ScenarioRunner`) y **`QaDriver`**:
-Script que recorre los flujos del catálogo contra el stage desplegado, solo con IAM y sin credenciales humanas, a través de la Lambda `QaDriver` (con principales armados en el servidor, incluido uno `JUDGE`), y asierta sobre estado persistido y bitácora. Cada paso es `det` (determinista, pasa 3 de 3) o `agent` (depende del modelo, se acepta con oráculo en ≥ 2 de 3); un paso que mezcla segmentos se divide en **partes** (`SC-18/4.a`, `SC-18/4.b`, …), cada una con su tipo, sus flujos y su dependencia, evaluadas por separado.
+Script que recorre los flujos del catálogo contra el stage desplegado, solo con IAM y sin credenciales humanas, a través de la Lambda `QaDriver` (con principales armados en el servidor, incluido uno `GUEST`), y asierta sobre estado persistido y bitácora. Cada paso es `det` (determinista, pasa 3 de 3) o `agent` (depende del modelo, se acepta con oráculo en ≥ 2 de 3); un paso que mezcla segmentos se divide en **partes** (`SC-18/4.a`, `SC-18/4.b`, …), cada una con su tipo, sus flujos y su dependencia, evaluadas por separado.
 _Avoid_: bot de pruebas
 
 **Recorrido guiado** (`Tour`):
-Pasos del jurado sobre la historia principal (orden 24817 y siguientes de Rogelio), con un botón por paso, "Saltar a escena" y glosa en inglés; tiene un recorrido **exprés** (~5 min) y uno **completo** (~15 min); la misma fuente genera las instrucciones del README y el escenario `SC-18`.
+Pasos del invitado sobre la historia principal (orden 24817 y siguientes de Rogelio), con un botón por paso, "Saltar a escena" y glosa en inglés; tiene un recorrido **exprés** (~5 min) y uno **completo** (~15 min); la misma fuente genera la sección "Guided tour" del README y el escenario `SC-18`.
 _Avoid_: tutorial
 
 ### Métricas
@@ -355,6 +413,7 @@ _Avoid_: precio
 - Un **Instalador** tiene un **Opt-in** (vigente o revocado), un perfil medido y cero o más **Órdenes de trabajo** por día; a lo sumo una es la **orden activa**.
 - Una **Orden de trabajo** tiene exactamente un **Cliente**, una **ONU**, un **Checklist de cierre** con cinco ítems, cero o más **Pasos de diagnóstico**, cero o más **Evidencias** (cada una con su **Validación**), cero o más **Casos** y, si se cerró, un **Acta**.
 - Un **Caso** pertenece a una orden y recorre la **Escalera**; mientras está tomado abre un **Puente**.
+- Un **Invitado** de alta propia tiene exactamente una cuenta de Cognito, un **Lead** y, a lo sumo, una **generación** vigente de su **Mundo de invitado**; un invitado `INVITED` tiene su mundo y ningún lead.
 - Un **Turno del agente** pertenece a un instalador y, si hay orden activa, a su sesión de memoria de esa orden.
 
 ## Example dialogue
@@ -375,4 +434,8 @@ _Avoid_: precio
 - "Alerta" se usó para el caso de seguridad y para el email: el **caso** `SAFETY` es el registro; la **alerta al jefe de zona** es el email que ese caso produce.
 - "Precisión" se usó para la coincidencia de veredictos con las etiquetas: se resolvió que esa métrica es la **exactitud** (accuracy) y que "precisión" y "cobertura" se reservan para las de `PASS`.
 - "Phone number id" se usó para dos cosas distintas: el **id de AWS** del número (envíos, media, IAM) y el **id de Meta** (eventos); siempre se dice cuál.
+- "Alta" nombraba cuatro cosas: el opt-in de WhatsApp ("ALTA"), el alta de una persona en la consola, el alta por código de un teléfono real y la cuenta que crea un visitante. Se resolvió: **opt-in** o "ALTA" para WhatsApp, **alta de persona** en la consola, **alta por código** para el teléfono ligado y **alta propia** para la cuenta de invitado.
+- "Consentimiento" se usa para el opt-in de WhatsApp (`Consent WHATSAPP_OPT_IN`) y para los del alta (`TERMS_PRIVACY`, `CONTACT`): se dice siempre cuál; el del alta vive en el lead, nunca en `People`.
+- "Invitado" (el rol `GUEST`) e "invitación" (cómo nacen las cuentas `INVITED` y los roles internos): un invitado puede venir de una invitación o de un alta propia.
+- "Evaluación" era el set con el que se mide el agente y también el contexto del concurso: en superficies visibles es **medición**; en docs internos, `EV-01`/`EV-02` y "set de medición".
 - "Modo vivo" se usó para todo el stage: se resolvió que el stage tiene **transportes** y cada **mundo** tiene su modo; solo el mundo vivo es `live`.
