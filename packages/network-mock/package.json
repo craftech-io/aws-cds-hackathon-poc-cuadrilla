@@ -1,0 +1,26 @@
+{
+  "name": "@cuadrilla/network-mock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mock of a generic network orchestrator: ONU status, optical power and behaviours driven by world events",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --root ../.. packages/network-mock"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.1135.0",
+    "@aws-sdk/lib-dynamodb": "3.1135.0",
+    "@cuadrilla/network-contract": "*",
+    "@cuadrilla/shared": "*",
+    "sst": "4.17.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.163"
+  }
+}

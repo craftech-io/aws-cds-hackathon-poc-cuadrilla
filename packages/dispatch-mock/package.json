@@ -1,0 +1,26 @@
+{
+  "name": "@cuadrilla/dispatch-mock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mock of the work-order dispatcher: work orders, reschedules and dispatch events on the Feeds bus",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --root ../.. packages/dispatch-mock"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.1135.0",
+    "@aws-sdk/client-eventbridge": "3.1135.0",
+    "@aws-sdk/lib-dynamodb": "3.1135.0",
+    "@cuadrilla/shared": "*",
+    "sst": "4.17.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.163"
+  }
+}

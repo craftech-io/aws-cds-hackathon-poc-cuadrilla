@@ -1,0 +1,1012 @@
+# One-time bootstrap of CI for aws-cds-hackathon-poc-cuadrilla (ADR-0009, docs/architecture.md §15).
+#
+# The only infrastructure that must exist BEFORE the first `sst deploy`: the deploy role GitHub
+# Actions assumes through OIDC, the qa-runner role of the scenario runner, the permissions boundary
+# of every role the app creates, the Router key-value store and the console's security headers.
+# The demos account is SHARED: every statement is fenced by tag, name, IAM path or ARN.
+# What each statement is for, residual risks, apply and verify: infra/bootstrap/README.md.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  CI bootstrap for aws-cds-hackathon-poc-cuadrilla: GitHub Actions OIDC deploy role, qa-runner role
+  and the permissions boundary applied to every IAM role the app creates. Internal Craftech scaffolding.
+
+Parameters:
+  AppName:
+    Type: String
+    Default: aws-cds-hackathon-poc-cuadrilla
+  BucketPrefix:
+    Type: String
+    Default: aws-cds-hackathon-poc-cua
+    Description: Leading characters of AppName that survive SST's truncation of bucket names (infra/ci-spec.ts).
+  DeployStage:
+    Type: String
+    Default: poc
+  AppDomain:
+    Type: String
+    Default: cuadrilla.demo.craftech.io
+  AgentNamePrefix:
+    Type: String
+    Default: aws_cds_hackathon_poc_cuadrilla
+  GitHubOrg:
+    Type: String
+    Default: craftech-io
+  GitHubRepo:
+    Type: String
+    Default: aws-cds-hackathon-poc-cuadrilla
+  DeployBranch:
+    Type: String
+    Default: main
+  GitHubOrgId:
+    Type: String
+    AllowedPattern: "^[0-9]+$"
+    ConstraintDescription: Numeric id of the GitHub organization (gh api orgs/<org> --jq .id).
+  GitHubRepoId:
+    Type: String
+    AllowedPattern: "^[0-9]+$"
+    ConstraintDescription: Numeric id of the repository (gh api repos/<org>/<repo> --jq .id).
+  CreateOidcProvider:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+  Region:
+    Type: String
+    Default: us-east-1
+  DnsZoneId:
+    Type: String
+    Default: Z043097217S4W7QWXU5O0
+  RouterCachePolicyId:
+    Type: String
+    Default: none
+    AllowedPattern: "^(none|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+  WhatsAppPhoneNumberArn:
+    Type: String
+    Default: ""
+    AllowedPattern: "^(|arn:aws:social-messaging:[a-z0-9-]+:[0-9]{12}:phone-number-id/[0-9a-f]{32})$"
+    Description: ARN of the own WhatsApp number (docs/pending.md P-01); empty until then, never a wildcard.
+
+Conditions:
+  ShouldCreateOidcProvider: !Equals [!Ref CreateOidcProvider, "true"]
+  HasWhatsAppPhoneNumber: !Not [!Equals [!Ref WhatsAppPhoneNumberArn, ""]]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+      Tags:
+        - { Key: Project, Value: !Ref AppName }
+        - { Key: Stage, Value: shared }
+        - { Key: ManagedBy, Value: cloudformation-bootstrap }
+        - { Key: Owner, Value: craftech }
+
+  RouterKeyValueStore:
+    Type: AWS::CloudFront::KeyValueStore
+    Properties:
+      Name: !Sub "${AppName}-${DeployStage}-router"
+      Comment: Router routing table, written by sst deploy through the CI deploy role.
+
+  ConsoleResponseHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "${AppName}-${DeployStage}-console"
+        Comment: CSP, HSTS, no framing, nosniff, referrer of the console, landing and legal pages.
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            ContentSecurityPolicy: !Sub "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-evidence-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-seed-${AWS::AccountId}.s3.${Region}.amazonaws.com; media-src 'self' blob: https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-evidence-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-seed-${AWS::AccountId}.s3.${Region}.amazonaws.com; font-src 'self' data:; connect-src 'self' https://cognito-idp.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+            Override: false
+          StrictTransportSecurity: { AccessControlMaxAgeSec: 31536000, IncludeSubdomains: false, Override: true }
+          ContentTypeOptions: { Override: true }
+          FrameOptions: { FrameOption: DENY, Override: true }
+          ReferrerPolicy: { ReferrerPolicy: strict-origin-when-cross-origin, Override: true }
+
+  # ---- Permissions boundary: the ceiling of every role the app creates -----------------------
+  DeployBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${AppName}-ci-boundary"
+      Description: >-
+        Ceiling of every IAM role aws-cds-hackathon-poc-cuadrilla creates: resources of the app only,
+        one region, no IAM management, no role assumption.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: TaggedAppResources
+            Effect: Allow
+            Action:
+              - bedrock:*
+              - bedrock-agentcore:*
+              - cloudwatch:*
+              - cognito-idp:*
+              - events:*
+              - lambda:*
+              - logs:*
+              - scheduler:*
+              - ses:*
+              - sns:*
+              - sqs:*
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:ResourceTag/sst:app: !Ref AppName
+          - Sid: NamedAppResources
+            Effect: Allow
+            Action:
+              - dynamodb:*
+              - s3:*
+              - s3vectors:*
+              - scheduler:*
+            Resource:
+              - !Sub "arn:${AWS::Partition}:dynamodb:${Region}:${AWS::AccountId}:table/${AppName}-*"
+              - !Sub "arn:${AWS::Partition}:s3:::${BucketPrefix}*"
+              - !Sub "arn:${AWS::Partition}:s3vectors:${Region}:${AWS::AccountId}:bucket/kb-${AppName}-*"
+              - !Sub "arn:${AWS::Partition}:scheduler:${Region}:${AWS::AccountId}:schedule/${AppName}-*/*"
+          - Sid: InvokeModels
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+              - bedrock:InvokeModelWithResponseStream
+            Resource:
+              - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
+              - !Sub "arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/*"
+          - Sid: WriteLogs
+            Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub "arn:${AWS::Partition}:logs:${Region}:${AWS::AccountId}:log-group:*"
+          - Sid: AgentWorkloadIdentity
+            Effect: Allow
+            Action: bedrock-agentcore:GetWorkloadAccessToken*
+            Resource: !Sub "arn:${AWS::Partition}:bedrock-agentcore:${Region}:${AWS::AccountId}:workload-identity-directory/default*"
+          - Sid: TranscriptionJobsOfThisApp
+            Effect: Allow
+            Action:
+              - transcribe:GetTranscriptionJob
+              - transcribe:DeleteTranscriptionJob
+            Resource: !Sub "arn:${AWS::Partition}:transcribe:${Region}:${AWS::AccountId}:transcription-job/cuadrilla-poc-*"
+          - Sid: NoResourceLevelRuntime
+            Effect: Allow
+            Action:
+              - cloudwatch:PutMetricData
+              - ecr-public:GetAuthorizationToken
+              - logs:DescribeLogGroups
+              - transcribe:StartTranscriptionJob
+              - xray:GetSamplingRules
+              - xray:GetSamplingTargets
+              - xray:PutTelemetryRecords
+              - xray:PutTraceSegments
+            Resource: "*"
+          - Sid: HarnessImagePullBearerToken
+            Effect: Allow
+            Action: sts:GetServiceBearerToken
+            Resource: "*"
+            Condition:
+              StringEquals:
+                sts:AWSServiceName: ecr-public.amazonaws.com
+          - Sid: HarnessRuntimeLogGroups
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:DescribeLogStreams
+            Resource: !Sub "arn:${AWS::Partition}:logs:${Region}:${AWS::AccountId}:log-group:/aws/bedrock-agentcore/runtimes/*"
+          - Sid: SesSendAsThisApp
+            Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+            Resource:
+              - !Sub "arn:${AWS::Partition}:ses:${Region}:${AWS::AccountId}:identity/${AppDomain}"
+              - !Sub "arn:${AWS::Partition}:ses:${Region}:${AWS::AccountId}:configuration-set/${AppName}-email-${DeployStage}"
+          - !If
+            - HasWhatsAppPhoneNumber
+            - Sid: WhatsAppOfThisNumber
+              Effect: Allow
+              Action:
+                - social-messaging:SendWhatsAppMessage
+                - social-messaging:PostWhatsAppMessageMedia
+                - social-messaging:GetWhatsAppMessageMedia
+              Resource: !Ref WhatsAppPhoneNumberArn
+            - !Ref AWS::NoValue
+          - Sid: NoResourceLevelDeployVocabularyCreate
+            Effect: Allow
+            Action:
+              - transcribe:CreateVocabulary
+              - transcribe:TagResource
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestTag/Project: !Ref AppName
+          - Sid: NoResourceLevelDeployVocabularyTagKeys
+            Effect: Allow
+            Action:
+              - transcribe:TagResource
+              - transcribe:UntagResource
+            Resource: "*"
+            Condition:
+              ForAllValues:StringEquals:
+                aws:TagKeys: [Project, Stage, ManagedBy, Owner, "sst:app", "sst:stage"]
+          - Sid: NoResourceLevelDeployVocabularyTagReads
+            Effect: Allow
+            Action: transcribe:ListTagsForResource
+            Resource: "*"
+          - Sid: VocabulariesOfThisApp
+            Effect: Allow
+            Action:
+              - transcribe:GetVocabulary
+              - transcribe:UpdateVocabulary
+              - transcribe:DeleteVocabulary
+            Resource: !Sub "arn:${AWS::Partition}:transcribe:${Region}:${AWS::AccountId}:vocabulary/cuadrilla-poc-*"
+          - Sid: PassAppRolesToScheduler
+            Effect: Allow
+            Action: iam:PassRole
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}/*"
+            Condition:
+              StringEquals:
+                iam:PassedToService: scheduler.amazonaws.com
+          - Sid: DenyOtherRegions
+            Effect: Deny
+            NotAction:
+              - bedrock:InvokeModel
+              - bedrock:InvokeModelWithResponseStream
+            Resource: "*"
+            Condition:
+              StringNotEquals:
+                aws:RequestedRegion: !Ref Region
+          - Sid: DenyIamManagementAndRoleAssumption
+            Effect: Deny
+            Action:
+              - iam:Add*
+              - iam:Attach*
+              - iam:Create*
+              - iam:Delete*
+              - iam:Detach*
+              - iam:Put*
+              - iam:Remove*
+              - iam:Set*
+              - iam:Tag*
+              - iam:Untag*
+              - iam:Update*
+              - iam:Upload*
+              - sts:AssumeRole
+              - sts:AssumeRoleWithSAML
+              - sts:AssumeRoleWithWebIdentity
+            Resource: "*"
+          - Sid: DenyPassingRolesOfOtherProjects
+            Effect: Deny
+            Action: iam:PassRole
+            NotResource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}/*"
+          - Sid: DenyAccountOrganizationAndBilling
+            Effect: Deny
+            Action:
+              - account:*
+              - aws-portal:*
+              - billing:*
+              - budgets:*
+              - organizations:*
+              - sso:*
+              - sso-directory:*
+            Resource: "*"
+
+  # ---- SST home: state, assets, bootstrap marker and passphrase of THIS app ----------------
+  DeploySstHomePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${AppName}-ci-deploy-sst-home"
+      Description: >-
+        SST home of this app: its state keys, the shared asset bucket, the bootstrap marker (read-only) and the app passphrase.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: SstBucketsList
+            Effect: Allow
+            Action:
+              - s3:GetBucketLocation
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::sst-state-*"
+              - !Sub "arn:${AWS::Partition}:s3:::sst-asset-*"
+          - Sid: SstStateOfThisApp
+            Effect: Allow
+            Action:
+              - s3:DeleteObject
+              - s3:GetObject
+              - s3:PutObject
+            Resource: !Sub "arn:${AWS::Partition}:s3:::sst-state-*/*/${AppName}/*"
+          - Sid: SstAssetObjects
+            Effect: Allow
+            Action:
+              - s3:DeleteObject
+              - s3:GetObject
+              - s3:GetObjectTagging
+              - s3:PutObject
+              - s3:PutObjectTagging
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::sst-asset-*/assets/*"
+              - !Sub "arn:${AWS::Partition}:s3:::sst-asset-*/sourcemap/*"
+          - Sid: SstBootstrapMarker
+            Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+            Resource: !Sub "arn:${AWS::Partition}:ssm:${Region}:${AWS::AccountId}:parameter/sst/bootstrap"
+          - Sid: SstPassphraseOfThisApp
+            Effect: Allow
+            Action:
+              - ssm:AddTagsToResource
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:PutParameter
+            Resource: !Sub "arn:${AWS::Partition}:ssm:${Region}:${AWS::AccountId}:parameter/sst/passphrase/${AppName}/*"
+          - Sid: DecryptPassphraseThroughSsm
+            Effect: Allow
+            Action:
+              - kms:Decrypt
+              - kms:Encrypt
+              - kms:GenerateDataKey
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub "ssm.${Region}.amazonaws.com"
+                kms:CallerAccount: !Ref AWS::AccountId
+          - Sid: CloudControlTransport
+            Effect: Allow
+            Action:
+              - cloudformation:CreateResource
+              - cloudformation:GetResource
+              - cloudformation:UpdateResource
+              - cloudformation:DeleteResource
+              - cloudformation:GetResourceRequestStatus
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !Ref Region
+
+  # ---- Resources of the app ----------------------------------------------------------------
+  DeployAppResourcesPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${AppName}-ci-deploy-app-resources"
+      Description: >-
+        Resources of this app: by sst:app tag, by name where tags cannot fence, and the few actions with no resource-level permissions.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: TaggedAppResources
+            Effect: Allow
+            Action:
+              - acm:*
+              - bedrock:*
+              - bedrock-agentcore:*
+              - cloudfront:*
+              - cloudwatch:*
+              - cognito-idp:*
+              - events:*
+              - lambda:*
+              - logs:*
+              - scheduler:*
+              - ses:*
+              - sns:*
+              - sqs:*
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !Ref Region
+                aws:ResourceTag/sst:app: !Ref AppName
+          - Sid: CreateTaggedAsThisApp
+            Effect: Allow
+            Action:
+              - acm:AddTagsToCertificate
+              - acm:RequestCertificate
+              - bedrock:CreateGuardrail
+              - bedrock:CreateKnowledgeBase
+              - bedrock:TagResource
+              - bedrock-agentcore:Create*
+              - bedrock-agentcore:TagResource
+              - cloudfront:CreateDistribution
+              - cloudfront:TagResource
+              - cloudwatch:PutMetricAlarm
+              - cloudwatch:TagResource
+              - cognito-idp:CreateUserPool
+              - cognito-idp:TagResource
+              - events:PutRule
+              - events:TagResource
+              - lambda:CreateEventSourceMapping
+              - lambda:CreateFunction
+              - lambda:TagResource
+              - logs:CreateLogGroup
+              - logs:TagResource
+              - scheduler:CreateScheduleGroup
+              - scheduler:TagResource
+              - ses:CreateConfigurationSet
+              - ses:CreateEmailIdentity
+              - ses:TagResource
+              - sns:CreateTopic
+              - sns:TagResource
+              - sqs:CreateQueue
+              - sqs:TagQueue
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !Ref Region
+                aws:RequestTag/sst:app: !Ref AppName
+          - Sid: NamedAppResources
+            Effect: Allow
+            Action:
+              - dynamodb:*
+              - s3:*
+              - s3vectors:*
+            Resource:
+              - !Sub "arn:${AWS::Partition}:dynamodb:${Region}:${AWS::AccountId}:table/${AppName}-*"
+              - !Sub "arn:${AWS::Partition}:s3:::${BucketPrefix}*"
+              - !Sub "arn:${AWS::Partition}:s3vectors:${Region}:${AWS::AccountId}:bucket/kb-${AppName}-*"
+          - Sid: SesNamedAppResources
+            Effect: Allow
+            Action:
+              - ses:ListTagsForResource
+              - ses:UntagResource
+            Resource:
+              - !Sub "arn:${AWS::Partition}:ses:${Region}:${AWS::AccountId}:identity/${AppDomain}"
+              - !Sub "arn:${AWS::Partition}:ses:${Region}:${AWS::AccountId}:configuration-set/${AppName}-email-${DeployStage}"
+          - Sid: HarnessDependentCreates
+            Effect: Allow
+            Action:
+              - bedrock-agentcore:CreateAgentRuntime
+              - bedrock-agentcore:CreateMemory
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !Ref Region
+          - Sid: HarnessUnderlyingRuntime
+            Effect: Allow
+            Action:
+              - bedrock-agentcore:CreateAgentRuntimeEndpoint
+              - bedrock-agentcore:DeleteAgentRuntime
+              - bedrock-agentcore:DeleteAgentRuntimeEndpoint
+              - bedrock-agentcore:GetAgentRuntime
+              - bedrock-agentcore:GetAgentRuntimeEndpoint
+              - bedrock-agentcore:UpdateAgentRuntime
+              - bedrock-agentcore:UpdateAgentRuntimeEndpoint
+            Resource:
+              - !Sub "arn:${AWS::Partition}:bedrock-agentcore:${Region}:${AWS::AccountId}:runtime/harness_${AgentNamePrefix}*"
+          - Sid: AgentCoreUntaggableChildren
+            Effect: Allow
+            Action:
+              - bedrock-agentcore:CreatePolicy
+              - bedrock-agentcore:DeletePolicy
+              - bedrock-agentcore:GetPolicy
+              - bedrock-agentcore:UpdatePolicy
+              - bedrock-agentcore:CreateWorkloadIdentity
+              - bedrock-agentcore:DeleteWorkloadIdentity
+              - bedrock-agentcore:GetWorkloadIdentity
+              - bedrock-agentcore:UpdateWorkloadIdentity
+            Resource:
+              - !Sub "arn:${AWS::Partition}:bedrock-agentcore:${Region}:${AWS::AccountId}:policy-engine/*/policy/*"
+              - !Sub "arn:${AWS::Partition}:bedrock-agentcore:${Region}:${AWS::AccountId}:workload-identity-directory/default*"
+          - Sid: ReadModelCatalog
+            Effect: Allow
+            Action:
+              - bedrock:GetFoundationModel
+              - bedrock:GetInferenceProfile
+            Resource:
+              - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
+              - !Sub "arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/*"
+          - Sid: NoResourceLevelDeploy
+            Effect: Allow
+            Action:
+              - bedrock:ListFoundationModels
+              - bedrock:ListInferenceProfiles
+              - cognito-idp:DescribeUserPoolDomain
+              - logs:DescribeLogGroups
+              - ses:GetAccount
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !Ref Region
+          - Sid: NoResourceLevelDeployVocabularyCreate
+            Effect: Allow
+            Action:
+              - transcribe:CreateVocabulary
+              - transcribe:TagResource
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestTag/Project: !Ref AppName
+          - Sid: NoResourceLevelDeployVocabularyTagKeys
+            Effect: Allow
+            Action:
+              - transcribe:TagResource
+              - transcribe:UntagResource
+            Resource: "*"
+            Condition:
+              ForAllValues:StringEquals:
+                aws:TagKeys: [Project, Stage, ManagedBy, Owner, "sst:app", "sst:stage"]
+          - Sid: NoResourceLevelDeployVocabularyTagReads
+            Effect: Allow
+            Action: transcribe:ListTagsForResource
+            Resource: "*"
+          - Sid: VocabulariesOfThisApp
+            Effect: Allow
+            Action:
+              - transcribe:GetVocabulary
+              - transcribe:UpdateVocabulary
+              - transcribe:DeleteVocabulary
+            Resource: !Sub "arn:${AWS::Partition}:transcribe:${Region}:${AWS::AccountId}:vocabulary/cuadrilla-poc-*"
+          - Sid: DenyRetaggingOtherApps
+            Effect: Deny
+            Action:
+              - acm:AddTagsToCertificate
+              - bedrock:TagResource
+              - bedrock-agentcore:TagResource
+              - cloudfront:TagResource
+              - cloudwatch:TagResource
+              - cognito-idp:TagResource
+              - events:TagResource
+              - lambda:TagResource
+              - logs:TagResource
+              - scheduler:TagResource
+              - ses:TagResource
+              - sns:TagResource
+              - sqs:TagQueue
+            Resource: "*"
+            Condition:
+              StringNotEquals:
+                aws:ResourceTag/sst:app: !Ref AppName
+              "Null":
+                aws:ResourceTag/sst:app: "false"
+
+  # ---- Resources of the app fenced by name: the tag is not there yet ------------------------
+  DeployNamedResourcesPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${AppName}-ci-deploy-named"
+      Description: >-
+        Resources of this app fenced by name where the provider acts before IAM can see the sst:app tag.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: SchedulerGroupsOfThisApp
+            Effect: Allow
+            Action:
+              - scheduler:GetScheduleGroup
+              - scheduler:DeleteScheduleGroup
+              - scheduler:ListTagsForResource
+              - scheduler:TagResource
+              - scheduler:UntagResource
+            Resource:
+              - !Sub "arn:${AWS::Partition}:scheduler:${Region}:${AWS::AccountId}:schedule-group/${AppName}-*"
+          - Sid: TopicsAndQueuesOfThisApp
+            Effect: Allow
+            Action:
+              - sns:CreateTopic
+              - sns:DeleteTopic
+              - sns:GetDataProtectionPolicy
+              - sns:GetSubscriptionAttributes
+              - sns:GetTopicAttributes
+              - sns:ListSubscriptionsByTopic
+              - sns:ListTagsForResource
+              - sns:PutDataProtectionPolicy
+              - sns:SetSubscriptionAttributes
+              - sns:SetTopicAttributes
+              - sns:Subscribe
+              - sns:TagResource
+              - sns:Unsubscribe
+              - sns:UntagResource
+              - sqs:CreateQueue
+              - sqs:DeleteQueue
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:ListQueueTags
+              - sqs:SetQueueAttributes
+              - sqs:TagQueue
+              - sqs:UntagQueue
+            Resource:
+              - !Sub "arn:${AWS::Partition}:sns:${Region}:${AWS::AccountId}:${AppName}-*"
+              - !Sub "arn:${AWS::Partition}:sns:${Region}:${AWS::AccountId}:${AppName}-wa-inbound"
+              - !Sub "arn:${AWS::Partition}:sqs:${Region}:${AWS::AccountId}:${AppName}-*"
+          - Sid: EventBusesOfThisApp
+            Effect: Allow
+            Action:
+              - events:CreateEventBus
+              - events:DeleteEventBus
+              - events:DescribeEventBus
+              - events:ListTagsForResource
+              - events:TagResource
+              - events:UntagResource
+            Resource: !Sub "arn:${AWS::Partition}:events:${Region}:${AWS::AccountId}:event-bus/${AppName}-*"
+          - Sid: LogGroupTagReads
+            Effect: Allow
+            Action:
+              - logs:ListTagsForResource
+              - logs:ListTagsLogGroup
+            Resource: !Sub "arn:${AWS::Partition}:logs:${Region}:${AWS::AccountId}:log-group:*"
+          - Sid: ProjectBudget
+            Effect: Allow
+            Action:
+              - budgets:ListTagsForResource
+              - budgets:ModifyBudget
+              - budgets:TagResource
+              - budgets:UntagResource
+              - budgets:ViewBudget
+            Resource: !Sub "arn:${AWS::Partition}:budgets::${AWS::AccountId}:budget/${AppName}-*"
+          - Sid: DenyPublicFunctionUrlsBesidesTheEdge
+            Effect: Deny
+            Action:
+              - lambda:AddPermission
+              - lambda:CreateFunctionUrlConfig
+              - lambda:UpdateFunctionUrlConfig
+            NotResource:
+              - !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${AppName}-${DeployStage}-BffFunction-*"
+            Condition:
+              StringEquals:
+                lambda:FunctionUrlAuthType: NONE
+
+  # ---- CloudFront parts of the Router (no tags; fences in infra/ci-spec.ts) -----------------
+  DeployEdgePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${AppName}-ci-deploy-edge"
+      Description: >-
+        CloudFront function, key-value store and cache policy of the Router of this app.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CloudFrontCreatesAndReads
+            Effect: Allow
+            Action:
+              - cloudfront:CreateCachePolicy
+              - cloudfront:CreateFunction
+              - cloudfront:DescribeKeyValueStore
+              - cloudfront:GetCachePolicy
+              - cloudfront:GetCachePolicyConfig
+              - cloudfront:ListCachePolicies
+              - cloudfront:ListOriginRequestPolicies
+              - cloudfront:ListResponseHeadersPolicies
+              - cloudfront:GetResponseHeadersPolicy
+            Resource: "*"
+          - Sid: CloudFrontFunctionsOfThisApp
+            Effect: Allow
+            Action:
+              - cloudfront:DeleteFunction
+              - cloudfront:DescribeFunction
+              - cloudfront:GetFunction
+              - cloudfront:PublishFunction
+              - cloudfront:UpdateFunction
+            Resource: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:function/${AppName}-${DeployStage}-*"
+          - Sid: RouterKeyValueStoreOfThisApp
+            Effect: Allow
+            Action: cloudfront-keyvaluestore:*
+            Resource: !GetAtt RouterKeyValueStore.Arn
+          - Sid: RouterCachePolicyOfThisApp
+            Effect: Allow
+            Action:
+              - cloudfront:DeleteCachePolicy
+              - cloudfront:UpdateCachePolicy
+            Resource: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:cache-policy/${RouterCachePolicyId}"
+          - Sid: DenyCloudFrontFunctionsOfOtherProjects
+            Effect: Deny
+            Action:
+              - cloudfront:DeleteFunction
+              - cloudfront:PublishFunction
+              - cloudfront:UpdateFunction
+            NotResource: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:function/${AppName}-${DeployStage}-*"
+          - Sid: DenyKeyValueStoresOfOtherProjects
+            Effect: Deny
+            Action: cloudfront-keyvaluestore:*
+            NotResource: !GetAtt RouterKeyValueStore.Arn
+          - Sid: DenyCachePoliciesOfOtherProjects
+            Effect: Deny
+            Action:
+              - cloudfront:DeleteCachePolicy
+              - cloudfront:UpdateCachePolicy
+            NotResource: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:cache-policy/${RouterCachePolicyId}"
+          - Sid: DenyCloudFrontPartsTheAppDoesNotOwn
+            Effect: Deny
+            Action:
+              - cloudfront:CreateKeyValueStore
+              - cloudfront:DeleteKeyValueStore
+              - cloudfront:UpdateKeyValueStore
+              - cloudfront:DeleteOriginAccessControl
+              - cloudfront:UpdateOriginAccessControl
+              - cloudfront:DeleteOriginRequestPolicy
+              - cloudfront:UpdateOriginRequestPolicy
+              - cloudfront:DeleteResponseHeadersPolicy
+              - cloudfront:UpdateResponseHeadersPolicy
+            Resource: "*"
+
+  # ---- DNS and IAM ---------------------------------------------------------------------------
+  DeployDnsAndIamPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${AppName}-ci-deploy-dns-and-iam"
+      Description: >-
+        DNS records of this app in the shared zone and IAM under the path of this app, always with the permissions boundary.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ProjectDnsRecords
+            Effect: Allow
+            Action: route53:ChangeResourceRecordSets
+            Resource: !Sub "arn:${AWS::Partition}:route53:::hostedzone/${DnsZoneId}"
+            Condition:
+              ForAllValues:StringLike:
+                route53:ChangeResourceRecordSetsNormalizedRecordNames:
+                  - !Ref AppDomain
+                  - !Sub "*.${AppDomain}"
+          - Sid: ProjectDnsZoneRead
+            Effect: Allow
+            Action:
+              - route53:GetHostedZone
+              - route53:ListResourceRecordSets
+              - route53:ListTagsForResource
+            Resource: !Sub "arn:${AWS::Partition}:route53:::hostedzone/${DnsZoneId}"
+          - Sid: DnsLookups
+            Effect: Allow
+            Action:
+              - route53:GetChange
+              - route53:ListHostedZones
+            Resource: "*"
+          - Sid: IamReadAppRolesAndPolicies
+            Effect: Allow
+            Action:
+              - iam:Get*
+              - iam:List*
+            Resource:
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}/*"
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${AppName}/*"
+          - Sid: IamCreateAppRolesWithBoundary
+            Effect: Allow
+            Action: iam:CreateRole
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}/*"
+            Condition:
+              StringEquals:
+                iam:PermissionsBoundary: !Ref DeployBoundary
+                aws:RequestTag/sst:app: !Ref AppName
+                aws:RequestTag/sst:stage: !Ref DeployStage
+          - Sid: IamEditPoliciesOfBoundedAppRoles
+            Effect: Allow
+            Action:
+              - iam:DeleteRolePolicy
+              - iam:PutRolePolicy
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}/*"
+            Condition:
+              StringEquals:
+                iam:PermissionsBoundary: !Ref DeployBoundary
+          - Sid: IamAttachKnownPoliciesToBoundedAppRoles
+            Effect: Allow
+            Action:
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}/*"
+            Condition:
+              StringEquals:
+                iam:PermissionsBoundary: !Ref DeployBoundary
+              ArnLike:
+                iam:PolicyARN:
+                  - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${AppName}/*"
+                  - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambda*"
+          - Sid: IamManageAppRoles
+            Effect: Allow
+            Action:
+              - iam:DeleteRole
+              - iam:PassRole
+              - iam:TagRole
+              - iam:UntagRole
+              - iam:UpdateAssumeRolePolicy
+              - iam:UpdateRole
+              - iam:UpdateRoleDescription
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}/*"
+          - Sid: IamManageAppPolicies
+            Effect: Allow
+            Action:
+              - iam:CreatePolicy
+              - iam:CreatePolicyVersion
+              - iam:DeletePolicy
+              - iam:DeletePolicyVersion
+              - iam:SetDefaultPolicyVersion
+              - iam:TagPolicy
+              - iam:UntagPolicy
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${AppName}/*"
+          - Sid: IamServiceLinkedRoles
+            Effect: Allow
+            Action: iam:CreateServiceLinkedRole
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/*"
+          - Sid: DenyIamUsersKeysAndLoginProfiles
+            Effect: Deny
+            Action:
+              - iam:CreateAccessKey
+              - iam:CreateLoginProfile
+              - iam:CreateUser
+              - iam:UpdateAccessKey
+              - iam:UpdateLoginProfile
+            Resource: "*"
+          - Sid: DenyIamOutsideAppPath
+            Effect: Deny
+            Action:
+              - iam:AttachRolePolicy
+              - iam:CreateRole
+              - iam:DeleteRole
+              - iam:DeleteRolePermissionsBoundary
+              - iam:DeleteRolePolicy
+              - iam:DetachRolePolicy
+              - iam:PassRole
+              - iam:PutRolePermissionsBoundary
+              - iam:PutRolePolicy
+              - iam:TagRole
+              - iam:UntagRole
+              - iam:UpdateAssumeRolePolicy
+              - iam:UpdateRole
+              - iam:UpdateRoleDescription
+              - sts:AssumeRole
+            NotResource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}/*"
+          - Sid: DenyRoleTagsOfOtherStages
+            Effect: Deny
+            Action:
+              - iam:CreateRole
+              - iam:TagRole
+            Resource: "*"
+            Condition:
+              StringNotEquals:
+                aws:RequestTag/sst:stage: !Ref DeployStage
+              "Null":
+                aws:RequestTag/sst:stage: "false"
+          - Sid: DenyBoundaryRemovalOrSwap
+            Effect: Deny
+            Action:
+              - iam:DeleteRolePermissionsBoundary
+              - iam:PutRolePermissionsBoundary
+            Resource: "*"
+          - Sid: DenyAdministrativeManagedPolicies
+            Effect: Deny
+            Action: iam:AttachRolePolicy
+            Resource: "*"
+            Condition:
+              ArnLike:
+                iam:PolicyARN:
+                  - !Sub "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess*"
+                  - !Sub "arn:${AWS::Partition}:iam::aws:policy/IAMFullAccess"
+                  - !Sub "arn:${AWS::Partition}:iam::aws:policy/PowerUserAccess"
+          - Sid: DenyChangesToBootstrapResources
+            Effect: Deny
+            NotAction:
+              - iam:Get*
+              - iam:List*
+            Resource:
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${AppName}-ci-*"
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${AppName}-ci-boundary"
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}-github-deploy"
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}-qa-runner"
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/*"
+          - Sid: DenyAccountOrganizationAndBilling
+            Effect: Deny
+            Action:
+              - account:*
+              - aws-portal:*
+              - billing:*
+              - organizations:*
+              - sso:*
+              - sso-directory:*
+            Resource: "*"
+          - Sid: DenyBudgetsOfOtherProjects
+            Effect: Deny
+            Action: budgets:*
+            NotResource: !Sub "arn:${AWS::Partition}:budgets::${AWS::AccountId}:budget/${AppName}-*"
+
+  # ---- Deploy role: fixed policies, denied any change to itself -----------------------------
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-github-deploy"
+      Description: Assumed by deploy.yml on main through OIDC to run sst deploy --stage poc. No access keys exist for this app.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: GitHubActionsDeployBranch
+            Effect: Allow
+            Principal:
+              Federated: !If
+                - ShouldCreateOidcProvider
+                - !Ref GitHubOidcProvider
+                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub:
+                  - !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${DeployBranch}"
+                  - !Sub "repo:${GitHubOrg}@${GitHubOrgId}/${GitHubRepo}@${GitHubRepoId}:ref:refs/heads/${DeployBranch}"
+                token.actions.githubusercontent.com:repository_owner_id: !Ref GitHubOrgId
+                token.actions.githubusercontent.com:repository_id: !Ref GitHubRepoId
+                token.actions.githubusercontent.com:job_workflow_ref: !Sub "${GitHubOrg}/${GitHubRepo}/.github/workflows/deploy.yml@refs/heads/${DeployBranch}"
+      ManagedPolicyArns:
+        - !Ref DeploySstHomePolicy
+        - !Ref DeployAppResourcesPolicy
+        - !Ref DeployNamedResourcesPolicy
+        - !Ref DeployEdgePolicy
+        - !Ref DeployDnsAndIamPolicy
+      Tags:
+        - { Key: Project, Value: !Ref AppName }
+        - { Key: Stage, Value: shared }
+        - { Key: ManagedBy, Value: cloudformation-bootstrap }
+        - { Key: Owner, Value: craftech }
+
+  # ---- qa-runner: invokes the QA driver of the stage and reads the app's logs (ADR-0005) -----
+  QaRunnerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-qa-runner"
+      Description: Assumed by deploy.yml and scenarios.yml on main to run the scenarios through the QA driver.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: GitHubActionsScenarioRunner
+            Effect: Allow
+            Principal:
+              Federated: !If
+                - ShouldCreateOidcProvider
+                - !Ref GitHubOidcProvider
+                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub:
+                  - !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${DeployBranch}"
+                  - !Sub "repo:${GitHubOrg}@${GitHubOrgId}/${GitHubRepo}@${GitHubRepoId}:ref:refs/heads/${DeployBranch}"
+                token.actions.githubusercontent.com:repository_owner_id: !Ref GitHubOrgId
+                token.actions.githubusercontent.com:repository_id: !Ref GitHubRepoId
+                token.actions.githubusercontent.com:job_workflow_ref:
+                  - !Sub "${GitHubOrg}/${GitHubRepo}/.github/workflows/deploy.yml@refs/heads/${DeployBranch}"
+                  - !Sub "${GitHubOrg}/${GitHubRepo}/.github/workflows/scenarios.yml@refs/heads/${DeployBranch}"
+      Policies:
+        - PolicyName: qa-runner
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: InvokeTheQaDriverOnly
+                Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${AppName}-${DeployStage}-qa-driver"
+              - Sid: ReadLogsOfThisApp
+                Effect: Allow
+                Action: logs:FilterLogEvents
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/sst:app: !Ref AppName
+              - Sid: ReadHarnessRuntimeLogs
+                Effect: Allow
+                Action: logs:FilterLogEvents
+                Resource: !Sub "arn:${AWS::Partition}:logs:${Region}:${AWS::AccountId}:log-group:/aws/bedrock-agentcore/runtimes/harness_${AgentNamePrefix}*"
+      Tags:
+        - { Key: Project, Value: !Ref AppName }
+        - { Key: Stage, Value: shared }
+        - { Key: ManagedBy, Value: cloudformation-bootstrap }
+        - { Key: Owner, Value: craftech }
+
+Outputs:
+  DeployRoleArn:
+    Description: role-to-assume of deploy.yml (repository variable AWS_DEPLOY_ROLE_ARN).
+    Value: !GetAtt DeployRole.Arn
+  QaRunnerRoleArn:
+    Description: role-to-assume of the scenario steps (repository variable AWS_QA_RUNNER_ROLE_ARN).
+    Value: !GetAtt QaRunnerRole.Arn
+  BoundaryPolicyArn:
+    Description: Permissions boundary that infra/ci.ts stamps on every IAM role of the app.
+    Value: !Ref DeployBoundary
+  AppIamPath:
+    Description: IAM path infra/ci.ts puts every role and policy of the app under.
+    Value: !Sub "/${AppName}/"
+  RouterKeyValueStoreArn:
+    Description: Routing table of the Router (infra/web.ts reads it by name).
+    Value: !GetAtt RouterKeyValueStore.Arn
+  ConsoleResponseHeadersPolicyId:
+    Description: Response headers policy of the console (infra/web.ts finds it by name).
+    Value: !Ref ConsoleResponseHeadersPolicy

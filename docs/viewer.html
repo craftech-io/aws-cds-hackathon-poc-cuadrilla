@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aws-cds-hackathon-poc-cuadrilla docs</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --panel: #ffffff; --border: #e3e0da; --fg: #1c1a17;
+    --muted: #6b6559; --accent: #1f6f5c; --code-bg: #f3f1ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181a; --panel: #1d2022; --border: #2f3437; --fg: #e6e3dd;
+      --muted: #9a958a; --accent: #4db39a; --code-bg: #22262a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg); display: flex; height: 100vh;
+    font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  nav {
+    width: 260px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 20px 0;
+  }
+  nav h1 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+    margin: 0 0 10px; padding: 0 20px; font-weight: 600;
+  }
+  nav h2 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+    margin: 22px 0 6px; padding: 0 20px; font-weight: 600;
+  }
+  nav a {
+    display: block; padding: 7px 20px; color: var(--fg); text-decoration: none;
+    font-size: 13.5px; border-left: 2px solid transparent;
+  }
+  nav a:hover { background: var(--code-bg); }
+  nav a.active { border-left-color: var(--accent); color: var(--accent); font-weight: 600; }
+  main { flex: 1; overflow-y: auto; padding: 44px 56px 100px; }
+  article { max-width: 78ch; margin: 0 auto; }
+  article h1 { font-size: 28px; margin: 0 0 22px; line-height: 1.25; text-wrap: balance; }
+  article h2 { font-size: 20px; margin: 36px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  article h3 { font-size: 16px; margin: 26px 0 8px; }
+  article code { background: var(--code-bg); padding: 2px 5px; border-radius: 3px; font-size: 13px; }
+  article pre { background: var(--code-bg); padding: 14px 16px; border-radius: 6px; overflow-x: auto; }
+  article pre code { background: none; padding: 0; }
+  article table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+  article th, article td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; }
+  article th { background: var(--code-bg); font-weight: 600; }
+  article blockquote {
+    margin: 16px 0; padding: 2px 18px; border-left: 3px solid var(--accent); color: var(--muted);
+  }
+  article a { color: var(--accent); }
+  .mermaid {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 20px; margin: 22px 0; overflow-x: auto; text-align: center;
+  }
+  .err { color: #c0392b; font-family: monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="nav"><h1>aws-cds-hackathon-poc-cuadrilla</h1></nav>
+<main><article id="content">Loading…</article></main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.4/marked.min.js"
+        integrity="sha512-VmLxPVdDGeR+F0DzUHVqzHwaR4ZSSh1g/7aYXwKT1PAGVxunOEcysta+4H5Utvmpr2xExEPybZ8q+iM9F1tGdw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.min.js"
+        integrity="sha384-aBQXj4hK6Jm05i7aQAsUV3bLdSUrHX1BGYfMB0166TtWt/RRaw+h0Eelme9OCOvy"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+const DOCS = [
+  { group: "Project",   file: "../CLAUDE.md",  label: "CLAUDE.md" },
+  { group: "Project",   file: "../CONTEXT.md", label: "CONTEXT.md" },
+  { group: "Project",   file: "../README.md",  label: "README" },
+  { group: "Design",    file: "design-brief.md",              label: "Design brief" },
+  { group: "Design",    file: "architecture.md",              label: "Architecture" },
+  { group: "Design",    file: "architecture-integrations.md", label: "Integrations" },
+  { group: "Design",    file: "flows-catalog.md",             label: "Flows catalog" },
+  { group: "Design",    file: "tool-catalog.md",              label: "Tool catalog" },
+  { group: "Design",    file: "seed-spec.md",                 label: "Seed spec" },
+  { group: "Design",    file: "test-plan.md",                 label: "Test plan" },
+  { group: "Design",    file: "build-plan.md",                label: "Build plan" },
+  { group: "Design",    file: "reuse-map.md",                 label: "Reuse map" },
+  { group: "Design",    file: "pending.md",                   label: "Pendientes" },
+  { group: "Decisions", file: "adr/0001-reuso-del-scaffolding-interno.md", label: "0001 · Reuso del scaffolding interno" },
+  { group: "Decisions", file: "adr/0002-modos-de-canal-y-enrutamiento-por-numero.md", label: "0002 · Modos de canal y enrutamiento por numero" },
+  { group: "Decisions", file: "adr/0003-sin-recepcion-de-email.md", label: "0003 · Sin recepcion de email" },
+  { group: "Decisions", file: "adr/0004-esperas-de-la-escalera-con-temporizadores.md", label: "0004 · Esperas de la escalera con temporizadores" },
+  { group: "Decisions", file: "adr/0005-manual-en-knowledge-base-sobre-s3-vectors.md", label: "0005 · Manual en knowledge base sobre s3 vectors" },
+  { group: "Decisions", file: "adr/0006-fotos-y-voces-sinteticas.md", label: "0006 · Fotos y voces sinteticas" },
+  { group: "Decisions", file: "adr/0007-ejecutor-de-escenarios-y-principal-de-qa.md", label: "0007 · Ejecutor de escenarios y principal de qa" },
+  { group: "Decisions", file: "adr/0008-neutralidad-de-marca.md", label: "0008 · Neutralidad de marca" },
+  { group: "Decisions", file: "adr/0009-rol-de-ci-por-bootstrap.md", label: "0009 · Rol de ci por bootstrap" },
+  { group: "Decisions", file: "adr/0010-reloj-de-demo-por-mundo.md", label: "0010 · Reloj de demo por mundo" },
+  { group: "Decisions", file: "adr/0011-la-validacion-manual-es-humana.md", label: "0011 · La validacion manual es humana" },
+  { group: "Decisions", file: "adr/0012-politica-de-contacto-en-codigo.md", label: "0012 · Politica de contacto en codigo" },
+  { group: "Decisions", file: "adr/0013-idiomas.md", label: "0013 · Idiomas" },
+  { group: "Decisions", file: "adr/0014-el-agente-habla-solo-por-tools.md", label: "0014 · El agente habla solo por tools" },
+  { group: "Decisions", file: "adr/0015-la-imagen-nunca-llega-al-harness.md", label: "0015 · La imagen nunca llega al harness" },
+  { group: "Decisions", file: "adr/0016-seguridad-determinista.md", label: "0016 · Seguridad determinista" },
+  { group: "Decisions", file: "adr/0017-cola-fifo-por-instalador.md", label: "0017 · Cola fifo por instalador" },
+  { group: "Decisions", file: "adr/0018-co-branding-configurable.md", label: "0018 · Co branding configurable" },
+  { group: "Decisions", file: "adr/0019-techo-de-costo-y-corte-en-runtime.md", label: "0019 · Techo de costo y corte en runtime" },
+  { group: "Decisions", file: "adr/0020-modelo-del-harness-y-presupuesto-de-latencia.md", label: "0020 · Modelo del harness y presupuesto de latencia" },
+  { group: "Decisions", file: "adr/0021-partes-de-paso-y-claves-de-oraculo.md", label: "0021 · Partes de paso y claves de oraculo" },
+  { group: "Agents",    file: "../.claude/agents/pm.md", label: "pm" },
+  { group: "Agents",    file: "../.claude/agents/architect.md", label: "architect" },
+  { group: "Agents",    file: "../.claude/agents/devops.md", label: "devops" },
+  { group: "Agents",    file: "../.claude/agents/typescript-dev.md", label: "typescript-dev" },
+  { group: "Agents",    file: "../.claude/agents/qa.md", label: "qa" },
+  { group: "Agents",    file: "../.claude/agents/security.md", label: "security" },
+  { group: "Agents",    file: "../.claude/agents/seed-generator.md", label: "seed-generator" }
+];
+
+const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+mermaid.initialize({ startOnLoad: false, theme: isDark ? "dark" : "neutral", securityLevel: "strict" });
+
+const nav = document.getElementById("nav");
+const content = document.getElementById("content");
+let seen = null;
+for (const d of DOCS) {
+  if (d.group !== seen) { const h = document.createElement("h2"); h.textContent = d.group; nav.appendChild(h); seen = d.group; }
+  const a = document.createElement("a");
+  a.textContent = d.label; a.href = "#" + d.file; a.dataset.file = d.file;
+  a.onclick = e => { e.preventDefault(); location.hash = d.file; };
+  nav.appendChild(a);
+}
+
+async function load(file) {
+  document.querySelectorAll("nav a").forEach(a => a.classList.toggle("active", a.dataset.file === file));
+  try {
+    const res = await fetch(file + "?t=" + Date.now());
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const md = await res.text();
+    // strip YAML frontmatter so agent files render cleanly
+    const body = md.replace(/^---\n[\s\S]*?\n---\n/, "");
+    content.innerHTML = marked.parse(body);
+    // turn fenced mermaid blocks into diagrams
+    const blocks = content.querySelectorAll("pre code.language-mermaid, code.language-mermaid");
+    let i = 0;
+    for (const block of blocks) {
+      const src = block.textContent;
+      const holder = document.createElement("div");
+      holder.className = "mermaid";
+      (block.closest("pre") || block).replaceWith(holder);
+      try {
+        const { svg } = await mermaid.render("d" + (i++) + "_" + Date.now(), src);
+        holder.innerHTML = svg;
+      } catch (err) {
+        holder.innerHTML = '<p class="err">Mermaid error: ' + err.message + "</p>";
+      }
+    }
+    content.parentElement.scrollTop = 0;
+  } catch (err) {
+    content.innerHTML = '<p class="err">Could not load ' + file + ": " + err.message + "</p>";
+  }
+}
+
+// The hash may only name a file this page lists. Without this the viewer fetches whatever a
+// link puts in the fragment, and the server's root is the engagement folder.
+const route = () => {
+  const asked = location.hash ? decodeURIComponent(location.hash.slice(1)) : "design-brief.md";
+  const known = DOCS.some(d => d.file === asked);
+  load(known ? asked : "design-brief.md");
+};
+window.addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>

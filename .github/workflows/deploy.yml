@@ -1,0 +1,142 @@
+# Deploys stage `poc` on every push to main. This is the only place `sst deploy` ever runs.
+#
+# Credentials come from GitHub's OIDC token exchanged for the deploy role created once by
+# infra/bootstrap/ci-role.yaml; the smoke assumes the qa-runner role of the same template. No access
+# keys exist for this app. Secrets (`sst.Secret`) must already be loaded for `poc` by the operator
+# (docs/architecture.md §15 step 3): a secret without a value stops the deploy.
+#
+# Both roles trust the `sub` of a push to main plus the numeric repository and owner ids and the
+# `job_workflow_ref` of this file. That is why the jobs declare NO `environment:`: with one, GitHub
+# emits `sub = repo:<org>/<repo>:environment:<name>` and AssumeRoleWithWebIdentity fails. The fix is
+# never a wildcard in the trust policy.
+#
+# Order (docs/architecture.md §15 step 5): the checks of ci.yml, then assume the deploy role, prove
+# who we are, deploy, load the seed (idempotent: uploads the manual and ingests the Knowledge Base
+# only when its fingerprint changed), smoke. This app never receives email, so there is no SES
+# receipt rule set to check (ADR-0003). Steps whose script is not in the repository yet print a
+# notice and pass (never the forbidden terms).
+name: Deploy poc
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+# One deploy at a time; a queued run waits instead of racing the previous one for the SST lock.
+concurrency:
+  group: deploy-poc
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  SST_TELEMETRY_DISABLED: "1"
+  AWS_REGION: us-east-1
+  APP_URL: https://cuadrilla.demo.craftech.io
+
+jobs:
+  deploy:
+    name: Checks, then sst deploy --stage poc
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout (full history, the commit messages are checked too)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: "Guard: no local-only files are committed"
+        run: |
+          offenders="$(git ls-files | grep -E '\.local\.[^/]+$' || true)"
+          if [ -n "$offenders" ]; then
+            echo "::error::Local-only files are committed (see .gitignore):"
+            echo "$offenders"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint, duplicates, typecheck and tests
+        run: |
+          npm run lint
+          npm run lint:duplicates
+          npm run typecheck
+          npm test
+
+      - name: Seed, manual, flows, tour, ownership, tool schemas, channel modes and network contract
+        run: |
+          run_if() { if [ -f "$1" ]; then npm run "$2"; else echo "::notice::$2 skipped: $1 is not in the repository yet."; fi; }
+          run_if scripts/seed/validate.ts seed:validate
+          run_if scripts/manual/check.ts manual:check
+          npm run flows:check
+          run_if scripts/tour/check.ts tour:check
+          npm run lint:wp-ownership
+          run_if packages/bff/src/agent-tools/common/build-schemas.ts tools:build-schemas
+          npm run channels:check-modes
+          run_if scripts/network/contract-check.ts network:contract
+
+      - name: Build the console
+        run: npm run build -w packages/web
+
+      - name: Forbidden terms (tree, commit messages, PDFs, photo texts, manual, seed and web build)
+        env:
+          FORBIDDEN_TERMS: ${{ secrets.FORBIDDEN_TERMS }}
+        run: |
+          npm run lint:forbidden
+          npm run lint:forbidden -- --dist
+
+      - name: Assume the deploy role (OIDC, no access keys)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN || 'arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy' }}
+          role-session-name: github-deploy-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Who am I (proves the role was assumed without access keys)
+        run: aws sts get-caller-identity
+
+      - name: Deploy stage poc
+        run: npx sst deploy --stage poc
+
+      - name: Publish the deployed URL in the run summary
+        run: |
+          {
+            echo "### Stage \`poc\` deployed"
+            echo ""
+            echo "- Console: ${APP_URL}"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Load the synthetic seed and the manual into poc (idempotent, ingests the Knowledge Base on change)
+        run: |
+          if [ ! -f scripts/seed/load.ts ]; then
+            echo "::notice::seed:load skipped: scripts/seed/load.ts is not in the repository yet (WP-39)."
+            exit 0
+          fi
+          npm run seed:load
+
+      - name: Interim smoke (until SC-00 exists)
+        if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') == '' }}
+        run: npx tsx scripts/smoke/interim.ts --base-url "${APP_URL}" --aws
+
+      - name: Assume the qa-runner role (OIDC)
+        if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') != '' }}
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_QA_RUNNER_ROLE_ARN || 'arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-qa-runner' }}
+          role-session-name: github-qa-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Smoke scenarios (SC-00)
+        if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') != '' }}
+        run: npm run scenarios -- --suite smoke

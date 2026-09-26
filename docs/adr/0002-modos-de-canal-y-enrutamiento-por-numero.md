@@ -1,0 +1,35 @@
+---
+status: accepted
+---
+
+# Transportes de WhatsApp por stage, modo por mundo y enrutamiento por número (id de Meta)
+
+WhatsApp es el corazón del producto y el objetivo del premio Best of WhatsApp, pero la WhatsApp Business Account, el número y las plantillas dependen del CTO y de Meta. Además, la otra POC de la cuenta también usa End User Messaging Social y podría compartir la WABA, cuyos eventos EUM Social publica a un único destino SNS. Y cuando el canal pase a vivo, los mundos de jurado, QA y evaluación tienen que seguir funcionando con el simulador: el premio se juzga justamente en esa configuración. Decidimos:
+
+1. **Transportes por stage**: `sst.Linkable("ChannelModes")` = `{ email: "live", whatsapp: { transports: ["simulated"] } }`; al cerrar P-01, `["simulated", "live"]`. El simulador de teléfono existe en todos los modos.
+2. **Modo por mundo**: `Isps/SETTINGS.whatsappMode` ∈ {`simulated`, `live`}. `live` solo para **un** mundo configurado por el operador (`SeedOverrides.liveWorldClockId`, p. ej. `GLOBAL#isp-demo`), registrado en el singleton `Runtime/LIVEWORLD` con escritura condicional; la fábrica de mundos rechaza `live` en mundos `JUDGE`, `QA` y `EVAL`. Los teléfonos reales de `SeedOverrides.personPhones` solo se aplican a ese mundo.
+3. **Transporte por destinatario**: sale por EUM Social solo a un teléfono real (del mundo vivo o ligado por código, punto 5); a toda identidad sintética sale por el transporte simulado. Así un jurado usa el simulador aunque el stage tenga el canal vivo.
+4. **Enrutamiento de entrada por número**, en `InboundWhatsApp`, **antes de parsear mensajes**: un sobre simulado (`sim-envelope` HMAC válido) se acepta solo si su `clockId` es de un mundo `simulated` y su `metadata.phone_number_id` es `sim-<clockId>`; un evento vivo (firma SNS válida) se acepta solo si `context.MetaPhoneNumberIds[]` contiene nuestro id de Meta con el ARN de nuestro número y cada `changes[].value.metadata.phone_number_id` es igual a `WhatsAppMetaPhoneNumberId`. El id de AWS del número (`WhatsAppPhoneNumberId`, `phone-number-id-<32 hex>`) solo se usa para enviar, bajar y subir media y en IAM; nunca en el filtro. Un evento vivo se resuelve con `PHONELEASE#<phoneHash>` (si hay un alta por código vigente) o con la clave compuesta (mundo vivo, `phoneHash`).
+5. **Teléfono real en un mundo de jurado**: el jurado ve en su consola un código de un solo uso ("ALTA J07-4F2K", 30 min); al enviarlo desde su teléfono, ese número queda ligado a su mundo como una persona de la historia durante 48 h (`Runtime/PHONELEASE#<phoneHash>`, único por teléfono, con los topes del mundo y auditado). El código prueba que el teléfono es de quien lo manda: nadie puede ligar un número ajeno.
+
+## Considered options
+
+- **Esperar la WABA**: bloquea el flujo central en algo que no controlamos.
+- **Chat web propio**: probaría otra cosa; el valor es que el instalador no instala nada.
+- **Modo global `live`/`simulated`**: al pasar a vivo se caen el simulador de todos los jurados, el `QaDriver` y la historia de la demo; y la identidad por teléfono sin acotar al mundo permitiría a un jurado registrar un teléfono real ajeno en su mundo.
+- **Confiar en que el topic solo recibe lo nuestro**: frágil si el CTO comparte la WABA.
+- **Transportes por stage + modo por mundo + transporte por destinatario + filtro por id de Meta** (elegida).
+
+## Estado
+
+- **2026-09-26 · opción A decidida** por el CTO y el orquestador (`docs/pending.md` P-01, que sigue abierto hasta tener WABA, número y plantillas): WABA propia de Cuadrilla con destino de eventos en el topic propio `aws-cds-hackathon-poc-cuadrilla-wa-inbound`.
+- **Hechos verificados** contra la documentación de AWS y Meta el mismo día, que confirman el diseño: el alta es por registro embebido en la consola de EUM Social; el destino de eventos es un topic SNS **estándar (no FIFO)** con `sns:Publish` permitido a `social-messaging.amazonaws.com`, **uno por WABA** y compartido por todos sus números, cambiable con `PutWhatsAppBusinessAccountEventDestinations`; el evento trae `context.MetaPhoneNumberIds[]` y `whatsAppWebhookEntry` como string JSON con `changes[].value.metadata.phone_number_id`, que es lo que filtra el punto 4 antes de parsear mensajes. Los límites del portfolio sin verificar (2 números, 250 usuarios por 24 h) y las opciones de número están en `docs/pending.md` §1.1.
+
+## Consequences
+
+- Dos transportes detrás de una interfaz; `channels:check-modes` falla si `live` aparece en los transportes con P-01 abierto, si una plantilla de mundo trae `whatsappMode: live` o si el ejemplo de overrides declara más de un mundo vivo.
+- Dos secretos del número: `WhatsAppPhoneNumberId` (id de AWS) y `WhatsAppMetaPhoneNumberId` (id de Meta), los dos leídos de `GetLinkedWhatsAppBusinessAccount` (P-01). `phone-filter.test.ts` falla si el filtro compara contra el id de AWS.
+- `ADDR#` pasa a ser único por mundo (`ADDR#<clockId>#<phoneHash>`); el `CONFLICT` de un alta nunca revela un teléfono de otro mundo.
+- WABA propia con topic propio (P-01, opción A, decidida el 2026-09-26; ver "Estado"). La opción B (compartir la WABA con otra POC) queda descartada; Cuadrilla nunca se suscribe al topic de otra POC ni reemplaza su destino de eventos (`waba-event-destination.ts` aborta si la WABA tiene otro destino u otros números), y el filtro por número se mantiene como defensa.
+- El filtro se prueba en `poc` sin WABA publicando en el topic propio un evento con otro número (FL-095); con P-01 cerrado, `SC-17/8` recorre el tour del jurado sobre un mundo simulado con el transporte vivo habilitado.
+- El reloj de la política es una propiedad del **transporte del destinatario**, no del modo del mundo: `CP-WA-24H` usa el reloj real y el último entrante real (`lastInboundAtReal`, del `timestamp` de Meta) para todo destinatario con transporte `live` (mundo vivo o `PHONELEASE#`); el reloj del mundo solo para identidades sintéticas. Un teléfono ligado por código a un mundo de jurado (siempre `simulated`, con el reloj en pausa entre sesiones) recibe por EUM Social, y Meta mide su ventana en tiempo real: medirla con el reloj del mundo mandaría texto libre fuera de la ventana real (error de reenganche `131047`, el jurado no recibe nada y la bitácora diría `ALLOW`). `lastInboundAtReal` se guarda en la persona (mundo vivo) o en el `PHONELEASE#` al llegar cada evento vivo. `CP-QUIET-HOURS` para destinatarios reales se evalúa con el reloj real solo en el mundo vivo; para un teléfono ligado a un mundo de jurado no se aplica (el jurado está conversando en ese momento y todo saliente nace de su recorrido), y la decisión lo registra (`CP-QUIET-HOURS` `NOT_APPLICABLE_LEASE`). Un estado vivo `failed` con el error de reenganche cae a la plantilla `UTILITY` equivalente (`respuesta_supervisor` para un relevo del supervisor, `ordenes_del_dia` para el detalle de órdenes) y queda auditado (`WINDOW_FALLBACK`).

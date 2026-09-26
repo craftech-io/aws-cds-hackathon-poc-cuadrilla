@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aviso de privacidad · Cuadrilla</title>
+<meta name="description" content="Aviso de privacidad de Cuadrilla, prueba de concepto de Craftech con datos sintéticos.">
+<style>
+:root{color-scheme:light;--navy:#0b1f3a;--cyan:#12b5d9;--cyan-deep:#0a7f99;--cyan-soft:#d8f4fa;--ink:#111a2b;--slate:#5a6a80;--mist:#e4e9f0;--paper:#f5f7fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
+.lockup{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand{font-weight:700;font-size:18px;color:#fff;white-space:nowrap}.brand span{color:var(--cyan)}
+.badge{font-size:12px;color:var(--cyan-soft)}
+main{max-width:760px;margin:24px auto;padding:0 16px}
+article{background:#fff;border:1px solid var(--mist);border-radius:12px;box-shadow:0 1px 2px rgb(11 31 58/.06),0 4px 12px rgb(11 31 58/.06);padding:28px}
+h1{font-size:26px;line-height:1.25;margin:0 0 4px;color:var(--navy)}
+h2{font-size:18px;margin:28px 0 8px;color:var(--navy)}
+p,li{margin:0 0 10px}ul{padding-left:22px}
+.muted{color:var(--slate);font-size:14px}
+.notice{background:var(--cyan-soft);border-radius:10px;padding:12px 14px;margin:16px 0}
+.table{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0 12px}
+th,td{border-bottom:1px solid var(--mist);padding:8px 10px;text-align:left;vertical-align:top}
+th{color:var(--slate);font-weight:600}
+a{color:var(--cyan-deep)}
+footer{max-width:760px;margin:0 auto 32px;padding:16px;font-size:13px;color:var(--slate)}
+.powered{display:inline-flex;align-items:center;gap:8px;margin-top:10px;color:var(--slate);text-decoration:none;font-size:12px}.powered img{display:block;height:20px;width:auto}
+</style>
+</head>
+<body>
+<header><a class="lockup" href="/legal/privacy.html"><span class="brand">Cuadrilla<span>.</span></span></a><div class="badge">Prueba de concepto · demo sintética</div></header>
+<main>
+<article>
+<h1>Aviso de privacidad</h1>
+<p class="muted">Última actualización: 26 de septiembre de 2026</p>
+
+<div class="notice"><strong>Esto es una prueba de concepto.</strong> Cuadrilla es una demo de Craftech. El manual, las políticas, los precios, las órdenes de trabajo, los instaladores y los clientes son inventados. Los mensajes solo llegan al simulador de teléfono de la consola, al simulador de buzones de Amazon SES y a destinatarios de prueba registrados por el equipo.</div>
+
+<h2>1. Qué es Cuadrilla</h2>
+<p>Cuadrilla es un copiloto de campo en WhatsApp para instaladores de fibra óptica. El instalador escribe o manda una nota de voz; el agente lee su orden de trabajo y el estado del equipo, lo guía con el manual de procedimientos de la operadora, valida las fotos de evidencia, escala a un supervisor cuando hace falta y emite el acta de instalación. La validación manual de evidencia y las decisiones de un caso son siempre de una persona.</p>
+
+<h2>2. Quién es responsable</h2>
+<p>El responsable de los datos de esta demo es <strong>Craftech</strong> (<a href="https://craftech.io">craftech.io</a>), que la opera. En un uso productivo, cada operadora es responsable de los datos de su personal y sus clientes, y Craftech actúa como encargada, siguiendo sus instrucciones.</p>
+
+<h2>3. Qué datos tratamos y para qué</h2>
+<ul>
+<li><strong>Teléfono del personal de campo</strong> (instaladores y supervisores), registrado por la operadora: para reconocer quién escribe y responder por el mismo medio. En los registros internos guardamos un identificador cifrado del teléfono, no el teléfono.</li>
+<li><strong>Consentimiento para WhatsApp</strong> (mensaje "ALTA"), con su fecha y el texto aceptado: sin él, el agente no escribe por WhatsApp.</li>
+<li><strong>Mensajes, notas de voz y fotos de evidencia</strong> de cada orden: para guiar la instalación y armar el acta. Antes de guardarse se enmascaran CURP, RFC, CLABE, tarjetas y teléfonos. Nunca pedimos documentos de identidad ni datos bancarios por chat.</li>
+<li><strong>Email del cliente</strong>, para enviarle el acta de instalación.</li>
+<li><strong>Bitácora de decisiones</strong>: qué hizo el agente, qué regla aplicó y quién intervino, para que la operadora pueda auditarlo.</li>
+</ul>
+<p>No vendemos datos ni los usamos para publicidad. No usamos cookies ni scripts de terceros en las páginas públicas.</p>
+
+<h2>4. Dónde se procesan</h2>
+<p>Los datos se procesan en Amazon Web Services, región <code>us-east-1</code> (Virginia del Norte, Estados Unidos). Esta prueba de concepto procesa exclusivamente datos sintéticos y los teléfonos de prueba del equipo.</p>
+
+<h2>5. Cómo dejar de recibir mensajes</h2>
+<ul>
+<li><strong>WhatsApp</strong>: responde <strong>BAJA</strong>. Confirmamos la baja y el agente no vuelve a escribirte por ese canal.</li>
+<li>También puedes pedírselo a la operadora que te registró.</li>
+</ul>
+
+<h2>6. Tus derechos</h2>
+<p>Puedes pedir el acceso a tus datos, su rectificación o cancelación y oponerte a su tratamiento, conforme a la legislación mexicana de protección de datos personales en posesión de los particulares, escribiendo a Craftech desde <a href="https://craftech.io">craftech.io</a>.</p>
+
+<h2>7. Inteligencia artificial</h2>
+<p>El agente usa modelos de Amazon Bedrock con reglas y controles propios: una política de contacto escrita en código, filtros de contenido y un catálogo cerrado de acciones. Toda política o procedimiento sale del manual y se cita; lo que no está en el manual no se inventa y se escala a un supervisor. Ante un riesgo físico, la instrucción de seguridad es un texto fijo del manual, nunca redactado por el modelo.</p>
+
+<h2>8. Cambios</h2>
+<p>Si este aviso cambia, publicamos la nueva versión en esta misma dirección con su fecha de actualización.</p>
+<p class="muted">Ver también los <a href="/legal/terms.html">términos y condiciones</a>.</p>
+</article>
+</main>
+<footer>Cuadrilla · Demo sintética de Craftech · <a href="/legal/privacy.html">Privacidad</a> · <a href="/legal/terms.html">Términos</a><br><a class="powered" href="https://craftech.io" rel="noopener">Powered by <img src="/brand/logo-craftech-color.svg" alt="Craftech" width="62" height="20"></a></footer>
+</body>
+</html>
