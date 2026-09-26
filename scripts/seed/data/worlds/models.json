@@ -142,7 +142,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3E1B0802",
       "opticalClass": "B+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "CLOSED",
       "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
       "window": {
@@ -256,7 +256,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3E1B0805",
       "opticalClass": "B+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "CLOSED",
       "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
       "window": {
@@ -312,7 +312,7 @@
         "emailOutcome": "success",
         "firstName": "Consuelo",
         "lastName": "Zepeda",
-        "neighborhood": "Valle Claro"
+        "neighborhood": "Valle Sereno"
       },
       "dayOffset": -1,
       "installer": {
@@ -350,7 +350,7 @@
         "emailOutcome": "success",
         "firstName": "Maribel",
         "lastName": "Galván",
-        "neighborhood": "Valle Claro"
+        "neighborhood": "Valle Sereno"
       },
       "dayOffset": -1,
       "installer": {
@@ -370,7 +370,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3E1B0808",
       "opticalClass": "C+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "CLOSED",
       "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
       "window": {
@@ -426,7 +426,7 @@
         "emailOutcome": "success",
         "firstName": "Efraín",
         "lastName": "Urías",
-        "neighborhood": "Valle Claro"
+        "neighborhood": "Valle Sereno"
       },
       "dayOffset": -1,
       "installer": {
@@ -484,7 +484,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3E1B0811",
       "opticalClass": "C+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "CLOSED",
       "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
       "window": {
@@ -502,7 +502,7 @@
         "emailOutcome": "success",
         "firstName": "Ulises",
         "lastName": "Nájera",
-        "neighborhood": "Valle Claro"
+        "neighborhood": "Valle Sereno"
       },
       "dayOffset": -1,
       "installer": {
@@ -598,7 +598,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3F2C1A11",
       "opticalClass": "B+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "SCHEDULED",
       "story": "Ladder and bridge",
       "window": {
@@ -713,7 +713,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3F2C2D15",
       "opticalClass": "B+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "SCHEDULED",
       "story": "Label with another serial (DEMO3F2C9999)",
       "window": {
@@ -826,7 +826,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3F2C3B12",
       "opticalClass": "C+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "SCHEDULED",
       "story": "Bounced certificate",
       "window": {
@@ -844,7 +844,7 @@
         "emailOutcome": "complaint",
         "firstName": "Consuelo",
         "lastName": "Arriaga",
-        "neighborhood": "Valle Claro"
+        "neighborhood": "Valle Sereno"
       },
       "dayOffset": 0,
       "installer": {
@@ -902,7 +902,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3F2C3D34",
       "opticalClass": "C+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "SCHEDULED",
       "story": "In range in C+, out of range in B+ (class test)",
       "window": {
@@ -940,7 +940,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3F2C4A05",
       "opticalClass": "B+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "SCHEDULED",
       "story": "No opt-in: day start denied",
       "window": {
@@ -958,7 +958,7 @@
         "emailOutcome": "success",
         "firstName": "Alma",
         "lastName": "Zepeda",
-        "neighborhood": "Valle Claro"
+        "neighborhood": "Valle Sereno"
       },
       "dayOffset": 0,
       "installer": {
@@ -1016,7 +1016,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3F2C4C27",
       "opticalClass": "B+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "SCHEDULED",
       "story": "ORDER_CHOICE list (Karina's four orders)",
       "window": {
@@ -1092,7 +1092,7 @@
       "onuModel": "ONU-G1 genérica",
       "onuSerial": "DEMO3F2C5B12",
       "opticalClass": "B+",
-      "plan": "Fibra 100",
+      "plan": "Fibra 200",
       "status": "SCHEDULED",
       "story": "Tomorrow's order",
       "window": {

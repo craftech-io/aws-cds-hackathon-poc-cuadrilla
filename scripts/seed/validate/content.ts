@@ -5,7 +5,7 @@ import { DEFAULT_OPERATOR_NAME } from "../../../packages/bff/src/copy/brand";
 import { checkManual } from "../../manual/check";
 import { findTerms, parseTerms } from "../../lint/forbidden-terms";
 import { allVoiceTexts } from "../audio/texts";
-import { NAME_CHECKS, pendingWebSearches } from "../generate/namecheck";
+import { NAME_CHECKS, orphanSearches, pendingWebSearches } from "../generate/namecheck";
 import { parseOutcome } from "../lib/questions";
 import { SEED_TABLES } from "../lib/tables";
 import { containsPhrase, ngramsOf, stringsOf } from "../lib/text";
@@ -65,6 +65,7 @@ function namesAndTerms(bundle: SeedBundle, env: CheckEnv): Finding {
   }
   const checked = new Set(bundle.tables.Reference.filter((item) => item.entity === "NameCheck").map((item) => String(item.term)));
   for (const check of NAME_CHECKS) if (!checked.has(check.term)) errors.push(`NAMECHECK has no row for "${check.term}"`);
+  for (const term of orphanSearches()) errors.push(`NAMECHECK: searches recorded for "${term}", a name the seed does not use`);
   for (const world of worldsOf(bundle)) {
     const names = [...entities(world, "Isps", "Isp").map((isp) => String(isp.cityName)), ...entities(world, "People", "Customer").map((customer) => String(customer.neighborhood)), ...entities(world, "WorkOrders", "WorkOrder").map((order) => String(order.plan))];
     for (const name of new Set(names)) if (!checked.has(name)) errors.push(`${world.name}: "${name}" has no NAMECHECK row`);

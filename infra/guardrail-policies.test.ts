@@ -225,7 +225,7 @@ describe("PII: G1 is the second layer of the normalizer, G3 is PII only", () => 
       "Orden 24817 (wo-24817, wo-24817-j03), cliente cust-10421, operadora isp-judge-07, instalador inst-rogelio",
       "Potencia −22,8 dBm a 1490 nm, clase B+ (de −8 a −25 dBm), puerto OLT-N3/1/4",
       "Manual v1, §DIAG-02 y §COM-04; foto ph-label-06, nota vn-01, pregunta q-A-14",
-      "hoy 11:30 a 13:30 · 2026-10-13T09:20:00-06:00 · Fibra 100",
+      "hoy 11:30 a 13:30 · 2026-10-13T09:20:00-06:00 · Fibra 200",
     ];
     for (const fact of facts) for (const key of ["g1", "g3"] as const) expect(fires(key, fact), `${key}: ${fact}`).toBe(false);
   });

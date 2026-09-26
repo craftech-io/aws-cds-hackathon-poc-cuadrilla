@@ -3493,98 +3493,248 @@
     {
       "PK": "REF#NAMECHECK#GLOBAL",
       "SK": "+52 55 0101 00xx",
-      "basis": "Mexico City number whose local part starts with 0, outside the subscriber numbering of the national plan; nothing is ever sent to it",
+      "basis": "Mexico City number in 55 0000 0000-55 0999 9999, a range where the IFT's published numbering plan assigns no block to any provider; nothing is ever sent to it",
       "checkedAt": "2026-09-26",
       "createdAt": "2026-09-26T00:00:00.000Z",
       "entity": "NameCheck",
       "kind": "PHONE_BLOCK",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "The plan of 1996 excluded local numbers starting with 0 (c ≠ 0 in the 8-digit local numbers of Mexico City); the plan in force since 3 August 2019 (DOF 11/05/2018) replaced local numbers with 10-digit national numbers",
+          "query": "Plan Técnico Fundamental de Numeración IFT número local primer dígito no podrá ser 0",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "ITU communication of Mexico of 5.VII.2024: national numbers A b c d e f g h i j with A = 2-9, b = 1-9 and c-j = 0-9, so 55 0… is well formed today; the block is safe because no provider holds it (next check), not because of its shape",
+          "query": "ITU national numbering plan Mexico +52 communication T0202 pdf",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "None. Of 178,172 geographic blocks, 13,460 are in zone 55 and the lowest starts at 55 1000 0000: no provider holds any number in 55 0000 0000-55 0999 9999. Read from a public normalized copy of that publication (the SNS portal serves the file only through its download form)",
+          "query": "IFT Plan Nacional de Numeración, publication of 05/09/2026: geographic blocks overlapping 55 0101 0000-55 0101 0099",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "8,314 series in NIR 55, the lowest 1000 (55 1000 xxxx): no series starting with 0 then either",
+          "query": "IFT numbering plan snapshot of 2022-06-12: series of NIR 55",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "+52 55 0101 00xx",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
       "SK": "+52 55 0102 00xx",
-      "basis": "Mexico City number whose local part starts with 0, outside the subscriber numbering of the national plan; nothing is ever sent to it",
+      "basis": "Mexico City number in 55 0000 0000-55 0999 9999, a range where the IFT's published numbering plan assigns no block to any provider; nothing is ever sent to it",
       "checkedAt": "2026-09-26",
       "createdAt": "2026-09-26T00:00:00.000Z",
       "entity": "NameCheck",
       "kind": "PHONE_BLOCK",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "The plan of 1996 excluded local numbers starting with 0 (c ≠ 0 in the 8-digit local numbers of Mexico City); the plan in force since 3 August 2019 (DOF 11/05/2018) replaced local numbers with 10-digit national numbers",
+          "query": "Plan Técnico Fundamental de Numeración IFT número local primer dígito no podrá ser 0",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "ITU communication of Mexico of 5.VII.2024: national numbers A b c d e f g h i j with A = 2-9, b = 1-9 and c-j = 0-9, so 55 0… is well formed today; the block is safe because no provider holds it (next check), not because of its shape",
+          "query": "ITU national numbering plan Mexico +52 communication T0202 pdf",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "None. Of 178,172 geographic blocks, 13,460 are in zone 55 and the lowest starts at 55 1000 0000: no provider holds any number in 55 0000 0000-55 0999 9999. Read from a public normalized copy of that publication (the SNS portal serves the file only through its download form)",
+          "query": "IFT Plan Nacional de Numeración, publication of 05/09/2026: geographic blocks overlapping 55 0102 0000-55 0102 0099",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "8,314 series in NIR 55, the lowest 1000 (55 1000 xxxx): no series starting with 0 then either",
+          "query": "IFT numbering plan snapshot of 2022-06-12: series of NIR 55",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "+52 55 0102 00xx",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
       "SK": "+52 55 0103 0xxx",
-      "basis": "Mexico City number whose local part starts with 0, outside the subscriber numbering of the national plan; nothing is ever sent to it",
+      "basis": "Mexico City number in 55 0000 0000-55 0999 9999, a range where the IFT's published numbering plan assigns no block to any provider; nothing is ever sent to it",
       "checkedAt": "2026-09-26",
       "createdAt": "2026-09-26T00:00:00.000Z",
       "entity": "NameCheck",
       "kind": "PHONE_BLOCK",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "The plan of 1996 excluded local numbers starting with 0 (c ≠ 0 in the 8-digit local numbers of Mexico City); the plan in force since 3 August 2019 (DOF 11/05/2018) replaced local numbers with 10-digit national numbers",
+          "query": "Plan Técnico Fundamental de Numeración IFT número local primer dígito no podrá ser 0",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "ITU communication of Mexico of 5.VII.2024: national numbers A b c d e f g h i j with A = 2-9, b = 1-9 and c-j = 0-9, so 55 0… is well formed today; the block is safe because no provider holds it (next check), not because of its shape",
+          "query": "ITU national numbering plan Mexico +52 communication T0202 pdf",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "None. Of 178,172 geographic blocks, 13,460 are in zone 55 and the lowest starts at 55 1000 0000: no provider holds any number in 55 0000 0000-55 0999 9999. Read from a public normalized copy of that publication (the SNS portal serves the file only through its download form)",
+          "query": "IFT Plan Nacional de Numeración, publication of 05/09/2026: geographic blocks overlapping 55 0103 0000-55 0103 0999",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "8,314 series in NIR 55, the lowest 1000 (55 1000 xxxx): no series starting with 0 then either",
+          "query": "IFT numbering plan snapshot of 2022-06-12: series of NIR 55",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "+52 55 0103 0xxx",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
       "SK": "+52 55 0199 0001",
-      "basis": "Mexico City number whose local part starts with 0, outside the subscriber numbering of the national plan; nothing is ever sent to it",
+      "basis": "Mexico City number in 55 0000 0000-55 0999 9999, a range where the IFT's published numbering plan assigns no block to any provider; nothing is ever sent to it",
       "checkedAt": "2026-09-26",
       "createdAt": "2026-09-26T00:00:00.000Z",
       "entity": "NameCheck",
       "kind": "PHONE_BLOCK",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "The plan of 1996 excluded local numbers starting with 0 (c ≠ 0 in the 8-digit local numbers of Mexico City); the plan in force since 3 August 2019 (DOF 11/05/2018) replaced local numbers with 10-digit national numbers",
+          "query": "Plan Técnico Fundamental de Numeración IFT número local primer dígito no podrá ser 0",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "ITU communication of Mexico of 5.VII.2024: national numbers A b c d e f g h i j with A = 2-9, b = 1-9 and c-j = 0-9, so 55 0… is well formed today; the block is safe because no provider holds it (next check), not because of its shape",
+          "query": "ITU national numbering plan Mexico +52 communication T0202 pdf",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "None. Of 178,172 geographic blocks, 13,460 are in zone 55 and the lowest starts at 55 1000 0000: no provider holds any number in 55 0000 0000-55 0999 9999. Read from a public normalized copy of that publication (the SNS portal serves the file only through its download form)",
+          "query": "IFT Plan Nacional de Numeración, publication of 05/09/2026: geographic blocks overlapping 55 0199 0001",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "8,314 series in NIR 55, the lowest 1000 (55 1000 xxxx): no series starting with 0 then either",
+          "query": "IFT numbering plan snapshot of 2022-06-12: series of NIR 55",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "+52 55 0199 0001",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
       "SK": "+52 55 02nn 0xxx",
-      "basis": "Mexico City number whose local part starts with 0, outside the subscriber numbering of the national plan; nothing is ever sent to it",
+      "basis": "Mexico City number in 55 0000 0000-55 0999 9999, a range where the IFT's published numbering plan assigns no block to any provider; nothing is ever sent to it",
       "checkedAt": "2026-09-26",
       "createdAt": "2026-09-26T00:00:00.000Z",
       "entity": "NameCheck",
       "kind": "PHONE_BLOCK",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "The plan of 1996 excluded local numbers starting with 0 (c ≠ 0 in the 8-digit local numbers of Mexico City); the plan in force since 3 August 2019 (DOF 11/05/2018) replaced local numbers with 10-digit national numbers",
+          "query": "Plan Técnico Fundamental de Numeración IFT número local primer dígito no podrá ser 0",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "ITU communication of Mexico of 5.VII.2024: national numbers A b c d e f g h i j with A = 2-9, b = 1-9 and c-j = 0-9, so 55 0… is well formed today; the block is safe because no provider holds it (next check), not because of its shape",
+          "query": "ITU national numbering plan Mexico +52 communication T0202 pdf",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "None. Of 178,172 geographic blocks, 13,460 are in zone 55 and the lowest starts at 55 1000 0000: no provider holds any number in 55 0000 0000-55 0999 9999. Read from a public normalized copy of that publication (the SNS portal serves the file only through its download form)",
+          "query": "IFT Plan Nacional de Numeración, publication of 05/09/2026: geographic blocks overlapping 55 0200 0000-55 0299 0999",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "8,314 series in NIR 55, the lowest 1000 (55 1000 xxxx): no series starting with 0 then either",
+          "query": "IFT numbering plan snapshot of 2022-06-12: series of NIR 55",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "+52 55 02nn 0xxx",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
       "SK": "+52 55 09xx xxxx",
-      "basis": "Mexico City number whose local part starts with 0, outside the subscriber numbering of the national plan; nothing is ever sent to it",
+      "basis": "Mexico City number in 55 0000 0000-55 0999 9999, a range where the IFT's published numbering plan assigns no block to any provider; nothing is ever sent to it",
       "checkedAt": "2026-09-26",
       "createdAt": "2026-09-26T00:00:00.000Z",
       "entity": "NameCheck",
       "kind": "PHONE_BLOCK",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "The plan of 1996 excluded local numbers starting with 0 (c ≠ 0 in the 8-digit local numbers of Mexico City); the plan in force since 3 August 2019 (DOF 11/05/2018) replaced local numbers with 10-digit national numbers",
+          "query": "Plan Técnico Fundamental de Numeración IFT número local primer dígito no podrá ser 0",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "ITU communication of Mexico of 5.VII.2024: national numbers A b c d e f g h i j with A = 2-9, b = 1-9 and c-j = 0-9, so 55 0… is well formed today; the block is safe because no provider holds it (next check), not because of its shape",
+          "query": "ITU national numbering plan Mexico +52 communication T0202 pdf",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "None. Of 178,172 geographic blocks, 13,460 are in zone 55 and the lowest starts at 55 1000 0000: no provider holds any number in 55 0000 0000-55 0999 9999. Read from a public normalized copy of that publication (the SNS portal serves the file only through its download form)",
+          "query": "IFT Plan Nacional de Numeración, publication of 05/09/2026: geographic blocks overlapping 55 0900 0000-55 0999 9999",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "8,314 series in NIR 55, the lowest 1000 (55 1000 xxxx): no series starting with 0 then either",
+          "query": "IFT numbering plan snapshot of 2022-06-12: series of NIR 55",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "+52 55 09xx xxxx",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3595,12 +3745,25 @@
       "entity": "NameCheck",
       "kind": "NEIGHBORHOOD",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "Common toponym ('groves') of colonias in several Mexican states; used only inside the fictitious city, without postal code",
+          "query": "\"Arboledas\" colonia México internet fibra",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No ISP or telecom brand of that name; also the name of municipalities in Colombia and Argentina, unrelated to the demo",
+          "query": "\"Arboledas\" OR \"Arboledas Telecom\" proveedor internet ISP",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "Arboledas",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3611,12 +3774,37 @@
       "entity": "NameCheck",
       "kind": "CITY",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "No Mexican city, municipality or locality of that name; only the title of a 2016 concert, a coastline and neighbourhoods named Esmeralda",
+          "query": "\"Ciudad Esmeralda\" México",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No ISP or telecom brand of that name; only ISPs of Brazilian places named Esmeralda or Esmeraldas",
+          "query": "\"Ciudad Esmeralda\" internet fibra óptica",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "Only subdivisions named Esmeralda in several states; none called Ciudad Esmeralda",
+          "query": "\"Ciudad Esmeralda\" fraccionamiento OR colonia OR municipio",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "A nickname of a US city and the title of press columns; the Ecuadorian city is Esmeraldas. No city is officially called Ciudad Esmeralda, and the console labels it fictitious",
+          "query": "\"la Ciudad Esmeralda\" apodo ciudad Colombia Ecuador Seattle",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "Ciudad Esmeralda",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3627,12 +3815,25 @@
       "entity": "NameCheck",
       "kind": "SERIAL_PREFIX",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "A GPON serial is a 4-character vendor id plus 8 hex digits; the public list of known ONU vendor ids has no DEMO",
+          "query": "GPON ONU serial number vendor ID list 4 letters",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No manufacturer or operator uses DEMO as a vendor id; only generic explanations of the serial format",
+          "query": "\"DEMO\" GPON vendor id ONU serial",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "DEMO",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3643,28 +3844,60 @@
       "entity": "NameCheck",
       "kind": "NEIGHBORHOOD",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "Common toponym ('lookout') of colonias in many municipalities; used only inside the fictitious city, without postal code",
+          "query": "\"El Mirador\" colonia México código postal",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No ISP or telecom brand of that name",
+          "query": "\"El Mirador\" internet ISP telecom fibra México",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "El Mirador",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
-      "SK": "Fibra 100",
+      "SK": "Fibra 200",
       "basis": "Generic plan name of the fictitious operator; no price is ever attached",
       "checkedAt": "2026-09-26",
       "createdAt": "2026-09-26T00:00:00.000Z",
       "entity": "NameCheck",
       "kind": "PLAN",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "No company named Fibra 200. It replaces an earlier plan name that is also the trade name of an ISP",
+          "query": "\"Fibra 200\" internet proveedor OR provedor OR empresa",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "Generic descriptive plan name (fiber + speed) used by several unrelated operators in different countries; not owned by a single company",
+          "query": "\"Fibra 200\" plan internet megas",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No company, brand or site named after these plan names",
+          "query": "\"fibra200\" OR \"fibra300\" OR \"fibra500\" empresa internet sitio",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
-      "term": "Fibra 100",
+      "term": "Fibra 200",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3675,12 +3908,37 @@
       "entity": "NameCheck",
       "kind": "PLAN",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "Generic descriptive plan name (fiber + speed) used by several unrelated operators in Spain and Latin America; not owned by a single company",
+          "query": "\"Fibra 300\" plan internet hogar",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No company named Fibra 300; only plans of several operators",
+          "query": "\"Fibra 300\" provedor OR empresa OR ISP nombre",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No ISP named Fibra 300 or Fibra 500 in Brazil or Mexico; both appear only as speed tiers in the plans of several unrelated operators",
+          "query": "\"Fibra 300\" OR \"Fibra 500\" nombre de empresa proveedor internet Brasil México",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No company, brand or site named after these plan names",
+          "query": "\"fibra200\" OR \"fibra300\" OR \"fibra500\" empresa internet sitio",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "Fibra 300",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3691,12 +3949,37 @@
       "entity": "NameCheck",
       "kind": "PLAN",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "Generic descriptive plan name (fiber + speed) used by several unrelated operators in Spain and Latin America; not owned by a single company",
+          "query": "\"Fibra 500\" plan internet megas",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No company named Fibra 500; only 500-Mbps plans of several operators",
+          "query": "\"Fibra 500\" provedor internet empresa",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No ISP named Fibra 300 or Fibra 500 in Brazil or Mexico; both appear only as speed tiers in the plans of several unrelated operators",
+          "query": "\"Fibra 300\" OR \"Fibra 500\" nombre de empresa proveedor internet Brasil México",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No company, brand or site named after these plan names",
+          "query": "\"fibra200\" OR \"fibra300\" OR \"fibra500\" empresa internet sitio",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "Fibra 500",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3707,12 +3990,25 @@
       "entity": "NameCheck",
       "kind": "NEIGHBORHOOD",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "Common toponym ('little hills') of colonias in several Mexican states; the seed uses it only inside the fictitious city, without postal code, so it points to no real address",
+          "query": "\"Las Lomitas\" colonia México",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No ISP, telecom brand or product of that name",
+          "query": "\"Las Lomitas\" internet proveedor fibra telecom",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "Las Lomitas",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3723,12 +4019,25 @@
       "entity": "NameCheck",
       "kind": "NEIGHBORHOOD",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "Common toponym ('the oaks') of colonias in several Mexican states; the seed uses it only inside the fictitious city, without postal code, so it points to no real address",
+          "query": "\"Los Encinos\" colonia México",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No ISP, telecom brand or product of that name",
+          "query": "\"Los Encinos\" internet ISP telecom fibra",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "Los Encinos",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3739,12 +4048,43 @@
       "entity": "NameCheck",
       "kind": "EQUIPMENT_MODEL",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "No ONU or ONT model of that name; only generic 1-port GPON ONUs sold under other model names",
+          "query": "\"ONU-G1\" GPON",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No product of that name in Spanish-language catalogues or stores",
+          "query": "\"ONU-G1\" router fibra óptica modelo",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No manufacturer lists a model named ONU G1",
+          "query": "\"ONU G1\" fiber optic terminal model manufacturer",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "Only unrelated uses of G1 and of ONU (United Nations in Spanish); no equipment",
+          "query": "\"ONU-G1\"",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "ONU-G is a managed entity of the ITU-T OMCI recommendation, a standard term and not a product: the synthetic model reads as generic",
+          "query": "ITU-T G.988 \"ONU-G\" managed entity OMCI",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "ONU-G1",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3755,12 +4095,25 @@
       "entity": "NameCheck",
       "kind": "EQUIPMENT_MODEL",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "OPM is the generic abbreviation of optical power meter; several manufacturers use it as the prefix of numbered models and none sells a model named just OPM",
+          "query": "\"OPM\" optical power meter model fiber",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "Same in Spanish-language catalogues: OPM names the category, every model carries a number or a brand",
+          "query": "\"OPM\" medidor de potencia óptica marca modelo",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
       "term": "OPM",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
@@ -3828,19 +4181,38 @@
     },
     {
       "PK": "REF#NAMECHECK#GLOBAL",
-      "SK": "Valle Claro",
+      "SK": "Valle Sereno",
       "basis": "Generic invented neighborhood of the fictitious city, no postal code",
       "checkedAt": "2026-09-26",
       "createdAt": "2026-09-26T00:00:00.000Z",
       "entity": "NameCheck",
       "kind": "NEIGHBORHOOD",
       "result": "CLEAR",
-      "searches": [],
+      "searches": [
+        {
+          "date": "2026-09-26",
+          "finding": "No Mexican colonia of that name. It replaces the earlier name of this neighborhood, which carried the brand of a Latin American telecom operator",
+          "query": "\"Valle Sereno\" México colonia",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "Residential developments outside Mexico, an apartment complex and a textile firm; no ISP, telecom brand or Mexican place",
+          "query": "\"Valle Sereno\"",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        },
+        {
+          "date": "2026-09-26",
+          "finding": "No ISP or telecom brand of that name",
+          "query": "\"Valle Sereno\" internet telecom fibra ISP",
+          "recordedIn": "scripts/seed/generate/namecheck-searches.ts"
+        }
+      ],
       "synthetic": true,
-      "term": "Valle Claro",
+      "term": "Valle Sereno",
       "updatedAt": "2026-09-26T00:00:00.000Z",
       "version": 1,
-      "webSearch": "PENDING"
+      "webSearch": "RECORDED"
     },
     {
       "PK": "REF#RATECARD#GLOBAL",

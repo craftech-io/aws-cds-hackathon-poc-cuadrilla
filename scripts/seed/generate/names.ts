@@ -13,7 +13,7 @@ export const NEIGHBORHOODS = {
   Arboledas: "zone-norte",
   "El Mirador": "zone-norte",
   "Los Encinos": "zone-sur",
-  "Valle Claro": "zone-sur",
+  "Valle Sereno": "zone-sur",
 } as const;
 export type Neighborhood = keyof typeof NEIGHBORHOODS;
 
@@ -140,5 +140,5 @@ export const CUSTOMER_FIRST_NAMES = FIRST_NAMES.slice(FIRST_NAMES.indexOf("Alma"
 export const CUSTOMER_LAST_NAMES = LAST_NAMES.slice(LAST_NAMES.indexOf("Arriaga"));
 
 /** Plans of the demo operator: fictitious names, never a real commercial offer. */
-export const PLANS = ["Fibra 100", "Fibra 300", "Fibra 500"] as const;
+export const PLANS = ["Fibra 200", "Fibra 300", "Fibra 500"] as const;
 export type Plan = (typeof PLANS)[number];

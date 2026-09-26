@@ -90,7 +90,7 @@ Usuarios de consola: `usr-adriana` (`SUPERVISOR`), `usr-ops-lina` (Lina Carranza
 
 ## 6. Clientes
 
-42 clientes `cust-10401..10442` (nombres y apellidos comunes, combinados por el generador desde listas cortas; ningún nombre compuesto de persona pública), domicilio con calle de nombre de árbol o flor, número y colonia inventada ("Las Lomitas", "Arboledas", "El Mirador", "Los Encinos", "Valle Claro"), sin código postal. Teléfono en el bloque de §2 (nunca se muestra completo) y email del simulador de SES. Excepciones: `cust-10431` con `bounce+c10431@simulator.amazonses.com` (FL-051) y `cust-10432` con `complaint+c10432@simulator.amazonses.com`. `cust-10421` es Lucía Treviño (historia principal). La nota interna de `cust-10425` incluye un CURP sintético con formato válido y dígito verificador inventado, para probar el filtrado del acta (FL-053).
+42 clientes `cust-10401..10442` (nombres y apellidos comunes, combinados por el generador desde listas cortas; ningún nombre compuesto de persona pública), domicilio con calle de nombre de árbol o flor, número y colonia inventada ("Las Lomitas", "Arboledas", "El Mirador", "Los Encinos", "Valle Sereno"), sin código postal. Teléfono en el bloque de §2 (nunca se muestra completo) y email del simulador de SES. Excepciones: `cust-10431` con `bounce+c10431@simulator.amazonses.com` (FL-051) y `cust-10432` con `complaint+c10432@simulator.amazonses.com`. `cust-10421` es Lucía Treviño (historia principal). La nota interna de `cust-10425` incluye un CURP sintético con formato válido y dígito verificador inventado, para probar el filtrado del acta (FL-053).
 
 ## 7. Órdenes de trabajo
 
@@ -99,18 +99,18 @@ Todas: operadora `isp-demo`, modelo de ONU "ONU-G1 genérica", fecha 13/10 salvo
 | Orden | Instalador | Cliente | Plan · ventana | ONU · puerto | Comportamiento | Historia / flujos |
 |---|---|---|---|---|---|---|
 | `wo-24817` | Rogelio | `cust-10421` Lucía Treviño, Calle Jacaranda 214, Col. Las Lomitas | Fibra 300 · 09:00-11:00 | `DEMO3F2C19A0` · OLT-N3/1/4 | `LOS_THEN_ONLINE` (−21,4) | Historia principal: voz, diagnóstico, política, fotos, acta |
-| `wo-24818` | Rogelio | `cust-10422` Armando Guzmán, Av. Los Fresnos 88, Col. Arboledas | Fibra 100 · 11:30-13:30 | `DEMO3F2C1A11` · OLT-N3/1/6 | `LOW_POWER_THEN_OK` | Escalera y puente |
+| `wo-24818` | Rogelio | `cust-10422` Armando Guzmán, Av. Los Fresnos 88, Col. Arboledas | Fibra 200 · 11:30-13:30 | `DEMO3F2C1A11` · OLT-N3/1/6 | `LOW_POWER_THEN_OK` | Escalera y puente |
 | `wo-24819` | Rogelio | `cust-10423` Rosa Elena Pineda, Privada Olmo 12, Col. El Mirador | Fibra 500 · 15:00-17:00 | `DEMO3F2C1B27` · OLT-N3/2/1 | `ONLINE_OK` (−20,6) | Seguridad |
 | `wo-24820` | Karina | `cust-10424` | Fibra 300 · 09:00-11:00 | `DEMO3F2C2C04` | `ONLINE_OK` (−20,2) | Tres rechazos de etiqueta → `PHOTO_ATTEMPTS` |
-| `wo-24821` | Karina | `cust-10425` | Fibra 100 · 11:30-13:30 | `DEMO3F2C2D15` | `ONLINE_OK` (−22,8) | Etiqueta con otro serial (`DEMO3F2C9999`) |
+| `wo-24821` | Karina | `cust-10425` | Fibra 200 · 11:30-13:30 | `DEMO3F2C2D15` | `ONLINE_OK` (−22,8) | Etiqueta con otro serial (`DEMO3F2C9999`) |
 | `wo-24822` | Karina | `cust-10426` | Fibra 300 · 15:00-17:00 | `DEMO3F2C2E26` | `ONLINE_OK` | Cliente ausente → visita fallida |
 | `wo-24830` | Beatriz | `cust-10430` | Fibra 300 · 10:00-12:00 | `DEMO3F2C3A01` · OLT-S1/1/2 | `NOT_PROVISIONED` | Caso `NOT_PROVISIONED` |
-| `wo-24831` | Beatriz | `cust-10431` (rebote) | Fibra 100 · 13:00-15:00 | `DEMO3F2C3B12` | `ONLINE_OK` (−23,9, C+) | Rebote del acta |
+| `wo-24831` | Beatriz | `cust-10431` (rebote) | Fibra 200 · 13:00-15:00 | `DEMO3F2C3B12` | `ONLINE_OK` (−23,9, C+) | Rebote del acta |
 | `wo-24832` | Tomás | `cust-10432` (queja) | Fibra 500 · 10:00-12:00 | `DEMO3F2C3C23` | `DYING_GASP` | §DIAG-01; queja del acta |
-| `wo-24833` | Tomás | `cust-10433` | Fibra 100 · 13:00-15:00 | `DEMO3F2C3D34` | `ONLINE_OK` (−26,1, C+) | En rango en C+, fuera en B+ (prueba de clase) |
-| `wo-24840` | Julián | `cust-10440` | Fibra 100 · 09:00-11:00 | `DEMO3F2C4A05` | `ONLINE_OK` | Sin opt-in: aviso del día denegado |
+| `wo-24833` | Tomás | `cust-10433` | Fibra 200 · 13:00-15:00 | `DEMO3F2C3D34` | `ONLINE_OK` (−26,1, C+) | En rango en C+, fuera en B+ (prueba de clase) |
+| `wo-24840` | Julián | `cust-10440` | Fibra 200 · 09:00-11:00 | `DEMO3F2C4A05` | `ONLINE_OK` | Sin opt-in: aviso del día denegado |
 | `wo-24841` | Ernesto | `cust-10441` | Fibra 300 · 09:00-11:00 | `DEMO3F2C4B16` | `ONLINE_OK` | Baja: aviso del día denegado |
-| `wo-24842` | Karina | `cust-10442` | Fibra 100 · 17:00-19:00 | `DEMO3F2C4C27` | `ONLINE_OK` | Lista `ORDER_CHOICE` (cuatro órdenes de Karina) |
+| `wo-24842` | Karina | `cust-10442` | Fibra 200 · 17:00-19:00 | `DEMO3F2C4C27` | `ONLINE_OK` | Lista `ORDER_CHOICE` (cuatro órdenes de Karina) |
 | `wo-24801..24812` | Rogelio, Karina, Beatriz, Tomás (3 cada uno) | varios | 12/10 | varios | — | `CLOSED` con actas, evidencias y validaciones históricas (métricas y perfil); sus fotos son **renders propios del 12/10** (`ph-hist-<nn>`, con bytes distintos de todas las fotos del set de §10), así ninguna evidencia histórica choca con una foto del recorrido o de `EV-02` |
 | `wo-24850..24853` | Rogelio, Karina | varios | 14/10 | varios | `ONLINE_OK` | Destino de reprogramaciones y "órdenes de mañana" |
 

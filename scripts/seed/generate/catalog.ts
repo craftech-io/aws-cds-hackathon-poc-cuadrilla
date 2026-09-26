@@ -120,30 +120,30 @@ const W3 = ["15:00", "17:00"] as const;
 /** The orders of 13/10 (docs/seed-spec.md §7). */
 export const DAY_ORDERS: readonly OrderDef[] = [
   { number: "24817", date: DAYS.demo, installerId: "inst-rogelio", customer: 10421, plan: "Fibra 300", window: W1, serial: "DEMO3F2C19A0", oltPort: "OLT-N3/1/4", behaviour: "LOS_THEN_ONLINE", rxDbm: -21.4, story: "Main story: voice, diagnosis, policy, photos, certificate" },
-  { number: "24818", date: DAYS.demo, installerId: "inst-rogelio", customer: 10422, plan: "Fibra 100", window: W2, serial: "DEMO3F2C1A11", oltPort: "OLT-N3/1/6", behaviour: "LOW_POWER_THEN_OK", rxDbm: -22.1, story: "Ladder and bridge" },
+  { number: "24818", date: DAYS.demo, installerId: "inst-rogelio", customer: 10422, plan: "Fibra 200", window: W2, serial: "DEMO3F2C1A11", oltPort: "OLT-N3/1/6", behaviour: "LOW_POWER_THEN_OK", rxDbm: -22.1, story: "Ladder and bridge" },
   { number: "24819", date: DAYS.demo, installerId: "inst-rogelio", customer: 10423, plan: "Fibra 500", window: W3, serial: "DEMO3F2C1B27", oltPort: "OLT-N3/2/1", behaviour: "ONLINE_OK", rxDbm: -20.6, story: "Safety" },
   { number: "24820", date: DAYS.demo, installerId: "inst-karina", customer: 10424, plan: "Fibra 300", window: W1, serial: "DEMO3F2C2C04", oltPort: "OLT-N3/2/3", behaviour: "ONLINE_OK", rxDbm: -20.2, story: "Three rejected labels → PHOTO_ATTEMPTS" },
-  { number: "24821", date: DAYS.demo, installerId: "inst-karina", customer: 10425, plan: "Fibra 100", window: W2, serial: "DEMO3F2C2D15", oltPort: "OLT-N3/2/5", behaviour: "ONLINE_OK", rxDbm: -22.8, story: "Label with another serial (DEMO3F2C9999)" },
+  { number: "24821", date: DAYS.demo, installerId: "inst-karina", customer: 10425, plan: "Fibra 200", window: W2, serial: "DEMO3F2C2D15", oltPort: "OLT-N3/2/5", behaviour: "ONLINE_OK", rxDbm: -22.8, story: "Label with another serial (DEMO3F2C9999)" },
   { number: "24822", date: DAYS.demo, installerId: "inst-karina", customer: 10426, plan: "Fibra 300", window: W3, serial: "DEMO3F2C2E26", oltPort: "OLT-N3/3/2", behaviour: "ONLINE_OK", rxDbm: -21.9, story: "Customer absent → failed visit" },
   { number: "24830", date: DAYS.demo, installerId: "inst-beatriz", customer: 10430, plan: "Fibra 300", window: ["10:00", "12:00"], serial: "DEMO3F2C3A01", oltPort: "OLT-S1/1/2", behaviour: "NOT_PROVISIONED", story: "NOT_PROVISIONED case" },
-  { number: "24831", date: DAYS.demo, installerId: "inst-beatriz", customer: 10431, plan: "Fibra 100", window: ["13:00", "15:00"], serial: "DEMO3F2C3B12", oltPort: "OLT-S1/1/5", behaviour: "ONLINE_OK", rxDbm: -23.9, story: "Bounced certificate" },
+  { number: "24831", date: DAYS.demo, installerId: "inst-beatriz", customer: 10431, plan: "Fibra 200", window: ["13:00", "15:00"], serial: "DEMO3F2C3B12", oltPort: "OLT-S1/1/5", behaviour: "ONLINE_OK", rxDbm: -23.9, story: "Bounced certificate" },
   { number: "24832", date: DAYS.demo, installerId: "inst-tomas", customer: 10432, plan: "Fibra 500", window: ["10:00", "12:00"], serial: "DEMO3F2C3C23", oltPort: "OLT-S1/2/2", behaviour: "DYING_GASP", rxDbm: -22.1, story: "§DIAG-01; certificate complaint" },
-  { number: "24833", date: DAYS.demo, installerId: "inst-tomas", customer: 10433, plan: "Fibra 100", window: ["13:00", "15:00"], serial: "DEMO3F2C3D34", oltPort: "OLT-S1/2/4", behaviour: "ONLINE_OK", rxDbm: -26.1, story: "In range in C+, out of range in B+ (class test)" },
-  { number: "24840", date: DAYS.demo, installerId: "inst-julian", customer: 10440, plan: "Fibra 100", window: W1, serial: "DEMO3F2C4A05", oltPort: "OLT-N3/3/6", behaviour: "ONLINE_OK", rxDbm: -21.2, story: "No opt-in: day start denied" },
+  { number: "24833", date: DAYS.demo, installerId: "inst-tomas", customer: 10433, plan: "Fibra 200", window: ["13:00", "15:00"], serial: "DEMO3F2C3D34", oltPort: "OLT-S1/2/4", behaviour: "ONLINE_OK", rxDbm: -26.1, story: "In range in C+, out of range in B+ (class test)" },
+  { number: "24840", date: DAYS.demo, installerId: "inst-julian", customer: 10440, plan: "Fibra 200", window: W1, serial: "DEMO3F2C4A05", oltPort: "OLT-N3/3/6", behaviour: "ONLINE_OK", rxDbm: -21.2, story: "No opt-in: day start denied" },
   { number: "24841", date: DAYS.demo, installerId: "inst-ernesto", customer: 10441, plan: "Fibra 300", window: W1, serial: "DEMO3F2C4B16", oltPort: "OLT-S1/3/1", behaviour: "ONLINE_OK", rxDbm: -23.3, story: "Opted out: day start denied" },
-  { number: "24842", date: DAYS.demo, installerId: "inst-karina", customer: 10442, plan: "Fibra 100", window: ["17:00", "19:00"], serial: "DEMO3F2C4C27", oltPort: "OLT-N3/4/1", behaviour: "ONLINE_OK", rxDbm: -19.7, story: "ORDER_CHOICE list (Karina's four orders)" },
+  { number: "24842", date: DAYS.demo, installerId: "inst-karina", customer: 10442, plan: "Fibra 200", window: ["17:00", "19:00"], serial: "DEMO3F2C4C27", oltPort: "OLT-N3/4/1", behaviour: "ONLINE_OK", rxDbm: -19.7, story: "ORDER_CHOICE list (Karina's four orders)" },
 ];
 
 /** The orders of 14/10: destination of reschedules and "tomorrow's orders". */
 export const NEXT_DAY_ORDERS: readonly OrderDef[] = [
   { number: "24850", date: DAYS.next, installerId: "inst-rogelio", customer: 10413, plan: "Fibra 300", window: W1, serial: "DEMO3F2C5A01", oltPort: "OLT-N3/4/3", behaviour: "ONLINE_OK", rxDbm: -20.8, story: "Tomorrow's order" },
-  { number: "24851", date: DAYS.next, installerId: "inst-rogelio", customer: 10414, plan: "Fibra 100", window: W2, serial: "DEMO3F2C5B12", oltPort: "OLT-N3/4/5", behaviour: "ONLINE_OK", rxDbm: -22.4, story: "Tomorrow's order" },
+  { number: "24851", date: DAYS.next, installerId: "inst-rogelio", customer: 10414, plan: "Fibra 200", window: W2, serial: "DEMO3F2C5B12", oltPort: "OLT-N3/4/5", behaviour: "ONLINE_OK", rxDbm: -22.4, story: "Tomorrow's order" },
   { number: "24852", date: DAYS.next, installerId: "inst-karina", customer: 10415, plan: "Fibra 500", window: W1, serial: "DEMO3F2C5C23", oltPort: "OLT-N3/5/2", behaviour: "ONLINE_OK", rxDbm: -19.9, story: "Tomorrow's order" },
   { number: "24853", date: DAYS.next, installerId: "inst-karina", customer: 10416, plan: "Fibra 300", window: W2, serial: "DEMO3F2C5D34", oltPort: "OLT-N3/5/4", behaviour: "ONLINE_OK", rxDbm: -21.6, story: "Tomorrow's order" },
 ];
 
 const HISTORY_INSTALLERS = ["inst-rogelio", "inst-karina", "inst-beatriz", "inst-tomas"] as const;
-const HISTORY_PLANS: readonly Plan[] = ["Fibra 300", "Fibra 100", "Fibra 500"];
+const HISTORY_PLANS: readonly Plan[] = ["Fibra 300", "Fibra 200", "Fibra 500"];
 
 /**
  * The orders closed on 12/10, three per installer (docs/seed-spec.md §7). Serials and classes are the

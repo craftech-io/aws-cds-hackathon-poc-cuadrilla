@@ -29,7 +29,7 @@ function order(overrides: Partial<Record<string, unknown>> = {}): DispatchOrderI
     workOrderId: "wo-24818",
     installerId: "inst-rogelio",
     customerId: "cust-10422",
-    plan: "Fibra 100",
+    plan: "Fibra 200",
     appointmentWindow: WINDOW,
     status: "SCHEDULED",
     createdAt: "2026-10-12T12:00:00.000Z",
