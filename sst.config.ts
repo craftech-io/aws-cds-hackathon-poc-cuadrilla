@@ -77,6 +77,12 @@ export default $config({
       args.logging ??= { retention: "1 month" };
     });
 
+    // A linked Dynamo or Bucket hands a Lambda its name and nothing else (SST would attach
+    // `dynamodb:*` / `s3:*`); each module grants the exact actions of the declared access with
+    // `storagePermissions` (infra/storage-access.ts). Global, so it runs before any module.
+    const { linkNameOnly } = await import("./infra/storage-access");
+    linkNameOnly();
+
     // Infra modules, in dependency order (docs/build-plan.md §1). Every module exists since WP-02;
     // the stubs export nothing until their work package fills them, so a later wave edits its module
     // and never this list. Pure helpers (ci-spec, web-spec, iam-capabilities, late-links, *-spec,

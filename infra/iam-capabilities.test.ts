@@ -19,6 +19,7 @@ import {
   type LambdaName,
   type RoleName,
 } from "./iam-capabilities";
+import { OBJECT_ACTIONS, TABLE_ACTIONS, dataAccessGrants, dataActions } from "./storage-access";
 
 const architecture = readFileSync(resolve(process.cwd(), "docs/architecture.md"), "utf8");
 
@@ -28,7 +29,8 @@ function documentedLambdas(): string[] {
   const names: string[] = [];
   for (const line of section.split("\n")) {
     const cell = /^\| `([A-Za-z]+)` \|/.exec(line)?.[1];
-    if (cell && !/^[A-Z_]+$/.test(cell)) names.push(cell);
+    // Role names are PascalCase; capabilities (ALL_CAPS) and access levels (lower case) are not roles.
+    if (cell && /^[A-Z][a-z]/.test(cell)) names.push(cell);
   }
   return names;
 }
@@ -202,5 +204,63 @@ describe("least privilege", () => {
     expect(actionDrift("DispatchMock", ["events:PutEvents"])).toEqual({ extra: [], missing: [] });
     expect(actionDrift("DispatchMock", ["events:PutEvents", "ses:SendEmail"])).toEqual({ extra: ["ses:SendEmail"], missing: [] });
     expect(actionDrift("ScheduleDispatch", [])).toEqual({ extra: [], missing: expectedActions("ScheduleDispatch") });
+  });
+});
+
+describe("data access [SEC-W1-01]", () => {
+  const ITEM_ACTIONS = new Set(TABLE_ACTIONS.write);
+  const OBJECT_ONLY = new Set(OBJECT_ACTIONS.write);
+  const storageGrants = (fn: LambdaName) => dataAccessGrants(fn).storage;
+  const grantOn = (fn: LambdaName, resource: string) => [...storageGrants(fn), ...dataAccessGrants(fn).mocks].find((grant) => grant.resources.includes(resource));
+
+  it.each(LAMBDAS)("gives %s item and object actions only, never dynamodb:* or s3:* nor a table or bucket action", (fn) => {
+    for (const action of dataActions(fn)) {
+      expect(action, fn).not.toContain("*");
+      expect(ITEM_ACTIONS.has(action) || OBJECT_ONLY.has(action), `${fn}: ${action}`).toBe(true);
+    }
+    for (const grant of [...storageGrants(fn), ...dataAccessGrants(fn).mocks]) {
+      for (const resource of grant.resources) expect(resource, fn).toMatch(/^\{[A-Za-z]+\}(\/index\/\*|\/\*)?$/);
+      if (grant.actions.some((action) => action.startsWith("s3:"))) for (const resource of grant.resources) expect(resource, `${fn}: objects only`).toMatch(/\/\*$/);
+    }
+  });
+
+  it.each(LAMBDAS)("gives %s exactly the actions of the access it declares on each table and bucket", (fn) => {
+    const tables = expectedTables(fn);
+    for (const [table, access] of Object.entries(tables)) {
+      expect(grantOn(fn, `{${table}}`)?.actions, `${fn}: ${table}`).toEqual(TABLE_ACTIONS[access]);
+      if (access !== "append") expect(grantOn(fn, `{${table}}/index/*`)?.actions, `${fn}: ${table} GSIs`).toEqual(TABLE_ACTIONS[access]);
+    }
+    const linked = [...storageGrants(fn), ...dataAccessGrants(fn).mocks].flatMap((grant) => grant.resources.filter((resource) => !resource.includes("/")));
+    expect(linked.map((resource) => resource.slice(1, -1)).sort()).toEqual(Object.keys(tables).sort());
+  });
+
+  it("keeps read-only roles read-only: no DeleteTable, UpdateItem, PutObject or bucket policy where the capability says read", () => {
+    expect(grantOn("CertificateWriter", "{People}")?.actions).toEqual(TABLE_ACTIONS.read);
+    expect(grantOn("CertificateWriter", "{Isps}")?.actions).toEqual(TABLE_ACTIONS.read);
+    expect(grantOn("ToolEvidence", "{Media}/*")?.actions).toEqual(["s3:GetObject"]);
+    expect(grantOn("Bff", "{Evidence}/*")?.actions).toEqual(["s3:GetObject"]);
+    expect(TABLE_ACTIONS.read).toEqual(["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:ConditionCheckItem"]);
+    for (const fn of LAMBDAS) for (const action of dataActions(fn)) expect(action).not.toMatch(/Table|Bucket|PublicAccessBlock|Cors/);
+  });
+
+  it("[SEC-W1-02] declares the pre token trigger: Query on Isps and its GSIs, PutItem on AuditLog, nothing else", () => {
+    expect(LAMBDA_CAPABILITIES.AuthPreToken).toEqual({ capabilities: [], tables: { Isps: "read", AuditLog: "append" } });
+    expect(expectedGrants("AuthPreToken")).toEqual([]);
+    expect(dataAccessGrants("AuthPreToken")).toEqual({
+      storage: [
+        { actions: TABLE_ACTIONS.read, resources: ["{Isps}", "{Isps}/index/*"] },
+        { actions: ["dynamodb:PutItem"], resources: ["{AuditLog}"] },
+      ],
+      mocks: [],
+    });
+  });
+
+  it("fences the mocks' tables by leading keys for the WORLDS roles and not for the mocks themselves", () => {
+    for (const role of Object.keys(WORLDS_LEADING_KEYS) as Array<keyof typeof WORLDS_LEADING_KEYS>) {
+      const [mocks] = dataAccessGrants(role).mocks;
+      expect(mocks?.resources).toEqual(["{Dispatch}", "{Dispatch}/index/*", "{Network}", "{Network}/index/*"]);
+      expect(mocks?.conditions).toEqual([{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: WORLDS_LEADING_KEYS[role] }]);
+    }
+    expect(dataAccessGrants("NetworkMock").mocks).toEqual([{ actions: TABLE_ACTIONS.write, resources: ["{Network}", "{Network}/index/*"] }]);
   });
 });

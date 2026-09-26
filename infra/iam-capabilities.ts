@@ -4,10 +4,11 @@
 // infra/iam-capabilities.test.ts derives the expected statements and compares them with what the
 // modules generate. A permission that is not in this file is drift, and the test fails.
 //
-// Tables and buckets are granted through `link` (SST derives the DynamoDB and S3 actions from the
-// linked component), so they are listed as data access. Everything else is a `Grant`: actions, the
-// resources they reach and the conditions that fence them. Resources are ARNs or references to a
-// component of the app that the module resolves at deploy time:
+// Tables and buckets are listed as data access (`read`, `append`, `write`). The `link` only hands the
+// Lambda their names: sst.config.ts strips the `dynamodb:*` / `s3:*` SST would attach to a linked
+// Dynamo or Bucket, and infra/storage-access.ts turns each access level into its exact actions.
+// Everything else is a `Grant`: actions, the resources they reach and the conditions that fence them.
+// Resources are ARNs or references to a component of the app that the module resolves at deploy time:
 //
 //   {Media}/transcripts/*   an object prefix of a bucket     {G1} {G2} {G3}  a guardrail
 //   {Memory}                the AgentCore Memory of the stage {KnowledgeBase} the manual's KB
@@ -79,21 +80,11 @@ const arn = {
 
 // ---- Types ---------------------------------------------------------------------------------------
 
-export type TableName =
-  | "Isps"
-  | "People"
-  | "WorkOrders"
-  | "Cases"
-  | "Conversations"
-  | "AuditLog"
-  | "Reference"
-  | "Runtime"
-  | "CuadrillaMetrics"
-  | "Network"
-  | "Dispatch";
+export type TableName = "Isps" | "People" | "WorkOrders" | "Cases" | "Conversations" | "AuditLog" | "Reference" | "Runtime" | "CuadrillaMetrics" | "Network" | "Dispatch";
 
 export type BucketName = "Media" | "Evidence" | "Manual" | "Seed";
-export type Access = "read" | "write";
+/** `read`: get and query; `append`: PutItem only (append-only logs); `write`: read plus every item write. */
+export type Access = "read" | "append" | "write";
 
 export interface Condition {
   readonly test: "StringEquals" | "StringLike" | "ForAllValues:StringLike" | "ForAllValues:StringEquals" | "ArnLike";
@@ -290,6 +281,8 @@ export const LAMBDA_CAPABILITIES = {
     tables: { Conversations: "read", AuditLog: "write", WorkOrders: "read", Cases: "read", People: "read", Isps: "read", Reference: "read" },
     grants: [g(["s3:GetObject"], ["{Evidence}/certificates/*"])],
   },
+  // Cognito pre token generation: the user row by GSI1 `SUB#<sub>` and one audit row per ignored attribute.
+  AuthPreToken: { capabilities: [], tables: { Isps: "read", AuditLog: "append" } },
   NetworkMock: { capabilities: [], tables: { Network: "write" } },
   DispatchMock: { capabilities: [], tables: { Dispatch: "write" }, grants: [g(["events:PutEvents"], ["{Feeds}"])] },
   QaDriver: {
@@ -371,17 +364,24 @@ export function expectedActions(role: RoleName): string[] {
   return [...new Set(expectedGrants(role).flatMap((grant) => grant.actions))].sort();
 }
 
-/** Tables a role reaches, capabilities included; `write` wins over `read`. */
-export function expectedTables(role: RoleName): Partial<Record<TableName, Access>> {
+/**
+ * Tables (or buckets) a role reaches, capabilities included. `write` wins; `read` and `append` of the
+ * same resource from two sources is an error, never silently widened (declare it `write`).
+ */
+export function expectedData<K extends "tables" | "buckets">(role: RoleName, kind: K): NonNullable<RoleCapabilities[K]> {
   const entry = roleEntry(role);
-  const merged: Partial<Record<TableName, Access>> = {};
-  for (const tables of [entry.tables, ...resolveCapabilities(entry.capabilities).map((name) => CAPABILITIES[name].tables)]) {
-    for (const [table, access] of Object.entries(tables ?? {}) as Array<[TableName, Access]>) {
-      if (merged[table] !== "write") merged[table] = access;
+  const merged: Record<string, Access> = {};
+  for (const data of [entry[kind], ...resolveCapabilities(entry.capabilities).map((name) => CAPABILITIES[name][kind])]) {
+    for (const [name, access] of Object.entries(data ?? {}) as Array<[string, Access]>) {
+      const current = merged[name];
+      if (current !== undefined && current !== access && current !== "write" && access !== "write") throw new Error(`${role}: ${name} is both ${current} and ${access}; declare it write.`);
+      if (current !== "write") merged[name] = access;
     }
   }
-  return merged;
+  return merged as NonNullable<RoleCapabilities[K]>;
 }
+
+export const expectedTables = (role: RoleName): Partial<Record<TableName, Access>> => expectedData(role, "tables");
 
 /** Actions a module generated that the capabilities do not allow, and allowed ones it did not generate. */
 export function actionDrift(role: RoleName, generated: readonly string[]): { extra: string[]; missing: string[] } {

@@ -11,6 +11,7 @@ import {
   luhnValid,
   maskSensitive,
   maskText,
+  prefilterBlock,
   stripMaskMarkers,
 } from "./mask";
 
@@ -61,6 +62,28 @@ describe("maskSensitive", () => {
     expect(luhnValid("4111111111111111")).toBe(true);
     expect(luhnValid("4111111111111112")).toBe(false);
     expect(luhnValid("0")).toBe(false);
+  });
+
+  it("[FL-078] blocks a Luhn-valid card before G1: only [TARJETA] is kept and the turn becomes guardrailRefusal and a case OTHER", () => {
+    for (const text of ["mi tarjeta es 4111 1111 1111 1111", "cóbrale a la 5500-0000-0000-0004 por favor"]) {
+      const masked = maskSensitive(text);
+      expect(masked.text).toContain(M.CARD);
+      expect(containsSensitive(masked.text, ["CARD"])).toBe(false);
+      expect(prefilterBlock(masked)).toEqual({
+        kind: "CARD",
+        caseReason: "OTHER",
+        origin: "PREFILTER",
+        policy: "SENSITIVE_INFORMATION",
+        entity: "CREDIT_DEBIT_CARD_NUMBER",
+        notice: "guardrailRefusal",
+      });
+    }
+  });
+
+  it("[FL-078] lets a CURP, a phone or digits that fail Luhn through the pre-filter: masked, no block", () => {
+    expect(prefilterBlock(maskSensitive("El CURP de la señora es TAMR800101MDFMZS09"))).toBeUndefined();
+    expect(prefilterBlock(maskSensitive("llámale al 55 0900 0103"))).toBeUndefined();
+    expect(prefilterBlock(maskSensitive("pedido 4111 1111 1111 1112"))).toBeUndefined();
   });
 
   it("[FL-078] masks Mexican phones in E.164 and in the national formats people type", () => {

@@ -19,16 +19,7 @@
 // kept for the life of the stage), so that rule never reaches it.
 
 import type { BrowserBucket } from "./ci-spec";
-import {
-  CAPABILITIES,
-  LAMBDA_CAPABILITIES,
-  expectedTables,
-  resolveCapabilities,
-  type BucketName,
-  type LambdaName,
-  type RoleCapabilities,
-  type TableName,
-} from "./iam-capabilities";
+import { expectedData, expectedTables, type BucketName, type LambdaName, type TableName } from "./iam-capabilities";
 
 // ---- DynamoDB ----------------------------------------------------------------------------------
 
@@ -264,12 +255,7 @@ export function browserUploadCors(appOrigin: string): BrowserUploadCors {
 
 /** Buckets a function links, its capabilities included (iam-capabilities.ts). */
 export function expectedBuckets(fn: LambdaName): BucketName[] {
-  const entry: RoleCapabilities = LAMBDA_CAPABILITIES[fn];
-  const names = new Set<BucketName>(Object.keys(entry.buckets ?? {}) as BucketName[]);
-  for (const capability of resolveCapabilities(entry.capabilities)) {
-    for (const name of Object.keys(CAPABILITIES[capability].buckets ?? {}) as BucketName[]) names.add(name);
-  }
-  return [...names].sort();
+  return (Object.keys(expectedData(fn, "buckets")) as BucketName[]).sort();
 }
 
 export interface StorageNeeds {
@@ -299,16 +285,18 @@ export function storageFor(fn: LambdaName): StorageNeeds {
 // ---- Storage references of the IAM grants ------------------------------------------------------
 
 /**
- * A storage placeholder of an iam-capabilities.ts grant: `{Runtime}` (the table), `{Media}` (the
- * bucket), `{Evidence}/photos/*` (objects under a prefix) or `{Media.name}` (the bucket's name, for
- * conditions such as `transcribe:OutputBucketName`).
+ * A storage placeholder of an iam-capabilities.ts grant: `{Runtime}` (the table), `{Runtime}/index/*`
+ * (its GSIs), `{Media}` (the bucket), `{Evidence}/photos/*` (objects under a prefix) or `{Media.name}`
+ * (the bucket's name, for conditions such as `transcribe:OutputBucketName`).
  */
 export type StorageRef =
-  | { readonly kind: "table"; readonly name: StorageTable }
+  | { readonly kind: "table"; readonly name: StorageTable; readonly indexes?: true }
   | { readonly kind: "bucket"; readonly name: BucketName; readonly objects?: string }
   | { readonly kind: "bucket-name"; readonly name: BucketName };
 
 const PLACEHOLDER = /^\{([A-Za-z0-9]+)(\.name)?\}(?:\/(.+))?$/;
+/** Suffix of a table placeholder that stands for every GSI of the table (`<table arn>/index/*`). */
+export const TABLE_INDEXES = "index/*";
 
 const isStorageTable = (name: string): name is StorageTable => (STORAGE_TABLES as string[]).includes(name);
 const isStorageBucket = (name: string): name is BucketName => (STORAGE_BUCKETS as string[]).includes(name);
@@ -325,6 +313,7 @@ export function parseStorageRef(resource: string): StorageRef | undefined {
   const attribute = match[2];
   const objects = match[3];
   if (isStorageTable(name) && attribute === undefined && objects === undefined) return { kind: "table", name };
+  if (isStorageTable(name) && attribute === undefined && objects === TABLE_INDEXES) return { kind: "table", name, indexes: true };
   if (isStorageBucket(name) && attribute === undefined) return objects === undefined ? { kind: "bucket", name } : { kind: "bucket", name, objects };
   if (isStorageBucket(name) && objects === undefined) return { kind: "bucket-name", name };
   throw new Error(`Grant resource "${resource}" names storage in a shape infra/storage.ts cannot resolve.`);

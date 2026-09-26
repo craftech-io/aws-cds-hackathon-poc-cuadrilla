@@ -366,6 +366,7 @@ describe("storage references of the IAM grants", () => {
 
   it("resolves every table, bucket, object prefix and bucket name the grants name", () => {
     expect(parseStorageRef("{Runtime}")).toEqual({ kind: "table", name: "Runtime" });
+    expect(parseStorageRef("{Isps}/index/*")).toEqual({ kind: "table", name: "Isps", indexes: true });
     expect(parseStorageRef("{Evidence}/photos/*")).toEqual({ kind: "bucket", name: "Evidence", objects: "photos/*" });
     expect(parseStorageRef("{Seed}/*")).toEqual({ kind: "bucket", name: "Seed", objects: "*" });
     expect(parseStorageRef("{Media.name}")).toEqual({ kind: "bucket-name", name: "Media" });

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { GUARDRAIL_KINDS, GUARDRAIL_REGEXES, SENSITIVE_KINDS, maskText } from "../packages/bff/src/lib/mask";
+import { GUARDRAIL_KINDS, GUARDRAIL_REGEXES, SENSITIVE_KINDS, maskPattern, maskSensitive, maskText, prefilterBlock } from "../packages/bff/src/lib/mask";
 import { detectLanguage } from "../packages/bff/src/services/language/language";
 import {
   BLOCKED_MESSAGES,
@@ -165,6 +165,16 @@ describe("PII: G1 is the second layer of the normalizer, G3 is PII only", () => 
       expect(regex.pattern.length).toBeLessThanOrEqual(500);
       for (const unsupported of ["(?=", "(?!", "(?<=", "(?<!", "\\d"]) expect(regex.pattern.includes(unsupported), `${regex.name}: ${unsupported}`).toBe(false);
     }
+  });
+
+  it("[FL-078] never shows G1 a Luhn-valid card: the normalizer masks it and prefilterBlock blocks the turn, G1's card entity is a second layer by design", () => {
+    // G1 runs on the normalizer's output, so its card entity cannot fire on a card the masker caught;
+    // the deterministic block (mask.ts `prefilterBlock`) audits the same entity with origin PREFILTER.
+    const normalized = maskSensitive("mi tarjeta es 4111 1111 1111 1111", SENSITIVE_KINDS);
+    expect(maskPattern("CARD").test(normalized.text)).toBe(false);
+    const block = prefilterBlock(normalized);
+    expect(block?.origin).toBe("PREFILTER");
+    expect(G1_PII_ENTITIES.filter((entity) => entity.inputAction === "BLOCK").map((entity) => entity.type)).toEqual([block?.entity]);
   });
 
   it("blocks cards in G1 and G3, leaves contacts alone in G1 and anonymizes them in G3", () => {

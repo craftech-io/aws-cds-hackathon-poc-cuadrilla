@@ -30,7 +30,10 @@
 // emails bypass the app's SES client and its recipient fence: the only recipients are the addresses
 // the operator passes to console:invite (judges get no email).
 //
-// Permissions. The `Auth` link carries what the BFF reads (packages/bff/src/auth/config.ts) and grants
+// Permissions. The trigger is `AuthPreToken` in infra/iam-capabilities.ts: it links `Isps` and
+// `AuditLog` for their names only and gets `storagePermissions` of that entry, i.e. Query/GetItem on
+// `Isps` and its GSIs and PutItem on `AuditLog`; nothing that updates or deletes a user row, an audit
+// row or a table. The `Auth` link carries what the BFF reads (packages/bff/src/auth/config.ts) and grants
 // nothing: the BFF verifies tokens offline against the public JWKS, and the only Cognito action of the
 // app's roles, `DescribeUserPoolClient` of the QaDriver (`{Auth}` in infra/iam-capabilities.ts), is
 // granted by its own module on `userPool.arn`. Users are created by the operator's script, never by a
@@ -62,14 +65,11 @@ import {
   type EmailSenderChoice,
 } from "./auth-email";
 import { appDomain, appUrl } from "./dns";
-import { lateLinks } from "./late-links";
 import { BrandConfig } from "./secrets";
+import { storageLinks, storagePermissions } from "./storage";
 
 /** Handler of the trigger (WP-13); the path is the contract with packages/bff. */
 export const PRE_TOKEN_HANDLER = "packages/bff/src/auth-triggers/pre-token.handler";
-
-/** Tables the trigger reads (`Isps`, its user rows and GSI1) and writes (`AuditLog`), owned by infra/storage-tables.ts. */
-export const PRE_TOKEN_TABLES = ["Isps", "AuditLog"] as const;
 
 function applySender(choice: EmailSenderChoice): EmailConfiguration {
   if (choice.warning) $util.log.warn(choice.warning);
@@ -101,7 +101,8 @@ const messages = BrandConfig.value.apply((raw) => cognitoMessages({ loginUrl: `$
 export const preTokenTrigger = new sst.aws.Function("AuthPreToken", {
   description: "Cognito pre token generation (V2_0): ispId, role and isJudge from Isps/USER#.",
   handler: PRE_TOKEN_HANDLER,
-  link: lateLinks("auth", "storage-tables", () => import("./storage-tables"), PRE_TOKEN_TABLES),
+  link: storageLinks("AuthPreToken"),
+  permissions: storagePermissions("AuthPreToken"),
   timeout: "5 seconds",
   memory: "256 MB",
 });

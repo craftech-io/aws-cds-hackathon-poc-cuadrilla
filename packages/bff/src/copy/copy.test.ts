@@ -43,6 +43,7 @@ const SAMPLES: { readonly [K in FunctionKey]: (pack: CopyPack) => string[] } = {
     ...CaseReason.options.map((reason) => pack.caseReason({ reason })),
     ...Symptom.options.map((symptom) => pack.caseReason({ reason: "DIAGNOSIS_ATTEMPTS", symptom })),
     ...PhotoItem.options.map((item) => pack.caseReason({ reason: "PHOTO_ATTEMPTS", item })),
+    pack.caseReason({ reason: "OTHER", sensitive: "CARD" }),
   ],
 };
 
@@ -135,6 +136,9 @@ describe("WhatsApp templates (docs/architecture-integrations.md §4.5)", () => {
   it("the case category built by code is the parameter the example shows", () => {
     expect(esMX.caseReason({ reason: "DIAGNOSIS_ATTEMPTS", symptom: "LOW_POWER" })).toBe(TEMPLATES.caso_escalado.params[3]?.example);
     for (const text of SAMPLES.caseReason(esMX)) expect(templateParamProblem(text)).toBeNull();
+    // [FL-078] the case of the pre-G1 card block names what it carried, never the number.
+    expect(esMX.caseReason({ reason: "OTHER", sensitive: "CARD" })).toBe("datos de tarjeta");
+    expect(esMX.caseReason({ reason: "OTHER" })).toBe("otro motivo");
     for (const hazard of HazardCategory.options) expect(templateParamProblem(esMX.hazard[hazard])).toBeNull();
   });
 });

@@ -72,7 +72,7 @@ const CHECKLIST_ITEM: CopyPack["checklistItem"] = {
   CUSTOMER_OK: "the customer's sign-off",
 };
 
-function caseReason({ reason, symptom, item }: CaseReasonInput): string {
+function caseReason({ reason, symptom, item, sensitive }: CaseReasonInput): string {
   switch (reason) {
     case "OUT_OF_MANUAL":
       return "question the manual doesn't cover";
@@ -93,7 +93,7 @@ function caseReason({ reason, symptom, item }: CaseReasonInput): string {
     case "CERTIFICATE_UNDELIVERED":
       return "the certificate didn't reach the customer";
     case "OTHER":
-      return "other reason";
+      return sensitive === "CARD" ? "card data" : "other reason";
   }
 }
 

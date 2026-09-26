@@ -3,6 +3,7 @@
 // judges (ADR-0013). Both implement this interface, so a text missing from either one is a compile
 // error instead of a blank bubble. No tool, adapter, worker or prompt carries an inline string.
 import type { CaseReason, ChecklistItem, HazardCategory, PersonRole, PhotoItem, RejectReason, Symptom } from "@cuadrilla/shared";
+import type { PrefilterBlockKind } from "../lib/mask";
 
 /** A row of an interactive WhatsApp list: title ≤ 24 characters, description ≤ 72 (buttons.ts). */
 export interface ListRowText {
@@ -20,6 +21,8 @@ export interface CaseReasonInput {
   readonly symptom?: Symptom;
   /** Checklist item of a `PHOTO_ATTEMPTS` case. */
   readonly item?: PhotoItem;
+  /** What an `OTHER` case opened by the pre-G1 block carried (lib/mask.ts `prefilterBlock`, FL-078). */
+  readonly sensitive?: PrefilterBlockKind;
 }
 
 export interface CaseBriefInput {

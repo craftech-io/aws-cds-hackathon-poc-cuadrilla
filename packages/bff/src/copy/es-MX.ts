@@ -83,7 +83,7 @@ const SYMPTOM: CopyPack["symptom"] = {
   OTHER: "falla sin resolver",
 };
 
-function caseReason({ reason, symptom, item }: CaseReasonInput): string {
+function caseReason({ reason, symptom, item, sensitive }: CaseReasonInput): string {
   switch (reason) {
     case "OUT_OF_MANUAL":
       return "pregunta que el manual no cubre";
@@ -104,7 +104,7 @@ function caseReason({ reason, symptom, item }: CaseReasonInput): string {
     case "CERTIFICATE_UNDELIVERED":
       return "el acta no llegó al cliente";
     case "OTHER":
-      return "otro motivo";
+      return sensitive === "CARD" ? "datos de tarjeta" : "otro motivo";
   }
 }
 

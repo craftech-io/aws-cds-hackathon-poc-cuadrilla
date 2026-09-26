@@ -574,10 +574,10 @@ Convenciones:
 
 ### FL-078 · Datos sensibles por chat
 - Actores: instalador · Canal: WhatsApp · Disparador: (a) "El CURP de la señora es …"; (b) un número de tarjeta.
-- Pasos: (a) normalizador enmascara (`[CURP]`) antes de persistir; G1 `ANONYMIZE` como segunda capa sin bloquear (`GUARDRAIL_MASK`); turno normal; (b) G1 `BLOCK` → `guardrailRefusal` + caso `OTHER` ("datos de tarjeta").
+- Pasos: (a) normalizador enmascara (`[CURP]`) antes de persistir; G1 `ANONYMIZE` como segunda capa sin bloquear (`GUARDRAIL_MASK`); turno normal; (b) normalizador enmascara la tarjeta (`[TARJETA]`) antes de persistir y, como `kinds` incluye `CARD`, bloqueo determinista antes de G1 (`prefilterBlock`, origen `PREFILTER`) → `guardrailRefusal` + caso `OTHER` ("datos de tarjeta"), sin G1 ni Harness; la tarjeta de G1/G3 queda como segunda capa.
 - Estado esperado: ningún CURP ni tarjeta completos en `Conversations`, Memory ni logs; ningún saliente que pida datos personales.
-- Reglas: G1, `CP-NO-SENSITIVE-ASK`, `lib/mask.ts`.
-- Prueba: U `lib/mask.test.ts`, `lib/log.test.ts`, `channels/normalizer.test.ts`, `worker/guardrail-block.test.ts` · LF `security.flow.test.ts` · SR `SC-11/5..6`. Notas: `memory.inspect` con `waitForExtraction`.
+- Reglas: G1, `CP-NO-SENSITIVE-ASK`, `lib/mask.ts` (`prefilterBlock`).
+- Prueba: U `lib/mask.test.ts`, `lib/log.test.ts`, `infra/guardrail-policies.test.ts`, `channels/normalizer.test.ts`, `worker/guardrail-block.test.ts` · LF `security.flow.test.ts` · SR `SC-11/5..6`. Notas: `memory.inspect` con `waitForExtraction`.
 
 ## Área J · Consola y superficies
 

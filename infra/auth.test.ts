@@ -144,7 +144,21 @@ async function resolveDeep(value: unknown): Promise<unknown> {
   return value;
 }
 
-const TABLES = { Isps: { table: "Isps" }, AuditLog: { table: "AuditLog" } };
+// Tables and buckets of infra/storage.ts as the real module sees them: an ARN and a name. Instances of
+// a class, so `resolveDeep` keeps them as they are and a link can be compared by identity.
+class FakeStorage {
+  readonly arn: FakeOutput;
+  readonly name: FakeOutput;
+  constructor(readonly logical: string, service: "dynamodb" | "s3") {
+    this.arn = output(service === "dynamodb" ? `arn:aws:dynamodb:us-east-1:111111111111:table/${logical}` : `arn:aws:s3:::${logical.toLowerCase()}`);
+    this.name = output(logical);
+  }
+}
+
+const TABLE_NAMES = ["Isps", "People", "WorkOrders", "Cases", "Conversations", "AuditLog", "Reference", "Runtime", "CuadrillaMetrics"] as const;
+const TABLES = Object.fromEntries(TABLE_NAMES.map((name) => [name, new FakeStorage(name, "dynamodb")])) as Record<(typeof TABLE_NAMES)[number], FakeStorage>;
+const BUCKETS = { Media: new FakeStorage("Media", "s3"), Evidence: new FakeStorage("Evidence", "s3"), Manual: new FakeStorage("Manual", "s3"), Seed: new FakeStorage("Seed", "s3") };
+const tableArn = (name: string): string => `arn:aws:dynamodb:us-east-1:111111111111:table/${name}`;
 
 async function evaluate(scenario: Scenario) {
   const runtime = fakeRuntime(scenario);
@@ -154,7 +168,15 @@ async function evaluate(scenario: Scenario) {
   vi.stubGlobal("aws", runtime.aws);
   vi.stubGlobal("$util", runtime.util);
   vi.stubGlobal("$interpolate", runtime.interpolate);
-  vi.doMock("./storage-tables", () => TABLES);
+  // infra/storage.ts itself is real: its links and permissions are what the trigger gets.
+  vi.doMock("./storage-tables", () => ({ ...TABLES, tables: TABLES }));
+  vi.doMock("./storage-buckets", () => ({
+    buckets: BUCKETS,
+    mediaBucket: BUCKETS.Media,
+    evidenceBucket: BUCKETS.Evidence,
+    manualBucket: BUCKETS.Manual,
+    seedBucket: BUCKETS.Seed,
+  }));
   // `undefined` while infra/messaging-email.ts is still the stub that exports nothing (WP-20).
   vi.doMock("./messaging-email", () => ({ emailIdentity: runtime.identity }));
   const module = await import("./auth");
@@ -169,6 +191,7 @@ async function evaluate(scenario: Scenario) {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.doUnmock("./storage-tables");
+  vi.doUnmock("./storage-buckets");
   vi.doUnmock("./messaging-email");
 });
 
@@ -237,11 +260,25 @@ describe("infra/auth.ts on a recording SST runtime [FL-079]", () => {
     expect(trigger.name).toBe("AuthPreToken");
     expect(trigger.args).toMatchObject({ handler: "packages/bff/src/auth-triggers/pre-token.handler", timeout: "5 seconds", memory: "256 MB" });
     expect(module.PRE_TOKEN_HANDLER).toBe(trigger.args.handler);
-    expect(await resolveDeep(trigger.args.link)).toEqual([TABLES.Isps, TABLES.AuditLog]);
+    const link = (await resolveDeep(trigger.args.link)) as unknown[];
+    expect(link).toHaveLength(2);
+    expect(link[0]).toBe(TABLES.AuditLog);
+    expect(link[1]).toBe(TABLES.Isps);
     expect(trigger.args).not.toHaveProperty("environment");
-    expect(trigger.args).not.toHaveProperty("permissions");
-    const tables = read("docs/architecture.md");
-    for (const table of module.PRE_TOKEN_TABLES) expect(tables, table).toContain(`| \`${table}\` |`);
+    const architecture = read("docs/architecture.md");
+    for (const table of ["Isps", "AuditLog"]) expect(architecture, table).toContain(`| \`${table}\` |`);
+    expect(architecture).toContain("| `AuthPreToken` |");
+  });
+
+  it("[SEC-W1-02] lets the trigger query Isps and its GSIs and append to AuditLog, and nothing else", async () => {
+    const { only } = await evaluate({ brandConfig: NEUTRAL });
+    const permissions = await resolveDeep(only("sst.aws.Function").args.permissions);
+    expect(permissions).toEqual([
+      { actions: ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:ConditionCheckItem"], resources: [tableArn("Isps"), `${tableArn("Isps")}/index/*`] },
+      { actions: ["dynamodb:PutItem"], resources: [tableArn("AuditLog")] },
+    ]);
+    const actions = (permissions as Array<{ actions: string[] }>).flatMap((statement) => statement.actions);
+    for (const action of actions) expect(action).not.toMatch(/\*|UpdateItem|DeleteItem|DeleteTable|UpdateTable|BatchWriteItem/);
   });
 
   it("points the trigger at a module of packages/bff that exports its handler", () => {

@@ -258,7 +258,9 @@ Schedule: nombre `tm-<w>-<timerId>` (≤ 64; `w` = `d` demo, `j` jurado, `q` QA,
 - mensaje = sobre de `docs/design-brief.md` §5.2 con `sessionToken = <sessionId>.<turnId>.<exp>.<HMAC>` (subclave `session`, `exp` ≤ 15 min) y `Runtime/SESSION#<sessionId>` = `{ispId, installerId, workOrderId?, trigger, clockId, eventAtSim, sourceMessageId}`. Una tool rechaza un token de un turno cerrado.
 - Nunca `systemPrompt`, `model` ni `tools` desde el borde. El system prompt es estático y dice que el contenido no confiable va dentro del bloque cuyo nombre declara la cabecera `<session delim="…"/>` del sobre; el sufijo aleatorio del turno se declara solo ahí, fuera de todo contenido no confiable, y el normalizador garantiza que no aparece dentro del contenido (`channels/normalizer.test.ts`).
 
-**Pre-filtro G1.** Si el turno trae texto no confiable (texto o transcripción del instalador), el worker llama `ApplyGuardrail` (G1, `source INPUT`) y clasifica las `assessments[]`: `BLOCKED` en `topicPolicy` → bloqueo `DENIED_TOPIC`; `BLOCKED` en `PROMPT_ATTACK` → bloqueo `PROMPT_INJECTION`; `BLOCKED` en tarjeta → bloqueo `OTHER` ("datos de tarjeta"); solo `ANONYMIZED` → sin bloqueo, sigue con el texto de G1 y audita `GUARDRAIL_MASK`. Ante un bloqueo (del pre-filtro o `stopReason` `guardrail_intervened`/`content_filtered` del Harness): nunca se reenvía el texto del Harness; respuesta fija `guardrailRefusal` al instalador (salvo que el mismo mensaje ya disparó `SAFETY_INSTRUCTION`); `open_case` con el motivo; `GUARDRAIL_BLOCK` con política, origen y fuente; si vino del Harness, `sessionEpoch + 1`. Las regex de CURP, RFC y CLABE de G1, G3, el normalizador y `log.ts` salen de un solo módulo, `packages/bff/src/lib/mask.ts`.
+**Bloqueo de tarjeta antes de G1.** El normalizador enmascara el texto y la transcripción con `maskSensitive` antes de persistir, así que una tarjeta que pasa Luhn queda como `[TARJETA]` y G1 nunca la ve. Por eso el bloqueo de tarjeta es determinista y previo a G1: si los `kinds` de `maskSensitive` incluyen `CARD`, `prefilterBlock` (`packages/bff/src/lib/mask.ts`) decide el bloqueo `OTHER` ("datos de tarjeta") con origen `PREFILTER`, política `SENSITIVE_INFORMATION` y entidad `CREDIT_DEBIT_CARD_NUMBER`, y el worker no llama a G1 ni al Harness. La entidad de tarjeta de G1 y G3 queda como segunda capa (lo que el enmascarador no reconoce, la salida del modelo, el acta).
+
+**Pre-filtro G1.** Si el turno trae texto no confiable (texto o transcripción del instalador) y no hubo bloqueo de tarjeta, el worker llama `ApplyGuardrail` (G1, `source INPUT`) y clasifica las `assessments[]`: `BLOCKED` en `topicPolicy` → bloqueo `DENIED_TOPIC`; `BLOCKED` en `PROMPT_ATTACK` → bloqueo `PROMPT_INJECTION`; `BLOCKED` en tarjeta (segunda capa) → bloqueo `OTHER` ("datos de tarjeta"); solo `ANONYMIZED` → sin bloqueo, sigue con el texto de G1 y audita `GUARDRAIL_MASK`. Ante un bloqueo (de tarjeta, del pre-filtro o `stopReason` `guardrail_intervened`/`content_filtered` del Harness): nunca se reenvía el texto del Harness; respuesta fija `guardrailRefusal` al instalador (salvo que el mismo mensaje ya disparó `SAFETY_INSTRUCTION`); `open_case` con el motivo; `GUARDRAIL_BLOCK` con política, origen y fuente; si vino del Harness, `sessionEpoch + 1`. Las regex de CURP, RFC y CLABE de G1, G3, el normalizador y `log.ts` salen de un solo módulo, `packages/bff/src/lib/mask.ts`.
 
 ### 9.2 Gateway, targets y Cedar
 
@@ -372,6 +374,16 @@ Los eventos de SES (`DELIVERY`, `BOUNCE`, `COMPLAINT`) y los estados de WhatsApp
 
 Todo con `link` y `sst.aws.permission`; sin `*` en `Resource` salvo justificación al lado. Todo rol bajo el path `/aws-cds-hackathon-poc-cuadrilla/` con la boundary. La tabla sale de `infra/iam-capabilities.ts`; `infra/iam-capabilities.test.ts` compara con las políticas generadas y falla ante cualquier deriva.
 
+**Acceso a datos.** Un `link` a una tabla o un bucket solo entrega el nombre (`Resource.<Name>.name`): `sst.config.ts` llama `linkNameOnly()` (`infra/storage-access.ts`) antes de todo módulo y quita el `dynamodb:*` / `s3:*` que SST pondría sobre la tabla, el bucket y todo lo que cuelga de ellos. Las acciones salen del nivel de acceso declarado, con `storagePermissions(fn)` (`infra/storage.ts`), y nunca incluyen una acción sobre la tabla o el bucket mismos (`DeleteTable`, `UpdateTable`, `PutBucketPolicy`, `PutPublicAccessBlock`…):
+
+| Acceso | Tabla (y sus GSI, `…/index/*`) | Bucket (`…/*`) |
+|---|---|---|
+| `read` | `dynamodb:{GetItem,BatchGetItem,Query,ConditionCheckItem}` | `s3:GetObject` |
+| `append` | `dynamodb:PutItem` sobre la tabla (bitácoras de solo agregado; el conector escribe con `attribute_not_exists`) | `s3:PutObject` |
+| `write` | `read` + `dynamodb:{PutItem,UpdateItem,DeleteItem,BatchWriteItem}` | `s3:{GetObject,PutObject,DeleteObject}` |
+
+Las transacciones no tienen acción propia (DynamoDB autoriza cada ítem con su `PutItem`/`UpdateItem`/`DeleteItem`/`ConditionCheckItem`). `Network` y `Dispatch` los resuelve `infra/mocks.ts`, con `dynamodb:LeadingKeys` de `WORLDS_LEADING_KEYS` para los roles con `WORLDS`.
+
 Capacidades compartidas:
 
 | Capacidad | Acciones | Recurso / condición |
@@ -406,6 +418,7 @@ Capacidades compartidas:
 | `CostGuard` | DynamoDB `Runtime` (solo `PutItem` de `KILL#*`, `dynamodb:LeadingKeys` = `KILL#*`), `AuditLog` (escritura) | Suscripción al topic `CostAlerts`; solo enciende el corte |
 | `WorldJanitor` | `WORLDS` (jurados) | Schedule diario; invocación asíncrona `MEMORY_PURGE` solo de `Bff` y `QaDriver` |
 | `PolicyAudit` | DynamoDB lectura de `Conversations`, `AuditLog`, `WorkOrders`, `Cases`, `People`, `Isps`, `Reference`; S3 `HeadObject` de `Evidence/certificates/*`; escritura de `AuditLog` | |
+| `AuthPreToken` | DynamoDB `Isps` (lectura: `Query` de GSI1 `SUB#<sub>`), `AuditLog` (solo `PutItem`, `append`) | Trigger pre-token de Cognito; nada que actualice o borre una fila de usuario, de auditoría o una tabla |
 | `NetworkMock` | DynamoDB `Network` | |
 | `DispatchMock` | DynamoDB `Dispatch`; `events:PutEvents` al bus `Feeds` | |
 | `QaDriver` | `cognito-idp:DescribeUserPoolClient` del pool del stage (`auth.probe`); lo de `Bff` (ejecuta el `appRouter` real) con `WORLDS` limitado a operadoras `isp-qa-*`, `isp-eval-*` e `isp-judge-test` (y la guarda de código por `Isp.kind` ∈ {`QA`, `EVAL`} más el prefijo del `clockId`); `lambda:InvokeFunction` de `InboundWhatsApp`, `PolicyAudit` y los targets de tools (sondas directas con `caller QA`); `sns:Publish` **solo** sobre el topic propio (eventos de forma viva con otro número y el atributo `qa-foreign=1`, FL-095); `bedrock:ApplyGuardrail` (G1, sonda); `sqs:{ReceiveMessage,DeleteMessage}` solo sobre la DLQ; `cloudwatch:DescribeAlarmHistory` solo sobre la alarma de la DLQ; `s3:DeleteObject` solo en `qa/*` y `eval/*`; `scheduler:DeleteSchedule` solo en `tm-q-*` y `tm-e-*`; `KILL#AGENT#qa-*` en `Runtime` (nunca los globales) | Política de recurso: solo `qa-runner`. Todo borrado de DynamoDB con `ConditionExpression world IN (:qa, :eval)` |

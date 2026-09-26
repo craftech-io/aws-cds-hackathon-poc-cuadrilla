@@ -14,7 +14,9 @@
 // topic (case DENIED_TOPIC), PROMPT_ATTACK (case PROMPT_INJECTION) or a card number (case OTHER). So it
 // carries no other content filter and no word filter. The document regexes are ANONYMIZE and never
 // block: the normalizer already masked them with the very same patterns, imported from
-// packages/bff/src/lib/mask.ts (never copied), and G1 is the second layer.
+// packages/bff/src/lib/mask.ts (never copied), and G1 is the second layer. The same holds for cards:
+// the normalizer masks a Luhn-valid card before G1 and mask.ts `prefilterBlock` blocks the turn
+// (origin PREFILTER), so G1's card entity only catches what the masker could not see.
 //
 // Topic definitions and examples are written in Mexican Spanish with an English gloss: installers
 // write Spanish and the CLASSIC tier covers both. None of the examples is a text the tests or the
@@ -87,8 +89,9 @@ export interface PiiEntity {
 }
 
 /**
- * Managed PII types of G1. A card number blocks (the worker opens a case OTHER, "datos de tarjeta"),
- * on input as the design asks and on the model's output, where a card can never be legitimate.
+ * Managed PII types of G1. A card number blocks (case OTHER, "datos de tarjeta") on the model's output,
+ * where a card can never be legitimate, and on input as a second layer: a Luhn-valid card never
+ * reaches G1 unmasked, the pre-G1 block of mask.ts `prefilterBlock` handles it (FL-078).
  * Emails and phones are detected and left alone (NONE): identity comes from the registered phone,
  * and the normalizer already masked the phones of the text.
  */

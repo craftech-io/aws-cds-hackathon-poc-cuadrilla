@@ -12,7 +12,9 @@
 // triggers a guardrail regex again (`mask.test.ts` checks it). Bedrock does not support lookarounds
 // in custom regexes and some engines give `\d` a Unicode meaning, so those patterns only use `[0-9]`,
 // `\b` and plain groups, and spell both cases because they take no flags. Cards (Luhn) are not a
-// guardrail regex (G1 and G3 block them with the managed card type), so they may validate.
+// guardrail regex, so they may validate. Because the normalizer masks a card before G1, G1 never sees
+// a Luhn-valid one: the card block of FL-078 is decided here, before G1 (`prefilterBlock`), and the
+// managed card type of G1 and G3 stays only as a second layer (the model's output, the certificate).
 //
 // Pure module on purpose: no imports, so the SST program can load it from infra/.
 
@@ -151,6 +153,37 @@ export function maskSensitive(text: string, kinds: readonly MaskKind[] = SENSITI
     if (current === before) break;
   }
   return { text: current, counts, kinds: selected.filter((kind) => counts[kind] !== undefined) };
+}
+
+/**
+ * Kinds that block the turn before G1 (FL-078 b, docs/architecture.md §9.1): the text is persisted
+ * with the marker, the Harness is never invoked, the installer gets `guardrailRefusal`, a case
+ * `OTHER` opens and `GUARDRAIL_BLOCK` is audited with origin `PREFILTER`, the same path as a G1 block.
+ */
+export const PREFILTER_BLOCK_KINDS = ["CARD"] as const satisfies readonly MaskKind[];
+export type PrefilterBlockKind = (typeof PREFILTER_BLOCK_KINDS)[number];
+
+/** Managed PII entity of the guardrails each blocking kind stands for, so the audit reads the same either way. */
+const BLOCK_ENTITY: Readonly<Record<PrefilterBlockKind, "CREDIT_DEBIT_CARD_NUMBER">> = { CARD: "CREDIT_DEBIT_CARD_NUMBER" };
+
+export interface PrefilterBlock {
+  readonly kind: PrefilterBlockKind;
+  /** Reason of the case the worker opens; the copy names it by `kind` ("datos de tarjeta"). */
+  readonly caseReason: "OTHER";
+  /** `origin` of `GUARDRAIL_BLOCK`. */
+  readonly origin: "PREFILTER";
+  /** `policy` and `entity` of `GUARDRAIL_BLOCK`, as a G1 block of that entity would audit them. */
+  readonly policy: "SENSITIVE_INFORMATION";
+  readonly entity: "CREDIT_DEBIT_CARD_NUMBER";
+  /** The fixed answer to the installer (copy key). */
+  readonly notice: "guardrailRefusal";
+}
+
+/** The pre-G1 block of a normalized text, from the kinds its `maskSensitive` replaced; `undefined` when the turn goes on. */
+export function prefilterBlock(masked: Pick<MaskResult, "kinds">): PrefilterBlock | undefined {
+  const kind = PREFILTER_BLOCK_KINDS.find((candidate) => masked.kinds.includes(candidate));
+  if (kind === undefined) return undefined;
+  return { kind, caseReason: "OTHER", origin: "PREFILTER", policy: "SENSITIVE_INFORMATION", entity: BLOCK_ENTITY[kind], notice: "guardrailRefusal" };
 }
 
 /** `maskSensitive(text, kinds).text`. */
