@@ -31,7 +31,7 @@ El brief aprobado permite presentar la demo en co-branding con el cliente de dis
 
 ## Estado
 
-- **2026-09-26 · decidido por el CTO (`docs/pending.md` P-05, cerrado):** modo **`cobrand`** en `poc`. El CTO tiene la autorización escrita del socio para nombrarlo en Devpost, la landing y el video. El repo, el README y el código siguen genéricos ("design partner"): no hay excepción de `FORBIDDEN_TERMS` para el README. Display name de WhatsApp: "Craftech". Nombre de la submission: "Cuadrilla".
+- **2026-09-26 · decidido por el CTO (`docs/pending.md` P-05, cerrado):** modo **`cobrand`** en `poc`. El CTO tiene la autorización escrita del socio para nombrarlo en Devpost, la landing y el video. Decisión del equipo (no del CTO, más estricta que el brief, que permitía nombrarlo también en el README): el repo, el README y el código siguen genéricos ("design partner") y no hay excepción de `FORBIDDEN_TERMS` para el README; si el CTO pide nombrarlo en el README, se revisa esta línea. Display name de WhatsApp: "Craftech". Nombre de la submission: "Cuadrilla".
 - Los dos SVG públicos del socio (fondo claro y fondo oscuro) se descargaron con la aprobación del CTO fuera del repo; el operador los sube a `Seed/brand/` con `seed:load --brand-logo-on-light/--brand-logo-on-dark`, que los valida (`docs/pending.md` §5). La marca de texto sigue como respaldo.
 
 ## Consequences
