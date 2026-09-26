@@ -1,9 +1,19 @@
-// Texts of the sign-in screens, the recent-login step-up and the optional TOTP enrolment. Error texts never say
-// whether an email has an account (lib/auth/errors.ts).
+// Texts of the sign-in screens, the recent-login step-up and the optional TOTP enrolment, in Mexican
+// Spanish (tuteo); copy.en.ts has the same keys in English (docs/landing-spec.md §7.7). Error texts
+// never say whether an email has an account (lib/auth/errors.ts).
 import type { AuthFlowErrorCode } from "../../lib/auth/errors";
 import type { PasswordRule } from "../../lib/auth/credentials";
 
-export const loginCopy = {
+/** The shape of a copy object with every text as a plain string: the English copy fills the same keys. */
+type Widen<T> = T extends string
+  ? string
+  : T extends (...args: infer A) => infer R
+    ? (...args: A) => Widen<R>
+    : T extends readonly (infer U)[]
+      ? readonly Widen<U>[]
+      : { readonly [K in keyof T]: Widen<T[K]> };
+
+const es = {
   panel: {
     tagline: "Copiloto de campo en WhatsApp para instaladores de fibra",
     title: "Cada instalación, cerrada con evidencia a la primera.",
@@ -12,12 +22,13 @@ export const loginCopy = {
   },
   credentials: {
     title: "Inicia sesión en la consola",
-    lead: "Usa el email y la contraseña de tu invitación.",
+    lead: "Usa tu email y tu contraseña.",
     email: "Email",
     password: "Contraseña",
     submit: "Iniciar sesión",
     forgot: "Olvidé mi contraseña",
     hint: "Tu usuario se crea por invitación. Si no lo tienes, pídeselo a tu supervisor.",
+    tryDemo: { before: "¿Nunca has usado Cuadrilla? ", link: "Prueba la demo" },
     passwordReset: "Listo: tu contraseña cambió. Inicia sesión con la nueva.",
     sessionExpired: "La sesión venció. Inicia sesión de nuevo.",
   },
@@ -101,4 +112,10 @@ export const loginCopy = {
   },
   close: "Cerrar",
   legal: { privacy: "Privacidad", terms: "Términos" },
+  lang: { label: "Idioma", switchTo: "English", short: "EN" },
 } as const;
+
+export type LoginCopy = Widen<typeof es>;
+
+/** The sign-in's texts in Mexican Spanish (the console's language, and the default of `/login`). */
+export const loginCopy: LoginCopy = es;

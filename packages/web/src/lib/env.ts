@@ -1,6 +1,8 @@
 // Build-time configuration of the console, validated at the edge. Vite inlines `import.meta.env`
 // at build time, so a missing variable surfaces here (as an "unconfigured" state on the login
-// screen) instead of as a sign-in that can never work.
+// screen) instead of as a sign-in that can never work. The names are those of infra/auth-email.ts
+// `WEB_ENV_NAMES`; none is a secret (the clients are public, the pool id is in every token, the
+// integration URL of AWS WAF is served to every browser).
 import { z } from "zod";
 import { regionOfPool } from "./auth/cognito";
 
@@ -36,6 +38,33 @@ export function readAuthEnv(): AuthEnvResult {
   const missing = parsed.error.issues.map((issue) => {
     const key = issue.path[0];
     return typeof key === "string" && key in ENV_NAMES ? ENV_NAMES[key as keyof AuthEnv] : String(key);
+  });
+  return { ok: false, missing: [...new Set(missing)] };
+}
+
+const SignupEnvSchema = z.object({
+  /** The public `GuestSignup` client: `SignUp`, `ConfirmSignUp`, `ResendConfirmationCode` only. */
+  signupClientId: z.string().min(1),
+  /** Where the AWS WAF integration SDK lives (`<url>challenge.js`); absent where no WAF fronts the app. */
+  wafIntegrationUrl: z.url({ protocol: /^https$/ }).optional(),
+});
+
+export type SignupEnv = z.infer<typeof SignupEnvSchema>;
+
+export type SignupEnvResult = { readonly ok: true; readonly env: SignupEnv } | { readonly ok: false; readonly missing: readonly string[] };
+
+export const SIGNUP_ENV_NAMES = { signupClientId: "VITE_COGNITO_SIGNUP_CLIENT_ID", wafIntegrationUrl: "VITE_WAF_INTEGRATION_URL" } as const;
+
+function text(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+export function readSignupEnv(env: Readonly<Record<string, unknown>> = import.meta.env): SignupEnvResult {
+  const parsed = SignupEnvSchema.safeParse({ signupClientId: text(env.VITE_COGNITO_SIGNUP_CLIENT_ID), wafIntegrationUrl: text(env.VITE_WAF_INTEGRATION_URL) });
+  if (parsed.success) return { ok: true, env: parsed.data };
+  const missing = parsed.error.issues.map((issue) => {
+    const key = issue.path[0];
+    return typeof key === "string" && key in SIGNUP_ENV_NAMES ? SIGNUP_ENV_NAMES[key as keyof SignupEnv] : String(key);
   });
   return { ok: false, missing: [...new Set(missing)] };
 }

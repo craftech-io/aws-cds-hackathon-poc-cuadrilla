@@ -1,7 +1,7 @@
 // The sign-in machine on screen: one step component per state, the error of the last step and the
 // way back to the start. Used by the login page and by the step-up drawer.
 import type { AuthFlowHandle } from "./use-auth-flow";
-import { loginCopy } from "./copy";
+import { useLoginCopy } from "./auth-lang";
 import { ErrorNote, LinkButton } from "./form-parts";
 import { MfaSetupStep } from "./MfaSetupStep";
 import { CredentialsStep, ForgotConfirmStep, ForgotRequestStep, NewPasswordStep, TotpStep } from "./steps";
@@ -13,21 +13,25 @@ interface AuthFlowPanelProps {
   readonly inDrawer?: boolean;
   /** Shown above the credentials when nothing else is (e.g. "the session expired"). */
   readonly credentialsNotice?: string;
+  /** The email the credentials start with (a finished sign-up whose automatic sign-in did not work). */
+  readonly initialEmail?: string;
 }
 
-export function AuthFlowPanel({ flow, fixedEmail, inDrawer = false, credentialsNotice }: AuthFlowPanelProps) {
+export function AuthFlowPanel({ flow, fixedEmail, inDrawer = false, credentialsNotice, initialEmail }: AuthFlowPanelProps) {
+  const copy = useLoginCopy();
   const { state, error, busy, dispatch } = flow;
   const common = { busy, dispatch, inDrawer };
-  const restart = <LinkButton onClick={() => dispatch({ type: "restart" })}>{state.step === "totp" ? loginCopy.otherUser : loginCopy.back}</LinkButton>;
+  const restart = <LinkButton onClick={() => dispatch({ type: "restart" })}>{state.step === "totp" ? copy.otherUser : copy.back}</LinkButton>;
 
   let body;
   switch (state.step) {
     case "credentials": {
-      const notice = state.notice === "passwordReset" ? loginCopy.credentials.passwordReset : credentialsNotice;
+      const notice = state.notice === "passwordReset" ? copy.credentials.passwordReset : credentialsNotice;
       body = (
         <CredentialsStep
           {...common}
           {...(fixedEmail !== undefined ? { fixedEmail } : {})}
+          {...(initialEmail !== undefined ? { initialEmail } : {})}
           {...(notice !== undefined ? { notice } : {})}
           {...(fixedEmail === undefined ? { onForgot: () => dispatch({ type: "forgot" }) } : {})}
         />
@@ -58,7 +62,7 @@ export function AuthFlowPanel({ flow, fixedEmail, inDrawer = false, credentialsN
   const key = state.step === "credentials" ? `credentials-${state.notice ?? ""}` : state.step;
   return (
     <div className="space-y-4">
-      {error ? <ErrorNote>{loginCopy.errors[error]}</ErrorNote> : null}
+      {error ? <ErrorNote>{copy.errors[error]}</ErrorNote> : null}
       <div key={key}>{body}</div>
       {state.step !== "credentials" && state.step !== "done" && !(inDrawer && state.step === "mfaSetup") ? <div className="text-center">{restart}</div> : null}
     </div>

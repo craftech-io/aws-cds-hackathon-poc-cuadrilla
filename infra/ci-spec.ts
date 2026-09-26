@@ -26,6 +26,8 @@
 // hold them) and the bucket prefix the CI role is fenced to. infra/storage-buckets.ts (WP-06) names
 // the three buckets with `browserBucketName`.
 
+import { WAF_CSP_SOURCES } from "./web-spec";
+
 /** The only stage CI deploys (template parameter DeployStage). */
 export const CI_DEPLOY_STAGE = "poc";
 
@@ -103,19 +105,20 @@ function templateBucketOrigin(purpose: BrowserBucket): string {
 
 /**
  * Content-Security-Policy of the console, landing and legal pages. The console only talks to its own
- * origin, to Cognito's endpoint (SRP sign-in, packages/web/src/lib/auth/cognito.ts) and to the
- * bucket it uploads to; it shows images and audio from its own origin and from the three browser
- * buckets (the TOTP QR is an inline SVG). Scripts only from its own origin, and nothing may frame
- * it. `${...}` is left for CloudFormation to substitute.
+ * origin, to Cognito's endpoint (SRP sign-in and the own sign-up, packages/web/src/lib/auth/cognito.ts),
+ * to the bucket it uploads to and to AWS WAF (the silent challenge of the sign-up, infra/web-spec.ts
+ * WAF_CSP_SOURCES); it shows images and audio from its own origin and from the three browser buckets
+ * (the TOTP QR is an inline SVG). Scripts only from its own origin and the AWS WAF SDK, and nothing
+ * may frame it. `${...}` is left for CloudFormation to substitute.
  */
 export const CONSOLE_CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  `script-src 'self' ${WAF_CSP_SOURCES["script-src"].join(" ")}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${DISPLAY_BUCKETS.map(templateBucketOrigin).join(" ")}`,
   `media-src 'self' blob: ${DISPLAY_BUCKETS.map(templateBucketOrigin).join(" ")}`,
   "font-src 'self' data:",
-  `connect-src 'self' https://cognito-idp.\${Region}.amazonaws.com ${UPLOAD_BUCKETS.map(templateBucketOrigin).join(" ")}`,
+  `connect-src 'self' https://cognito-idp.\${Region}.amazonaws.com ${UPLOAD_BUCKETS.map(templateBucketOrigin).join(" ")} ${WAF_CSP_SOURCES["connect-src"].join(" ")}`,
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'self'",

@@ -1,11 +1,14 @@
 // The two worlds the generator writes rows for (docs/seed-spec.md §3): the operator's demo world and
-// the `guest` template. Both tell the same story; the template carries the placeholder guest number
-// `00` in every id, phone and email of its world (`inst-rogelio-g00`, `wo-24817-g00`, `+52 55 0200
-// 0001`, `success+g00-c10421@…`), which the world factory replaces with the guest world's own tokens
-// (`guestBlock` of lib/synthetic.ts). Nothing of a world names the operator (ADR-0018).
-import { guestClockId } from "@cuadrilla/shared";
-import { guestBlock, simulatorEmail, type SimulatorOutcome } from "../lib/synthetic";
+// the `guest` template. Both tell the same story. The guest world is built with the sample tokens of
+// guest-template.ts (`isp-guest-00`, tag `g00`, block `0200`: a world no guest ever gets) in every id,
+// phone and email (`inst-rogelio-g00`, `wo-24817-g00`, `+52 55 0200 0001`, `success+g00-c10421@…`), and
+// `markGuestTemplate` turns those tokens into the markers the world factory replaces. The console user
+// of a guest belongs to the account, not to the world: `console:invite` or the signup writes it.
+// Nothing of a world names the operator (ADR-0018).
+import { clockIdOfIsp } from "@cuadrilla/shared";
+import { PHONE_PREFIX, simulatorEmail, type SimulatorOutcome } from "../lib/synthetic";
 import { DAY_ORDERS, DEMO_CLOCK, DEMO_ISP, HISTORY_ORDERS, NEXT_DAY_ORDERS, STAFF, type OrderDef, type StaffDef } from "./catalog";
+import { SAMPLE_GUEST_TOKENS } from "./guest-template";
 
 export type WorldKind = "DEMO" | "GUEST";
 
@@ -17,7 +20,7 @@ export interface WorldSpec {
   readonly staff: readonly StaffDef[];
   /** Orders of the world, each with its received power already resolved for the history. */
   readonly orders: readonly OrderDef[];
-  readonly consoleUsers: ReadonlyArray<{ readonly userId: string; readonly role: "SUPERVISOR" | "OPS" | "GUEST"; readonly name: string }>;
+  readonly consoleUsers: ReadonlyArray<{ readonly userId: string; readonly role: "SUPERVISOR" | "OPS"; readonly name: string }>;
   readonly opsMailbox: string;
   readonly unknownNumber: string;
   personId(base: string): string;
@@ -36,11 +39,10 @@ export function supervisorUser(world: WorldSpec): { readonly userId: string; rea
   return user;
 }
 
-/** Placeholder guest of the `guest` template. */
-export const TEMPLATE_GUEST = 0;
-
+/** `+52 55`, the four digits of a world's block and a four-digit slot `0xxx`. */
 function phone(block: string, slot: number): string {
-  return `${block}${String(slot).padStart(4, "0")}`;
+  if (!Number.isInteger(slot) || slot < 0 || slot > 999) throw new RangeError(`phone slot out of 0xxx: ${slot}`);
+  return `${PHONE_PREFIX}${block}${String(slot).padStart(4, "0")}`;
 }
 
 /** Slot of a person inside a world's block: installers 0001-0010, supervisors 0011-0020. */
@@ -80,22 +82,18 @@ export const GUEST_STAFF = ["inst-rogelio", "inst-karina", "inst-julian", "inst-
 export const GUEST_ORDERS = ["24801", "24802", "24803", "24804", "24805", "24806", "24817", "24818", "24819", "24820", "24821", "24822", "24830", "24831", "24840", "24842", "24850", "24851", "24852", "24853"] as const;
 
 export function guestWorld(historyRx: ReadonlyMap<string, number>): WorldSpec {
-  const tokens = guestBlock(TEMPLATE_GUEST);
+  const tokens = SAMPLE_GUEST_TOKENS;
   const tag = tokens.clockTag;
-  const clockId = guestClockId(TEMPLATE_GUEST);
   const all = [...withHistoryRx(historyRx), ...DAY_ORDERS, ...NEXT_DAY_ORDERS];
   return {
     name: "guest",
     kind: "GUEST",
-    ispId: clockId.slice("GUEST#".length),
-    clockId,
+    ispId: tokens.ispId,
+    clockId: clockIdOfIsp(tokens.ispId),
     staff: STAFF.filter((person) => (GUEST_STAFF as readonly string[]).includes(person.personId)),
     orders: all.filter((order) => (GUEST_ORDERS as readonly string[]).includes(order.number)),
     // The supervisor's user signs the manual validations of the 12/10 history; nobody logs in with it.
-    consoleUsers: [
-      { userId: `usr-guest-${tokens.number}`, role: "GUEST", name: "Invitado" },
-      { userId: `usr-adriana-${tag}`, role: "SUPERVISOR", name: "Adriana Solís" },
-    ],
+    consoleUsers: [{ userId: `usr-adriana-${tag}`, role: "SUPERVISOR", name: "Adriana Solís" }],
     opsMailbox: simulatorEmail("success", `ops-${tag}`),
     unknownNumber: phone(tokens.phoneBlock, 999),
     personId: (base) => `${base}-${tag}`,

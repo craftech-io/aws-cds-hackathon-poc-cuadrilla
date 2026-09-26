@@ -17,6 +17,8 @@ import { readLinked } from "../lib/resource";
 import { withRetry } from "../lib/retry";
 import { type NetworkClient, networkClient } from "../network/client";
 import { type HttpResponse, type HttpTransport, sigv4Transport } from "../network/sigv4";
+import type { SignupPorts } from "../signup/start";
+import type { GuestPorts } from "./guest";
 
 export type MockHealth = "OK" | "UNAVAILABLE";
 
@@ -40,6 +42,12 @@ export interface ContextDeps {
   readonly wallClock: () => Date;
   /** One logger per request, bound to its correlation id. */
   readonly loggerFor: (correlationId: string) => Logger;
+  /**
+   * The ports of `signup.start` and of the `guest` router for a local server or a test (memory
+   * stores, a DNS stand-in). The Lambda never sets them: its routers build theirs from the links.
+   */
+  readonly signup?: () => SignupPorts;
+  readonly guest?: () => GuestPorts;
 }
 
 // Same budget as the network client (docs/architecture-integrations.md §6): 3 s per attempt, 2 retries.

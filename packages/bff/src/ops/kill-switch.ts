@@ -1,12 +1,15 @@
 // The runtime kill switch (ADR-0019): stops spending without a deploy. It is data in `Runtime`:
 //
-//   KILL#ALL             the agent, the simulator and every console write
+//   KILL#ALL             the agent, the simulator, every console write and the own sign-up
 //   KILL#SIMULATOR       the phone simulator stops accepting messages
 //   KILL#AGENT           no Harness turn, transcription or photo validation in any world
 //   KILL#AGENT#<clockId> the same for one world (the only one the QaDriver may write, `qa-*` only)
+//   KILL#SIGNUP          the own sign-up (ADR-0025 §4): `signup.start` and the pre sign-up answer
+//                        CAP_REACHED and no sign-up code nor resend is sent; sign-in, recovery and the
+//                        worlds that exist go on
 //
-// The BFF, the worker, `InboundWhatsApp` and `createToolHandler` read it through a reader that
-// caches each item for at most 30 seconds. Physical safety is never cut: the classifier, the fixed
+// The BFF, the worker, `InboundWhatsApp`, `createToolHandler` and the sign-up triggers read it
+// through a reader that caches each item for at most 30 seconds. Physical safety is never cut: the classifier, the fixed
 // §SEG-01 instruction and the alerts use no model and never ask this module (`report_safety_hazard`
 // is exempt from the tool gate). The operator (`npm run ops:kill`) turns it on and off; `CostGuard`
 // may only turn it on; the QaDriver only the switch of a `qa-*` world. Cedar's `CED-KILL-SWITCH`
@@ -61,12 +64,14 @@ export interface KillSwitchStore {
 }
 
 /** What the switch blocks. The console is only blocked by `KILL#ALL` (it goes read-only). */
-export type KillSurface = "AGENT" | "SIMULATOR" | "CONSOLE";
+export type KillSurface = "AGENT" | "SIMULATOR" | "CONSOLE" | "SIGNUP";
 
 export interface KillStatus {
   readonly all: boolean;
   readonly simulator: boolean;
   readonly agent: boolean;
+  /** `KILL#SIGNUP`; the reader always answers it, a status built by hand may leave it out (off). */
+  readonly signup?: boolean;
   /** The AGENT switch of the world asked about, when a world was named. */
   readonly world?: { readonly clockId: string; readonly agent: boolean };
 }
@@ -76,6 +81,7 @@ export function blockingScope(status: KillStatus, surface: KillSurface): KillSco
   if (status.all) return "ALL";
   if (surface === "SIMULATOR" && status.simulator) return "SIMULATOR";
   if (surface === "AGENT" && (status.agent || status.world?.agent === true)) return "AGENT";
+  if (surface === "SIGNUP" && status.signup === true) return "SIGNUP";
   return undefined;
 }
 
@@ -143,10 +149,10 @@ export function createKillSwitchReader(deps: KillSwitchReaderDeps): KillSwitchRe
   return {
     async status(clockId) {
       const worldKey = clockId === undefined ? undefined : killSwitchKey("AGENT", clockId);
-      const keys = [killSwitchKey("ALL"), killSwitchKey("SIMULATOR"), killSwitchKey("AGENT"), ...(worldKey === undefined ? [] : [worldKey])];
+      const keys = [killSwitchKey("ALL"), killSwitchKey("SIMULATOR"), killSwitchKey("AGENT"), killSwitchKey("SIGNUP"), ...(worldKey === undefined ? [] : [worldKey])];
       await load(keys, (await realClock.now()).getTime());
       const on = (key: string): boolean => cache.get(key)?.on === true;
-      const status: KillStatus = { all: on("KILL#ALL"), simulator: on("KILL#SIMULATOR"), agent: on("KILL#AGENT") };
+      const status: KillStatus = { all: on("KILL#ALL"), simulator: on("KILL#SIMULATOR"), agent: on("KILL#AGENT"), signup: on("KILL#SIGNUP") };
       return worldKey === undefined || clockId === undefined ? status : { ...status, world: { clockId, agent: on(worldKey) } };
     },
     invalidate: () => cache.clear(),

@@ -11,6 +11,8 @@ import {
   ABORT_MULTIPART_AFTER_DAYS,
   BUCKET_LOGICAL_NAME_MAX_LENGTH,
   BUCKET_SPECS,
+  GUEST_PREFIX,
+  GUEST_RETENTION_DAYS,
   MANUAL_PREFIX,
   MEDIA_TRANSCRIPTS_PREFIX,
   MOCK_TABLES,
@@ -29,10 +31,9 @@ import {
   parseStorageRef,
   storageFor,
   tableFields,
-  type BucketSpec,
-  type IndexSpec,
-  type TableSpec,
 } from "./storage-keys";
+import type { BucketSpec, IndexSpec, TableSpec } from "./storage-keys";
+import { LEADS_TABLE, LEADS_TABLE_SPEC } from "./leads-spec";
 
 const APP = "aws-cds-hackathon-poc-cuadrilla";
 const STAGE = "poc";
@@ -41,17 +42,10 @@ const APP_ORIGIN = "https://cuadrilla.demo.craftech.io";
 
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), "utf8");
 const architecture = read("docs/architecture.md");
-const allDocs = readdirSync(resolve(process.cwd(), "docs"))
-  .filter((file) => file.endsWith(".md"))
-  .map((file) => read(`docs/${file}`))
-  .join("\n");
+const allDocs = readdirSync(resolve(process.cwd(), "docs")).filter((file) => file.endsWith(".md")).map((file) => read(`docs/${file}`)).join("\n");
 const infraSource = (file: string): string => read(`infra/${file}`);
 /** An infra module without its comment lines, for checks on what the code does. */
-const infraCode = (file: string): string =>
-  infraSource(file)
-    .split("\n")
-    .filter((line) => !line.trim().startsWith("//"))
-    .join("\n");
+const infraCode = (file: string): string => infraSource(file).split("\n").filter((line) => !line.trim().startsWith("//")).join("\n");
 
 function section(start: string, end: string): string {
   return architecture.slice(architecture.indexOf(start), architecture.indexOf(end));
@@ -103,16 +97,12 @@ function documentedTables(): Map<string, TableSpec> {
   return tables;
 }
 
-/** What §5 and §6 already document for wave 2b.2 (WP-56); each entry leaves in the change that declares it. */
-const PLANNED_TABLES: readonly string[] = ["Leads"];
-const PLANNED_PREFIXES: Partial<Record<BucketName, readonly string[]>> = { Media: ["guest/"], Evidence: ["guest/"] };
-
 describe("DynamoDB tables of docs/architecture.md §5", () => {
   const documented = documentedTables();
-  it("declares every table of §5 except the two the mocks own and the planned ones", () => {
+  it("declares every table of §5: this module's, the two the mocks own and Leads (infra/leads.ts)", () => {
     expect([...MOCK_TABLES]).toEqual(["Network", "Dispatch"]);
-    for (const name of PLANNED_TABLES) expect(STORAGE_TABLES as readonly string[], `${name} is declared: remove it from PLANNED_TABLES`).not.toContain(name);
-    expect([...STORAGE_TABLES, ...MOCK_TABLES, ...PLANNED_TABLES].sort()).toEqual([...documented.keys()].sort());
+    expect([...STORAGE_TABLES, ...MOCK_TABLES, LEADS_TABLE].sort()).toEqual([...documented.keys()].sort());
+    expect(LEADS_TABLE_SPEC).toEqual(documented.get(LEADS_TABLE));
   });
 
   it.each(STORAGE_TABLES)("keeps the GSIs and the TTL of %s exactly as §5", (name) => {
@@ -211,9 +201,7 @@ describe("S3 buckets of docs/architecture.md §6", () => {
   });
 
   it.each(STORAGE_BUCKETS)("keeps the key layout of %s as the docs state it", (name) => {
-    const planned = PLANNED_PREFIXES[name] ?? [];
-    for (const prefix of planned) expect(spec(name).prefixes, `${name}/${prefix} is declared: remove it from PLANNED_PREFIXES`).not.toContain(prefix);
-    const inTable = (documented.get(name)?.prefixes ?? []).filter((key) => !planned.some((prefix) => key.startsWith(prefix)));
+    const inTable = documented.get(name)?.prefixes ?? [];
     expect(inTable.length).toBeGreaterThan(0);
     for (const key of inTable) expect(spec(name).prefixes.some((prefix) => key.startsWith(prefix)), key).toBe(true);
     for (const prefix of spec(name).prefixes) {
@@ -237,7 +225,14 @@ describe("S3 buckets of docs/architecture.md §6", () => {
     expect(lifecycleRules(spec("Evidence")).slice(1)).toEqual([
       { id: "expire-qa", status: "Enabled", filter: { prefix: "qa/" }, expiration: { days: 2 } },
       { id: "expire-eval", status: "Enabled", filter: { prefix: "eval/" }, expiration: { days: 2 } },
+      { id: "expire-guest", status: "Enabled", filter: { prefix: "guest/" }, expiration: { days: 9 } },
     ]);
+  });
+
+  it("expires guest/ in 9 days where guest worlds keep media and evidence, as §6 and ADR-0026 state", () => {
+    for (const name of STORAGE_BUCKETS) expect(prefixDays(name, GUEST_PREFIX), name).toBe(["Media", "Evidence"].includes(name) ? GUEST_RETENTION_DAYS : undefined);
+    expect(days("Media", /`guest\/` (\d+) días/)).toBe(GUEST_RETENTION_DAYS);
+    expect(days("Evidence", /`guest\/` (\d+) días/)).toBe(GUEST_RETENTION_DAYS);
   });
 
   it("expires qa/ and eval/ within two days in exactly the buckets QA and evaluation worlds write to", () => {

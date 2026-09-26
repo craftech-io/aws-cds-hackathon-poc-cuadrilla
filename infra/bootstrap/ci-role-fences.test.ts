@@ -19,6 +19,9 @@ describe("fixed names of docs/architecture.md §1", () => {
     ["kb-aws-cds-hackathon-poc-cuadrilla-poc-manual", "vector bucket", `${PREFIX}s3vectors:\${Region}:\${AWS::AccountId}:bucket/kb-\${AppName}-*"`],
     ["cuadrilla-poc-ftth-es-mx", "Transcribe vocabulary", `${PREFIX}transcribe:\${Region}:\${AWS::AccountId}:vocabulary/cuadrilla-poc-*"`],
     ["cuadrilla-poc-<sha256", "Transcribe jobs", `${PREFIX}transcribe:\${Region}:\${AWS::AccountId}:transcription-job/cuadrilla-poc-*"`],
+    ["aws-cds-hackathon-poc-cuadrilla-poc-edge", "edge web ACL", `${PREFIX}wafv2:\${Region}:\${AWS::AccountId}:global/webacl/\${AppName}-*"`],
+    ["aws-cds-hackathon-poc-cuadrilla-poc-auth", "user pool web ACL", `${PREFIX}wafv2:\${Region}:\${AWS::AccountId}:regional/webacl/\${AppName}-*"`],
+    ["aws-cds-hackathon-poc-cuadrilla-poc-guest-account-deletion", "account deletion", `${PREFIX}lambda:\${Region}:\${AWS::AccountId}:function:\${AppName}-\${DeployStage}-guest-account-deletion"`],
   ];
   const architecture = read("docs/architecture.md");
   const statements = statementsOf(template);

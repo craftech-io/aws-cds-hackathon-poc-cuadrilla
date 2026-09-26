@@ -15,12 +15,15 @@
 // through SST's Route 53 adapter of infra/dns.ts, pinned to the delegated zone.
 //
 // Configuration set. Fixed name `aws-cds-hackathon-poc-cuadrilla-email-poc` (the CI role fences it by
-// ARN). The app's SES client names it in every SendEmail; it is not the identity's default, so the
-// Cognito emails of infra/auth.ts (`no-reply@`, sent by Cognito's service-linked role) never produce
-// events for ChannelEvents. Events SEND, DELIVERY, BOUNCE, COMPLAINT, REJECT, DELIVERY_DELAY and
-// RENDERING_FAILURE go to the default EventBridge bus (the only bus SES publishes to); one rule on it,
-// filtered by the `ses:configuration-set` tag of our set (the other app shares the bus), invokes
-// ChannelEvents. The Function belongs to infra/workers.ts (WP-27), which sst.config.ts evaluates after
+// ARN). The app's SES client names it in every SendEmail, and the user pool sends Cognito's emails of
+// infra/auth.ts (`no-reply@`) through it too (`EmailConfiguration.ConfigurationSet`, ADR-0025 §4).
+// Events SEND, DELIVERY, BOUNCE, COMPLAINT, REJECT, DELIVERY_DELAY and RENDERING_FAILURE go to the
+// default EventBridge bus (the only bus SES publishes to); one rule on it, filtered by the
+// `ses:configuration-set` tag of our set (the other app shares the bus) and by the product's `mailId`
+// tag (Cognito's untagged emails never reach it), invokes ChannelEvents. A second destination
+// publishes `Send`, `Bounce` and `Complaint` to CloudWatch with the dimension `kind` of the message tag,
+// `AUTH` by default: the authentication emails, whose bounces and complaints cut the sign-up
+// (infra/cost-guard.ts) before the reputation of the shared account suffers. The Function belongs to infra/workers.ts (WP-27), which sst.config.ts evaluates after
 // this module: it is read with a late link, and a workers module that does not export it fails the
 // deploy instead of leaving the certificates without delivery events.
 //
@@ -43,7 +46,8 @@
 //     no ConfigurationSetName
 //   aws --profile craftech-demos sesv2 get-configuration-set-event-destinations \
 //     --configuration-set-name aws-cds-hackathon-poc-cuadrilla-email-poc
-//     one destination `channel-events`, EventBridge default bus, the seven types, no OPEN or CLICK
+//     `channel-events`: EventBridge default bus, the seven types, no OPEN or CLICK;
+//     `auth-metrics`: CloudWatch, SEND/BOUNCE/COMPLAINT, dimension kind (MESSAGE_TAG, default AUTH)
 //   dig +short TXT _dmarc.cuadrilla.demo.craftech.io     "v=DMARC1; p=reject; adkim=r; aspf=r"
 //   dig +short MX bounce.cuadrilla.demo.craftech.io      10 feedback-smtp.us-east-1.amazonses.com
 //   dig +short MX cuadrilla.demo.craftech.io             (nothing: no inbound MX)
@@ -53,6 +57,7 @@
 import { appDomain, dns, mailFromDomain } from "./dns";
 import { lateLinks } from "./late-links";
 import {
+  AUTH_METRICS_DESTINATION_NAME,
   CHANNEL_EVENTS_EXPORT,
   CONFIGURATION_SET_NAME,
   DKIM_KEY_LENGTH,
@@ -62,7 +67,9 @@ import {
   EMAIL_EVENT_TYPES,
   EMAIL_LINK_NAME,
   EVENT_DESTINATION_NAME,
+  KIND_DIMENSION,
   MAIL_FROM_BEHAVIOR_ON_MX_FAILURE,
+  METRIC_EVENT_TYPES,
   MAIL_FROM_DOMAIN,
   assertDeclaredArns,
   defaultEventBusArn,
@@ -130,6 +137,17 @@ export const emailEventDestination = new aws.sesv2.ConfigurationSetEventDestinat
     enabled: true,
     matchingEventTypes: [...EMAIL_EVENT_TYPES],
     eventBridgeDestination: { eventBusArn },
+  },
+});
+
+/** CloudWatch metrics by `kind` (AUTH by default): the cut of the sign-up watches them. */
+export const authMetricsDestination = new aws.sesv2.ConfigurationSetEventDestination("EmailAuthMetrics", {
+  configurationSetName: emailConfigurationSet.configurationSetName,
+  eventDestinationName: AUTH_METRICS_DESTINATION_NAME,
+  eventDestination: {
+    enabled: true,
+    matchingEventTypes: [...METRIC_EVENT_TYPES],
+    cloudWatchDestination: { dimensionConfigurations: [{ ...KIND_DIMENSION }] },
   },
 });
 

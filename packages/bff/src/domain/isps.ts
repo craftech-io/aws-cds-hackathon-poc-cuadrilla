@@ -8,6 +8,7 @@ import {
   ConsoleRole,
   ConsoleUserId,
   CrewId,
+  GuestOrigin,
   IsoInstant,
   IspId,
   IspKind,
@@ -56,6 +57,8 @@ export const SimulatorCaps = z.object({
   transcribeSecPerDay: z.int().min(0),
   emailsPerDay: z.int().min(0),
   messagesPerRealHourPerIdentity: z.int().min(0),
+  /** Scene jumps per real hour; the `SIGNUP` profile sets its own (docs/seed-spec.md §4). */
+  sceneJumpsPerRealHour: z.int().min(0).optional(),
 });
 export type SimulatorCaps = z.infer<typeof SimulatorCaps>;
 
@@ -75,6 +78,10 @@ export const IspSettings = defineEntity("IspSettings", {
   templateStatus: z.partialRecord(TemplateName, TemplateStatus).default({}),
   costBudgetUsdPerConversation: z.number().min(0).optional(),
   rateLimitPerHour: z.int().min(0).optional(),
+  /** Profile of a guest world's caps (`INVITED`, `TEST`, `SIGNUP`; docs/seed-spec.md §4), written by the world factory. */
+  capsProfile: GuestOrigin.optional(),
+  /** The guest a sign-up generation belongs to: its account quota and sub-ceiling (ops/cost-caps.ts, ADR-0025 §3). */
+  ownerUserId: ConsoleUserId.optional(),
   /** Only `qa-*` worlds: test values of the stage's ceiling, under keys of their own (ops/cost-caps.ts). */
   globalCapsOverride: z
     .object({ turnsPerDay: z.int().min(0), validationsPerDay: z.int().min(0), transcribeSecondsPerDay: z.int().min(0) })
@@ -121,7 +128,9 @@ export type ShiftRoster = z.infer<typeof ShiftRoster>;
 /**
  * A console user. The row, found by the Cognito `sub` (`GSI1 SUB#<sub>`), is the only source of the
  * token's `ispId` and role (never `custom:ispId`). Seeded with an empty `cognitoSub`, which
- * `console:invite` fills and a reload keeps.
+ * `console:invite` fills and a reload keeps. A guest carries its origin (ADR-0024); a guest of the own
+ * sign-up also its Cognito user (`gst-<ULID>`, the only handle the deletion calls Cognito with) and
+ * its last sign-in, and lives in the operator of its current world generation (ADR-0025 §2).
  */
 export const ConsoleUser = defineEntity("ConsoleUser", {
   ispId: IspId,
@@ -131,5 +140,8 @@ export const ConsoleUser = defineEntity("ConsoleUser", {
   cognitoSub: z.string().max(128).default(""),
   active: z.boolean().default(true),
   email: EmailAddress.optional(),
+  guestOrigin: GuestOrigin.optional(),
+  cognitoUsername: z.string().regex(/^[A-Za-z0-9_.@+-]{1,128}$/).optional(),
+  lastLoginAt: IsoInstant.optional(),
 });
 export type ConsoleUser = z.infer<typeof ConsoleUser>;

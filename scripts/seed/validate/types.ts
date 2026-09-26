@@ -1,5 +1,6 @@
 // One invariant of docs/seed-spec.md §14 as `seed:validate` runs it: an id, a title and a check over
 // the bundle that returns errors (the seed is wrong) and warnings (something to know, not a failure).
+import { SAMPLE_GUEST_TOKENS } from "../generate/guest-template";
 import type { SeedBundle } from "./bundle";
 
 export interface CheckEnv {
@@ -36,7 +37,8 @@ export function duplicates(values: readonly string[]): string[] {
   return [...repeated];
 }
 
-/** The id of a person or customer without the placeholder guest tag (`inst-rogelio-g00` → `inst-rogelio`). */
+/** The id of a person or customer without the tag of the sample guest world (`inst-rogelio-g00` → `inst-rogelio`). */
 export function baseId(id: string): string {
-  return id.replace(/-g00$/, "");
+  const tag = `-${SAMPLE_GUEST_TOKENS.clockTag}`;
+  return id.endsWith(tag) ? id.slice(0, -tag.length) : id;
 }

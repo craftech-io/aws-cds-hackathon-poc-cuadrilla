@@ -5,7 +5,7 @@ import { principalFromClaims } from "../auth/principal";
 import { createTestIssuer } from "../auth/testing";
 import { createMemoryConnector, type Connector } from "../connector/index";
 import { createLogger } from "../lib/log";
-import { CUSTOM_ISP_ID_ATTRIBUTE, type PreTokenDeps, createPreTokenHandler, decideTokenClaims } from "./pre-token";
+import { CUSTOM_ISP_ID_ATTRIBUTE, INDEX_RETRY_DELAYS_MS, type PreTokenDeps, createPreTokenHandler, decideTokenClaims, resolveRegistryUser } from "./pre-token";
 
 const SUB_ADRIANA = "7f1c9d2e-0000-4000-8000-00000000ad01";
 const SUB_GUEST = "7f1c9d2e-0000-4000-8000-00000000d707";
@@ -141,5 +141,56 @@ describe("pre token generation trigger [FL-079] [FL-081]", () => {
     expect(decideTokenClaims(row, "isp-guest-01")).toEqual({ kind: "STAMP", user: row, ignoredIspId: "isp-guest-01" });
     expect(decideTokenClaims(undefined, "isp-demo")).toEqual({ kind: "NO_PRINCIPAL", why: "UNREGISTERED" });
     expect(decideTokenClaims({ ...row, role: "GUEST" }, undefined)).toEqual({ kind: "NO_PRINCIPAL", why: "INCONSISTENT" });
+  });
+});
+
+describe("[FL-108] the registry row of a guest of the own sign-up, as the post triggers leave it", () => {
+  const SUB_SIGNUP = "7f1c9d2e-0000-4000-8000-00000000s001";
+  const OLD = "isp-guest-s261001abcde";
+  const NEW = "isp-guest-s261009vwxyz";
+  const USER = "usr-g01K60000000000000000000001";
+  const signupRow = (ispId: string) => ({ ispId, userId: USER, role: "GUEST" as const, name: "Invitado", cognitoSub: SUB_SIGNUP, guestOrigin: "SIGNUP" as const, cognitoUsername: "gst-01K60000000000000000000001" });
+
+  it("[FL-108] stamps the generation's operator, role GUEST and isGuest for a sign-up guest", async () => {
+    const data = createMemoryConnector().connector;
+    await data.isps.putUser(signupRow(NEW));
+    const deps: PreTokenDeps = { findUserBySub: (sub) => resolveRegistryUser(data.isps, sub, async () => undefined), audit: data.audit, newLogger: () => createLogger({ sink: () => undefined }) };
+    const result = await createPreTokenHandler(() => deps)(event({ sub: SUB_SIGNUP }));
+    expect(result.response.claimsAndScopeOverrideDetails.idTokenGeneration?.claimsToAddOrOverride).toEqual({ ispId: NEW, userId: USER, role: "GUEST", isGuest: "true" });
+  });
+
+  it("[FL-111] right after a new generation the index may still list the old row: only the live one is stamped", async () => {
+    const data = createMemoryConnector().connector;
+    await data.isps.putUser(signupRow(NEW));
+    const stale = { ...(await data.isps.getUser(NEW, USER)), ispId: OLD };
+    const isps = { listUsersBySub: async () => [stale as never, (await data.isps.getUser(NEW, USER)) as never], getUser: (ispId: string, userId: string) => data.isps.getUser(ispId, userId) };
+    expect((await resolveRegistryUser(isps, SUB_SIGNUP, async () => undefined))?.ispId).toBe(NEW);
+  });
+
+  it("[FL-105] an index that does not show the row yet is read again within the deadline; nothing live after that opens nothing", async () => {
+    const data = createMemoryConnector().connector;
+    const waits: number[] = [];
+    let reads = 0;
+    const isps = {
+      listUsersBySub: async (sub: string, limit: number) => {
+        reads += 1;
+        if (reads === 2) await data.isps.putUser(signupRow(NEW));
+        return data.isps.listUsersBySub(sub, limit);
+      },
+      getUser: (ispId: string, userId: string) => data.isps.getUser(ispId, userId),
+    };
+    expect((await resolveRegistryUser(isps, SUB_SIGNUP, async (ms) => void waits.push(ms)))?.ispId).toBe(NEW);
+    expect(waits).toEqual([INDEX_RETRY_DELAYS_MS[0]]);
+    const none: number[] = [];
+    expect(await resolveRegistryUser(data.isps, "sub-nobody", async (ms) => void none.push(ms))).toBeUndefined();
+    expect(none).toEqual([...INDEX_RETRY_DELAYS_MS]);
+    expect(INDEX_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0)).toBeLessThan(2_000);
+  });
+
+  it("two live rows of one sub open nothing", async () => {
+    const data = createMemoryConnector().connector;
+    await data.isps.putUser(signupRow(NEW));
+    await data.isps.putUser(signupRow(OLD));
+    expect(await resolveRegistryUser(data.isps, SUB_SIGNUP, async () => undefined)).toBeUndefined();
   });
 });

@@ -183,3 +183,76 @@ describe("globalCapUsage", () => {
     ]);
   });
 });
+
+describe("[FL-112] worlds of the own sign-up: world → account → sub-ceiling → global ceiling (ADR-0025 §3)", () => {
+  const SIGNUP_CAPS: GlobalCostCaps = { ...GLOBAL, guestSignup: { turnsPerDay: 600, validationsPerDay: 150, transcribeSecondsPerDay: 1800, perUserTurnsPerDay: 40 } };
+  const OWNER = "usr-g01K60000000000000000000001";
+  const signupWorld = (ispId = "isp-guest-s261020abcde", ownerUserId: string | null = OWNER) => ({
+    clockId: `GUEST#${ispId}`,
+    settings: {
+      turnCaps: { perHour: 20, perDay: 60 },
+      simulatorCaps: { turnsPerHour: 20, turnsPerDay: 60, validationsPerDay: 20, transcribeSecPerDay: 300, emailsPerDay: 10, messagesPerRealHourPerIdentity: 15 },
+      capsProfile: "SIGNUP",
+      ...(ownerUserId === null ? {} : { ownerUserId }),
+    },
+  });
+
+  it("[FL-112] plans the account's quota and the sub-ceiling between the world's caps and the global ceiling", () => {
+    const keys = (request: ReserveCostRequest) => planCounters(request, SIGNUP_CAPS, new Date(REAL)).map((counter) => [counter.key, counter.limit, counter.tier ?? counter.ledger]);
+    expect(keys({ world: signupWorld(), resource: "turns", amount: 1, reserve: ["SIMULATOR", "OPERATOR", "GLOBAL"] })).toEqual([
+      ["SIMCAP#GUEST#isp-guest-s261020abcde#turns#2026-10-20T15", 20, "SIMULATOR"],
+      ["SIMCAP#GUEST#isp-guest-s261020abcde#turns#2026-10-20", 60, "SIMULATOR"],
+      ["TURNCAP#isp-guest-s261020abcde#2026-10-20T15", 20, "OPERATOR"],
+      ["TURNCAP#isp-guest-s261020abcde#2026-10-20", 60, "OPERATOR"],
+      [`TURNCAP#GUESTUSER#${OWNER}#2026-10-20`, 40, "GUEST_ACCOUNT"],
+      ["TURNCAP#GUESTSIGNUP#2026-10-20", 600, "GUEST_SIGNUP"],
+      ["TURNCAP#GLOBAL#2026-10-20", 1500, "GLOBAL"],
+    ]);
+    expect(keys({ world: signupWorld(), resource: "validations", amount: 1, reserve: ["GLOBAL"] })).toEqual([
+      ["VALCAP#GUESTSIGNUP#2026-10-20", 150, "GUEST_SIGNUP"],
+      ["VALCAP#GLOBAL#2026-10-20", 400, "GLOBAL"],
+    ]);
+    expect(keys({ world: signupWorld(), resource: "transcribe", amount: 12, reserve: ["GLOBAL"] })).toEqual([
+      ["TRANSCRIBE#GUESTSIGNUP#2026-10-20", 1800, "GUEST_SIGNUP"],
+      ["TRANSCRIBE#GLOBAL#2026-10-20", 5400, "GLOBAL"],
+    ]);
+    // An invited guest's world never touches the sign-up keys.
+    expect(keys(turnSpend(GUEST)).map(([key]) => key)).toEqual(["TURNCAP#isp-guest-07#2026-10-20T15", "TURNCAP#isp-guest-07#2026-10-20", "TURNCAP#GLOBAL#2026-10-20"]);
+  });
+
+  it("[FL-112] with the sub-ceiling full a sign-up world spends nothing, and an invited world still reserves", async () => {
+    const { deps, store, used } = setup(SIGNUP_CAPS);
+    await store.reserve([{ key: "TURNCAP#GUESTSIGNUP#2026-10-20", ledger: "GLOBAL", resource: "turns", period: "DAY", limit: 600, amount: 600, expiresAt: 0, resetsAtReal: "" }], { nowIso: new Date(REAL).toISOString() });
+    const refused = await reserveCost(deps, turnSpend(signupWorld()));
+    expect(refused).toMatchObject({ ok: false, code: "CAP_REACHED", counter: { key: "TURNCAP#GUESTSIGNUP#2026-10-20", tier: "GUEST_SIGNUP" } });
+    if (refused.ok || refused.code !== "CAP_REACHED") throw new Error("expected a refusal");
+    expect(costFailure(refused)).toMatchObject({ ok: false, error: { code: "CAP_REACHED", reason: "GUEST_SIGNUP" } });
+    expect(used("TURNCAP#GLOBAL#2026-10-20")).toBe(0);
+    expect(used(`TURNCAP#GUESTUSER#${OWNER}#2026-10-20`)).toBe(0);
+    expect(await reserveCost(deps, turnSpend(GUEST))).toMatchObject({ ok: true });
+    expect(used("TURNCAP#GLOBAL#2026-10-20")).toBe(1);
+  });
+
+  it("[FL-112] the account's 40 turns a day hold across generations of the same guest", async () => {
+    const { deps, used } = setup(SIGNUP_CAPS);
+    for (let turn = 0; turn < 40; turn += 1) {
+      const world = signupWorld(turn < 20 ? "isp-guest-s261020abcde" : "isp-guest-s261020fghij");
+      expect(await reserveCost(deps, { world, resource: "turns", amount: 1, reserve: ["GLOBAL"], surface: "AGENT" })).toMatchObject({ ok: true });
+    }
+    expect(used(`TURNCAP#GUESTUSER#${OWNER}#2026-10-20`)).toBe(40);
+    expect(await reserveCost(deps, { world: signupWorld("isp-guest-s261020klmno"), resource: "turns", amount: 1, reserve: ["GLOBAL"], surface: "AGENT" })).toMatchObject({ ok: false, code: "CAP_REACHED", counter: { tier: "GUEST_ACCOUNT" } });
+    expect(used("TURNCAP#GUESTSIGNUP#2026-10-20")).toBe(40);
+    expect(used("TURNCAP#GLOBAL#2026-10-20")).toBe(40);
+  });
+
+  it("[FL-112] KILL# stays above everything; a world without its guest, or a stage without the sub-ceiling, spends nothing", async () => {
+    const { deps, store, kill, used } = setup(SIGNUP_CAPS);
+    await setKillSwitch({ store, reader: kill }, { scope: "AGENT", on: true, actor: "OPERATOR" });
+    expect(await reserveCost(deps, turnSpend(signupWorld()))).toMatchObject({ ok: false, code: "KILL_SWITCH_ACTIVE", scope: "AGENT" });
+    expect(used(`TURNCAP#GUESTUSER#${OWNER}#2026-10-20`)).toBe(0);
+    await setKillSwitch({ store, reader: kill }, { scope: "AGENT", on: false, actor: "OPERATOR" });
+    expect(await reserveCost(deps, turnSpend(signupWorld("isp-guest-s261020abcde", null)))).toMatchObject({ ok: false, code: "CAP_REACHED", counter: { tier: "GUEST_ACCOUNT", limit: 0 } });
+    const bare = setup(GLOBAL);
+    expect(await reserveCost(bare.deps, { world: signupWorld(), resource: "validations", amount: 1, reserve: ["GLOBAL"] })).toMatchObject({ ok: false, code: "CAP_REACHED", counter: { tier: "GUEST_SIGNUP", limit: 0 } });
+  });
+});

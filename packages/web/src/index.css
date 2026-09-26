@@ -1,87 +1,194 @@
 @import "tailwindcss";
+/* Display face, self-hosted (docs/landing-spec.md §2.3): font-display swap; the browser only fetches the
+   Latin file for Spanish and English text (unicode-range). vite.config.ts preloads it. */
+@import "@fontsource-variable/space-grotesk/wght.css";
 
 /*
- * Palette of Cuadrilla (console, landing and login). Every colour used in JSX comes from these tokens
- * (`bg-navy`, `text-cyan`, `border-mist`, …); hex values live only here.
+ * Palette of Cuadrilla (console, landing, login and signup: one system of tokens). Every colour used in
+ * JSX comes from these tokens (`bg-navy`, `text-cyan`, `border-mist`, …); hex values live only here.
+ * The names are shared with the console; the values are Cuadrilla's own, taken from the FTTH field:
+ * an asphalt/graphite base, the yellow of a single-mode patch cord as the brand accent and the green
+ * of an APC connector as the second accent (docs/landing-spec.md §2.1, contrast pairs in §5.1).
  */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  /* Display face for H1, H2 and eyebrows (self-hosted above); the system stack stands in while it loads. */
+  --font-display: "Space Grotesk Variable", "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --color-navy: #0b1f3a;
-  --color-navy-deep: #071429;
-  --color-navy-soft: #16305a;
+  /* Asphalt/graphite base. */
+  --color-navy: #1b1f24;
+  --color-navy-deep: #0a0c0f;
+  --color-navy-soft: #2c323a;
 
-  --color-cyan: #12b5d9;
-  --color-cyan-deep: #0a7f99;
-  --color-cyan-soft: #d8f4fa;
+  /* Brand accent: the yellow of a single-mode patch cord. `cyan-deep` is the one for text, links and
+     focus on light backgrounds; `cyan` itself only on dark ones. */
+  --color-cyan: #f4c430;
+  --color-cyan-deep: #8a6400;
+  --color-cyan-soft: #fbf0cf;
 
-  --color-ink: #111a2b;
-  --color-slate: #5a6a80;
-  --color-mist: #e4e9f0;
-  --color-paper: #f5f7fa;
+  --color-ink: #12161b;
+  --color-slate: #57626e;
+  --color-mist: #dfe3e8;
+  --color-paper: #f4f5f7;
   --color-white: #ffffff;
 
-  --color-success: #1d8f5a;
+  --color-success: #167a49;
   --color-success-soft: #dff5ea;
-  --color-warning: #c98a12;
-  --color-warning-soft: #fff1d6;
-  --color-danger: #c73a52;
+  --color-warning: #9a5b00;
+  --color-warning-soft: #fdecd2;
+  --color-danger: #c62839;
   --color-danger-soft: #fbe1e6;
-  --color-info: #2f6bd6;
-  --color-info-soft: #e1eafb;
+  /* Second accent: the green of an APC connector (manual citations, system notes, PON status dots). */
+  --color-info: #146b5c;
+  --color-info-soft: #dcefe9;
 
-  /* Craftech's navy, for the text wordmark that stands in while its logo file is missing. */
+  /* Craftech's navy, for the "Powered by Craftech" wordmark; Craftech's brand, not Cuadrilla's. */
   --color-craftech: #122d45;
 
+  /* The landing's widest layout (docs/landing-spec.md §4.3: five thumbnails a row from 1440 px). */
+  --breakpoint-wide: 90rem;
+
   --radius-card: 0.75rem;
+  /* Chat bubbles of the landing's phone frame: rounder than a card, like a real message. */
+  --radius-bubble: 1.125rem;
 
-  /* Landing: the progress of the current demo scene and the entrance of its visual. */
-  --animate-scene-progress: scene-progress 9s linear forwards;
-  --animate-scene-in: scene-in 400ms ease-out;
+  --shadow-card: 0 1px 2px rgb(10 12 15 / 0.06), 0 4px 12px rgb(10 12 15 / 0.06);
+  /* The pinned visual of the walkthrough and the active phone frame. */
+  --shadow-float: 0 12px 32px rgb(10 12 15 / 0.24), 0 2px 8px rgb(10 12 15 / 0.12);
 
-  @keyframes scene-progress {
-    from {
-      transform: scaleX(0);
+  /* Fluid type of the landing: a legible minimum at 360 px and a ceiling at 1440 px and wider. */
+  --text-hero: clamp(2rem, 1.3rem + 3vw, 3.75rem);
+  --text-hero--line-height: 1.05;
+  --text-h2: clamp(1.5rem, 1.25rem + 1.1vw, 2.25rem);
+  --text-h2--line-height: 1.15;
+  --text-lead: clamp(1rem, 0.93rem + 0.3vw, 1.125rem);
+  --text-lead--line-height: 1.6;
+  /* Timestamps and file types inside a chat bubble. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  /* The reaction on a photo bubble lands with a slight overshoot (M4). */
+  --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Motion of the landing (docs/landing-spec.md §3). Only transform and opacity, and every one of
+     them finite: the fibre pulse (M10) runs twice, a PON dot (M11) blinks for at most 5 s, the voice
+     note's waveform (M3) plays once. */
+  --animate-fiber-pulse: fiber-pulse 2.4s ease-in-out 2 forwards;
+  --animate-pon-blink: pon-blink 1s steps(2, jump-none) 5 forwards;
+  --animate-wave: wave 0.8s ease-in-out 4 alternate;
+  --animate-caret: caret 1s steps(2, jump-none) infinite;
+  --animate-typing-dot: typing-dot 1.2s ease-in-out infinite;
+
+  @keyframes fiber-pulse {
+    0% {
+      opacity: 0.35;
+      transform: translateY(0);
     }
-    to {
-      transform: scaleX(1);
+    50% {
+      opacity: 1;
+      transform: translateY(6px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 
-  @keyframes scene-in {
+  @keyframes pon-blink {
     from {
-      opacity: 0;
-      transform: translateY(8px);
+      opacity: 0.25;
     }
     to {
       opacity: 1;
-      transform: none;
     }
   }
-  --shadow-card: 0 1px 2px rgb(11 31 58 / 0.06), 0 4px 12px rgb(11 31 58 / 0.06);
+
+  @keyframes wave {
+    from {
+      transform: scaleY(0.3);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  @keyframes caret {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes typing-dot {
+    0%,
+    100% {
+      opacity: 0.3;
+      transform: translateY(0);
+    }
+    50% {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+  }
 }
 
 @layer base {
   html {
     color-scheme: light;
+    scroll-behavior: smooth;
   }
 
   body {
     @apply bg-paper font-sans text-ink antialiased;
   }
 
+  /* Keyboard focus: the deep yellow on light backgrounds (5.4:1), the bright one on dark blocks. */
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-cyan;
+    @apply outline-2 outline-offset-2 outline-cyan-deep;
   }
 
-  html {
-    scroll-behavior: smooth;
+  :where(.bg-navy, .bg-navy-deep, .bg-navy-soft) :focus-visible {
+    @apply outline-cyan;
   }
 
   @media (prefers-reduced-motion: reduce) {
     html {
       scroll-behavior: auto;
     }
+  }
+}
+
+/* Heights of the landing's visuals: a scene's visual never takes more than 70 % of a small screen's
+   height (docs/landing-spec.md §4.2), and the pinned phone of the desktop walkthrough fits the viewport. */
+@utility max-h-scene {
+  max-height: 70svh;
+}
+
+@utility h-phone {
+  height: min(70vh, 40rem);
+}
+
+/* Two phones side by side in the pinned column of the desktop walkthrough (55 % of the page). */
+@utility h-phone-pair {
+  height: min(60vh, 32rem, calc((55vw - 4rem) * 1.05));
+}
+
+/* Each scene of the desktop walkthrough gets more than a screen of scroll to be read comfortably. */
+@utility min-h-scene-block {
+  min-height: 130vh;
+}
+
+@utility h-hero-phone {
+  height: min(72vh, 38rem);
+}
+
+@layer components {
+  /* The first letter of a sentence-case product label (the checklist items of copy/ are written to sit
+     inside a sentence, "la foto de la roseta instalada"). */
+  .sentence-case::first-letter {
+    text-transform: uppercase;
   }
 }

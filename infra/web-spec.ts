@@ -51,6 +51,47 @@ export function lambdaRouteFor(uri: string): EdgeFunction | undefined {
   return candidates[0]?.[0];
 }
 
+// ---- Origin of /api/* (ADR-0025 §3) ---------------------------------------------------------------
+
+/**
+ * Header the Router adds on every origin request (an origin custom header of the distribution's
+ * default origin, which the Router's dynamic routing inherits), with the value of `OriginVerifyKey`.
+ * CloudFront overwrites a viewer's header of the same name. The Bff answers 403, before parsing, to
+ * any request without it (routers/edge.ts), so its Function URL called directly skips nothing.
+ */
+export const ORIGIN_VERIFY_HEADER = "x-cuadrilla-origin";
+
+/** The viewer's IP and port as CloudFront saw them; the Bff reads it only after the origin check. */
+export const VIEWER_ADDRESS_HEADER = "CloudFront-Viewer-Address";
+
+/** Cache behavior of the BFF: the origin request policy of the bootstrap applies to these paths only. */
+export const API_PATH_PATTERN = `${API_PATH}/*`;
+
+/**
+ * Origin request policy the bootstrap creates for `/api/*` (infra/bootstrap/ci-role.yaml,
+ * ApiOriginRequestPolicy): every viewer header, cookie and query string (the WAF-inserted
+ * `x-amzn-waf-*` headers included) plus `CloudFront-Viewer-Address`. The managed
+ * AllViewerExceptHostHeader SST puts on the Router is `allExcept [host]`, which never forwards
+ * CloudFront's own headers. The Host the Lambda URL sees is the origin's domain: the Router's
+ * `updateRequestOrigin` names it, and a `domainName` there takes the place of the viewer's Host.
+ */
+export function apiOriginRequestPolicyName(app: string, stage: string): string {
+  return `${app}-${stage}-api`;
+}
+
+// ---- AWS WAF in the browser (ADR-0025 §4) ------------------------------------------------------------
+
+/**
+ * Hosts of the AWS WAF JavaScript integration, by wildcard because the edge ACL's integration URL is
+ * born after the bootstrap: `challenge.js` from `<id>.<region|edge>.sdk.awswaf.com`, token calls to
+ * `<id>…token.awswaf.com`. The AWS WAF guide ("Using the JavaScript API with content security
+ * policies") allowlists the apex `*.awswaf.com`; the console narrows it to the two families it uses.
+ */
+export const WAF_SDK_ORIGIN = "https://*.sdk.awswaf.com";
+export const WAF_TOKEN_ORIGIN = "https://*.token.awswaf.com";
+/** Directive → the AWS WAF origins the console's CSP adds to it. */
+export const WAF_CSP_SOURCES = { "script-src": [WAF_SDK_ORIGIN], "connect-src": [WAF_SDK_ORIGIN, WAF_TOKEN_ORIGIN] } as const;
+
 // ---- Budgets -----------------------------------------------------------------------------------
 
 /** CloudFront's ceiling for the origin response timeout without a quota increase. */

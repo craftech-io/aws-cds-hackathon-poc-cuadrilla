@@ -10,8 +10,22 @@ import { normalizeEmail, normalizePhone } from "@cuadrilla/shared";
 
 export type SecretKey = string | Uint8Array;
 
-/** Fixed labels of the subkeys (HKDF `info`); changing one invalidates every value derived with it. */
-export const SUBKEY_PURPOSES = ["session", "phone-hash", "email-hash", "nonce", "sim-envelope", "runtime-session", "media-key"] as const;
+/**
+ * Fixed labels of the subkeys (HKDF `info`); changing one invalidates every value derived with it.
+ * `email-hash` also keys the `Leads` table and the abuse key of the own sign-up; `signup-ticket`
+ * signs the sign-up ticket and `ip-hash` hashes the viewer IP of its limits (ADR-0025 §3).
+ */
+export const SUBKEY_PURPOSES = [
+  "session",
+  "phone-hash",
+  "email-hash",
+  "nonce",
+  "sim-envelope",
+  "runtime-session",
+  "media-key",
+  "signup-ticket",
+  "ip-hash",
+] as const;
 export type SubkeyPurpose = (typeof SUBKEY_PURPOSES)[number];
 
 /** HKDF salt shared by every subkey of the app; public by design (RFC 5869 §3.1). */

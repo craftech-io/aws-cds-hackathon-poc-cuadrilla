@@ -1,58 +1,144 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-MX">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Términos y condiciones · Cuadrilla</title>
-<meta name="description" content="Términos y condiciones de Cuadrilla, prueba de concepto de Craftech con datos sintéticos.">
+<meta name="legal-version" content="2026-09-26">
+<title>Términos · Cuadrilla</title>
+<meta name="description" content="Términos de uso de la demo de Cuadrilla, de Craftech: tu cuenta, tu mundo de prueba con datos sintéticos y cómo borrarla.">
 <style>
-:root{color-scheme:light;--navy:#0b1f3a;--cyan:#12b5d9;--cyan-deep:#0a7f99;--cyan-soft:#d8f4fa;--ink:#111a2b;--slate:#5a6a80;--mist:#e4e9f0;--paper:#f5f7fa}
+:root{color-scheme:light;--navy:#1b1f24;--cyan:#f4c430;--cyan-deep:#8a6400;--cyan-soft:#fbf0cf;--ink:#12161b;--slate:#57626e;--mist:#dfe3e8;--paper:#f4f5f7}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
-header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
-.lockup{display:flex;align-items:center;gap:12px;text-decoration:none}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;overflow-wrap:anywhere}
+.skip{position:absolute;left:-9999px;top:8px;background:#fff;color:var(--navy);padding:10px 14px;border-radius:8px;z-index:10}
+.skip:focus{left:8px}
+header{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
+.lockup{display:inline-flex;align-items:center;min-height:44px;text-decoration:none}
 .brand{font-weight:700;font-size:18px;color:#fff;white-space:nowrap}.brand span{color:var(--cyan)}
 .badge{font-size:12px;color:var(--cyan-soft)}
-main{max-width:760px;margin:24px auto;padding:0 16px}
-article{background:#fff;border:1px solid var(--mist);border-radius:12px;box-shadow:0 1px 2px rgb(11 31 58/.06),0 4px 12px rgb(11 31 58/.06);padding:28px}
+nav.langs{display:flex;gap:8px}
+nav.langs a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;color:#fff;text-decoration:none;border:1px solid rgb(255 255 255/.35)}
+a:focus-visible{outline:3px solid var(--cyan-deep);outline-offset:2px}nav.langs a:focus-visible{outline-color:var(--cyan)}
+main{max-width:780px;margin:24px auto;padding:0 16px}
+article{background:#fff;border:1px solid var(--mist);border-radius:12px;box-shadow:0 1px 2px rgb(11 31 58/.06),0 4px 12px rgb(11 31 58/.06);padding:24px 20px;margin-bottom:24px}
+@media (min-width:640px){article{padding:32px}}
 h1{font-size:26px;line-height:1.25;margin:0 0 4px;color:var(--navy)}
-h2{font-size:18px;margin:28px 0 8px;color:var(--navy)}
+h2{font-size:22px;line-height:1.3;margin:0 0 4px;color:var(--navy)}
+h3{font-size:18px;margin:28px 0 8px;color:var(--navy)}
 p,li{margin:0 0 10px}ul{padding-left:22px}
 .muted{color:var(--slate);font-size:14px}
 .notice{background:var(--cyan-soft);border-radius:10px;padding:12px 14px;margin:16px 0}
-.table{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0 12px}
-th,td{border-bottom:1px solid var(--mist);padding:8px 10px;text-align:left;vertical-align:top}
-th{color:var(--slate);font-weight:600}
 a{color:var(--cyan-deep)}
-footer{max-width:760px;margin:0 auto 32px;padding:16px;font-size:13px;color:var(--slate)}
-.powered{display:inline-flex;align-items:center;gap:8px;margin-top:10px;color:var(--slate);text-decoration:none;font-size:12px}.powered img{display:block;height:20px;width:auto}
+footer{max-width:780px;margin:0 auto 32px;padding:16px;font-size:13px;color:var(--slate)}
+footer a{display:inline-block;min-height:44px;line-height:44px}
+.powered{display:inline-flex;align-items:center;gap:8px;color:var(--slate);text-decoration:none;font-size:12px}.powered img{display:block;height:20px;width:auto}
 </style>
 </head>
 <body>
-<header><a class="lockup" href="/legal/terms.html"><span class="brand">Cuadrilla<span>.</span></span></a><div class="badge">Prueba de concepto · demo sintética</div></header>
-<main>
-<article>
-<h1>Términos y condiciones</h1>
-<p class="muted">Última actualización: 26 de septiembre de 2026</p>
+<a class="skip" href="#contenido">Ir al contenido</a>
+<header>
+<a class="lockup" href="/" aria-label="Cuadrilla, ir al inicio"><span class="brand">Cuadrilla<span>.</span></span></a>
+<div class="badge">Demo sintética · Powered by Craftech</div>
+<nav class="langs" aria-label="Idioma / Language"><a href="#es" lang="es-MX">Español</a><a href="#en" lang="en">English</a></nav>
+</header>
+<main id="contenido">
 
-<div class="notice"><strong>Esto es una prueba de concepto.</strong> Cuadrilla es una demo de Craftech. No es un servicio comercial. El manual, las políticas, los precios y los datos son inventados y no son las políticas reales de ninguna empresa.</div>
+<article id="es" lang="es-MX" data-legal-version="2026-09-26">
+<h1>Términos</h1>
+<p class="muted">Versión 2026-09-26 · Última actualización: 26 de septiembre de 2026</p>
 
-<h2>1. Uso de la demo</h2>
-<p>El acceso a la consola es por invitación. Las cuentas de invitado sirven solo para probar la demo; cada una tiene su propio mundo de datos sintéticos y su propio reloj de demo.</p>
+<div class="notice"><strong>Demo con datos sintéticos.</strong> Cuadrilla es un producto de Craftech que puedes probar con tu propia cuenta. No es un servicio comercial contratado: el manual, las políticas, los precios, las órdenes, los instaladores y los clientes de la demo son inventados y no son las políticas reales de ninguna empresa.</div>
 
-<h2>2. Qué es real y qué es simulado</h2>
-<p>Los servicios de AWS son reales. WhatsApp corre con un simulador de teléfono dentro de la consola y, cuando se conecte la cuenta de WhatsApp Business, también en vivo. El despacho de órdenes, el orquestador de red, el registro de personal y los clientes son sistemas simulados por Craftech. Ningún nombre de persona ni de equipo corresponde a uno real.</p>
+<h3>1. Qué es la demo</h3>
+<p>Cuadrilla es un copiloto de campo en WhatsApp para instaladores de fibra óptica. En la demo, tu cuenta abre la consola de una operadora ficticia y un simulador de teléfono donde ves cómo el agente guía la instalación con el manual, valida las fotos de evidencia, escala a un supervisor y emite el acta. La validación manual de evidencia y las decisiones de un caso son siempre de una persona.</p>
 
-<h2>3. Sin instrucciones eléctricas ni compromisos comerciales</h2>
-<p>El agente no da instrucciones eléctricas fuera del manual, no cambia precios ni ofrece compensaciones: esas preguntas las escala a un supervisor. Las cifras de impacto que muestra la demo son hipótesis de un piloto, no mediciones.</p>
+<h3>2. Tu cuenta</h3>
+<ul>
+<li>Te das de alta con tu email, que confirmas con un código. Hay una cuenta por email.</li>
+<li>Al confirmar, se crea tu propio <strong>mundo de prueba</strong>, aislado del de cualquier otra persona, con datos sintéticos. Dura 7 días; si vuelves a entrar después, se crea uno nuevo. Tu cuenta sigue activa.</li>
+<li>Las cuentas del equipo interno (supervisión y operaciones) solo se crean por invitación.</li>
+<li>Cuida tu contraseña: no la compartas.</li>
+</ul>
 
-<h2>4. Propiedad intelectual</h2>
+<h3>3. Uso aceptable</h3>
+<ul>
+<li>Usa solo los datos sintéticos de la demo. <strong>No cargues datos reales de terceros</strong> (nombres, teléfonos, domicilios, documentos ni fotos de otras personas) ni datos sensibles tuyos.</li>
+<li>La demo tiene límites de uso por mundo y por cuenta, y un tope diario de altas. No intentes eludirlos, automatizar altas ni vulnerar las protecciones del servicio.</li>
+<li>Craftech puede pausar el alta, limitar el uso o dar de baja una cuenta ante abuso o para proteger el servicio.</li>
+</ul>
+
+<h3>4. Qué es real y qué es simulado</h3>
+<p>Los servicios de AWS que usa la demo son reales. WhatsApp corre con un simulador de teléfono dentro de la consola y, cuando se conecte la cuenta de WhatsApp Business, también en vivo. El despacho de órdenes, el orquestador de red, el registro de personal y los clientes son sistemas simulados por Craftech. Ningún nombre de persona ni de equipo corresponde a uno real. Los emails que la demo manda a clientes o supervisores van a buzones de prueba, nunca a personas reales.</p>
+
+<h3>5. Sin instrucciones eléctricas ni compromisos comerciales</h3>
+<p>El agente no da instrucciones fuera del manual, no cambia precios ni ofrece compensaciones: esas preguntas las escala a un supervisor. Las cifras de impacto que muestra la página son metas o supuestos de un piloto, no mediciones de producción.</p>
+
+<h3>6. Disponibilidad</h3>
+<p>La demo se ofrece tal como está, sin garantía de disponibilidad. Puede cambiar, pausarse o terminar; los mundos de prueba vencen según el punto 2.</p>
+
+<h3>7. Borrar tu cuenta</h3>
+<p>Puedes borrar tu cuenta, tus datos de contacto y tu mundo de prueba cuando quieras desde la consola ("Borrar mi cuenta", en tu portada), o pedirlo por <a href="https://craftech.io/contact/">craftech.io/contact</a>. Los detalles están en el <a href="/legal/privacy.html">aviso de privacidad</a>.</p>
+
+<h3>8. Privacidad y contacto comercial</h3>
+<p>El tratamiento de tus datos se rige por el <a href="/legal/privacy.html">aviso de privacidad</a>. Craftech solo te contacta por esta solución si lo aceptaste en la casilla de contacto, y puedes retirar ese consentimiento sin borrar tu cuenta.</p>
+
+<h3>9. Propiedad intelectual</h3>
 <p>El software, los textos, el manual sintético y el diseño de Cuadrilla son de Craftech.</p>
 
-<h2>5. Ley aplicable</h2>
-<p>Estos términos se rigen por las leyes de los Estados Unidos Mexicanos.</p>
-<p class="muted">Ver también el <a href="/legal/privacy.html">aviso de privacidad</a>.</p>
+<h3>10. Ley aplicable</h3>
+<p>Estos términos se rigen por las leyes de la República Argentina.</p>
+
+<p class="muted">Si estos términos cambian, publicamos una versión nueva en esta misma dirección, con su fecha, y te pedimos aceptarla de nuevo en el alta.</p>
+</article>
+
+<article id="en" lang="en" data-legal-version="2026-09-26">
+<h2>Terms</h2>
+<p class="muted">Version 2026-09-26 · Last updated: September 26, 2026</p>
+
+<div class="notice"><strong>A demo with synthetic data.</strong> Cuadrilla is a Craftech product you can try with your own account. It is not a contracted commercial service: the demo's manual, policies, prices, work orders, installers and customers are made up and are not the actual policies of any company.</div>
+
+<h3>1. What the demo is</h3>
+<p>Cuadrilla is a field copilot on WhatsApp for fiber installers. In the demo, your account opens the console of a fictitious operator and a phone simulator where you see how the agent guides the installation with the manual, validates the evidence photos, escalates to a supervisor and issues the installation certificate. The manual validation of evidence and the decisions on a case are always made by a person.</p>
+
+<h3>2. Your account</h3>
+<ul>
+<li>You sign up with your email, which you confirm with a code. There is one account per email.</li>
+<li>Once confirmed, your own <strong>test world</strong> is created, isolated from anyone else's, with synthetic data. It lasts 7 days; if you sign in again after that, a new one is created. Your account stays active.</li>
+<li>Internal team accounts (supervision and operations) are created by invitation only.</li>
+<li>Keep your password to yourself.</li>
+</ul>
+
+<h3>3. Acceptable use</h3>
+<ul>
+<li>Use only the demo's synthetic data. <strong>Do not load real third-party data</strong> (other people's names, phone numbers, addresses, documents or photos) or sensitive data of your own.</li>
+<li>The demo has usage limits per world and per account, and a daily cap on sign-ups. Do not try to get around them, automate sign-ups or break the service's protections.</li>
+<li>Craftech may pause sign-ups, limit usage or close an account in case of abuse or to protect the service.</li>
+</ul>
+
+<h3>4. What is real and what is simulated</h3>
+<p>The AWS services the demo uses are real. WhatsApp runs with a phone simulator inside the console and, once the WhatsApp Business account is connected, live too. Work order dispatch, the network orchestrator, the staff registry and the customers are systems simulated by Craftech. No person or equipment name is a real one. The emails the demo sends to customers or supervisors go to test mailboxes, never to real people.</p>
+
+<h3>5. No electrical instructions or commercial commitments</h3>
+<p>The agent gives no instructions outside the manual, changes no prices and offers no compensation: it escalates those questions to a supervisor. The impact figures on the page are goals or assumptions of a pilot, not production measurements.</p>
+
+<h3>6. Availability</h3>
+<p>The demo is offered as is, with no availability guarantee. It may change, pause or end; test worlds expire as described in point 2.</p>
+
+<h3>7. Deleting your account</h3>
+<p>You can delete your account, your contact details and your test world whenever you want from the console ("Delete my account", on your home page), or ask for it at <a href="https://craftech.io/contact/">craftech.io/contact</a>. The details are in the <a href="/legal/privacy.html">privacy notice</a>.</p>
+
+<h3>8. Privacy and commercial contact</h3>
+<p>The processing of your data is governed by the <a href="/legal/privacy.html">privacy notice</a>. Craftech only contacts you about this solution if you accepted it in the contact box, and you can withdraw that consent without deleting your account.</p>
+
+<h3>9. Intellectual property</h3>
+<p>Cuadrilla's software, texts, synthetic manual and design belong to Craftech.</p>
+
+<h3>10. Governing law</h3>
+<p>These terms are governed by the laws of the Argentine Republic.</p>
+
+<p class="muted">If these terms change, we publish a new version at this same address, with its date, and ask you to accept it again when you sign up.</p>
 </article>
 </main>
 <footer>Cuadrilla · Demo sintética de Craftech · <a href="/legal/privacy.html">Privacidad</a> · <a href="/legal/terms.html">Términos</a><br><a class="powered" href="https://craftech.io" rel="noopener">Powered by <img src="/brand/logo-craftech-color.svg" alt="Craftech" width="62" height="20"></a></footer>

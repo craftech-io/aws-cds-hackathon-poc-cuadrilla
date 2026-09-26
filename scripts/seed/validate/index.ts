@@ -5,12 +5,13 @@
 import type { SeedBundle } from "./bundle";
 import { CONTENT_INVARIANTS } from "./content";
 import { FILE_INVARIANTS } from "./files";
+import { GUEST_MARKER_INVARIANTS } from "./guest-markers";
 import { IDENTITY_INVARIANTS } from "./identity";
 import { MEDIA_INVARIANTS } from "./media";
 import type { CheckEnv, Invariant } from "./types";
 import { WORLD_INVARIANTS } from "./worlds";
 
-export const INVARIANTS: readonly Invariant[] = [...WORLD_INVARIANTS, ...IDENTITY_INVARIANTS, ...MEDIA_INVARIANTS, ...CONTENT_INVARIANTS, ...FILE_INVARIANTS].sort((a, b) => a.id - b.id);
+export const INVARIANTS: readonly Invariant[] = [...WORLD_INVARIANTS, ...IDENTITY_INVARIANTS, ...MEDIA_INVARIANTS, ...CONTENT_INVARIANTS, ...FILE_INVARIANTS, ...GUEST_MARKER_INVARIANTS].sort((a, b) => a.id - b.id);
 
 /** Invariants the manifest cannot vouch for when the generator writes it: its own checksums. */
 export const MANIFEST_INVARIANT = 15;

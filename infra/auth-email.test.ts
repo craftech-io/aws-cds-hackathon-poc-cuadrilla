@@ -18,6 +18,7 @@ import {
   ISP_ID_CLAIM,
   LOGIN_PATH,
   NEUTRAL_DISCLAIMER,
+  NEUTRAL_EMAIL_BRAND,
   PASSWORD_POLICY,
   PRODUCT_NAME,
   SYNTHETIC_DEMO_TAG,
@@ -85,9 +86,13 @@ describe("groups and the informative attribute", () => {
 });
 
 describe("sign-up, recovery and passwords", () => {
-  it("creates users only through AdminCreateUser and recovers them only by verified email", () => {
-    for (const options of [NEUTRAL, COBRANDED]) expect(cognitoMessages(options).adminCreateUserConfig.allowAdminCreateUserOnly).toBe(true);
+  it("opens the own sign-up (the pre sign-up trigger demands its ticket) and recovers only by verified email (ADR-0025 §1)", () => {
+    for (const options of [NEUTRAL, COBRANDED]) expect(cognitoMessages(options).adminCreateUserConfig.allowAdminCreateUserOnly).toBe(false);
     expect(SETTINGS.accountRecoverySetting.recoveryMechanisms).toEqual([{ name: "verified_email", priority: 1 }]);
+  });
+
+  it("never applies a new email before it is verified", () => {
+    expect(SETTINGS.userAttributeUpdateSettings).toEqual({ attributesRequireVerificationBeforeUpdates: ["email"] });
   });
 
   it("runs on the feature plan of the V2_0 pre token trigger and can be removed", () => {
@@ -170,6 +175,13 @@ describe("brand of the emails (ADR-0018)", () => {
     expect(COBRANDED.brand).toEqual({ name: `${PRODUCT_NAME} for ${PARTNER}`, partner: PARTNER, disclaimer: PARTNER_NOTICE });
   });
 
+  it("is the neutral one for the pool's templates, whatever the mode (ADR-0025 §1)", () => {
+    expect(NEUTRAL_EMAIL_BRAND).toEqual(NEUTRAL.brand);
+    const source = read("infra/auth.ts").replace(/^\s*\/\/.*$/gm, "");
+    expect(source).toContain("brand: NEUTRAL_EMAIL_BRAND");
+    expect(source).not.toMatch(/BrandConfig|emailBrandFrom/);
+  });
+
   it("fails on a value that is not JSON or not ADR-0018 without printing it", () => {
     const secret = "SECRET-PARTNER-NAME";
     for (const raw of [secret, JSON.stringify({ mode: "cobrand", partnerDisplayName: secret }), JSON.stringify({ mode: secret })]) {
@@ -203,9 +215,14 @@ describe("brand of the emails (ADR-0018)", () => {
 describe("sender of the console emails", () => {
   const verified = { domain: APP_DOMAIN, arn: `arn:aws:ses:us-east-1:111111111111:identity/${APP_DOMAIN}`, verified: true };
 
-  it("sends through SES from no-reply of the app domain once the identity is verified", () => {
+  it("sends through SES from no-reply of the app domain and the app's configuration set once the identity is verified", () => {
     expect(emailSenderFor(verified, APP_DOMAIN)).toEqual({
-      configuration: { emailSendingAccount: "DEVELOPER", sourceArn: verified.arn, fromEmailAddress: `${PRODUCT_NAME} <no-reply@${APP_DOMAIN}>` },
+      configuration: {
+        emailSendingAccount: "DEVELOPER",
+        sourceArn: verified.arn,
+        fromEmailAddress: `${PRODUCT_NAME} <no-reply@${APP_DOMAIN}>`,
+        configurationSet: "aws-cds-hackathon-poc-cuadrilla-email-poc",
+      },
     });
   });
 

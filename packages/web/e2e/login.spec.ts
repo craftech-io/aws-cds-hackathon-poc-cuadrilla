@@ -1,14 +1,18 @@
 // FL-079 in the browser (docs/test-plan.md §2.1: the only level where the SRP sign-in, the initial
 // password change and TOTP run): the console's own login against a route mock of Cognito, with
 // tokens of 15 minutes signed by the run's ephemeral key, for the three roles, the guest variant
-// included. Also the shell every later view lives in: the brand of `brand.get`, the simulated-time
-// bar with its polling and controls, the placeholders of the views and the guided-tour dock.
+// included (a guest lands on its portada, `/app/home`). Also the login's copy in es-MX and en
+// (docs/landing-spec.md §7.7), and the shell every later view lives in: the brand of `brand.get`,
+// the simulated-time bar with its polling and controls, the placeholders of the views and the
+// guided-tour dock.
 import { type Page, expect, test } from "@playwright/test";
 import { copy } from "../src/copy/console";
 import { dataCopy } from "../src/copy/console-data";
 import { totpCode } from "../src/lib/auth/testing/totp";
 import { TOKENS_KEY } from "../src/lib/auth/tokens";
+import { guestHomeCopy } from "../src/views/guest-home/copy";
 import { loginCopy } from "../src/views/login/copy";
+import { loginCopyEn } from "../src/views/login/copy.en";
 import { expectReadableScreen } from "./support/a11y";
 import { type Account, addAccount, createPool, randomPassword } from "./support/accounts";
 import { type CognitoCall, routeCognito } from "./support/cognito";
@@ -31,6 +35,9 @@ async function signIn(page: Page, account: Pick<Account, "email" | "password">):
 }
 
 const operations = (calls: readonly CognitoCall[]) => calls.map((call) => call.operation);
+/** The side navigation (with the brand line) is a desktop landmark; below `md` the shell shows its menu bar. */
+const isMobile = () => test.info().project.use.isMobile === true;
+const consoleNavigation = (page: Page) => page.getByRole("navigation", { name: isMobile() ? copy.app.menu : "Cuadrilla" });
 const refreshes = (calls: readonly CognitoCall[]) => calls.filter((call) => call.operation === "InitiateAuth" && call.body.includes("REFRESH_TOKEN_AUTH")).length;
 
 test.describe("console sign-in", () => {
@@ -101,9 +108,12 @@ test.describe("console sign-in", () => {
     expect(operations(cognito)).toEqual(["InitiateAuth", "RespondToAuthChallenge"]);
 
     // Neutral brand: "Cuadrilla · Powered by Craftech", the synthetic-data notice, no partner, no operator name.
-    const navigation = page.getByRole("navigation", { name: "Cuadrilla" });
-    await expect(navigation).toContainText(copy.app.syntheticData);
-    await expect(navigation.getByRole("note")).toHaveCount(0);
+    if (!isMobile()) {
+      const navigation = page.getByRole("navigation", { name: "Cuadrilla" });
+      await expect(navigation).toContainText(copy.app.syntheticData);
+      await expect(navigation.getByRole("note")).toHaveCount(0);
+    }
+    await expect(page.getByRole("note")).toHaveCount(0);
     await expect(page.getByText(`${copy.app.ispLabel}:`)).toHaveCount(0);
     await expectReadableScreen(page);
 
@@ -140,19 +150,59 @@ test.describe("console sign-in", () => {
 
     await page.goto("/login");
     await signIn(page, guest);
-    await expect(page.getByRole("heading", { name: copy.views.orders.title })).toBeVisible();
+    // A guest's home is its portada.
+    await expect(page).toHaveURL(/\/app\/home$/);
+    await expect(page.getByRole("heading", { level: 1, name: guestHomeCopy.es.heading })).toBeVisible();
     expect(refreshes(cognito)).toBe(0);
 
     // The session refreshes a minute before the 15 minutes end, without a word to the person.
     await page.clock.fastForward("14:05");
     await expect.poll(() => refreshes(cognito)).toBe(1);
-    await expect(page.getByRole("heading", { name: copy.views.orders.title })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: guestHomeCopy.es.heading })).toBeVisible();
 
     await page.getByRole("button", { name: copy.app.signOut }).click();
     await expect(page).toHaveURL(/\/login$/);
     await expect.poll(() => operations(cognito).includes("RevokeToken")).toBe(true);
     await page.goto("/app/orders");
     await expect(page).toHaveURL(/\/login\?returnTo=%2Fapp%2Forders$/);
+  });
+});
+
+test.describe("the login's copy and ways in [FL-079]", () => {
+  const lang = () => (test.info().project.use.locale === "en" ? "en" : "es");
+  const copyOf = () => (lang() === "en" ? loginCopyEn : loginCopy);
+  const query = () => (lang() === "en" ? "?lang=en" : "?lang=es-MX");
+
+  test("[FL-079] a neutral lead, the invitation hint for staff, and 'Prueba la demo' to the sign-up in the same language", async ({ page }) => {
+    await routeConsoleApi(page);
+    await page.goto(`/login${query()}`);
+    const text = copyOf();
+    await expect(page.locator("html")).toHaveAttribute("lang", lang() === "en" ? "en" : "es-MX");
+    await expect(page.getByRole("heading", { name: text.credentials.title })).toBeVisible();
+    await expect(page.getByText(text.credentials.lead)).toBeVisible();
+    await expect(page.getByText(text.credentials.hint)).toBeVisible();
+    await expect(page.getByText(text.credentials.tryDemo.before.trim())).toBeVisible();
+    const tryDemo = page.getByRole("link", { name: text.credentials.tryDemo.link });
+    await expect(tryDemo).toHaveAttribute("href", `/signup${query()}`);
+    await expectReadableScreen(page);
+    await tryDemo.click();
+    await expect(page).toHaveURL(/\/signup\?lang=/);
+  });
+
+  test("[FL-079] the switch moves every text of the login to the other language and the document follows", async ({ page }) => {
+    await routeConsoleApi(page);
+    await page.goto(`/login${query()}`);
+    const other = lang() === "en" ? loginCopy : loginCopyEn;
+    await page.getByRole("button", { name: lang() === "en" ? /Español/ : /English/ }).click();
+    await expect(page.getByRole("heading", { name: other.credentials.title })).toBeVisible();
+    await expect(page.getByRole("button", { name: other.credentials.submit })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", lang() === "en" ? "es-MX" : "en");
+  });
+
+  test("[FL-079] ?forgot=1 opens the recovery, in the language asked", async ({ page }) => {
+    await routeConsoleApi(page);
+    await page.goto(`/login?forgot=1&${query().slice(1)}`);
+    await expect(page.getByRole("heading", { name: copyOf().forgot.title })).toBeVisible();
   });
 });
 
@@ -168,11 +218,13 @@ test.describe("console shell", () => {
 
     await page.goto("/login");
     await signIn(page, guest);
-    await expect(page.getByRole("heading", { name: copy.views.orders.title })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: guestHomeCopy.es.heading })).toBeVisible();
 
-    const navigation = page.getByRole("navigation", { name: "Cuadrilla" });
-    await expect(navigation).toContainText(`for ${COBRAND.displayName}`);
-    await expect(navigation.getByRole("note")).toHaveText(COBRAND.disclaimer.es);
+    if (!isMobile()) {
+      const navigation = page.getByRole("navigation", { name: "Cuadrilla" });
+      await expect(navigation).toContainText(`for ${COBRAND.displayName}`);
+      await expect(navigation.getByRole("note")).toHaveText(COBRAND.disclaimer.es);
+    }
     await expect(page.getByText(`${copy.app.ispLabel}: ${COBRAND.displayName}`)).toBeVisible();
 
     // Busy: the bar says what the world waits for and the controls wait too.
@@ -214,7 +266,7 @@ test.describe("console shell", () => {
     await signIn(page, supervisor);
     await page.getByRole("button", { name: loginCopy.mfaSetup.skip }).click();
     await expect(page.getByRole("heading", { name: copy.views["order-detail"].title })).toBeVisible();
-    const navigation = page.getByRole("navigation", { name: "Cuadrilla" });
+    const navigation = consoleNavigation(page);
     await expect(navigation.getByRole("link", { name: copy.views.orders.title })).toHaveAttribute("aria-current", "page");
 
     for (const id of ["cases", "evidence", "people", "manual", "simulator", "clock", "outbox", "metrics", "audit", "orders"] as const) {

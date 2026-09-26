@@ -2,25 +2,25 @@
 // dependency: every infra module that creates a Function or a service role builds its `link` and its
 // `sst.aws.permission` statements from the entry of that role here, and
 // infra/iam-capabilities.test.ts derives the expected statements and compares them with what the
-// modules generate. A permission that is not in this file is drift, and the test fails.
+// modules generate. A permission that is not in this file is drift, and the test fails. The rows of
+// the own sign-up, the guest worlds and the leads live in infra/leads-spec.ts and are merged here.
 //
-// Tables and buckets are listed as data access (`read`, `append`, `write`). The `link` only hands the
-// Lambda their names: sst.config.ts strips the `dynamodb:*` / `s3:*` SST would attach to a linked
-// Dynamo or Bucket, and infra/storage-access.ts turns each access level into its exact actions.
-// Everything else is a `Grant`: actions, the resources they reach and the conditions that fence them.
-// Resources are ARNs or references to a component of the app that the module resolves at deploy time:
+// Tables and buckets are data access (`read`, `append`, `write`): the `link` only hands the Lambda
+// their names (sst.config.ts strips SST's `dynamodb:*` / `s3:*`; infra/storage-access.ts turns each
+// level into its exact actions). Everything else is a `Grant`: actions, resources and the conditions
+// that fence them. Resources are ARNs or references to a component the module resolves at deploy time:
 //
 //   {Media}/transcripts/*   an object prefix of a bucket     {G1} {G2} {G3}  a guardrail
-//   {Memory}                the AgentCore Memory of the stage {KnowledgeBase} the manual's KB
-//   {Gateway}               the AgentCore Gateway             {NetworkMock} {DispatchMock} … a Lambda
+//   {Memory} {Gateway}      AgentCore of the stage            {KnowledgeBase} the manual's KB
+//   {NetworkMock} …         a Lambda                          {Leads} {UserPool} the leads and the pool
 //   {model:HARNESS}         agentModelArns(HARNESS_MODEL_ID)  {model:PHOTO}  agentModelArns(PHOTO_MODEL_ID)
-//   {whatsappPhone}         whatsappPhoneArn(WhatsAppPhoneNumberId); the statement is omitted while
-//                           the secret is `not-connected` (docs/pending.md P-01)
+//   {whatsappPhone}         whatsappPhoneArn(WhatsAppPhoneNumberId); omitted while `not-connected` (P-01)
 //
 // `Resource: "*"` appears only where IAM offers nothing else, each with its justification and a
 // condition (JUSTIFIED_WILDCARDS). No grant carries an SES receipt-rule action (the only active rule
 // set of the account belongs to another app, ADR-0003) nor any WABA association or
 // `PutWhatsAppBusinessAccountEventDestinations` (the operator applies the event destination).
+import { BFF_LEADS_GRANT, GUEST_WORLDS_LEADING_KEYS, SIGNUP_CAPABILITIES, SIGNUP_ROLES, type SignupCapability } from "./leads-spec";
 
 export const REGION = "us-east-1";
 export const ACCOUNT_ID = "776805327629";
@@ -36,7 +36,6 @@ export const METRICS_NAMESPACE = "CuadrillaAgent";
 export const SENDERS = [`actas@${APP_DOMAIN}`, `avisos@${APP_DOMAIN}`] as const;
 
 // ---- ARN helpers ---------------------------------------------------------------------------------
-
 /** Base foundation model of a model id (`global.anthropic.claude-opus-5` → `anthropic.claude-opus-5`). */
 export function foundationModelOf(modelId: string): string {
   return modelId.replace(/^(global|us|eu|apac)\./, "");
@@ -87,7 +86,7 @@ export type BucketName = "Media" | "Evidence" | "Manual" | "Seed";
 export type Access = "read" | "append" | "write";
 
 export interface Condition {
-  readonly test: "StringEquals" | "StringLike" | "ForAllValues:StringLike" | "ForAllValues:StringEquals" | "ArnLike";
+  readonly test: "StringEquals" | "StringLike" | "StringEqualsIfExists" | "ForAllValues:StringLike" | "ForAllValues:StringEquals" | "ArnLike";
   readonly variable: string;
   readonly values: readonly string[];
 }
@@ -99,7 +98,7 @@ export interface Grant {
   readonly conditions?: readonly Condition[];
 }
 
-export type CapabilityName = "TIMERS" | "SEND_EMAIL" | "SEND_WHATSAPP" | "PIPELINE" | "MOCK_NETWORK" | "MOCK_DISPATCH" | "TRANSCRIBE" | "MEMORY_ADMIN" | "WORLDS";
+export type CapabilityName = "TIMERS" | "SEND_EMAIL" | "SEND_WHATSAPP" | "PIPELINE" | "MOCK_NETWORK" | "MOCK_DISPATCH" | "TRANSCRIBE" | "MEMORY_ADMIN" | "WORLDS" | SignupCapability;
 
 export interface Capability {
   readonly grants: readonly Grant[];
@@ -190,6 +189,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityName, Capability>> = {
     includes: ["TIMERS", "MEMORY_ADMIN"],
     tables: { ...writeAll(APP_TABLES), Reference: "read", Network: "write", Dispatch: "write" },
   },
+  // LEADS_READ, LEADS_WRITE, SEND_LEAD_NOTIFY: `Leads` is never part of WORLDS (ADR-0026).
+  ...SIGNUP_CAPABILITIES,
 };
 
 /** `dynamodb:LeadingKeys` of `Network` and `Dispatch` per role that holds `WORLDS` (docs/architecture.md §14). */
@@ -197,6 +198,8 @@ export const WORLDS_LEADING_KEYS = {
   Bff: ["ONU#GLOBAL#isp-demo#*", "ONU#GUEST#isp-guest-*", "DWO#isp-demo#*", "DWO#isp-guest-*"],
   WorldJanitor: ["ONU#GUEST#isp-guest-*", "DWO#isp-guest-*"],
   QaDriver: ["ONU#qa-*", "ONU#eval-*", "ONU#GUEST#isp-guest-test#*", "DWO#isp-qa-*", "DWO#isp-eval-*", "DWO#isp-guest-test#*"],
+  GuestWorlds: GUEST_WORLDS_LEADING_KEYS,
+  GuestAccountDeletion: GUEST_WORLDS_LEADING_KEYS,
 } as const;
 
 export type WorldsRole = keyof typeof WORLDS_LEADING_KEYS;
@@ -264,15 +267,12 @@ export const LAMBDA_CAPABILITIES = {
   ChannelEvents: { capabilities: [], tables: { Conversations: "write", WorkOrders: "write", Runtime: "write" }, grants: [sqsSend()] },
   FeedEvents: { capabilities: [], tables: { WorkOrders: "write", Runtime: "write", AuditLog: "write" }, grants: [sqsSend()] },
   ScheduleDispatch: { capabilities: [], tables: { WorkOrders: "read", Cases: "read", People: "read", Runtime: "write" }, grants: [sqsSend()] },
+  // Leads: only `signup.start`'s writes, fenced by key and attributes; retryWorld and deleteGuest invoke.
   Bff: {
     capabilities: ["MOCK_NETWORK", "MOCK_DISPATCH", "WORLDS"],
     tables: { ...writeAll(APP_TABLES), Reference: "read" },
     buckets: { Evidence: "read", Media: "write" },
-    grants: [
-      g(["s3:GetObject"], ["{Seed}/brand/*"]),
-      sqsSend(),
-      g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}"]),
-    ],
+    grants: [g(["s3:GetObject"], ["{Seed}/brand/*"]), sqsSend(), g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{GuestWorlds}", "{GuestAccountDeletion}"]), BFF_LEADS_GRANT],
   },
   CostGuard: {
     capabilities: [],
@@ -307,6 +307,7 @@ export const LAMBDA_CAPABILITIES = {
       g(["dynamodb:PutItem", "dynamodb:DeleteItem"], ["{Runtime}"], [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#AGENT#qa-*"] }]),
     ],
   },
+  ...SIGNUP_ROLES,
 } as const satisfies Record<string, RoleCapabilities>;
 
 export type LambdaName = keyof typeof LAMBDA_CAPABILITIES;
@@ -391,10 +392,7 @@ export const expectedTables = (role: RoleName): Partial<Record<TableName, Access
 export function actionDrift(role: RoleName, generated: readonly string[]): { extra: string[]; missing: string[] } {
   const expected = new Set(expectedActions(role));
   const actual = new Set(generated);
-  return {
-    extra: [...actual].filter((action) => !expected.has(action)).sort(),
-    missing: [...expected].filter((action) => !actual.has(action)).sort(),
-  };
+  return { extra: [...actual].filter((action) => !expected.has(action)).sort(), missing: [...expected].filter((action) => !actual.has(action)).sort() };
 }
 
 export const IAM_ARNS = arn;

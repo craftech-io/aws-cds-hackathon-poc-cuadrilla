@@ -3,6 +3,7 @@
 //
 //   Media      WhatsApp media (live), the phone simulator's uploads, Transcribe output; 30 days
 //   Evidence   validated photos and installation certificates; life of the stage
+//              (both: `guest/` 9 days, the media and evidence of guest worlds; ADR-0026 retention)
 //   Manual     the procedures manual the Knowledge Base ingests (infra/storage-kb.ts); life of the stage
 //   Seed       world templates, synthetic photos and voices, evaluation set, Transcribe vocabulary
 //              (infra/media.ts), the partner's logos and the template header sample; life of the stage
@@ -10,7 +11,8 @@
 // Every bucket: private (BlockPublicAccess on all four settings, SST's default), HTTPS enforced by the
 // SST component's policy (Deny when `aws:SecureTransport` is false), SSE-S3 declared explicitly,
 // incomplete multipart uploads aborted after 7 days, `qa/` and `eval/` gone in two days where QA and
-// evaluation worlds write (Media, Evidence), and `forceDestroy` (SST's default) so removing the stage
+// evaluation worlds write (Media, Evidence), `guest/` gone in nine days in the same two buckets (a
+// guest's own voice and photos: the 7-day TTL of a sign-up generation plus its grace), and `forceDestroy` (SST's default) so removing the stage
 // empties them. Only Media has a CORS rule: SST's default rule allows every origin and method, so
 // every other bucket gets `cors: false`.
 //

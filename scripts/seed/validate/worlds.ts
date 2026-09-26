@@ -2,6 +2,7 @@
 // order; 2 numbers, serials and story photos; 4 opt-in of the people who receive WhatsApp; 5 rosters
 // and zone chiefs; 19 the guest template's tour window, scenes and day-start timers.
 import { ChecklistItem, WORK_ORDER_NUMBER_RANGES } from "@cuadrilla/shared";
+import { SAMPLE_GUEST_TOKENS } from "../generate/guest-template";
 import { DAYS, DAY_START_TIME, sim } from "../generate/time";
 import type { SeedItem } from "../lib/tables";
 import { entities, str, worldsOf, type SeedBundle, type SeedWorld } from "./bundle";
@@ -133,7 +134,7 @@ function guestTour(bundle: SeedBundle): string[] {
   const errors = worldsOf(bundle).flatMap(dayStarts);
   const guest = bundle.guest;
   if (guest?.tour === undefined || guest.scenes === undefined) return [...errors, "guest: the template declares no tour or no scenes"];
-  if (guest.placeholders === undefined || guest.guestTest === undefined) errors.push("guest: the template declares no placeholders or no guest-test overrides");
+  const tag = `-${SAMPLE_GUEST_TOKENS.clockTag}`;
   const idFields: ReadonlyArray<readonly [string, string]> = [
     ["Person", "personId"],
     ["Customer", "customerId"],
@@ -141,7 +142,7 @@ function guestTour(bundle: SeedBundle): string[] {
   ];
   for (const item of [...guest.tables.People, ...guest.tables.WorkOrders]) {
     const field = idFields.find(([entity]) => entity === item.entity)?.[1];
-    if (field !== undefined && !str(item, field).endsWith("-g00")) errors.push(`guest: ${str(item, field)} does not carry the placeholder tag g00`);
+    if (field !== undefined && !str(item, field).endsWith(tag)) errors.push(`guest: ${str(item, field)} does not carry the tag of its world`);
   }
   const { windowStartSim, windowEndSim } = guest.tour;
   const inWindow = (instant: string): boolean => Date.parse(instant) >= Date.parse(windowStartSim) && Date.parse(instant) <= Date.parse(windowEndSim);

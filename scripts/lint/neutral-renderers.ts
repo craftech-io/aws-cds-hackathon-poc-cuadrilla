@@ -1,10 +1,12 @@
 // The authentication emails the neutral-surfaces guard renders in memory and reads as text
 // (ADR-0023 §3): every template, in each locale it is written in, with the neutral brand and with a
 // made-up co-branding one, because the brand's name and notice are interpolated when the email is
-// built. Today: the pool's default templates of infra/auth-email.ts (Mexican Spanish only: Cognito
-// keeps one template per pool). The Cognito custom message trigger adds its templates of
-// packages/bff/src/copy/auth-emails*.ts here, in es and en (ADR-0025 §1).
+// built. The pool's default templates of infra/auth-email.ts (Mexican Spanish only: Cognito keeps one
+// template per pool), and the four emails of the Cognito custom message trigger of
+// packages/bff/src/copy/auth-emails*.ts, in es and en (ADR-0025 §1), which carry the neutral brand
+// whatever BrandConfig says: both brands render the same text, and the guard reads both.
 import { emailBrandFrom, invitationEmail, verificationEmail, type AuthEmailOptions, type CognitoEmail } from "../../infra/auth-email";
+import { AUTH_EMAIL_KINDS, type AuthEmailKind, renderAuthEmail } from "../../packages/bff/src/copy/auth-emails";
 import type { BrandConfigValue } from "../../packages/bff/src/lib/secret-schemas";
 
 export type RenderLocale = "es" | "en";
@@ -55,9 +57,18 @@ function poolTemplate(template: (options: AuthEmailOptions) => CognitoEmail): Au
   };
 }
 
+// The trigger's emails, as Cognito sends them: its placeholders stay, the brand is never an input.
+function triggerTemplate(kind: AuthEmailKind): AuthEmailRenderer["render"] {
+  return (locale) => {
+    const email = renderAuthEmail(kind, locale === "en" ? "en" : "es-MX", { code: "{####}", username: "{username}" }, { loginUrl: `${APP_URL}/login`, logoUrl: `${APP_URL}/brand/logo-craftech-color.png` });
+    return { subject: email.subject, body: email.html };
+  };
+}
+
 export const AUTH_EMAIL_RENDERERS: readonly AuthEmailRenderer[] = [
   { source: "infra/auth-email.ts invitationEmail", locales: ["es"], render: poolTemplate(invitationEmail) },
   { source: "infra/auth-email.ts verificationEmail", locales: ["es"], render: poolTemplate(verificationEmail) },
+  ...AUTH_EMAIL_KINDS.map((kind): AuthEmailRenderer => ({ source: `packages/bff/src/copy/auth-emails.ts ${kind}`, locales: ["es", "en"], render: triggerTemplate(kind) })),
 ];
 
 /** Every renderer in each of its locales and with each test brand, subject first. */

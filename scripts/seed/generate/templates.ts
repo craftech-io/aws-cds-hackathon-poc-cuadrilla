@@ -1,7 +1,7 @@
-// The five world templates (docs/seed-spec.md §3, lib/worlds.ts): `demo` and `guest` item by item,
-// `models` with every order of §7 and its people, `qa-min` and `eval` as the operations the world
-// factory clones from the models. All of them run `whatsappMode: simulated`.
-import { guestBlock } from "../lib/synthetic";
+// The five world templates (docs/seed-spec.md §3, lib/worlds.ts): `demo` item by item, `guest` item by
+// item with its markers (guest-template.ts), `models` with every order of §7 and its people, `qa-min`
+// and `eval` as the operations the world factory clones from the models. All of them run
+// `whatsappMode: simulated`.
 import type { SeedItem, WorldTable } from "../lib/tables";
 import type { EvalQuestionDef } from "../lib/questions";
 import { TEMPLATE_VERSION, type EvalTemplate, type ModelOrder, type ModelsTemplate, type QaMinTemplate, type WorldTablesTemplate } from "../lib/worlds";
@@ -9,12 +9,13 @@ import type { PhotoEntry } from "../photos/schema";
 import { CREWS, ONU_MODEL, ZONES, staff, zoneOfOrder, type OrderDef, type StaffDef } from "./catalog";
 import { GENERATOR, GENERATOR_VERSION } from "./context";
 import { scriptedKpi } from "./metrics";
+import { markGuestTemplate, type GuestTemplateFile } from "./guest-template";
 import { worldSettings } from "./org";
 import { isClosedHistory } from "./orders";
 import type { CustomerDef } from "./people";
 import { guestScenes, guestTour } from "./scenes";
 import { DAYS, WORLD_START_SIM } from "./time";
-import { TEMPLATE_GUEST, type WorldSpec } from "./world";
+import type { WorldSpec } from "./world";
 
 const HEADER = { templateVersion: TEMPLATE_VERSION, generator: GENERATOR, generatorVersion: GENERATOR_VERSION, seed: 20260926, startAtSim: WORLD_START_SIM, whatsappMode: "simulated" } as const;
 
@@ -33,14 +34,13 @@ export function worldTemplate(world: WorldSpec, tables: Readonly<Record<WorldTab
     tables: Object.fromEntries(Object.entries(tables).map(([table, items]) => [table, [...items]])) as WorldTablesTemplate["tables"],
   };
   if (world.kind === "DEMO") return base;
-  const tokens = guestBlock(TEMPLATE_GUEST);
-  return {
-    ...base,
-    placeholders: { guestNumber: "00", clockTag: "g00", ispId: world.ispId, clockId: world.clockId, phoneBlock: tokens.phoneBlock, emailTag: "g00" },
-    guestTest: { simulatorCaps: { messagesPerRealHourPerIdentity: 80, turnsPerHour: 180, emailsPerDay: 60 }, consoleUsers: [{ userId: "usr-qa-guest", role: "GUEST", name: "Invitado de QA" }] },
-    tour: guestTour(world),
-    scenes: guestScenes(world),
-  };
+  return { ...base, tour: guestTour(world), scenes: guestScenes(world) };
+}
+
+/** The `guest` template: the sample guest world with its markers, and what the rehearsal world adds. */
+export function guestTemplate(world: WorldSpec, tables: Readonly<Record<WorldTable, readonly SeedItem[]>>): GuestTemplateFile {
+  if (world.kind !== "GUEST") throw new RangeError(`${world.name} is not the guest world`);
+  return markGuestTemplate(worldTemplate(world, tables), { consoleUsers: [{ userId: "usr-qa-guest", role: "GUEST", name: "Invitado de QA" }] });
 }
 
 function staffModel(person: StaffDef) {

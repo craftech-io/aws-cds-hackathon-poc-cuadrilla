@@ -2,7 +2,8 @@
 #
 # The only infrastructure that must exist BEFORE the first `sst deploy`: the deploy role GitHub
 # Actions assumes through OIDC, the qa-runner role of the scenario runner, the permissions boundary
-# of every role the app creates, the Router key-value store and the console's security headers.
+# of every role the app creates, the Router key-value store, the console's security headers and the
+# origin request policy of /api/*.
 # The demos account is SHARED: every statement is fenced by tag, name, IAM path or ARN.
 # What each statement is for, residual risks, apply and verify: infra/bootstrap/README.md.
 AWSTemplateFormatVersion: "2010-09-09"
@@ -98,12 +99,24 @@ Resources:
         Comment: CSP, HSTS, no framing, nosniff, referrer of the console, landing and legal pages.
         SecurityHeadersConfig:
           ContentSecurityPolicy:
-            ContentSecurityPolicy: !Sub "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-evidence-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-seed-${AWS::AccountId}.s3.${Region}.amazonaws.com; media-src 'self' blob: https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-evidence-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-seed-${AWS::AccountId}.s3.${Region}.amazonaws.com; font-src 'self' data:; connect-src 'self' https://cognito-idp.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+            ContentSecurityPolicy: !Sub "default-src 'self'; script-src 'self' https://*.sdk.awswaf.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-evidence-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-seed-${AWS::AccountId}.s3.${Region}.amazonaws.com; media-src 'self' blob: https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-evidence-${AWS::AccountId}.s3.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-seed-${AWS::AccountId}.s3.${Region}.amazonaws.com; font-src 'self' data:; connect-src 'self' https://cognito-idp.${Region}.amazonaws.com https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com https://*.sdk.awswaf.com https://*.token.awswaf.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
             Override: false
           StrictTransportSecurity: { AccessControlMaxAgeSec: 31536000, IncludeSubdomains: false, Override: true }
           ContentTypeOptions: { Override: true }
           FrameOptions: { FrameOption: DENY, Override: true }
           ReferrerPolicy: { ReferrerPolicy: strict-origin-when-cross-origin, Override: true }
+
+  ApiOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Name: !Sub "${AppName}-${DeployStage}-api"
+        Comment: /api/* of the Router - every viewer value plus CloudFront-Viewer-Address for the BFF.
+        HeadersConfig:
+          HeaderBehavior: allViewerAndWhitelistCloudFront
+          Headers: [CloudFront-Viewer-Address]
+        CookiesConfig: { CookieBehavior: all }
+        QueryStringsConfig: { QueryStringBehavior: all }
 
   # ---- Permissions boundary: the ceiling of every role the app creates -----------------------
   DeployBoundary:
@@ -242,6 +255,18 @@ Resources:
               - transcribe:UpdateVocabulary
               - transcribe:DeleteVocabulary
             Resource: !Sub "arn:${AWS::Partition}:transcribe:${Region}:${AWS::AccountId}:vocabulary/cuadrilla-poc-*"
+          - Sid: WebAclReadsOfThisApp
+            Effect: Allow
+            Action:
+              - wafv2:GetWebACL
+              - wafv2:GetWebACLForResource
+            Resource:
+              - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:global/webacl/${AppName}-*"
+              - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:regional/webacl/${AppName}-*"
+          - Sid: InvokeAccountDeletionByName
+            Effect: Allow
+            Action: lambda:InvokeFunction
+            Resource: !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${AppName}-${DeployStage}-guest-account-deletion"
           - Sid: PassAppRolesToScheduler
             Effect: Allow
             Action: iam:PassRole
@@ -641,6 +666,34 @@ Resources:
               - budgets:UntagResource
               - budgets:ViewBudget
             Resource: !Sub "arn:${AWS::Partition}:budgets::${AWS::AccountId}:budget/${AppName}-*"
+          - Sid: EventSourceMappingsOfThisApp
+            Effect: Allow
+            Action:
+              - lambda:CreateEventSourceMapping
+              - lambda:UpdateEventSourceMapping
+              - lambda:DeleteEventSourceMapping
+            Resource: "*"
+            Condition:
+              ArnLike:
+                lambda:FunctionArn: !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${AppName}-*"
+          - Sid: CognitoWebAclAssociation
+            Effect: Allow
+            Action:
+              - cognito-idp:AssociateWebACL
+              - cognito-idp:DisassociateWebACL
+              - cognito-idp:GetWebACLForResource
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:ResourceTag/sst:app: !Ref AppName
+          - Sid: SesEventDestinationsOfThisApp
+            Effect: Allow
+            Action:
+              - ses:CreateConfigurationSetEventDestination
+              - ses:UpdateConfigurationSetEventDestination
+              - ses:DeleteConfigurationSetEventDestination
+              - ses:GetConfigurationSetEventDestinations
+            Resource: !Sub "arn:${AWS::Partition}:ses:${Region}:${AWS::AccountId}:configuration-set/${AppName}-email-${DeployStage}"
           - Sid: DenyPublicFunctionUrlsBesidesTheEdge
             Effect: Deny
             Action:
@@ -672,9 +725,34 @@ Resources:
               - cloudfront:GetCachePolicy
               - cloudfront:GetCachePolicyConfig
               - cloudfront:ListCachePolicies
+              - cloudfront:GetOriginRequestPolicy
               - cloudfront:ListOriginRequestPolicies
               - cloudfront:ListResponseHeadersPolicies
               - cloudfront:GetResponseHeadersPolicy
+            Resource: "*"
+          - Sid: WebAclsOfThisApp
+            Effect: Allow
+            Action:
+              - wafv2:AssociateWebACL
+              - wafv2:CreateWebACL
+              - wafv2:DeleteWebACL
+              - wafv2:DisassociateWebACL
+              - wafv2:GetWebACL
+              - wafv2:GetWebACLForResource
+              - wafv2:ListTagsForResource
+              - wafv2:TagResource
+              - wafv2:UntagResource
+              - wafv2:UpdateWebACL
+            Resource:
+              - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:global/webacl/${AppName}-*"
+              - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:regional/webacl/${AppName}-*"
+          - Sid: ManagedRuleGroupReads
+            Effect: Allow
+            Action:
+              - wafv2:CheckCapacity
+              - wafv2:DescribeManagedRuleGroup
+              - wafv2:ListAvailableManagedRuleGroups
+              - wafv2:ListAvailableManagedRuleGroupVersions
             Resource: "*"
           - Sid: CloudFrontFunctionsOfThisApp
             Effect: Allow
@@ -1020,3 +1098,6 @@ Outputs:
   ConsoleResponseHeadersPolicyId:
     Description: Response headers policy of the console (infra/web.ts finds it by name).
     Value: !Ref ConsoleResponseHeadersPolicy
+  ApiOriginRequestPolicyId:
+    Description: Origin request policy of /api/* (infra/web.ts finds it by name).
+    Value: !Ref ApiOriginRequestPolicy

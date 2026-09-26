@@ -30,7 +30,7 @@ beforeEach(() => {
   cognito = new FakeCognito();
 });
 
-describe("sign in with email and password (USER_SRP_AUTH)", () => {
+describe("sign in with email and password (USER_SRP_AUTH) [FL-079] [FL-108]", () => {
   it("proves the password by SRP: the password itself never crosses the wire", async () => {
     await cognito.addUser({ email: "ops@example.test", password: PASSWORD, role: "OPS", totpSecret: randomBase32Secret() });
     const challenge = expectStep(await run(INITIAL_STATE, { type: "signIn", email: " Ops@Example.test ", password: PASSWORD }), "totp");
@@ -93,7 +93,7 @@ describe("first login after an invitation (NEW_PASSWORD_REQUIRED → optional TO
     expect(cognito.user("operaciones@example.test").totpEnabled).toBe(false);
   });
 
-  it("never offers TOTP to a GUEST", async () => {
+  it("[FL-108] never offers TOTP to a GUEST", async () => {
     await cognito.addUser({ email: "guest-01@example.test", password: PASSWORD, role: "GUEST" });
     const done = expectStep(await run(INITIAL_STATE, { type: "signIn", email: "guest-01@example.test", password: PASSWORD }), "done");
     expect(done.totpVerified).toBe(false);
@@ -141,8 +141,8 @@ describe("MFA_SETUP (a pool where Cognito itself requires MFA)", () => {
   });
 });
 
-describe("forgot password (ForgotPassword → ConfirmForgotPassword)", () => {
-  it("answers a known and an unknown email with the same next screen", async () => {
+describe("forgot password (ForgotPassword → ConfirmForgotPassword) [FL-109]", () => {
+  it("[FL-109] answers a known and an unknown email with the same next screen (preventUserExistenceErrors)", async () => {
     await cognito.addUser({ email: "known@example.test", password: PASSWORD });
     const request = expectStep(await run(INITIAL_STATE, { type: "forgot" }), "forgotRequest");
     const known = await run(request, { type: "requestReset", email: "known@example.test" });
@@ -158,7 +158,7 @@ describe("forgot password (ForgotPassword → ConfirmForgotPassword)", () => {
     expectStep(await run({ step: "forgotRequest" }, { type: "requestReset", email: "invited@example.test" }), "forgotConfirm");
   });
 
-  it("resets with the emailed code and signs in with the new password", async () => {
+  it("[FL-109] resets with the emailed code and signs in with the new password", async () => {
     await cognito.addUser({ email: "olvido@example.test", password: PASSWORD, role: "OPS" });
     const confirm = expectStep(await run({ step: "forgotRequest" }, { type: "requestReset", email: "olvido@example.test" }), "forgotConfirm");
     const code = cognito.sentResetCode("olvido@example.test") ?? "";

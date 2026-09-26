@@ -1,14 +1,14 @@
-// Pure half of the console's Cognito user pool (infra/auth.ts): the settings the pool and its web
-// client are built from, the brand and the sender of the emails Cognito sends, and those emails (the
-// invitation of AdminCreateUser and the code message ForgotPassword uses). No SST or Pulumi
-// dependency, so infra/auth-email.test.ts checks every value without an AWS account, and
-// scripts/console/invite.ts can read the groups, the informative attribute and the password policy.
+// Pure half of the console's Cognito user pool (infra/auth.ts): the settings the pool and its three
+// clients are built from, the brand and the sender of the emails Cognito sends, and the pool's default
+// templates (the invitation of AdminCreateUser and the code message). No SST or Pulumi dependency, so
+// infra/auth-email.test.ts checks every value without an AWS account, and scripts/console/invite.ts
+// can read the groups, the informative attribute and the password policy.
 //
-// Brand (ADR-0018). Cognito keeps one template per pool, so the brand is resolved on each deploy from
-// the BrandConfig secret: "Cuadrilla" in `neutral`, "Cuadrilla for <partner>" in `cobrand`, with the
-// synthetic-demo notice in both and "(demo sintética)" in every subject. The partner's name and its
-// notice come only from the secret; this file never names an operator. The From header is generic
-// ("Cuadrilla") in both modes.
+// Brand (ADR-0025 §1). Authentication emails go to addresses nobody verified yet, so they carry the
+// NEUTRAL brand ("Cuadrilla", synthetic-demo notice, "(demo sintética)" in every subject) whatever
+// BrandConfig says: infra/auth.ts builds the templates with NEUTRAL_EMAIL_BRAND. The custom message
+// trigger (packages/bff/src/copy/auth-emails*.ts) writes the real ones, in es-MX and en; these are
+// its fallback. `emailBrandFrom` stays for the neutral-surfaces guard, which renders both brands.
 //
 // Email clients drop <style> blocks and SVG, so every rule is inline, the layout is tables and the
 // only image is Craftech's PNG logo on an absolute URL of the app domain (packages/web/public/brand).
@@ -16,6 +16,7 @@
 // up to 20,000 characters per message and 140 per subject. Texts are Mexican Spanish with tuteo, like
 // every text the operator's staff reads (ADR-0013).
 import { BrandConfigValue } from "../packages/bff/src/lib/secret-schemas";
+import { EMAIL_CONFIGURATION_SET } from "./iam-capabilities";
 
 export const PRODUCT_NAME = "Cuadrilla";
 
@@ -50,31 +51,36 @@ export const PASSWORD_POLICY = {
 } as const;
 
 /** Build-time variables of the console, as packages/web/src/lib/env.ts reads them. */
-export const WEB_ENV_NAMES = { userPoolId: "VITE_COGNITO_USER_POOL_ID", clientId: "VITE_COGNITO_CLIENT_ID" } as const;
+export const WEB_ENV_NAMES = {
+  userPoolId: "VITE_COGNITO_USER_POOL_ID",
+  clientId: "VITE_COGNITO_CLIENT_ID",
+  signupClientId: "VITE_COGNITO_SIGNUP_CLIENT_ID",
+  wafIntegrationUrl: "VITE_WAF_INTEGRATION_URL",
+} as const;
 
-// Public client of the browser: SRP and refresh only, no secret, no OAuth, no hosted UI (the
-// placeholder callback URL SST puts on a client is cleared). Tokens live 15 minutes because the BFF
-// verifies them offline, so a revoked or copied token is usable until it expires; the console
-// refreshes silently with the 12-hour refresh token. The only attribute a user may write is the
-// display name: never `custom:*`, never the email.
-export const WEB_CLIENT_SETTINGS = {
-  generateSecret: false,
-  allowedOauthFlowsUserPoolClient: false,
-  allowedOauthFlows: [],
-  allowedOauthScopes: [],
-  callbackUrls: [],
-  logoutUrls: [],
-  supportedIdentityProviders: ["COGNITO"],
-  explicitAuthFlows: ["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"],
-  preventUserExistenceErrors: "ENABLED",
-  enableTokenRevocation: true,
-  accessTokenValidity: 15,
-  idTokenValidity: 15,
-  refreshTokenValidity: 12,
-  tokenValidityUnits: { accessToken: "minutes", idToken: "minutes", refreshToken: "hours" },
-  readAttributes: ["email", "email_verified", "name", ISP_ID_CLAIM],
-  writeAttributes: ["name"],
-};
+// Every client is public: no secret, no OAuth, no hosted UI (the placeholder callback URL SST puts on a
+// client is cleared), and names the attributes it reads and writes (without the lists Cognito lets a
+// client read and write every writable attribute, `email` and `custom:ispId` included).
+function publicClient(explicitAuthFlows: string[], tokenMinutes: number, refreshHours: number, readAttributes: string[], writeAttributes: string[]) {
+  const oauthOff = { allowedOauthFlowsUserPoolClient: false, allowedOauthFlows: [], allowedOauthScopes: [], callbackUrls: [], logoutUrls: [] };
+  const units = { accessToken: "minutes", idToken: "minutes", refreshToken: "hours" };
+  return { generateSecret: false, ...oauthOff, supportedIdentityProviders: ["COGNITO"], preventUserExistenceErrors: "ENABLED", enableTokenRevocation: true, explicitAuthFlows, accessTokenValidity: tokenMinutes, idTokenValidity: tokenMinutes, refreshTokenValidity: refreshHours, tokenValidityUnits: units, readAttributes, writeAttributes };
+}
+
+// `ConsoleWeb`, the browser's sign-in: SRP and refresh. Tokens live 15 minutes because the BFF verifies
+// them offline; the console refreshes silently with the 12-hour refresh token. A user writes only the
+// display name: never `custom:*`, never the email (a guest cannot move the lead's verified address).
+export const WEB_CLIENT_SETTINGS = publicClient(["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"], 15, 12, ["email", "email_verified", "name", ISP_ID_CLAIM], ["name"]);
+
+// `GuestSignup`, the own sign-up only (SignUp, ConfirmSignUp, ResendConfirmationCode): no sign-in uses it
+// and Cognito needs one flow, so refresh is its only one. Never `custom:*`.
+export const GUEST_SIGNUP_CLIENT_SETTINGS = publicClient(["ALLOW_REFRESH_TOKEN_AUTH"], 5, 1, ["email", "email_verified", "name", "locale"], ["email", "name", "locale"]);
+
+// `QaProbe`, the QaDriver's seam over QA addresses (ADR-0025 §7): AdminInitiateAuth, 5-minute tokens, writes nothing.
+export const QA_PROBE_CLIENT_SETTINGS = publicClient(["ALLOW_ADMIN_USER_PASSWORD_AUTH"], 5, 1, ["email", "email_verified"], []);
+
+/** The three clients of the pool, by the name infra/auth.ts gives them. */
+export const POOL_CLIENTS = { ConsoleWeb: WEB_CLIENT_SETTINGS, GuestSignup: GUEST_SIGNUP_CLIENT_SETTINGS, QaProbe: QA_PROBE_CLIENT_SETTINGS } as const;
 
 /**
  * What infra/auth.ts lays over SST's pool defaults, besides the messages. ESSENTIALS is the feature
@@ -98,16 +104,18 @@ export function userPoolSettings() {
     ],
     accountRecoverySetting: { recoveryMechanisms: [{ name: "verified_email", priority: 1 }] },
     passwordPolicy: { ...PASSWORD_POLICY },
+    // A new email never applies before it is verified (the second layer besides the message trigger).
+    userAttributeUpdateSettings: { attributesRequireVerificationBeforeUpdates: ["email"] },
   };
 }
 
-/** Nobody signs up (only AdminCreateUser), and both templates carry the brand of this deploy. */
+/** Own sign-up open (the pre sign-up trigger demands its ticket, ADR-0025); the templates are the fallback. */
 export function cognitoMessages(options: AuthEmailOptions) {
   const invitation = invitationEmail(options);
   const verification = verificationEmail(options);
   return {
     adminCreateUserConfig: {
-      allowAdminCreateUserOnly: true,
+      allowAdminCreateUserOnly: false,
       inviteMessageTemplate: { emailSubject: invitation.subject, emailMessage: invitation.message, smsMessage: COGNITO_INVITE_SMS },
     },
     verificationMessageTemplate: {
@@ -133,6 +141,8 @@ export interface EmailBrand {
 export const SYNTHETIC_DEMO_TAG = "(demo sintética)";
 /** Neutral notice: it never names the fictitious default operator (that name lives only in copy/brand.ts). */
 export const NEUTRAL_DISCLAIMER = `${PRODUCT_NAME} es una demo con datos sintéticos: la operadora, el manual, las políticas, las personas y las órdenes son ficticios.`;
+/** The brand of every authentication email, in every mode of BrandConfig (ADR-0025 §1). */
+export const NEUTRAL_EMAIL_BRAND: EmailBrand = { name: PRODUCT_NAME, disclaimer: NEUTRAL_DISCLAIMER };
 
 /**
  * The brand of the emails from the raw BrandConfig secret. Every error names fields and codes only,
@@ -151,7 +161,7 @@ export function emailBrandFrom(raw: string): EmailBrand {
     throw new Error(`BrandConfig does not match ADR-0018 (${fields.join("; ")}); value not shown.`);
   }
   const config = parsed.data;
-  if (config.mode === "neutral") return { name: PRODUCT_NAME, disclaimer: NEUTRAL_DISCLAIMER };
+  if (config.mode === "neutral") return NEUTRAL_EMAIL_BRAND;
   if ([config.partnerDisplayName, config.disclaimer.es].some((text) => /\p{Cc}/u.test(text))) {
     throw new Error("BrandConfig.partnerDisplayName and BrandConfig.disclaimer.es must not carry control characters (value not shown).");
   }
@@ -166,6 +176,8 @@ export interface EmailConfiguration {
   readonly emailSendingAccount: "DEVELOPER" | "COGNITO_DEFAULT";
   readonly sourceArn?: string;
   readonly fromEmailAddress?: string;
+  /** The app's configuration set: its sends, bounces and complaints are measured as `kind = AUTH`. */
+  readonly configurationSet?: string;
 }
 
 /** The SES identity as read on this deploy (infra/messaging-email.ts creates it). */
@@ -194,12 +206,12 @@ export function fromAddress(displayName: string, address: string): string {
 }
 
 /**
- * The sender of the console emails: SES (DEVELOPER) from `no-reply@<app domain>`, DKIM-aligned under
- * the domain's `p=reject` DMARC record, as soon as the identity exists and is verified; Cognito's own
- * sender, with the same templates, until then (DKIM can take a while after the identity is created).
- * An identity of another domain is a wiring error and fails the deploy.
+ * The sender of the console emails: SES (DEVELOPER) from `no-reply@<app domain>` through the app's
+ * configuration set, DKIM-aligned under the domain's `p=reject` DMARC record, as soon as the identity
+ * exists and is verified; Cognito's own sender, with the same templates, until then (DKIM can take a
+ * while after the identity is created). An identity of another domain fails the deploy.
  */
-export function emailSenderFor(identity: SesIdentityState | undefined, appDomain: string): EmailSenderChoice {
+export function emailSenderFor(identity: SesIdentityState | undefined, appDomain: string, configurationSet: string = EMAIL_CONFIGURATION_SET): EmailSenderChoice {
   if (identity === undefined) {
     return {
       configuration: { emailSendingAccount: "COGNITO_DEFAULT" },
@@ -218,6 +230,7 @@ export function emailSenderFor(identity: SesIdentityState | undefined, appDomain
       emailSendingAccount: "DEVELOPER",
       sourceArn: identity.arn,
       fromEmailAddress: fromAddress(PRODUCT_NAME, `${NO_REPLY_LOCAL_PART}@${appDomain}`),
+      configurationSet,
     },
   };
 }
@@ -253,16 +266,7 @@ export interface CognitoEmail {
 }
 
 /** Console theme tokens (packages/web/src/index.css `--color-*`); an email carries no stylesheet. */
-export const EMAIL_PALETTE = {
-  navy: "#0b1f3a",
-  cyan: "#12b5d9",
-  "cyan-deep": "#0a7f99",
-  ink: "#111a2b",
-  slate: "#5a6a80",
-  mist: "#e4e9f0",
-  paper: "#f5f7fa",
-  white: "#ffffff",
-} as const;
+export const EMAIL_PALETTE = { navy: "#1b1f24", cyan: "#f4c430", "cyan-deep": "#8a6400", ink: "#12161b", slate: "#57626e", mist: "#dfe3e8", paper: "#f4f5f7", white: "#ffffff" } as const;
 
 const C = EMAIL_PALETTE;
 const SANS = "Inter,Segoe UI,Helvetica,Arial,sans-serif";
@@ -272,9 +276,7 @@ const LAYOUT_TABLE = 'role="presentation" cellpadding="0" cellspacing="0" border
 const HTML_ESCAPES: Readonly<Record<string, string>> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
 /** Texts that come from the secret are data, never markup. */
-function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char] ?? char);
-}
+const escapeHtml = (text: string): string => text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char] ?? char);
 
 function safeUrl(url: string): string {
   if (!/^https:\/\/[^\s"'<>]+$/.test(url)) throw new Error("email links must be absolute https URLs without quotes, spaces or angle brackets");
@@ -286,9 +288,7 @@ function paragraph(html: string, tone: "body" | "note" = "body"): string {
   return `<p style="margin:0 0 14px;color:${tone === "body" ? C.ink : C.slate};font:${font};">${html}</p>`;
 }
 
-function block(padding: string, content: readonly string[]): string {
-  return `<tr><td style="padding:${padding};">\n${content.join("\n")}\n</td></tr>`;
-}
+const block = (padding: string, content: readonly string[]): string => `<tr><td style="padding:${padding};">\n${content.join("\n")}\n</td></tr>`;
 
 function credential(label: string, value: string): string {
   return [
@@ -307,13 +307,11 @@ function actionButton(href: string, label: string): string {
   return `<tr><td align="center" style="padding:8px 28px 20px;"><table ${LAYOUT_TABLE}><tr><td style="border-radius:10px;background:${C["cyan-deep"]};">${link}</td></tr></table></td></tr>`;
 }
 
-function fallbackLink(url: string): string {
-  return paragraph(`Si el botón no funciona, copia este enlace en tu navegador:<br><a href="${url}" style="color:${C["cyan-deep"]};word-break:break-all;">${url}</a>`, "note");
-}
+const fallbackLink = (url: string): string =>
+  paragraph(`Si el botón no funciona, copia este enlace en tu navegador:<br><a href="${url}" style="color:${C["cyan-deep"]};word-break:break-all;">${url}</a>`, "note");
 
-function heading(title: string, lines: readonly string[]): string {
-  return block("28px 28px 8px", [`<h1 style="margin:0 0 14px;color:${C.navy};font:700 22px/1.3 ${SANS};">${title}</h1>`, ...lines.map((line) => paragraph(line))]);
-}
+const heading = (title: string, lines: readonly string[]): string =>
+  block("28px 28px 8px", [`<h1 style="margin:0 0 14px;color:${C.navy};font:700 22px/1.3 ${SANS};">${title}</h1>`, ...lines.map((line) => paragraph(line))]);
 
 // First line of the body: the brand, as text like the console's wordmark (it survives blocked images).
 function brandHeader(brand: EmailBrand): string {

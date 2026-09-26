@@ -51,9 +51,9 @@ describe("kill switch status", () => {
     const clock = movableClock();
     await setKillSwitch({ store, realClock: clock }, { scope: "AGENT", clockId: QA_WORLD, on: true, actor: "QA" });
     const reader = createKillSwitchReader({ store, realClock: clock });
-    expect(await reader.status(QA_WORLD)).toEqual({ all: false, simulator: false, agent: false, world: { clockId: QA_WORLD, agent: true } });
+    expect(await reader.status(QA_WORLD)).toEqual({ all: false, simulator: false, agent: false, signup: false, world: { clockId: QA_WORLD, agent: true } });
     expect(await reader.status(OTHER_QA_WORLD)).toMatchObject({ agent: false, world: { agent: false } });
-    expect(await reader.status()).toEqual({ all: false, simulator: false, agent: false });
+    expect(await reader.status()).toEqual({ all: false, simulator: false, agent: false, signup: false });
   });
 
   it("[FL-100] caches every item for at most 30 seconds, so another container's write is seen within 30 s", async () => {
@@ -120,6 +120,16 @@ describe("what the switch blocks", () => {
     expect(blockingScope(off, "AGENT")).toBeUndefined();
   });
 
+  it("[FL-112] SIGNUP blocks only the own sign-up, and ALL blocks it too", () => {
+    const signup = { ...off, signup: true };
+    expect([blockingScope(signup, "SIGNUP"), blockingScope(signup, "AGENT"), blockingScope(signup, "SIMULATOR"), blockingScope(signup, "CONSOLE")]).toEqual(["SIGNUP", undefined, undefined, undefined]);
+    expect(blockingScope({ ...off, all: true }, "SIGNUP")).toBe("ALL");
+    expect(blockingScope({ ...off, all: true, signup: true }, "SIGNUP")).toBe("ALL");
+    expect(blockingScope({ ...off, agent: true, simulator: true }, "SIGNUP")).toBeUndefined();
+    // A status built by hand without the sign-up switch reads it as off.
+    expect(blockingScope(off, "SIGNUP")).toBeUndefined();
+  });
+
   it("[FL-100] LAM-KILL: every tool is UNAVAILABLE without effects while the agent is cut, except report_safety_hazard", () => {
     const cut = { ...off, world: { clockId: QA_WORLD, agent: true } };
     for (const tool of TOOLS) expect(toolKillGate(cut, tool), tool).toEqual({ ok: false, error: { code: "UNAVAILABLE", message: "the service is paused", reason: "KILL_SWITCH_ACTIVE" } });
@@ -153,6 +163,40 @@ describe("what the switch blocks", () => {
     await handleInbound("Ya limpié el conector, ya prende");
     expect(harnessCalls).toBe(1);
     expect(agentKillDecision({ ...off, all: true })).toEqual({ proceed: false, notice: "servicePaused", scope: "ALL" });
+  });
+});
+
+describe("the sign-up switch [FL-112]", () => {
+  it("[FL-112] the reader reads KILL#SIGNUP with the global switches and sees the operator's write within 30 s", async () => {
+    const { store } = countingStore();
+    const clock = movableClock();
+    const reader = createKillSwitchReader({ store, realClock: clock });
+    expect((await reader.status()).signup).toBe(false);
+    await setKillSwitch({ store, realClock: clock }, { scope: "SIGNUP", on: true, actor: "OPERATOR", reason: "bounces of the authentication emails" });
+    clock.advance(KILL_CACHE_TTL_MS);
+    const status = await reader.status();
+    expect(status).toMatchObject({ signup: true, all: false, agent: false, simulator: false });
+    expect(blockingScope(status, "SIGNUP")).toBe("SIGNUP");
+    expect(blockingScope(status, "AGENT")).toBeUndefined();
+  });
+
+  it("[FL-112] CostGuard turns KILL#SIGNUP on but never off; only the operator turns it off, audited", async () => {
+    const memory = createMemoryRuntimeStore();
+    const events: KillSwitchAuditEvent[] = [];
+    const audit = async (event: KillSwitchAuditEvent) => void events.push(event);
+    await expect(setKillSwitch({ store: memory, audit }, { scope: "SIGNUP", on: true, actor: "COST_GUARD", reason: "alarm AuthEmailBounces" })).resolves.toMatchObject({ scope: "SIGNUP", state: "on", setBy: "COST_GUARD" });
+    await expect(setKillSwitch({ store: memory, audit }, { scope: "SIGNUP", on: false, actor: "COST_GUARD" })).rejects.toBeInstanceOf(ToolError);
+    await expect(setKillSwitch({ store: memory, audit }, { scope: "SIGNUP", on: true, actor: "QA" })).rejects.toBeInstanceOf(ToolError);
+    expect(memory.items.get("KILL#SIGNUP")?.state).toBe("on");
+    await setKillSwitch({ store: memory, audit }, { scope: "SIGNUP", on: false, actor: "OPERATOR" });
+    expect(memory.items.get("KILL#SIGNUP")).toMatchObject({ state: "off", setBy: "OPERATOR" });
+    expect(memory.items.get("KILL#SIGNUP")).not.toHaveProperty("expiresAt");
+    expect(events.map((event) => [event.action, event.record.scope, event.record.state])).toEqual([
+      ["KILL_SWITCH_SET", "SIGNUP", "on"],
+      ["KILL_SWITCH_SET", "SIGNUP", "off"],
+    ]);
+    expect(killSwitchKey("SIGNUP")).toBe("KILL#SIGNUP");
+    expect(() => killSwitchKey("SIGNUP", QA_WORLD)).toThrow(RangeError);
   });
 });
 

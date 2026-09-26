@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { hasOuterSpaces, looksLikeEmail, missingPasswordRules } from "../../lib/auth/credentials";
 import type { AuthFlowAction } from "../../lib/auth/flow";
-import { loginCopy } from "./copy";
+import { useLoginCopy } from "./auth-lang";
 import { CodeField, Field, LinkButton, NoticeNote, PasswordField, PasswordRules, StepHeading, SubmitButton } from "./form-parts";
 
 export interface StepProps {
@@ -19,8 +19,17 @@ function submit(handler: () => void) {
   };
 }
 
-export function CredentialsStep({ busy, dispatch, inDrawer, fixedEmail, notice, onForgot }: StepProps & { readonly fixedEmail?: string; readonly notice?: string; readonly onForgot?: () => void }) {
-  const [email, setEmail] = useState(fixedEmail ?? "");
+export function CredentialsStep({
+  busy,
+  dispatch,
+  inDrawer,
+  fixedEmail,
+  initialEmail,
+  notice,
+  onForgot,
+}: StepProps & { readonly fixedEmail?: string; readonly initialEmail?: string; readonly notice?: string; readonly onForgot?: () => void }) {
+  const copy = useLoginCopy();
+  const [email, setEmail] = useState(fixedEmail ?? initialEmail ?? "");
   const [password, setPassword] = useState("");
   const onSubmit = submit(() => {
     if (!looksLikeEmail(email) || !password) return;
@@ -29,10 +38,10 @@ export function CredentialsStep({ busy, dispatch, inDrawer, fixedEmail, notice, 
   });
   return (
     <form className="space-y-4" onSubmit={onSubmit} noValidate={false}>
-      {inDrawer ? null : <StepHeading title={loginCopy.credentials.title} lead={loginCopy.credentials.lead} />}
+      {inDrawer ? null : <StepHeading title={copy.credentials.title} lead={copy.credentials.lead} />}
       {notice ? <NoticeNote>{notice}</NoticeNote> : null}
       <Field
-        label={loginCopy.credentials.email}
+        label={copy.credentials.email}
         type="email"
         autoComplete="username"
         inputMode="email"
@@ -43,11 +52,11 @@ export function CredentialsStep({ busy, dispatch, inDrawer, fixedEmail, notice, 
         readOnly={fixedEmail !== undefined}
         required
       />
-      <PasswordField label={loginCopy.credentials.password} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-      <SubmitButton busy={busy}>{loginCopy.credentials.submit}</SubmitButton>
+      <PasswordField label={copy.credentials.password} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+      <SubmitButton busy={busy}>{copy.credentials.submit}</SubmitButton>
       {onForgot ? (
         <div className="text-center">
-          <LinkButton onClick={onForgot}>{loginCopy.credentials.forgot}</LinkButton>
+          <LinkButton onClick={onForgot}>{copy.credentials.forgot}</LinkButton>
         </div>
       ) : null}
     </form>
@@ -56,6 +65,7 @@ export function CredentialsStep({ busy, dispatch, inDrawer, fixedEmail, notice, 
 
 /** New password + confirmation, checked against the pool's policy before anything is sent. */
 function useNewPassword() {
+  const copy = useLoginCopy();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const mismatch = confirm.length > 0 && confirm !== password;
@@ -68,15 +78,16 @@ function useNewPassword() {
     <>
       <PasswordField label={label} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
       <PasswordRules password={password} />
-      <PasswordField label={loginCopy.password.confirm} autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required />
-      {mismatch ? <p className="text-xs text-danger">{loginCopy.password.mismatch}</p> : null}
-      {hasOuterSpaces(password) ? <p className="text-xs text-danger">{loginCopy.password.outerSpaces}</p> : null}
+      <PasswordField label={copy.password.confirm} autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required />
+      {mismatch ? <p className="text-xs text-danger">{copy.password.mismatch}</p> : null}
+      {hasOuterSpaces(password) ? <p className="text-xs text-danger">{copy.password.outerSpaces}</p> : null}
     </>
   );
   return { password, valid, reset, fields };
 }
 
 export function NewPasswordStep({ busy, dispatch, inDrawer }: StepProps) {
+  const copy = useLoginCopy();
   const form = useNewPassword();
   const onSubmit = submit(() => {
     if (!form.valid) return;
@@ -85,14 +96,15 @@ export function NewPasswordStep({ busy, dispatch, inDrawer }: StepProps) {
   });
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
-      <StepHeading title={loginCopy.newPassword.title} lead={loginCopy.newPassword.lead} inDrawer={inDrawer} />
-      {form.fields(loginCopy.newPassword.field)}
-      <SubmitButton busy={busy}>{loginCopy.newPassword.submit}</SubmitButton>
+      <StepHeading title={copy.newPassword.title} lead={copy.newPassword.lead} inDrawer={inDrawer} />
+      {form.fields(copy.newPassword.field)}
+      <SubmitButton busy={busy}>{copy.newPassword.submit}</SubmitButton>
     </form>
   );
 }
 
 export function TotpStep({ busy, dispatch, inDrawer }: StepProps) {
+  const copy = useLoginCopy();
   const [code, setCode] = useState("");
   const onSubmit = submit(() => {
     dispatch({ type: "totp", code });
@@ -100,28 +112,30 @@ export function TotpStep({ busy, dispatch, inDrawer }: StepProps) {
   });
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
-      <StepHeading title={loginCopy.totp.title} lead={loginCopy.totp.lead} inDrawer={inDrawer} />
-      <CodeField label={loginCopy.totp.code} value={code} onChange={setCode} />
-      <SubmitButton busy={busy}>{loginCopy.totp.submit}</SubmitButton>
+      <StepHeading title={copy.totp.title} lead={copy.totp.lead} inDrawer={inDrawer} />
+      <CodeField label={copy.totp.code} value={code} onChange={setCode} />
+      <SubmitButton busy={busy}>{copy.totp.submit}</SubmitButton>
     </form>
   );
 }
 
 export function ForgotRequestStep({ busy, dispatch }: StepProps) {
+  const copy = useLoginCopy();
   const [email, setEmail] = useState("");
   const onSubmit = submit(() => {
     if (looksLikeEmail(email)) dispatch({ type: "requestReset", email });
   });
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
-      <StepHeading title={loginCopy.forgot.title} lead={loginCopy.forgot.lead} />
-      <Field label={loginCopy.credentials.email} type="email" autoComplete="username" inputMode="email" autoCapitalize="off" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} required />
-      <SubmitButton busy={busy}>{loginCopy.forgot.submit}</SubmitButton>
+      <StepHeading title={copy.forgot.title} lead={copy.forgot.lead} />
+      <Field label={copy.credentials.email} type="email" autoComplete="username" inputMode="email" autoCapitalize="off" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} required />
+      <SubmitButton busy={busy}>{copy.forgot.submit}</SubmitButton>
     </form>
   );
 }
 
 export function ForgotConfirmStep({ busy, dispatch, email }: StepProps & { readonly email: string }) {
+  const copy = useLoginCopy();
   const [code, setCode] = useState("");
   const form = useNewPassword();
   const onSubmit = submit(() => {
@@ -131,10 +145,10 @@ export function ForgotConfirmStep({ busy, dispatch, email }: StepProps & { reado
   });
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
-      <StepHeading title={loginCopy.reset.title} lead={loginCopy.reset.lead(email)} />
-      <CodeField label={loginCopy.reset.code} value={code} onChange={setCode} />
-      {form.fields(loginCopy.newPassword.field)}
-      <SubmitButton busy={busy}>{loginCopy.reset.submit}</SubmitButton>
+      <StepHeading title={copy.reset.title} lead={copy.reset.lead(email)} />
+      <CodeField label={copy.reset.code} value={code} onChange={setCode} />
+      {form.fields(copy.newPassword.field)}
+      <SubmitButton busy={busy}>{copy.reset.submit}</SubmitButton>
     </form>
   );
 }

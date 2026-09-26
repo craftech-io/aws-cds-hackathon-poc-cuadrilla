@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CognitoError, createCognitoApi, regionOfPool } from "./cognito";
+import { signupErrorCodeOf } from "./errors";
+import { createSignupCognitoApi } from "./signup-cognito";
 import type { FetchRetryOptions } from "../http";
 
 interface Sent {
@@ -103,5 +105,56 @@ describe("regionOfPool", () => {
     expect(regionOfPool("us-east-1_AbC123xyz")).toBe("us-east-1");
     expect(regionOfPool("ap-southeast-2_x1")).toBe("ap-southeast-2");
     expect(regionOfPool("not-a-pool")).toBeUndefined();
+  });
+});
+
+describe("the sign-up's Cognito calls (GuestSignup) [FL-104] [FL-105] [FL-106]", () => {
+  it("[FL-104] SignUp names the ticket's user, the password, the email, the locale and the name, and carries the ticket as client metadata; sent once", async () => {
+    const { sent, fetch } = fakeFetch(200, { UserConfirmed: false, UserSub: "sub-1" });
+    const api = createSignupCognitoApi({ region: "us-east-1", clientId: "guest-signup-client", fetch });
+    await api.signUp({ username: "gst-01K80000000000000000000001", password: "Fixture-Pass-1!", email: "ana@example.test", locale: "en", name: "Ana", ticket: "ticket-1" });
+    const [request] = sent;
+    if (!request) throw new Error("no request");
+    expect(headersOf(request).get("x-amz-target")).toBe("AWSCognitoIdentityProviderService.SignUp");
+    expect(bodyOf(request)).toEqual({
+      ClientId: "guest-signup-client",
+      Username: "gst-01K80000000000000000000001",
+      Password: "Fixture-Pass-1!",
+      UserAttributes: [
+        { Name: "email", Value: "ana@example.test" },
+        { Name: "locale", Value: "en" },
+        { Name: "name", Value: "Ana" },
+      ],
+      ClientMetadata: { signupTicket: "ticket-1" },
+    });
+    expect(request.options?.attempts).toBe(1);
+    expect(request.init.credentials).toBe("omit");
+  });
+
+  it("[FL-105] [FL-106] confirms with the code and resends it, once each, with the sign-up client", async () => {
+    const { sent, fetch } = fakeFetch(200, {});
+    const api = createSignupCognitoApi({ region: "us-east-1", clientId: "guest-signup-client", fetch });
+    await api.confirmSignUp("gst-01K80000000000000000000001", "123456");
+    await api.resendCode("gst-01K80000000000000000000001");
+    expect(sent.map((request) => [headersOf(request).get("x-amz-target"), bodyOf(request), request.options?.attempts])).toEqual([
+      ["AWSCognitoIdentityProviderService.ConfirmSignUp", { ClientId: "guest-signup-client", Username: "gst-01K80000000000000000000001", ConfirmationCode: "123456" }, 1],
+      ["AWSCognitoIdentityProviderService.ResendConfirmationCode", { ClientId: "guest-signup-client", Username: "gst-01K80000000000000000000001" }, 1],
+    ]);
+  });
+
+  it("[FL-104] reads a trigger's refusal by its code and never shows Cognito's raw text", async () => {
+    const { fetch } = fakeFetch(400, { __type: "UserLambdaValidationException", message: "PreSignUp failed with error TICKET_INVALID." });
+    const api = createSignupCognitoApi({ region: "us-east-1", clientId: "guest-signup-client", fetch });
+    const error = await api.signUp({ username: "gst-01K80000000000000000000001", password: "p", email: "a@example.test", locale: "es-MX", ticket: "t" }).catch((caught: unknown) => caught);
+    expect(signupErrorCodeOf(error, "signUp")).toBe("TICKET_INVALID");
+    expect(signupErrorCodeOf(new CognitoError("UserLambdaValidationException", "PreSignUp failed with error EMAIL_TAKEN."), "signUp")).toBe("EMAIL_TAKEN");
+    expect(signupErrorCodeOf(new CognitoError("UserLambdaValidationException", "CustomMessage failed with error CAP_REACHED."), "resend")).toBe("CAP_REACHED");
+    expect(signupErrorCodeOf(new CognitoError("UserLambdaValidationException", "PreSignUp failed with error SOURCE_NOT_ALLOWED."), "signUp")).toBe("UNAVAILABLE");
+    expect(signupErrorCodeOf(new CognitoError("InvalidPasswordException", "x"), "signUp")).toBe("WEAK_PASSWORD");
+    expect(signupErrorCodeOf(new CognitoError("CodeMismatchException", "x"), "confirm")).toBe("INVALID_CODE");
+    expect(signupErrorCodeOf(new CognitoError("ExpiredCodeException", "x"), "confirm")).toBe("INVALID_CODE");
+    expect(signupErrorCodeOf(new CognitoError("AliasExistsException", "x"), "confirm")).toBe("EMAIL_TAKEN");
+    expect(signupErrorCodeOf(new CognitoError("LimitExceededException", "x"), "resend")).toBe("TOO_MANY_ATTEMPTS");
+    expect(signupErrorCodeOf(new TypeError("Failed to fetch"), "signUp")).toBe("UNAVAILABLE");
   });
 });

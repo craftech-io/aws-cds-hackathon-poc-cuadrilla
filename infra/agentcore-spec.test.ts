@@ -385,7 +385,9 @@ describe("Linkables", () => {
     expect(ROLES.filter((role) => expectedGrants(role).some((grant) => grant.resources.includes(spec.HARNESS_REF)))).toEqual(["InstallerWorker"]);
     for (const grant of CAPABILITIES.MEMORY_ADMIN.grants) expect(grant.resources).toEqual([spec.MEMORY_REF]);
     const memoryHolders = (Object.keys(LAMBDA_CAPABILITIES) as LambdaName[]).filter((fn) => resolveCapabilities(LAMBDA_CAPABILITIES[fn].capabilities).includes("MEMORY_ADMIN"));
-    expect(memoryHolders.sort()).toEqual(["Bff", "QaDriver", "WorldJanitor"]);
+    // The world factory of guest worlds and the account deletion purge a generation's memory too (ADR-0025 §2 and §6).
+    expect(memoryHolders.sort()).toEqual(["Bff", "GuestAccountDeletion", "GuestWorlds", "QaDriver", "WorldJanitor"]);
+    expect(read("infra/leads.ts")).toContain(`lateLinks("leads", "agentcore", () => import("./agentcore"), ["${spec.MEMORY_LINK}"], "optional")`);
     expect(read("infra/workers.ts")).toContain(`agentcore: ["${spec.HARNESS_LINK}"]`);
     expect(read("infra/scheduler.ts")).toContain(`agentcore: ["${spec.MEMORY_LINK}"]`);
     expect(read("infra/agentcore.ts")).toMatch(/export const Harness = new sst\.Linkable\(HARNESS_LINK, [\s\S]+export const Memory = new sst\.Linkable\(MEMORY_LINK, /);

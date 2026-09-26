@@ -15,10 +15,12 @@ import {
   expectedTables,
   resolveCapabilities,
   whatsappPhoneArn,
+  type CapabilityName,
   type Grant,
   type LambdaName,
   type RoleName,
 } from "./iam-capabilities";
+import { BFF_LEAD_ATTRIBUTES, SERVER_LEAD_ATTRIBUTES } from "./leads-spec";
 import { OBJECT_ACTIONS, TABLE_ACTIONS, dataAccessGrants, dataActions } from "./storage-access";
 
 const architecture = readFileSync(resolve(process.cwd(), "docs/architecture.md"), "utf8");
@@ -40,27 +42,11 @@ const ROLES = [...LAMBDAS, ...(Object.keys(SERVICE_ROLES) as RoleName[])];
 const everyGrant = (): Array<[RoleName, Grant]> => ROLES.flatMap((role) => expectedGrants(role).map((grant) => [role, grant] as [RoleName, Grant]));
 const AWS_PHONE_ID = `phone-number-id-${"0123456789abcdef".repeat(2)}`;
 
-/**
- * Lambdas of §14 for the own sign-up, the guest worlds and the leads that WP-56 (wave 2b.2) declares.
- * Each name leaves this list in the change that adds it to LAMBDA_CAPABILITIES.
- */
-const PLANNED_LAMBDAS: readonly string[] = [
-  "AuthCustomMessage",
-  "AuthPostAuthentication",
-  "AuthPostConfirmation",
-  "AuthPreSignUp",
-  "GuestAccountDeletion",
-  "GuestWorlds",
-  "LeadStream",
-];
-
 describe("capabilities table", () => {
   it("has one entry per Lambda of docs/architecture.md §14 and nothing else", () => {
     const documented = documentedLambdas();
-    expect(documented.length).toBeGreaterThan(15);
-    expect(documented).toEqual(expect.arrayContaining([...PLANNED_LAMBDAS]));
-    for (const name of PLANNED_LAMBDAS) expect(LAMBDAS as readonly string[], `${name} is declared: remove it from PLANNED_LAMBDAS`).not.toContain(name);
-    expect([...LAMBDAS].sort()).toEqual(documented.filter((name) => !PLANNED_LAMBDAS.includes(name)).sort());
+    expect(documented.length).toBeGreaterThan(20);
+    expect([...LAMBDAS].sort()).toEqual([...documented].sort());
   });
 
   it("builds PIPELINE from both senders, the output guardrails and the timers", () => {
@@ -75,6 +61,13 @@ describe("capabilities table", () => {
       const url = grants.find((grant) => grant.actions.includes("lambda:InvokeFunctionUrl"));
       expect(url?.conditions).toEqual([{ test: "StringEquals", variable: "lambda:FunctionUrlAuthType", values: ["AWS_IAM"] }]);
     }
+  });
+
+  it("keeps Leads out of WORLDS and of every capability but LEADS_READ and LEADS_WRITE (ADR-0026)", () => {
+    const onLeads = (Object.keys(CAPABILITIES) as CapabilityName[]).filter((name) => CAPABILITIES[name].grants.some((grant) => grant.resources.some((resource) => resource.startsWith("{Leads}"))));
+    expect(onLeads.sort()).toEqual(["LEADS_READ", "LEADS_WRITE"]);
+    expect(resolveCapabilities(["WORLDS"])).not.toEqual(expect.arrayContaining(["LEADS_READ"]));
+    for (const name of ["WORLDS", "TIMERS", "MEMORY_ADMIN"] as const) expect(JSON.stringify(CAPABILITIES[name])).not.toContain("Leads");
   });
 
   it("gives WORLDS the world tables, the mock tables, the timers and the memory purge", () => {
@@ -293,3 +286,81 @@ describe("data access [SEC-W1-01]", () => {
     expect(dataAccessGrants("NetworkMock").mocks).toEqual([{ actions: TABLE_ACTIONS.write, resources: ["{Network}", "{Network}/index/*"] }]);
   });
 });
+
+// ---- Own sign-up, guest worlds and leads (ADR-0025, ADR-0026, docs/test-plan.md §3) ----------------------
+
+describe("sign-up and leads", () => {
+  const grantsOn = (role: RoleName, resource: string) => expectedGrants(role).filter((grant) => grant.resources.includes(resource));
+  const keysOf = (grant: Grant | undefined) => grant?.conditions?.find((condition) => condition.variable === "dynamodb:LeadingKeys")?.values;
+  const cognito = (role: RoleName) => expectedActions(role).filter((action) => action.startsWith("cognito-idp:"));
+
+  it("fences SEND_LEAD_NOTIFY to leads@ as sender and *@craftech.io as recipients, on the app's identity only", () => {
+    expect(CAPABILITIES.SEND_LEAD_NOTIFY.grants).toEqual([
+      {
+        actions: ["ses:SendEmail"],
+        resources: ["arn:aws:ses:us-east-1:776805327629:identity/cuadrilla.demo.craftech.io", "arn:aws:ses:us-east-1:776805327629:configuration-set/aws-cds-hackathon-poc-cuadrilla-email-poc"],
+        conditions: [
+          { test: "StringEquals", variable: "ses:FromAddress", values: ["leads@cuadrilla.demo.craftech.io"] },
+          { test: "ForAllValues:StringLike", variable: "ses:Recipients", values: ["*@craftech.io"] },
+        ],
+      },
+    ]);
+    expect(ROLES.filter((role) => resolveCapabilities(roleCapabilities(role)).includes("SEND_LEAD_NOTIFY"))).toEqual(["LeadStream"]);
+    // The demo's fence never admits craftech.io (CP-RECIPIENT-FENCE is unchanged).
+    const demoRecipients = CAPABILITIES.SEND_EMAIL.grants.flatMap((grant) => grant.conditions ?? []).filter((condition) => condition.variable === "ses:Recipients");
+    expect(demoRecipients.flatMap((condition) => condition.values)).toEqual(["*@simulator.amazonses.com"]);
+  });
+
+  it("lets the Bff write a lead only by LEAD#* and the form's attributes, never a server attribute", () => {
+    const [grant] = grantsOn("Bff", "{Leads}");
+    expect(grant?.actions).toEqual(["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]);
+    expect(keysOf(grant)).toEqual(["LEAD#*"]);
+    const attributes = grant?.conditions?.find((condition) => condition.variable === "dynamodb:Attributes");
+    expect(attributes).toEqual({ test: "ForAllValues:StringEquals", variable: "dynamodb:Attributes", values: [...BFF_LEAD_ATTRIBUTES] });
+    for (const attribute of ["status", "cognitoSub", "cognitoUsername", "userId", "notifiedAt", "notifyOutcome"]) expect(attributes?.values).not.toContain(attribute);
+    for (const attribute of SERVER_LEAD_ATTRIBUTES) expect(BFF_LEAD_ATTRIBUTES as readonly string[]).not.toContain(attribute);
+    expect(grant?.conditions).toContainEqual({ test: "StringEqualsIfExists", variable: "dynamodb:ReturnValues", values: ["NONE", "UPDATED_OLD", "UPDATED_NEW"] });
+    expect(grantsOn("Bff", "{Leads}/index/*")).toEqual([]);
+  });
+
+  it("fences each trigger's Runtime keys and reads, and gives the triggers no Cognito action", () => {
+    const runtime = (role: RoleName) => grantsOn(role, "{Runtime}").map((grant) => ({ actions: [...grant.actions].sort(), keys: keysOf(grant) }));
+    expect(runtime("AuthPreSignUp")).toEqual([
+      { actions: ["dynamodb:UpdateItem"], keys: ["SIGNUPTICKET#*"] },
+      { actions: ["dynamodb:BatchGetItem", "dynamodb:GetItem"], keys: ["SIGNUP#*", "KILL#*"] },
+    ]);
+    expect(runtime("AuthCustomMessage")).toEqual([{ actions: ["dynamodb:BatchGetItem", "dynamodb:GetItem"], keys: ["KILL#*"] }]);
+    expect(expectedGrants("AuthCustomMessage")).toHaveLength(1);
+    expect(runtime("AuthPostConfirmation").map((grant) => grant.keys)).toEqual([["GUESTACCOUNT#*", "GUESTWORLDS#*", "SIGNUPOK#*", "SIGNUPKEY#*", "SIGNUPSUB#*"]]);
+    expect(runtime("AuthPostAuthentication").map((grant) => grant.keys)).toEqual([["GUESTACCOUNT#*", "GUESTWORLDS#*", "SIGNUPOK#*"]]);
+    for (const role of ["AuthPostConfirmation", "AuthPostAuthentication"] as const) expect(keysOf(grantsOn(role, "{Isps}")[0])).toEqual(["ISP#isp-guest-s*"]);
+    for (const role of ["AuthPreSignUp", "AuthCustomMessage", "AuthPostConfirmation", "AuthPostAuthentication", "AuthPreToken"] as const) expect(cognito(role), role).toEqual([]);
+    for (const role of ["AuthPreSignUp", "AuthCustomMessage", "AuthPostConfirmation", "AuthPostAuthentication"] as const) expect(expectedTables(role), role).toEqual({});
+  });
+
+  it("deletes accounts without listing users, lets LeadStream list and delete, and keeps AdminDeleteUser from the QaDriver", () => {
+    expect(cognito("GuestAccountDeletion")).toEqual(["cognito-idp:AdminDeleteUser", "cognito-idp:AdminGetUser"]);
+    expect(cognito("LeadStream")).toEqual(["cognito-idp:AdminDeleteUser", "cognito-idp:ListUsers"]);
+    expect(cognito("QaDriver")).not.toContain("cognito-idp:AdminDeleteUser");
+    expect(ROLES.filter((role) => expectedActions(role).includes("cognito-idp:ListUsers"))).toEqual(["LeadStream"]);
+    for (const role of ["GuestAccountDeletion", "LeadStream"] as const) for (const grant of expectedGrants(role).filter((item) => item.actions.some((action) => action.startsWith("cognito-idp:")))) expect(grant.resources).toEqual(["{UserPool}"]);
+    expect(grantsOn("LeadStream", "{GuestAccountDeletion}")[0]?.actions).toEqual(["lambda:InvokeFunction"]);
+    expect(expectedGrants("GuestAccountDeletion").find((grant) => grant.actions.includes("s3:ListBucket"))?.conditions).toEqual([{ test: "StringLike", variable: "s3:prefix", values: ["guest/*"] }]);
+  });
+
+  it("lets only the Bff, LeadStream (and later the QaDriver) invoke the deletion, and only the triggers and the Bff the world factory", () => {
+    const invokers = (target: string) => ROLES.filter((role) => grantsOn(role, target).some((grant) => grant.actions.includes("lambda:InvokeFunction"))).sort();
+    expect(invokers("{GuestAccountDeletion}")).toEqual(["Bff", "LeadStream"]);
+    expect(invokers("{GuestWorlds}")).toEqual(["AuthPostAuthentication", "AuthPostConfirmation", "Bff"]);
+  });
+
+  it("fences the world factory and the deletion to guest worlds in the mocks' tables", () => {
+    for (const role of ["GuestWorlds", "GuestAccountDeletion"] as const) expect(WORLDS_LEADING_KEYS[role]).toEqual(["ONU#GUEST#isp-guest-*", "DWO#isp-guest-*"]);
+    expect(resolveCapabilities(LAMBDA_CAPABILITIES.GuestAccountDeletion.capabilities)).toContain("LEADS_WRITE");
+    expect(resolveCapabilities(LAMBDA_CAPABILITIES.GuestWorlds.capabilities)).not.toContain("LEADS_WRITE");
+  });
+});
+
+function roleCapabilities(role: RoleName): readonly CapabilityName[] {
+  return role in LAMBDA_CAPABILITIES ? LAMBDA_CAPABILITIES[role as LambdaName].capabilities : SERVICE_ROLES[role as keyof typeof SERVICE_ROLES].capabilities;
+}

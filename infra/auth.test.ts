@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CONSOLE_GROUPS, WEB_CLIENT_SETTINGS, WEB_ENV_NAMES, cognitoMessages, emailBrandFrom, userPoolSettings } from "./auth-email";
+import { CONSOLE_GROUPS, NEUTRAL_EMAIL_BRAND, WEB_CLIENT_SETTINGS, WEB_ENV_NAMES, cognitoMessages, emailBrandFrom, userPoolSettings } from "./auth-email";
 
 const APP_DOMAIN = "cuadrilla.demo.craftech.io";
 const POOL_ID = "us-east-1_TESTPOOL1";
@@ -179,6 +179,10 @@ async function evaluate(scenario: Scenario) {
   }));
   // `undefined` while infra/messaging-email.ts is still the stub that exports nothing (WP-20).
   vi.doMock("./messaging-email", () => ({ emailIdentity: runtime.identity }));
+  // The modules of the own sign-up are checked by infra/auth-signup.test.ts; here they are sentinels.
+  vi.doMock("./leads", () => ({ Leads: FLOW.Leads, grantTableLinks: () => [], signupPermissions: () => [] }));
+  vi.doMock("./guest-worlds", () => ({ guestWorlds: FLOW.guestWorlds }));
+  vi.doMock("./cost-caps", () => ({ CostCaps: FLOW.CostCaps }));
   const module = await import("./auth");
   const only = (type: string): Created => {
     const matching = runtime.created.filter((entry) => entry.type === type);
@@ -193,7 +197,10 @@ afterEach(() => {
   vi.doUnmock("./storage-tables");
   vi.doUnmock("./storage-buckets");
   vi.doUnmock("./messaging-email");
+  for (const module of ["./leads", "./guest-worlds", "./cost-caps"]) vi.doUnmock(module);
 });
+
+const FLOW = { Leads: { sentinel: "Leads" }, guestWorlds: { sentinel: "GuestWorlds" }, CostCaps: { sentinel: "CostCaps" } };
 
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), "utf8");
 const URLS = { loginUrl: `https://${APP_DOMAIN}/login`, brandUrl: `https://${APP_DOMAIN}/brand` };
@@ -201,16 +208,14 @@ const URLS = { loginUrl: `https://${APP_DOMAIN}/login`, brandUrl: `https://${APP
 // ---- What infra/auth.ts creates -------------------------------------------------------------------
 
 describe("infra/auth.ts on a recording SST runtime [FL-079]", () => {
-  it("creates one pool, its three groups, one web client, the trigger and the Auth link, and nothing else", async () => {
+  it("creates one pool, its three groups, three clients, five triggers and the Auth link, and nothing else", async () => {
     const { created } = await evaluate({ brandConfig: NEUTRAL });
     const count = (type: string) => created.filter((entry) => entry.type === type).length;
-    expect(created.map((entry) => entry.type).sort()).toEqual(
-      ["aws.cognito.UserGroup", "aws.cognito.UserGroup", "aws.cognito.UserGroup", "sst.Linkable", "sst.aws.CognitoUserPool", "sst.aws.CognitoUserPoolClient", "sst.aws.Function"].sort(),
-    );
-    expect(count("sst.aws.CognitoUserPool")).toBe(1);
+    expect([count("sst.aws.CognitoUserPool"), count("aws.cognito.UserGroup"), count("sst.aws.CognitoUserPoolClient"), count("sst.aws.Function"), count("sst.Linkable")]).toEqual([1, 3, 3, 5, 1]);
+    expect(created).toHaveLength(13);
   });
 
-  it("builds a pool without self sign-up or hosted UI: email alias, optional TOTP, V2_0 pre token trigger", async () => {
+  it("builds a pool without hosted UI: email alias, optional TOTP, the five triggers, V2_0 pre token", async () => {
     const { only } = await evaluate({ brandConfig: NEUTRAL });
     const pool = only("sst.aws.CognitoUserPool").args;
     expect(pool).toMatchObject({ aliases: ["email"], mfa: "optional", softwareToken: true });
@@ -218,32 +223,50 @@ describe("infra/auth.ts on a recording SST runtime [FL-079]", () => {
     expect(pool).not.toHaveProperty("domain");
     expect(pool).not.toHaveProperty("verify");
     const triggers = (await resolveDeep(pool.triggers)) as Record<string, unknown>;
-    expect(triggers).toEqual({ preTokenGeneration: "arn:aws:lambda:us-east-1:111111111111:function:AuthPreToken", preTokenGenerationVersion: "v2" });
+    const arn = (name: string) => `arn:aws:lambda:us-east-1:111111111111:function:${name}`;
+    expect(triggers).toEqual({
+      preSignUp: arn("AuthPreSignUp"),
+      customMessage: arn("AuthCustomMessage"),
+      postConfirmation: arn("AuthPostConfirmation"),
+      postAuthentication: arn("AuthPostAuthentication"),
+      preTokenGeneration: arn("AuthPreToken"),
+      preTokenGenerationVersion: "v2",
+    });
   });
 
-  it("lays the settings and the branded messages of infra/auth-email.ts over SST's pool defaults", async () => {
+  it("lays the settings and the neutral messages of infra/auth-email.ts over SST's pool defaults", async () => {
     const { only, warn } = await evaluate({ brandConfig: NEUTRAL });
     const transform = only("sst.aws.CognitoUserPool").args.transform as { userPool: unknown };
     const userPool = await resolveDeep(transform.userPool);
     expect(userPool).toEqual({
       ...userPoolSettings(),
-      ...cognitoMessages({ ...URLS, brand: emailBrandFrom(NEUTRAL) }),
+      ...cognitoMessages({ ...URLS, brand: NEUTRAL_EMAIL_BRAND }),
       emailConfiguration: { emailSendingAccount: "COGNITO_DEFAULT" },
     });
-    expect((userPool as { adminCreateUserConfig: { allowAdminCreateUserOnly: boolean } }).adminCreateUserConfig.allowAdminCreateUserOnly).toBe(true);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("infra/messaging-email.ts exports no emailIdentity yet"));
   });
 
   it("gives the web client SRP only, 15-minute tokens and writeAttributes [name], never custom:*", async () => {
-    const { only } = await evaluate({ brandConfig: NEUTRAL });
-    const client = only("sst.aws.CognitoUserPoolClient");
-    expect(client.name).toBe("ConsoleWeb");
+    const { created } = await evaluate({ brandConfig: NEUTRAL });
+    const client = created.find((entry) => entry.type === "sst.aws.CognitoUserPoolClient" && entry.name === "ConsoleWeb") as Created;
     const settings = (client.args.transform as { client: typeof WEB_CLIENT_SETTINGS }).client;
     expect(settings).toEqual(WEB_CLIENT_SETTINGS);
     expect(settings.writeAttributes).toEqual(["name"]);
     for (const attribute of settings.writeAttributes) expect(attribute.startsWith("custom:")).toBe(false);
     expect(settings.explicitAuthFlows).toEqual(["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]);
     expect([settings.idTokenValidity, settings.accessTokenValidity, settings.tokenValidityUnits.idToken]).toEqual([15, 15, "minutes"]);
+  });
+
+  it("names the attributes every client reads and writes (QaProbe writes none) and verifies a new email first", async () => {
+    const { created, only } = await evaluate({ brandConfig: NEUTRAL });
+    const clients = created.filter((entry) => entry.type === "sst.aws.CognitoUserPoolClient").map((entry) => [entry.name, (entry.args.transform as { client: Record<string, unknown> }).client] as const);
+    expect(clients.map(([name, client]) => [name, client.readAttributes, client.writeAttributes])).toEqual([
+      ["ConsoleWeb", ["email", "email_verified", "name", "custom:ispId"], ["name"]],
+      ["GuestSignup", ["email", "email_verified", "name", "locale"], ["email", "name", "locale"]],
+      ["QaProbe", ["email", "email_verified"], []],
+    ]);
+    const pool = (await resolveDeep((only("sst.aws.CognitoUserPool").args.transform as { userPool: unknown }).userPool)) as Record<string, unknown>;
+    expect(pool.userAttributeUpdateSettings).toEqual({ attributesRequireVerificationBeforeUpdates: ["email"] });
   });
 
   it("creates the groups SUPERVISOR, GUEST and OPS on the pool, with their precedence", async () => {
@@ -254,9 +277,11 @@ describe("infra/auth.ts on a recording SST runtime [FL-079]", () => {
     );
   });
 
+  const preToken = (created: Created[]) => created.find((entry) => entry.type === "sst.aws.Function" && entry.name === "AuthPreToken") as Created;
+
   it("runs the pre token trigger within Cognito's 5 seconds, linked only to Isps and AuditLog", async () => {
-    const { only, module } = await evaluate({ brandConfig: NEUTRAL });
-    const trigger = only("sst.aws.Function");
+    const { created, module } = await evaluate({ brandConfig: NEUTRAL });
+    const trigger = preToken(created);
     expect(trigger.name).toBe("AuthPreToken");
     expect(trigger.args).toMatchObject({ handler: "packages/bff/src/auth-triggers/pre-token.handler", timeout: "5 seconds", memory: "256 MB" });
     expect(module.PRE_TOKEN_HANDLER).toBe(trigger.args.handler);
@@ -271,8 +296,8 @@ describe("infra/auth.ts on a recording SST runtime [FL-079]", () => {
   });
 
   it("[SEC-W1-02] lets the trigger query Isps and its GSIs and append to AuditLog, and nothing else", async () => {
-    const { only } = await evaluate({ brandConfig: NEUTRAL });
-    const permissions = await resolveDeep(only("sst.aws.Function").args.permissions);
+    const { created } = await evaluate({ brandConfig: NEUTRAL });
+    const permissions = await resolveDeep(preToken(created).args.permissions);
     expect(permissions).toEqual([
       { actions: ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:ConditionCheckItem"], resources: [tableArn("Isps"), `${tableArn("Isps")}/index/*`] },
       { actions: ["dynamodb:PutItem"], resources: [tableArn("AuditLog")] },
@@ -307,9 +332,13 @@ describe("infra/auth.ts on a recording SST runtime [FL-079]", () => {
     });
   });
 
-  it("hands the console the pool id and the client id at build time", async () => {
+  it("hands the console the pool id, the sign-in client and the sign-up client at build time", async () => {
     const { module } = await evaluate({ brandConfig: NEUTRAL });
-    expect(await resolveDeep(module.authWebEnvironment)).toEqual({ [WEB_ENV_NAMES.userPoolId]: POOL_ID, [WEB_ENV_NAMES.clientId]: "client-ConsoleWeb" });
+    expect(await resolveDeep(module.authWebEnvironment)).toEqual({
+      [WEB_ENV_NAMES.userPoolId]: POOL_ID,
+      [WEB_ENV_NAMES.clientId]: "client-ConsoleWeb",
+      [WEB_ENV_NAMES.signupClientId]: "client-GuestSignup",
+    });
   });
 });
 
@@ -326,6 +355,7 @@ describe("sender and brand of the console emails", () => {
       emailSendingAccount: "DEVELOPER",
       sourceArn: IDENTITY_ARN,
       fromEmailAddress: `Cuadrilla <no-reply@${APP_DOMAIN}>`,
+      configurationSet: "aws-cds-hackathon-poc-cuadrilla-email-poc",
     });
     expect(identityReads).toEqual([{ args: { emailIdentity: APP_DOMAIN }, opts: { dependsOn: [identity] } }]);
     expect(warn).not.toHaveBeenCalled();
@@ -342,25 +372,15 @@ describe("sender and brand of the console emails", () => {
     await expect(emailConfigurationOf(created)).rejects.toThrow(/console emails are sent from/);
   });
 
-  it("brands both templates as Cuadrilla for <partner> in co-branding", async () => {
-    const { only } = await evaluate({ brandConfig: COBRAND });
-    const transform = only("sst.aws.CognitoUserPool").args.transform as { userPool: unknown };
-    const userPool = (await resolveDeep(transform.userPool)) as ReturnType<typeof cognitoMessages>;
-    const expected = cognitoMessages({ ...URLS, brand: emailBrandFrom(COBRAND) });
-    expect(userPool.adminCreateUserConfig).toEqual(expected.adminCreateUserConfig);
-    expect(userPool.verificationMessageTemplate).toEqual(expected.verificationMessageTemplate);
-    expect(userPool.adminCreateUserConfig.inviteMessageTemplate.emailSubject).toContain(`Cuadrilla for ${PARTNER}`);
-  });
-
-  it("fails the deploy on a BrandConfig that does not parse, without printing it", async () => {
-    const value = JSON.stringify({ mode: "cobrand", partnerDisplayName: "LEAKED-NAME" });
-    const { only } = await evaluate({ brandConfig: value });
-    const transform = only("sst.aws.CognitoUserPool").args.transform as { userPool: unknown };
-    const failure = await resolveDeep(transform.userPool).then(
-      () => "",
-      (error: unknown) => (error instanceof Error ? error.message : String(error)),
-    );
-    expect(failure).toMatch(/^BrandConfig does not match ADR-0018/);
-    expect(failure).not.toContain("LEAKED-NAME");
+  it("keeps the neutral brand on both templates in co-branding, and never reads BrandConfig (ADR-0025 §1)", async () => {
+    for (const brandConfig of [COBRAND, JSON.stringify({ mode: "cobrand", partnerDisplayName: "LEAKED-NAME" })]) {
+      const { only } = await evaluate({ brandConfig });
+      const transform = only("sst.aws.CognitoUserPool").args.transform as { userPool: unknown };
+      const userPool = (await resolveDeep(transform.userPool)) as ReturnType<typeof cognitoMessages>;
+      const expected = cognitoMessages({ ...URLS, brand: emailBrandFrom(NEUTRAL) });
+      expect(userPool.adminCreateUserConfig).toEqual(expected.adminCreateUserConfig);
+      expect(userPool.verificationMessageTemplate).toEqual(expected.verificationMessageTemplate);
+      expect(JSON.stringify(userPool)).not.toMatch(new RegExp(`${PARTNER}|LEAKED-NAME`));
+    }
   });
 });

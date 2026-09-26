@@ -1,5 +1,166 @@
 {
-  "version": 1,
+  "version": 2,
   "video": null,
-  "media": {}
+  "media": {
+    "hero-loop": {
+      "status": "render",
+      "alt": {
+        "es": "Un teléfono con WhatsApp: la nota de voz del instalador, la respuesta que cita el manual, una foto rechazada con 🔁, la siguiente aceptada con ✅ y el acta en PDF.",
+        "en": "A phone with WhatsApp: the installer's voice note, the reply citing the manual, a photo rejected with 🔁, the next one accepted with ✅ and the certificate as a PDF."
+      },
+      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Rogelio, de la escena \"En sitio 09:20\" hasta \"Cierre 10:05\"", "by": "WP-44" }
+    },
+    "s1-voice-diagnosis": {
+      "status": "render",
+      "alt": {
+        "es": "El teléfono de Rogelio: su nota de voz sobre la luz PON y la respuesta que cita el manual, sección DIAG-02, como texto.",
+        "en": "Rogelio's phone: his voice note about the PON light and the reply citing the manual, section DIAG-02, as plain text."
+      },
+      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"En sitio 09:20\"", "by": "WP-44" }
+    },
+    "s2-policy-cite": {
+      "status": "render",
+      "alt": {
+        "es": "Una pregunta de política respondida con la sección COM-04 citada, y otra que el manual no cubre, con la oferta de consultar a la supervisora.",
+        "en": "A policy question answered citing section COM-04, and another the manual doesn't cover, with the offer to check with the supervisor."
+      },
+      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"Pregunta de política\"", "by": "WP-44" }
+    },
+    "s3-photo-reject": {
+      "status": "render",
+      "alt": {
+        "es": "La foto de la etiqueta con reflejo recibe la reacción 🔁 y un mensaje con el motivo; al lado, la revisión de evidencia de la consola.",
+        "en": "The label photo with glare gets the 🔁 reaction and a message with the reason; next to it, the console's evidence review."
+      },
+      "replacement": { "routes": ["/app/simulator", "/app/evidence"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"Evidencia\": reacción y mensaje del motivo", "by": "WP-44" }
+    },
+    "s3-photo-pass": {
+      "status": "render",
+      "alt": {
+        "es": "La segunda foto de la etiqueta, aceptada con ✅.",
+        "en": "The second label photo, accepted with ✅."
+      },
+      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"Evidencia\", segundo envío", "by": "WP-44" }
+    },
+    "s4-checklist-complete": {
+      "status": "render",
+      "alt": {
+        "es": "El checklist de la orden 24817 completo, cinco de cinco validados, sin botón de cierre en la consola.",
+        "en": "The checklist of order 24817 complete, five of five validated, with no close button in the console."
+      },
+      "replacement": { "routes": ["/app/orders/:workOrderId"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"Checklist completo\"", "by": "WP-44" }
+    },
+    "s4-certificate-pdf": {
+      "status": "render",
+      "alt": {
+        "es": "Rogelio toca Cerrar instalación y recibe el acta en PDF por WhatsApp.",
+        "en": "Rogelio taps Close installation and gets the certificate as a PDF on WhatsApp."
+      },
+      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Después de \"Cerrar instalación\"", "by": "WP-44" }
+    },
+    "s4-outbox": {
+      "status": "render",
+      "alt": {
+        "es": "El buzón de salida con los dos emails del acta, al cliente y a operaciones, entregados.",
+        "en": "The outbox with the certificate's two emails, to the customer and to operations, delivered."
+      },
+      "replacement": { "routes": ["/app/outbox"], "viewports": ["1440x900", "390x844"], "worldState": "Después del cierre", "by": "WP-44" }
+    },
+    "s5-escalation-template": {
+      "status": "render",
+      "alt": {
+        "es": "El teléfono de Adriana con la plantilla del caso escalado y los botones Tomar caso y No puedo.",
+        "en": "Adriana's phone with the escalated-case template and the Take case and Can't buttons."
+      },
+      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Adriana, escena \"Escalación recibida\"", "by": "WP-44" }
+    },
+    "s5-escalation-take": {
+      "status": "render",
+      "alt": {
+        "es": "Héctor toma el caso, recibe el resumen y su instrucción le llega a Rogelio con su nombre delante.",
+        "en": "Héctor takes the case, gets the summary, and his instruction reaches Rogelio with his name in front."
+      },
+      "replacement": { "routes": ["/app/cases/:caseId", "/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Héctor, escenas \"Vencimiento\" y \"Tomar y responder\"", "by": "WP-44" }
+    },
+    "s6-safety-hazard": {
+      "status": "render",
+      "alt": {
+        "es": "Rogelio reporta un cable chispeando y recibe al instante la instrucción de seguridad fija del manual.",
+        "en": "Rogelio reports a sparking cable and instantly gets the manual's fixed safety instruction."
+      },
+      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Rogelio, escena \"Riesgo detectado\"", "by": "WP-44" }
+    },
+    "s6-safety-alerts": {
+      "status": "render",
+      "alt": {
+        "es": "La alerta de seguridad en el teléfono de Adriana y el email a la jefa de zona en el buzón de salida, segundos después del reporte.",
+        "en": "The safety alert on Adriana's phone and the email to the zone lead in the outbox, seconds after the report."
+      },
+      "replacement": { "routes": ["/app/simulator", "/app/outbox"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Adriana, escena \"Alertas de seguridad\"", "by": "WP-44" }
+    },
+    "gallery-orders": {
+      "status": "render",
+      "alt": {
+        "es": "Las órdenes del día en la consola, con su instalador, su cliente y su estado.",
+        "en": "The day's work orders in the console, with their installer, customer and status."
+      },
+      "replacement": { "routes": ["/app/orders"], "viewports": ["1440x900", "390x844"], "worldState": "Mundo de la plantilla, fin del día", "by": "WP-44" }
+    },
+    "gallery-order-detail": {
+      "status": "render",
+      "alt": {
+        "es": "La línea de tiempo de la orden 24817: mensajes, la transcripción de la nota de voz, las fotos con su veredicto y el acta.",
+        "en": "The timeline of order 24817: messages, the voice note's transcription, the photos with their verdict and the certificate."
+      },
+      "replacement": { "routes": ["/app/orders/:workOrderId"], "viewports": ["1440x900"], "worldState": "Orden 24817 cerrada", "by": "WP-44" }
+    },
+    "gallery-manual": {
+      "status": "render",
+      "alt": {
+        "es": "El manual de la operadora abierto en la sección DIAG-02, la que cita la respuesta.",
+        "en": "The operator's manual open at section DIAG-02, the one the reply cites."
+      },
+      "replacement": { "routes": ["/app/manual/:sectionId"], "viewports": ["1440x900"], "worldState": "Sección DIAG-02", "by": "WP-44" }
+    },
+    "gallery-metrics": {
+      "status": "render",
+      "alt": {
+        "es": "La vista de métricas de la consola, con las áreas que mide.",
+        "en": "The console's metrics view, with the areas it measures."
+      },
+      "replacement": { "routes": ["/app/metrics"], "viewports": ["1440x900"], "worldState": "Pestaña \"Medición del manual\" con N y meta", "by": "WP-44" }
+    },
+    "gallery-audit": {
+      "status": "render",
+      "alt": {
+        "es": "La bitácora: cada mensaje que salió con las reglas de la política de contacto que lo permitieron.",
+        "en": "The decision log: every message sent with the contact-policy rules that allowed it."
+      },
+      "replacement": { "routes": ["/app/audit"], "viewports": ["1440x900"], "worldState": "Fin del día de la historia", "by": "WP-44" }
+    },
+    "gallery-clock": {
+      "status": "render",
+      "alt": {
+        "es": "La barra de hora simulada del mundo, en pausa, con Avanzar al próximo evento.",
+        "en": "The world's simulated-time bar, paused, with Advance to the next event."
+      },
+      "replacement": { "routes": ["/app/clock"], "viewports": ["1440x900"], "worldState": "Escena \"En sitio 09:20\"", "by": "WP-44" }
+    },
+    "signup-form": {
+      "status": "render",
+      "alt": {
+        "es": "El formulario de alta, con los dos consentimientos separados y sin marcar.",
+        "en": "The signup form, with the two consents separate and unticked."
+      },
+      "replacement": { "routes": ["/signup"], "viewports": ["1440x900", "390x844"], "worldState": "Paso \"signUp\" del alta", "by": "WP-63" }
+    },
+    "signup-code": {
+      "status": "render",
+      "alt": {
+        "es": "La pantalla de verificación por código del alta.",
+        "en": "The signup's code verification screen."
+      },
+      "replacement": { "routes": ["/signup"], "viewports": ["1440x900", "390x844"], "worldState": "Paso \"confirmCode\" del alta", "by": "WP-63" }
+    }
+  }
 }

@@ -1,74 +1,26 @@
-// Cognito user pool of the console (docs/architecture.md §10, docs/build-plan.md WP-10). Every value
-// the pool and its web client take lives in infra/auth-email.ts as plain data, checked by
-// infra/auth-email.test.ts; this module only turns it into resources, and infra/auth.test.ts
-// evaluates it against a recording SST runtime.
-//
-// Who gets in. Nobody signs up: `allowAdminCreateUserOnly`, and the operator creates every user with
-// AdminCreateUser through `npm run console:invite` (scripts/console/invite.ts), which sets the group
-// and the informative `custom:ispId`. Sign-in names: email is an alias, so supervisors and operations
-// sign in with the email the invitation verified, and invited guests (`guest-01..NN`, `guest-test`)
-// with a plain username and no email at all.
-//
-// Tenancy. Groups SUPERVISOR, GUEST and OPS. `custom:ispId` is readable by the web client and never
-// writable by it (WEB_CLIENT_SETTINGS.writeAttributes = ["name"]), and nothing trusts it: the pre token
-// generation trigger (event V2_0, packages/bff/src/auth-triggers/pre-token.ts) stamps `ispId`, the
-// role and `isGuest` from `Isps/USER#` by GSI1 `SUB#<sub>`, and audits a `custom:ispId` that differs.
-// Cognito waits at most 5 s for it, hence the explicit timeout.
-//
-// Sign-in surface. The console's own screen (packages/web/src/views/login) speaks USER_SRP_AUTH,
-// REFRESH_TOKEN_AUTH, the challenges, ForgotPassword and RevokeToken to the Cognito API. The pool has
-// no domain and the client no OAuth flow, so there is no hosted UI. MFA is optional TOTP (no SMS):
-// supervisors and operations may turn it on; invited guest accounts are created with it off and the
-// console hides it.
-//
-// Email. Cognito sends the invitation and the code message with its service-linked role
-// (AWSServiceRoleForAmazonCognitoIdpEmailService, created by the first deploy that sets DEVELOPER),
-// from `Cuadrilla <no-reply@cuadrilla.demo.craftech.io>` through the SES identity of
-// infra/messaging-email.ts once that identity exists and is verified; until then from Cognito's
-// default sender with the same templates, and the deploy log says so (auth-email.ts `emailSenderFor`).
-// The brand of both templates is resolved from the BrandConfig secret on every deploy (ADR-0018). These
-// emails bypass the app's SES client and its recipient fence: the only recipients are the addresses
-// the operator passes to console:invite (invited guests get no email).
-//
-// Permissions. The trigger is `AuthPreToken` in infra/iam-capabilities.ts: it links `Isps` and
-// `AuditLog` for their names only and gets `storagePermissions` of that entry, i.e. Query/GetItem on
-// `Isps` and its GSIs and PutItem on `AuditLog`; nothing that updates or deletes a user row, an audit
-// row or a table. The `Auth` link carries what the BFF reads (packages/bff/src/auth/config.ts) and grants
-// nothing: the BFF verifies tokens offline against the public JWKS, and the only Cognito action of the
-// app's roles, `DescribeUserPoolClient` of the QaDriver (`{Auth}` in infra/iam-capabilities.ts), is
-// granted by its own module on `userPool.arn`. Users are created by the operator's script, never by a
-// Lambda.
-//
-// Verify:
-//   aws --profile craftech-demos cognito-idp describe-user-pool --user-pool-id <id>
-//     AdminCreateUserConfig.AllowAdminCreateUserOnly = true · AliasAttributes = [email] ·
-//     MfaConfiguration = OPTIONAL · UserPoolTier = ESSENTIALS · SchemaAttributes has custom:ispId ·
-//     LambdaConfig.PreTokenGenerationConfig.LambdaVersion = V2_0 · no Domain ·
-//     EmailConfiguration.EmailSendingAccount = DEVELOPER (once the SES identity is verified)
-//   aws --profile craftech-demos cognito-idp list-groups --user-pool-id <id>        SUPERVISOR, GUEST, OPS
-//   aws --profile craftech-demos cognito-idp describe-user-pool-client --user-pool-id <id> --client-id <clientId>
-//     ExplicitAuthFlows = [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH] · AllowedOAuthFlowsUserPoolClient = false ·
-//     AccessTokenValidity = IdTokenValidity = 15 (minutes) · RefreshTokenValidity = 12 (hours) · WriteAttributes = [name]
-
 import {
   CONSOLE_GROUPS,
   CONSOLE_GROUP_NAMES,
   LOGIN_PATH,
-  WEB_CLIENT_SETTINGS,
+  NEUTRAL_EMAIL_BRAND,
+  POOL_CLIENTS,
   WEB_ENV_NAMES,
   cognitoMessages,
-  emailBrandFrom,
   emailSenderFor,
   userPoolSettings,
   type ConsoleGroup,
   type EmailConfiguration,
   type EmailSenderChoice,
 } from "./auth-email";
+import { CostCaps } from "./cost-caps";
 import { appDomain, appUrl } from "./dns";
-import { BrandConfig } from "./secrets";
+import { guestWorlds } from "./guest-worlds";
+import { Leads, grantTableLinks, signupPermissions } from "./leads";
+import { SIGNUP_HANDLERS, TRIGGER_BUDGET, type SignupFunction } from "./leads-spec";
+import { SessionTokenKey } from "./secrets";
 import { storageLinks, storagePermissions } from "./storage";
 
-/** Handler of the trigger (WP-13); the path is the contract with packages/bff. */
+/** Handler of the pre token trigger (WP-13); the path is the contract with packages/bff. */
 export const PRE_TOKEN_HANDLER = "packages/bff/src/auth-triggers/pre-token.handler";
 
 function applySender(choice: EmailSenderChoice): EmailConfiguration {
@@ -88,14 +40,12 @@ function senderConfiguration(identity: unknown): $util.Output<EmailConfiguration
     .apply((live) => applySender(emailSenderFor({ domain: live.emailIdentity, arn: live.arn, verified: live.verifiedForSendingStatus }, appDomain)));
 }
 
-// The SES identity belongs to infra/messaging-email.ts (WP-20), which sst.config.ts evaluates after
-// this module and which exports nothing until then. A dynamic import inside an Output settles once
-// that module has run, whatever the order.
+// The SES identity belongs to infra/messaging-email.ts, which may be evaluated after this module. A
+// dynamic import inside an Output settles once that module has run, whatever the order.
 const emailConfiguration = $util.output(import("./messaging-email").then((module) => senderConfiguration(Reflect.get(module, "emailIdentity"))));
 
-// Both templates carry the brand of this deploy; a BrandConfig that does not parse fails the deploy
-// without printing its value.
-const messages = BrandConfig.value.apply((raw) => cognitoMessages({ loginUrl: `${appUrl}${LOGIN_PATH}`, brandUrl: `${appUrl}/brand`, brand: emailBrandFrom(raw) }));
+// The neutral brand in every mode of BrandConfig: these go to addresses nobody verified (ADR-0025 §1).
+const messages = cognitoMessages({ loginUrl: `${appUrl}${LOGIN_PATH}`, brandUrl: `${appUrl}/brand`, brand: NEUTRAL_EMAIL_BRAND });
 
 /** Stamps `ispId`, the role and `isGuest` on the tokens from `Isps/USER#`; audits a differing `custom:ispId`. */
 export const preTokenTrigger = new sst.aws.Function("AuthPreToken", {
@@ -103,15 +53,53 @@ export const preTokenTrigger = new sst.aws.Function("AuthPreToken", {
   handler: PRE_TOKEN_HANDLER,
   link: storageLinks("AuthPreToken"),
   permissions: storagePermissions("AuthPreToken"),
-  timeout: "5 seconds",
-  memory: "256 MB",
+  timeout: `${TRIGGER_BUDGET.timeoutSeconds} seconds`,
+  memory: `${TRIGGER_BUDGET.memoryMb} MB`,
 });
+
+/** The Lambdas each trigger of the flow links besides `Runtime` (always fenced by its grants). */
+const TRIGGER_LINKS = {
+  AuthPreSignUp: [Leads, SessionTokenKey],
+  AuthCustomMessage: [],
+  AuthPostConfirmation: [Leads, SessionTokenKey, CostCaps, guestWorlds],
+  AuthPostAuthentication: [Leads, CostCaps, guestWorlds],
+} as const;
+
+type SignupTrigger = keyof typeof TRIGGER_LINKS & SignupFunction;
+
+const TRIGGER_DESCRIPTIONS: Readonly<Record<SignupTrigger, string>> = {
+  AuthPreSignUp: "Cognito pre sign-up: only SignUp with a valid ticket and AdminCreateUser; never confirms.",
+  AuthCustomMessage: "Cognito custom message: the neutral es-MX/en authentication emails; none while the sign-up is cut.",
+  AuthPostConfirmation: "Cognito post confirmation: a gst-* user with a pending lead becomes a GUEST with a world.",
+  AuthPostAuthentication: "Cognito post authentication: last login, lead retention and a new world generation when due.",
+};
+
+function trigger(name: SignupTrigger): sst.aws.Function {
+  return new sst.aws.Function(name, {
+    description: TRIGGER_DESCRIPTIONS[name],
+    handler: SIGNUP_HANDLERS[name],
+    // `Runtime` and `Isps` by name only; every access is a fenced grant of the trigger's row.
+    link: [...storageLinks(name), ...grantTableLinks(name), ...TRIGGER_LINKS[name]],
+    permissions: [...storagePermissions(name), ...signupPermissions(name)],
+    timeout: `${TRIGGER_BUDGET.timeoutSeconds} seconds`,
+    memory: `${TRIGGER_BUDGET.memoryMb} MB`,
+  });
+}
+
+export const preSignUpTrigger = trigger("AuthPreSignUp");
+export const customMessageTrigger = trigger("AuthCustomMessage");
+export const postConfirmationTrigger = trigger("AuthPostConfirmation");
+export const postAuthenticationTrigger = trigger("AuthPostAuthentication");
 
 export const userPool = new sst.aws.CognitoUserPool("UserPool", {
   aliases: ["email"],
   mfa: "optional",
   softwareToken: true,
   triggers: {
+    preSignUp: preSignUpTrigger.arn,
+    customMessage: customMessageTrigger.arn,
+    postConfirmation: postConfirmationTrigger.arn,
+    postAuthentication: postAuthenticationTrigger.arn,
     preTokenGeneration: preTokenTrigger.arn,
     // V2_0 also shapes the access token; it needs the ESSENTIALS feature plan (userPoolSettings).
     preTokenGenerationVersion: "v2",
@@ -119,8 +107,7 @@ export const userPool = new sst.aws.CognitoUserPool("UserPool", {
   transform: {
     userPool: {
       ...userPoolSettings(),
-      adminCreateUserConfig: messages.apply((message) => message.adminCreateUserConfig),
-      verificationMessageTemplate: messages.apply((message) => message.verificationMessageTemplate),
+      ...messages,
       emailConfiguration,
     },
   },
@@ -138,9 +125,9 @@ export const userGroups = Object.fromEntries(
   ]),
 ) as Record<ConsoleGroup, aws.cognito.UserGroup>;
 
-export const webClient = userPool.addClient("ConsoleWeb", {
-  transform: { client: WEB_CLIENT_SETTINGS },
-});
+export const webClient = userPool.addClient("ConsoleWeb", { transform: { client: POOL_CLIENTS.ConsoleWeb } });
+export const guestSignupClient = userPool.addClient("GuestSignup", { transform: { client: POOL_CLIENTS.GuestSignup } });
+export const qaProbeClient = userPool.addClient("QaProbe", { transform: { client: POOL_CLIENTS.QaProbe } });
 
 const region = aws.getRegionOutput({}).region;
 
@@ -159,10 +146,11 @@ export const Auth = new sst.Linkable("Auth", {
 
 /**
  * Build-time variables of the console (infra/web.ts passes them to the StaticSite; Vite exposes the
- * `VITE_` prefix to the browser). Neither is a secret: the client is public and the pool id is part
+ * `VITE_` prefix to the browser). None is a secret: the clients are public and the pool id is part
  * of every token; the region of the Cognito API is the prefix of the pool id.
  */
 export const authWebEnvironment: Record<string, $util.Input<string>> = {
   [WEB_ENV_NAMES.userPoolId]: userPool.id,
   [WEB_ENV_NAMES.clientId]: webClient.id,
+  [WEB_ENV_NAMES.signupClientId]: guestSignupClient.id,
 };

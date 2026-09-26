@@ -2,6 +2,7 @@
 // and forbidden screens. Loaded lazily by app.tsx, so the landing and the login do not download it.
 // Each view is `views/<route id>/view.tsx` (lib/view-registry.ts); a route whose view does not exist
 // yet shows its placeholder, so navigation, role guards and the shell work end to end from the start.
+// `/app` leads to the home of the role: the guest's portada for a guest, the work orders otherwise.
 import { Suspense } from "react";
 import { FullScreenMessage } from "./components/FullScreenMessage";
 import { AppShell } from "./components/layout/AppShell";
@@ -12,13 +13,14 @@ import { WorldClockProvider } from "./context/WorldClockContext";
 import { copy } from "./copy/console";
 import { Link, Redirect, useRouter } from "./lib/router";
 import { VIEWS } from "./lib/view-registry";
-import { CONSOLE_HOME, type RouteMatch, isConsoleRoot, matchRoute, routeAllows } from "./routes";
+import { type RouteMatch, homeOf, isConsoleRoot, matchRoute, routeAllows } from "./routes";
 import { SecurityPrompts } from "./views/login/SecurityPrompts";
 import { PlaceholderView } from "./views/placeholder/PlaceholderView";
 
 function BackHome() {
+  const { role } = usePrincipal();
   return (
-    <Link to={CONSOLE_HOME} className="text-sm font-semibold text-cyan-deep underline">
+    <Link to={homeOf(role)} className="text-sm font-semibold text-cyan-deep underline">
       {copy.errors.backHome}
     </Link>
   );
@@ -65,7 +67,7 @@ export default function ConsoleRoutes() {
   const { signOut } = useSession();
   const principal = usePrincipal();
   if (!principal.ispId) return <NoAccess onSignOut={signOut} />;
-  if (isConsoleRoot(path)) return <Redirect to={CONSOLE_HOME} />;
+  if (isConsoleRoot(path)) return <Redirect to={homeOf(principal.role)} />;
 
   const match = matchRoute(path);
   if (!match) return <NotFound />;

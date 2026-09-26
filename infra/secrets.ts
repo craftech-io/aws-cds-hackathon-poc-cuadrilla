@@ -17,6 +17,10 @@
 // |                           | phones. `{}` by default. PII: never logged.                      |
 // | BrandConfig               | Brand of the demo operator (ADR-0018): `{"mode":"neutral"}` or   |
 // |                           | the co-branding JSON. The partner's name lives only here.        |
+// | OriginVerifyKey           | Value of the origin header `x-cuadrilla-origin` the Router adds  |
+// |                           | on `/api/*`; the Bff answers 403 without it (ADR-0025 §3).       |
+// | LeadConfig                | Lead notice (ADR-0026): `{notifyRecipients: [1..5 @craftech.io], |
+// |                           | privacyContact?}`. PII-free; the mailbox is never in the code.   |
 //
 // The three WhatsApp secrets are `not-connected` until docs/pending.md P-01 is closed. The shape of
 // every value is checked by packages/bff/src/lib/secret-schemas.ts (zod), which the readers and
@@ -36,10 +40,15 @@
 //   npx sst secret set WhatsAppMetaPhoneNumberId not-connected --stage poc
 //   npx sst secret set SeedOverrides '{}' --stage poc
 //   npx sst secret set BrandConfig '{"mode":"neutral"}' --stage poc
+//   npx sst secret set OriginVerifyKey "$(openssl rand -base64 32)" --stage poc
+//   npx sst secret set LeadConfig '{"notifyRecipients":["<mailbox>@craftech.io"]}' --stage poc
 //   npx sst secret list --stage poc      # prints values: never share the output
 //
 // - `SessionTokenKey` is never rotated casually: every phone and email hash and runtime session id
 //   derives from it, so a new key means a seed reload.
+// - `OriginVerifyKey` is read by the Router's configuration (infra/web.ts) and by the Bff; rotating it
+//   is `sst secret set` and a deploy. `LeadConfig` reaches only LeadStream (the operator's
+//   `leads:notify-test` reads it through `sst shell`).
 // - After `sst secret set` the value reaches the Lambdas on the next deploy.
 
 export const SessionTokenKey = new sst.Secret("SessionTokenKey");
@@ -48,3 +57,5 @@ export const WhatsAppPhoneNumberId = new sst.Secret("WhatsAppPhoneNumberId");
 export const WhatsAppMetaPhoneNumberId = new sst.Secret("WhatsAppMetaPhoneNumberId");
 export const SeedOverrides = new sst.Secret("SeedOverrides");
 export const BrandConfig = new sst.Secret("BrandConfig");
+export const OriginVerifyKey = new sst.Secret("OriginVerifyKey");
+export const LeadConfig = new sst.Secret("LeadConfig");

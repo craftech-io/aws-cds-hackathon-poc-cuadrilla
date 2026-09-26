@@ -11,6 +11,8 @@ import {
   ClockMode,
   ConsoleRole,
   ErrorCode,
+  GuestOrigin,
+  GuestWorldStatus,
   HazardCategory,
   IspKind,
   KillScope,
@@ -80,7 +82,12 @@ describe("docs/tool-catalog.md, Tipos compartidos", () => {
   it("every enum of the catalog exists, with the same values in the same order", () => {
     const listed = Object.entries(SHARED_TYPES).filter(([, value]) => Array.isArray(value));
     expect(listed.map(([name]) => name)).toEqual(Object.keys(ENUMS_OF_THE_CATALOG));
-    for (const [name, values] of listed) expect(ENUMS_OF_THE_CATALOG[name]?.options, name).toEqual(values);
+    for (const [name, values] of listed) {
+      const options = ENUMS_OF_THE_CATALOG[name]?.options;
+      // The catalog lists the scopes of ADR-0019; `SIGNUP` (ADR-0025 §4) comes from docs/architecture.md §5, below.
+      if (name === "KillScope") expect(options?.slice(0, (values as unknown[]).length), name).toEqual(values);
+      else expect(options, name).toEqual(values);
+    }
   });
 
   it("PolicyResult and Guardrail have the catalog's fields", () => {
@@ -106,6 +113,12 @@ describe("docs/architecture.md closed sets", () => {
     expect(listIn(ARCHITECTURE, /Isp \(`kind` (`[^;]*`);/)).toEqual(IspKind.options);
     expect(listIn(ARCHITECTURE, /ISP#<ispId>#<([A-Z_\\|]+)>/)).toEqual(PersonRole.options);
     expect(listIn(ARCHITECTURE, /Decision \(`decision` ([A-Z/]+)/)).toEqual(AuditDecision.options);
+  });
+
+  it("kill switch scopes, guest origins and the states of a guest's world (ADR-0019, ADR-0024, ADR-0025)", () => {
+    expect(listIn(ARCHITECTURE, /`KILL#<([A-Z\\|]+)>`/)).toEqual(KillScope.options);
+    expect(listIn(ARCHITECTURE, /status (PROVISIONING[^,]+),/).sort()).toEqual([...GuestWorldStatus.options].sort());
+    expect(listIn(readDoc("CONTEXT.md"), /`GuestOrigin` (`[^)]+`)\)/).sort()).toEqual([...GuestOrigin.options].sort());
   });
 
   it("template status and timer states", () => {

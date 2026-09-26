@@ -3,7 +3,7 @@
 // line someone under pressure would be tempted to write, and must not.
 import { describe, expect, it } from "vitest";
 import { policyEngineName } from "../policy-rules";
-import { allows, block, deployWorkflow, parameterBlock, read, statement, template } from "./template-text";
+import { allows, block, deployWorkflow, parameterBlock, read, statement, statementsOf, template } from "./template-text";
 
 const TRUSTS = {
   deploy: block(template, "  DeployRole:", "ManagedPolicyArns:"),
@@ -325,6 +325,70 @@ describe("tags as the fence", () => {
     for (const [name, next] of names.slice(0, -1).map((name, index) => [name, names[index + 1] ?? ""] as const)) {
       const document = block(block(template, `  ${name}:`, `  ${next}:`), "PolicyDocument:", "\n\n");
       expect(document.replace(/\s/g, "").length * 1.2, name).toBeLessThan(6_144);
+    }
+  });
+});
+
+const boundary = block(template, "  DeployBoundary:", "  DeploySstHomePolicy:");
+const deployPolicies = block(template, "  DeploySstHomePolicy:", "  DeployRole:");
+
+describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
+  const WEB_ACLS = ['wafv2:${Region}:${AWS::AccountId}:global/webacl/${AppName}-*"', 'wafv2:${Region}:${AWS::AccountId}:regional/webacl/${AppName}-*"'];
+
+  it("manages web ACLs only by the app's name prefix, in both scopes, and never wafv2:*", () => {
+    const acls = statement("WebAclsOfThisApp");
+    for (const arn of WEB_ACLS) expect(acls).toContain(arn);
+    for (const action of ["CreateWebACL", "UpdateWebACL", "DeleteWebACL", "GetWebACL", "AssociateWebACL", "DisassociateWebACL", "TagResource"]) expect(acls).toContain(`- wafv2:${action}\n`);
+    expect(acls).not.toContain('Resource: "*"');
+    expect(template).not.toMatch(/wafv2:\*|webacl\/\*/);
+    for (const { sid, body } of allows.filter(({ body }) => /- wafv2:(Create|Update|Delete|Associate|Disassociate|Tag|Untag)/.test(body))) for (const arn of WEB_ACLS) expect(body, sid).toContain(arn);
+  });
+
+  it("reads AWS's managed rule groups and never creates an API key of AWS WAF (no CAPTCHA)", () => {
+    const reads = statement("ManagedRuleGroupReads");
+    expect([...reads.matchAll(/- (wafv2:\w+)/g)].map((match) => match[1]).sort()).toEqual(["wafv2:CheckCapacity", "wafv2:DescribeManagedRuleGroup", "wafv2:ListAvailableManagedRuleGroupVersions", "wafv2:ListAvailableManagedRuleGroups"]);
+    expect(template).not.toMatch(/APIKey|captcha/i);
+  });
+
+  it("associates a web ACL only with a Cognito pool tagged as this app", () => {
+    const association = statement("CognitoWebAclAssociation");
+    for (const action of ["AssociateWebACL", "DisassociateWebACL", "GetWebACLForResource"]) expect(association).toContain(`- cognito-idp:${action}`);
+    expect(association).toContain("aws:ResourceTag/sst:app: !Ref AppName");
+  });
+
+  it("maps event sources only onto functions named after the app", () => {
+    const mappings = statement("EventSourceMappingsOfThisApp");
+    for (const action of ["CreateEventSourceMapping", "UpdateEventSourceMapping", "DeleteEventSourceMapping"]) expect(mappings).toContain(`- lambda:${action}`);
+    expect(mappings).toContain('lambda:FunctionArn: !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${AppName}-*"');
+    expect(mappings).toContain("ArnLike:");
+  });
+
+  it("adds event destinations (CloudWatch by kind) only to the app's configuration set", () => {
+    const destinations = statement("SesEventDestinationsOfThisApp");
+    expect(destinations).toContain("- ses:CreateConfigurationSetEventDestination");
+    expect(destinations).toContain('configuration-set/${AppName}-email-${DeployStage}"');
+    expect(destinations).not.toContain('Resource: "*"');
+  });
+
+  it("lets app roles read only the app's web ACLs and invoke the account deletion by its name", () => {
+    const reads = block(boundary, "Sid: WebAclReadsOfThisApp", "- Sid:");
+    expect([...reads.matchAll(/- (wafv2:\w+)/g)].map((match) => match[1])).toEqual(["wafv2:GetWebACL", "wafv2:GetWebACLForResource"]);
+    for (const arn of WEB_ACLS) expect(reads).toContain(arn);
+    expect(block(boundary, "Sid: InvokeAccountDeletionByName", "- Sid:")).toContain("function:${AppName}-${DeployStage}-guest-account-deletion");
+  });
+
+  it("creates the origin request policy of /api/* and lets the deploy role only read it", () => {
+    expect(template).toContain("Type: AWS::CloudFront::OriginRequestPolicy");
+    expect(statement("CloudFrontCreatesAndReads")).toContain("- cloudfront:GetOriginRequestPolicy");
+    for (const verb of ["Create", "Update", "Delete"]) expect(allows.filter(({ body }) => body.includes(`cloudfront:${verb}OriginRequestPolicy`))).toHaveLength(0);
+    expect(read("infra/bootstrap/ci-role.yaml")).toContain("ApiOriginRequestPolicyId:");
+  });
+
+  it("keeps the Leads table and its stream inside the app's table fence", () => {
+    for (const policy of [boundary, deployPolicies]) {
+      const named = statementsOf(policy).filter(({ body }) => body.includes("- dynamodb:*"));
+      expect(named).toHaveLength(1);
+      expect(named[0]?.body).toContain('table/${AppName}-*"');
     }
   });
 });

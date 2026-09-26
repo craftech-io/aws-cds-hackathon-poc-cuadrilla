@@ -1,7 +1,8 @@
 // Route table of the web: the public pages and one entry per console view of docs/design-brief.md
 // §6, with the roles that may open it (docs/architecture.md §10). The id of a console route is the
 // directory of its view (`views/<id>/view.tsx`, lib/view-registry.ts); console-routes.tsx matches
-// the path and the AppShell builds the navigation from the same table.
+// the path and the AppShell builds the navigation from the same table. A guest's home is its portada
+// (`/app/home`, ADR-0025 §2); the operator's staff land on the day's work orders.
 import type { ConsoleRole } from "@cuadrilla/shared";
 import { copy } from "./copy/console";
 import { matchPath } from "./lib/match-path";
@@ -24,6 +25,7 @@ export interface ConsoleRoute {
 export const CONSOLE_PREFIX = "/app";
 
 export const ROUTES: readonly ConsoleRoute[] = [
+  { id: "guest-home", patterns: [`${CONSOLE_PREFIX}/home`], group: "demo", roles: ["GUEST"] },
   { id: "orders", patterns: [`${CONSOLE_PREFIX}/orders`], group: "work", roles: "ALL" },
   { id: "order-detail", patterns: [`${CONSOLE_PREFIX}/orders/:workOrderId`], group: "work", roles: "ALL", navAs: "orders" },
   { id: "cases", patterns: [`${CONSOLE_PREFIX}/cases`, `${CONSOLE_PREFIX}/cases/:caseId`], group: "work", roles: "ALL" },
@@ -39,6 +41,9 @@ export const ROUTES: readonly ConsoleRoute[] = [
 
 export const LOGIN_PATH = "/login";
 
+/** The own sign-up (views/signup): `signUp → confirmCode → done`, then the guest's portada. */
+export const SIGNUP_PATH = "/signup";
+
 /** The public welcome page of the demo (views/landing). */
 export const LANDING_PATH = "/";
 
@@ -48,8 +53,16 @@ export const JOIN_PATH = "/join";
 /** Public pages served by the web itself; the legal pages are static files under public/legal/. */
 export type PublicPageId = "join";
 
-/** Where a sign-in lands when nothing asked for another view. */
+/** Where a sign-in of the operator's staff lands when nothing asked for another view. */
 export const CONSOLE_HOME = `${CONSOLE_PREFIX}/orders`;
+
+/** The guest's portada: the start of every guest, the only place that tells the state of its world. */
+export const GUEST_HOME = `${CONSOLE_PREFIX}/home`;
+
+/** The home of a role: the portada for a guest, the day's work orders for the rest. */
+export function homeOf(role: ConsoleRole | undefined): string {
+  return role === "GUEST" ? GUEST_HOME : CONSOLE_HOME;
+}
 
 export interface RouteMatch {
   readonly route: ConsoleRoute;
@@ -67,7 +80,7 @@ export function matchRoute(path: string): RouteMatch | undefined {
   return undefined;
 }
 
-/** `/app` and `/app/` lead to the console's home. */
+/** `/app` and `/app/` lead to the home of the role. */
 export function isConsoleRoot(path: string): boolean {
   return path === CONSOLE_PREFIX || path === `${CONSOLE_PREFIX}/`;
 }

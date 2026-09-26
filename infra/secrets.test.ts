@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import type { z } from "zod";
+import * as schemas from "../packages/bff/src/lib/secret-schemas";
 import {
   BrandConfigValue,
   NOT_CONNECTED,
@@ -9,6 +11,15 @@ import {
   WhatsAppMetaPhoneNumberIdValue,
   WhatsAppPhoneNumberIdValue,
 } from "../packages/bff/src/lib/secret-schemas";
+
+/** A zod schema of packages/bff/src/lib/secret-schemas.ts by its name (`<Secret>Value`), published by WP-59. */
+function schemaOf(name: string): z.ZodType {
+  const schema: unknown = Reflect.get(schemas, name);
+  if (typeof schema !== "object" || schema === null || typeof Reflect.get(schema, "safeParse") !== "function") {
+    throw new Error(`packages/bff/src/lib/secret-schemas.ts exports no ${name}: the shape of every secret of infra/secrets.ts lives there (WP-59).`);
+  }
+  return schema as z.ZodType;
+}
 
 // infra/secrets.ts only evaluates inside the SST program ($app, sst), so it is read as text.
 const read = (relative: string): string => readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
@@ -30,9 +41,9 @@ describe("shared secrets", () => {
     expect([...declared(infraSecrets)].sort()).toEqual([...SECRET_NAMES].sort());
   });
 
-  it("declares the six secrets of docs/architecture.md §3, each once and never with a placeholder", () => {
+  it("declares the eight secrets of docs/architecture.md §3, each once and never with a placeholder", () => {
     const names = declared(infraSecrets);
-    expect([...names].sort()).toEqual(["BrandConfig", "SeedOverrides", "SessionTokenKey", "WabaId", "WhatsAppMetaPhoneNumberId", "WhatsAppPhoneNumberId"]);
+    expect([...names].sort()).toEqual(["BrandConfig", "LeadConfig", "OriginVerifyKey", "SeedOverrides", "SessionTokenKey", "WabaId", "WhatsAppMetaPhoneNumberId", "WhatsAppPhoneNumberId"]);
     expect(new Set(names).size).toBe(names.length);
     expect(stripComments(infraSecrets)).not.toMatch(/new sst\.Secret\("[A-Za-z0-9]+"\s*,/);
   });
@@ -100,5 +111,40 @@ describe("SeedOverrides", () => {
   it("takes phones only in E.164 and rejects unknown keys", () => {
     expect(SeedOverridesValue.safeParse({ demoRecipients: { emails: [], phones: ["5512345678"] } }).success).toBe(false);
     expect(SeedOverridesValue.safeParse({ unknown: true }).success).toBe(false);
+  });
+});
+
+describe("OriginVerifyKey (ADR-0025 §3)", () => {
+  const architecture = readFileSync(fileURLToPath(new URL("../docs/architecture.md", import.meta.url)), "utf8");
+
+  it("is declared, documented in §3 and linked to the Bff and the Router's origin, never set as a value", () => {
+    expect(declared(infraSecrets)).toContain("OriginVerifyKey");
+    expect(architecture).toContain("| `OriginVerifyKey` |");
+    expect(stripComments(read("./bff.ts"))).toMatch(/link: \[[^\]]*\bOriginVerifyKey\b/);
+    expect(stripComments(read("./web.ts"))).toContain("OriginVerifyKey.value");
+    expect(stripComments(infraSecrets)).not.toMatch(/OriginVerifyKey"\s*,/);
+  });
+
+  it("takes a random value of at least 32 bytes, never a short or guessable one", () => {
+    const schema = schemaOf("OriginVerifyKeyValue");
+    expect(schema.safeParse("q1W2e3R4t5Y6u7I8o9P0a1S2d3F4g5H6j7K8l9Z0x1C=").success).toBe(true);
+    for (const weak of ["", "secret", "not-connected", "a".repeat(10)]) expect(schema.safeParse(weak).success, weak).toBe(false);
+  });
+});
+
+describe("LeadConfig (ADR-0026)", () => {
+  it("is linked only to LeadStream among the Lambdas", () => {
+    const linking = readdirSync(fileURLToPath(new URL(".", import.meta.url)))
+      .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts") && file !== "secrets.ts")
+      .filter((file) => /\bLeadConfig\b/.test(stripComments(read(`./${file}`))));
+    expect(linking).toEqual(["leads.ts"]);
+    expect(stripComments(read("./leads.ts"))).toMatch(/new sst\.aws\.Function\("LeadStream"[\s\S]*?link: links\(\[[^\]]*\bLeadConfig\b/);
+  });
+
+  it("takes 1 to 5 recipients of the exact domain craftech.io and nothing else", () => {
+    const schema = schemaOf("LeadConfigValue");
+    expect(schema.safeParse({ notifyRecipients: ["leads-fixture@craftech.io"] }).success).toBe(true);
+    const wrong = [[], ["a@craftech.io.evil.test"], ["a@sub.craftech.io"], ["a@example.com"], Array.from({ length: 6 }, (_, i) => `a${i}@craftech.io`)];
+    for (const notifyRecipients of wrong) expect(schema.safeParse({ notifyRecipients }).success, JSON.stringify(notifyRecipients)).toBe(false);
   });
 });

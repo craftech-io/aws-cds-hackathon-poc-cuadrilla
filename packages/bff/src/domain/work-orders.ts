@@ -202,7 +202,8 @@ export type CertificateDelivery = z.infer<typeof CertificateDelivery>;
 /**
  * The installation certificate. `content` is what the PDF shows (built from the order, never from
  * model text); historical certificates of the seed carry only `content`, and the world factory
- * renders their PDF and fills `sha256`/`s3Key` with the brand of the world (ADR-0018).
+ * renders their PDF and fills `sha256`/`s3Key` with the brand of the world (ADR-0018). Until the
+ * factory can render (WP-39), a historical certificate of a new world is `pdfPending`.
  */
 export const Certificate = defineEntity("Certificate", {
   workOrderId: WorkOrderId,
@@ -212,6 +213,7 @@ export const Certificate = defineEntity("Certificate", {
   issuedAtSim: IsoInstant,
   sha256: Sha256Hex.optional(),
   s3Key: S3Key.optional(),
+  pdfPending: z.boolean().optional(),
   content: JsonObject.optional(),
   deliveries: z.array(CertificateDelivery).default([]),
 });

@@ -1,5 +1,6 @@
 // The procedures the shell reads, answered on `/api/*` in the tRPC batch protocol, for the specs that
-// run on Vite alone (login.spec.ts, wave 1): `brand.get`, `clock.get` and the bar's clock controls.
+// run on Vite alone (login.spec.ts, wave 1): `brand.get`, `clock.get` and the bar's clock controls, and
+// `guest.world` (a world READY) for the guest's portada, where every guest lands after signing in.
 // The spec sets what they answer (and can refuse the next call of a procedure) and reads every call.
 // The specs of the views run against the real router in tests/ui-server/ instead.
 import type { Page, Route } from "@playwright/test";
@@ -42,6 +43,20 @@ export function quietClock(): SimClock {
   return { mode: "PAUSED", simNow: "2026-10-13T07:00:00-06:00", busy: false, pending: [], next: [{ kind: "DAY_START", dueAtSim: "2026-10-13T07:30:00-06:00" }] };
 }
 
+/** What `guest.world` answers for a guest whose world is built (packages/bff/src/guest/world-status.ts). */
+export function readyWorld() {
+  return {
+    status: "READY",
+    origin: "SIGNUP",
+    canDeleteAccount: true,
+    canRetry: false,
+    refreshSession: false,
+    createdAtReal: "2026-10-20T15:00:00.000Z",
+    expiresAtReal: "2026-10-27T15:00:00.000Z",
+    summary: { operatorName: "Operadora ficticia de prueba", installers: ["Rogelio Méndez"], supervisors: 4, workOrders: 13, simNow: "2026-10-13T07:00:00-06:00" },
+  };
+}
+
 // The world's offset is fixed at -06:00 (America/Mexico_City has no daylight saving time).
 const OFFSET_MS = 6 * 60 * 60_000;
 
@@ -74,6 +89,8 @@ function answer(state: ConsoleApiState, path: string, input: unknown) {
       return state.brand === undefined ? refused(path, { code: "NOT_FOUND", httpStatus: 404 }) : data(state.brand);
     case "clock.get":
       return data(state.clock);
+    case "guest.world":
+      return data(readyWorld());
     case "clock.advance":
       state.clock.simNow = shiftSim(state.clock.simNow, MINUTES(input));
       return data({ simNow: state.clock.simNow });

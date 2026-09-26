@@ -2,7 +2,8 @@
 // fault it is written for. Invariant 10 runs here with the real contact policy
 // (packages/bff/src/policy/): every outbound message of the history of the demo world and of the
 // guest template, re-evaluated at the instant it left with the records of that instant, is allowed,
-// and carries its ALLOW decision in the audit log.
+// and carries its ALLOW decision in the audit log. Invariant 26 [FL-107]: the guest template carries
+// its markers and gives each origin its own world.
 import { describe, expect, it } from "vitest";
 import type { Consent, Person } from "../../../packages/bff/src/domain/people";
 import { Consent as ConsentSchema, Person as PersonSchema } from "../../../packages/bff/src/domain/people";
@@ -15,6 +16,7 @@ import { localDate } from "../generate/time";
 import { asLoaded } from "../lib/conformance";
 import { DATA_LAYOUT, DATA_DIR, fromRoot, tableFile, worldFile } from "../lib/paths";
 import type { SeedItem } from "../lib/tables";
+import { CAPS_PROFILES, GuestTemplateFile, SAMPLE_GUEST_TOKENS, guestTokens, instantiateGuestTemplate, markGuestTemplate, tokensProblem } from "../generate/guest-template";
 import { bundleOf, readDataDir, worldsOf, type SeedWorld } from "../validate/bundle";
 import { INVARIANTS, runInvariants, type InvariantResult } from "../validate/index";
 
@@ -123,7 +125,7 @@ describe("each invariant catches its fault", () => {
   it("3: the guest template takes phones of the invited and signup blocks, never one of the demo world", async () => {
     const withPhone = (phone: string): Map<string, string> =>
       mutated(worldFile("guest"), (json) => {
-        const person = guestTables(json).People?.find((item) => item.entity === "Person" && item.personId === "inst-karina-g00");
+        const person = guestTables(json).People?.find((item) => item.entity === "Person" && item.personId === "inst-karina-{{clockTag}}");
         if (person !== undefined) person.phone = phone;
       });
     expect(await errorsOf(withPhone("+525503000001"), 3)).toEqual([]);
@@ -224,5 +226,102 @@ describe("each invariant catches its fault", () => {
       if (inbound !== undefined) inbound.text = "Hago la valoración del riesgo, voy a evaluar la caja y la medición sale bien, sin prejuicio del cliente.";
     });
     expect(await errorsOf(files, 25)).toEqual([]);
+  });
+});
+
+describe("invariant 26: the guest template carries its markers and gives each origin its own world [FL-107]", () => {
+  const template = GuestTemplateFile.parse(JSON.parse(committed.get(worldFile("guest")) ?? "{}"));
+  const phonesOf = (tables: Record<string, SeedItem[]>): string[] => (tables.People ?? []).map((item) => item.phone).filter((phone): phone is string => typeof phone === "string");
+  const mutateGuest = (mutate: (json: Record<string, unknown>, tables: Record<string, SeedItem[]>) => void): Map<string, string> => mutated(worldFile("guest"), (json) => mutate(json, guestTables(json)));
+  const karina = (tables: Record<string, SeedItem[]>): SeedItem => tables.People?.find((item) => item.personId === "inst-karina-{{clockTag}}") ?? {};
+  const customer = (tables: Record<string, SeedItem[]>): SeedItem => tables.People?.find((item) => item.entity === "Customer") ?? {};
+
+  it("writes the four markers and no literal of a guest world, and the caps of §4 per origin", () => {
+    const text = committed.get(worldFile("guest")) ?? "";
+    for (const name of ["phoneBlock", "clockTag", "capsProfile", "ispId"]) expect(text).toContain(`{{${name}}}`);
+    expect(text).not.toMatch(/\+52550[23]\d{6}|isp-guest-(?:\d{2}|test)\b|-g(?:\d{2}|test)\b/);
+    expect(template.capsProfiles.SIGNUP).toEqual({
+      simulatorCaps: { turnsPerHour: 20, turnsPerDay: 60, validationsPerDay: 20, transcribeSecPerDay: 300, emailsPerDay: 10, messagesPerRealHourPerIdentity: 15, sceneJumpsPerRealHour: 15 },
+      turnCaps: { perHour: 20, perDay: 60 },
+    });
+    expect(template.capsProfiles.TEST.simulatorCaps).toMatchObject({ messagesPerRealHourPerIdentity: 80, turnsPerHour: 180, emailsPerDay: 60 });
+    expect(template.capsProfiles.INVITED).toEqual(CAPS_PROFILES.INVITED);
+  });
+
+  it("gives each origin its operator, block, tag and caps, and marking the sample world gives back the template", () => {
+    const origins = [
+      [guestTokens("INVITED", 7), "+52550207", "g07"],
+      [guestTokens("TEST"), "+52550299", "gtest"],
+      [guestTokens("INVITED", 42), "+52550242", "g42"],
+    ] as const;
+    for (const [tokens, block, tag] of origins) {
+      const world = instantiateGuestTemplate(template, tokens);
+      expect(world.clockId).toBe(`GUEST#${tokens.ispId}`);
+      expect(phonesOf(world.tables).every((phone) => phone.startsWith(block))).toBe(true);
+      expect(world.tables.People.filter((item) => item.entity === "Person").every((person) => String(person.personId).endsWith(`-${tag}`))).toBe(true);
+      expect(world.tables.Isps.find((item) => item.entity === "IspSettings")).toMatchObject(CAPS_PROFILES[tokens.capsProfile]);
+    }
+    const sample = instantiateGuestTemplate(template, SAMPLE_GUEST_TOKENS);
+    expect(markGuestTemplate(sample, template.guestTest)).toEqual(template);
+  });
+
+  it("refuses tokens that do not belong together: a block of another origin, a tag of another operator", () => {
+    expect(tokensProblem(guestTokens("SIGNUP", "s261013k2m7q"))).toBeNull();
+    expect(tokensProblem({ ...guestTokens("INVITED", 7), phoneBlock: "0300" })).toMatch(/phoneBlock/);
+    expect(tokensProblem({ ...guestTokens("TEST"), clockTag: "g07" })).toMatch(/clockTag/);
+    expect(tokensProblem({ ...guestTokens("SIGNUP", "s261013k2m7q"), capsProfile: "INVITED" })).toMatch(/capsProfile/);
+    expect(() => guestTokens("SIGNUP", "s2610")).toThrow(RangeError);
+    expect(() => instantiateGuestTemplate(template, { ...SAMPLE_GUEST_TOKENS, phoneBlock: "0299" })).toThrow(RangeError);
+  });
+
+  it("catches a literal phone of a guest block, a literal operator and an email without the tag", async () => {
+    const files = mutateGuest((json, tables) => {
+      (json.markers as Record<string, string>).ispId = "for example isp-guest-07";
+      karina(tables).phone = "+525502070001";
+      customer(tables).email = "success+g07-c10401@simulator.amazonses.com";
+      customer(tables).ispId = "isp-guest-07";
+    });
+    const errors = await errorsOf(files, 26);
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/\.phone: a phone number written as a literal instead of a marker$/),
+        expect.stringMatching(/\.phone: a phone outside \+5255\{\{phoneBlock\}\}0xxx$/),
+        expect.stringMatching(/\.email: a guest clock tag written as a literal instead of a marker$/),
+        expect.stringMatching(/\.email: an email without the tag of its world$/),
+        expect.stringMatching(/\.ispId: a guest operator written as a literal instead of a marker$/),
+        "worlds/guest.json:1: a literal of a guest world",
+      ]),
+    );
+  });
+
+  it("catches a cloned id without the tag, literal caps, other caps and an unknown marker", async () => {
+    const files = mutateGuest((json, tables) => {
+      const order = tables.WorkOrders?.find((item) => item.entity === "WorkOrder");
+      if (order !== undefined) order.installerId = "inst-rogelio";
+      const settings = tables.Isps?.find((item) => item.entity === "IspSettings");
+      if (settings !== undefined) settings.simulatorCaps = CAPS_PROFILES.INVITED.simulatorCaps;
+      ((json.capsProfiles as Record<string, { turnCaps: { perHour: number } }>).SIGNUP as { turnCaps: { perHour: number } }).turnCaps.perHour = 40;
+      karina(tables).lastName = "{{guestNumber}}";
+    });
+    const errors = await errorsOf(files, 26);
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/\.installerId: inst-rogelio is a cloned id without the tag of its world$/),
+        "guest IspSettings: caps written as literals instead of by the profile",
+        "guest: capsProfiles differ from the values of docs/seed-spec.md §4",
+        "guest: unknown marker {{guestNumber}}",
+      ]),
+    );
+  });
+
+  it("catches a world that repeats a phone and an item two worlds would share", async () => {
+    const files = mutateGuest((_json, tables) => {
+      const people = tables.People?.filter((item) => item.entity === "Customer") ?? [];
+      if (people[0] !== undefined && people[1] !== undefined) people[1].phone = people[0].phone;
+      const zone = tables.Isps?.find((item) => item.entity === "Zone");
+      if (zone !== undefined) zone.PK = "ISP#isp-shared";
+    });
+    const errors = await errorsOf(files, 26);
+    expect(errors).toEqual(expect.arrayContaining([expect.stringMatching(/^INVITED: phone \+52550207\d{4} used more than once$/), expect.stringMatching(/^two worlds of the template share the item Isps ISP#isp-shared /)]));
   });
 });

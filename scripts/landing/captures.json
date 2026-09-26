@@ -1,0 +1,46 @@
+{
+  "_readme": "Captures of the product for the landing (docs/landing-spec.md §6.2), taken by scripts/landing/capture-console.ts from the real console and its BFF served on localhost over a synthetic world (scripts/landing/console-world.ts), always with the neutral brand. Each capture names its route, the state of its world, the language, the viewports, how the picture is framed, the manifest entry it replaces (if any), what it needs to exist in the tree first, and the moment it shows; the steps to reach that moment live in scripts/landing/scenes.ts. `images` is the ledger the pipeline writes: per capture and viewport, the hash of the picture's pixels and of every file written under packages/web/public, so a run that moves no pixel writes no file. Synthetic data only, no real person, never taken in CI, with credentials or against a deployed stage.",
+  "captures": {
+    "landing": {
+      "route": "/",
+      "world": "visitor",
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "full" },
+      "manifest": null,
+      "requires": { "views": ["landing"], "procedures": [] },
+      "moment": "The first screen of the landing: the promise, the three calls to action and the hero's phone as its still poster (reduced motion), for the README and the product's presentation"
+    },
+    "signup-form": {
+      "route": "/signup",
+      "world": "visitor",
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "full" },
+      "manifest": { "id": "signup-form", "viewport": "1440x900" },
+      "requires": { "views": ["signup"], "procedures": [] },
+      "moment": "The signup form as a visitor first sees it: email, password, the three optional fields and the two consents, separate and unticked"
+    },
+    "signup-code": {
+      "route": "/signup",
+      "world": "visitor",
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "full" },
+      "manifest": { "id": "signup-code", "viewport": "1440x900" },
+      "requires": { "views": ["signup"], "procedures": ["signup.start"] },
+      "moment": "The code step right after \"Crear cuenta\": the synthetic visitor's address on a reserved domain, the code field, resend and the way back"
+    },
+    "guest-home": {
+      "route": "/app/home",
+      "world": "guest-ready",
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "full" },
+      "manifest": null,
+      "requires": { "views": ["guest-home"], "procedures": ["guest.world"] },
+      "moment": "The guest's home once the signup world is READY: the seeded installer and operator, the expiry date and what can already be used"
+    }
+  },
+  "images": {}
+}

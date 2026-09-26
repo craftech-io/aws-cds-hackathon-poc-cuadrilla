@@ -1,0 +1,105 @@
+// The sign-in screens in English (docs/landing-spec.md §7.7): the same keys as copy.ts, chosen by the
+// es/en switch of the AuthShell or by `?lang=en`. Error texts never say whether an email has an account.
+import type { LoginCopy } from "./copy";
+
+export const loginCopyEn: LoginCopy = {
+  panel: {
+    tagline: "WhatsApp field copilot for fiber installers",
+    title: "Every installation closed with evidence, the first time.",
+    lead: "The installer asks on WhatsApp, by text or voice note; the agent reads the work order and the ONU status, guides them with the cited manual, checks every photo and escalates to a supervisor when needed.",
+    points: ["Manual validation is always a person's call", "Contact policy in code", "Synthetic demo: 100% made-up data"],
+  },
+  credentials: {
+    title: "Sign in to the console",
+    lead: "Use your email and password.",
+    email: "Email",
+    password: "Password",
+    submit: "Sign in",
+    forgot: "I forgot my password",
+    hint: "Staff accounts are created by invitation. If you don't have one, ask your supervisor.",
+    tryDemo: { before: "Never used Cuadrilla? ", link: "Try the demo" },
+    passwordReset: "Done: your password changed. Sign in with the new one.",
+    sessionExpired: "Your session expired. Sign in again.",
+  },
+  password: {
+    show: "Show",
+    hide: "Hide",
+    rulesTitle: "The password needs:",
+    rules: {
+      length: "12 characters or more",
+      lower: "a lowercase letter",
+      upper: "an uppercase letter",
+      number: "a number",
+      symbol: "a symbol (for example ! # $ -)",
+    },
+    confirm: "Repeat the password",
+    mismatch: "The two passwords don't match.",
+    outerSpaces: "The password can't start or end with a space.",
+  },
+  newPassword: {
+    title: "Choose your password",
+    lead: "This is your first sign-in: replace the temporary password with your own.",
+    field: "New password",
+    submit: "Save and continue",
+  },
+  mfaSetup: {
+    title: "Turn on the verification code",
+    leadRequired: "Your account asks for the verification code (TOTP). You set it up only once.",
+    leadOptional: "It's optional and adds a layer of security to your account. You set it up only once.",
+    steps: [
+      "Open your authenticator app: Google Authenticator, Microsoft Authenticator, 1Password or similar.",
+      "Scan the QR code, or type the key by hand.",
+      "Type the 6-digit code the app shows you.",
+    ],
+    qrLabel: "QR code for your authenticator app",
+    manualKey: "Key to type by hand",
+    code: "6-digit code",
+    submit: "Turn on",
+    skip: "Not now",
+  },
+  totp: {
+    title: "Verification code",
+    lead: "Type the 6-digit code your authenticator app shows.",
+    code: "Code",
+    submit: "Verify",
+  },
+  forgot: {
+    title: "Reset your password",
+    lead: "Type the email of your account and we'll send you a code to choose a new password.",
+    submit: "Send code",
+  },
+  reset: {
+    title: "Check your email",
+    lead: (email: string) =>
+      `If ${email} belongs to a console account, we sent you a 6-digit code. If it doesn't arrive in a few minutes, check your spam folder or ask your supervisor to invite you again.`,
+    code: "Code from the email",
+    submit: "Change the password",
+  },
+  back: "Back to sign in",
+  otherUser: "Sign in with another account",
+  working: "One moment…",
+  errors: {
+    INVALID_CREDENTIALS: "The email or the password isn't right. If you don't remember the password, you can reset it.",
+    INVALID_CODE: "The code isn't valid or has expired. Try the one it shows now.",
+    WEAK_PASSWORD: "The password doesn't meet the requirements.",
+    SESSION_EXPIRED: "Too much time went by. Start again with your email and password.",
+    TOO_MANY_ATTEMPTS: "Too many attempts. Wait a few minutes and try again.",
+    UNAVAILABLE: "We couldn't reach the sign-in service. Check your connection and try again.",
+    UNSUPPORTED: "Your account asks for a verification method the console doesn't support. Ask your supervisor for help.",
+    DIFFERENT_USER: "That isn't the account of this session. Confirm with yours.",
+  },
+  stepUp: {
+    title: "Confirm it's you",
+    lead: "Validating evidence by hand needs a sign-in within the last 15 minutes. Confirm with your password.",
+    done: "Done. You can try the action again.",
+  },
+  enroll: {
+    title: "Verification code",
+    done: "Code turned on. We'll ask for it from your next sign-in.",
+    unavailable: "We couldn't set up the verification code. Try again in a few seconds.",
+    retry: "Retry",
+  },
+  close: "Close",
+  legal: { privacy: "Privacy", terms: "Terms" },
+  lang: { label: "Language", switchTo: "Español", short: "ES" },
+};

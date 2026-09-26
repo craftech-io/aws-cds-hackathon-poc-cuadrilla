@@ -65,6 +65,11 @@ export interface IspsPort {
   putUser(user: NewEntity<typeof ConsoleUser>): Promise<ConsoleUser>;
   /** The console user of a Cognito `sub` (`GSI1 SUB#<sub>`), in any operator. */
   findUserBySub(sub: string): Promise<ConsoleUser | undefined>;
+  /**
+   * Every row the `SUB#<sub>` index lists (at most `limit`), as the index sees them: the index is
+   * eventually consistent, so a caller that must be exact re-reads each row by its key (`getUser`).
+   */
+  listUsersBySub(sub: string, limit: number): Promise<ConsoleUser[]>;
   /** `UserLookup` of auth/staff.ts: the user of `sub` only if it belongs to `ispId`. */
   findBySub(ispId: string, sub: string): Promise<UserMatch | undefined>;
   setCognitoSub(ispId: string, userId: string, sub: string): Promise<ConsoleUser>;

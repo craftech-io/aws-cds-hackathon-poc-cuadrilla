@@ -31,7 +31,7 @@ describe("HKDF subkeys", () => {
   });
 
   it("derives one stable 32-byte subkey per purpose of docs/architecture.md §3, all different and none equal to the master", () => {
-    expect(SUBKEY_PURPOSES).toEqual(["session", "phone-hash", "email-hash", "nonce", "sim-envelope", "runtime-session", "media-key"]);
+    expect(SUBKEY_PURPOSES).toEqual(["session", "phone-hash", "email-hash", "nonce", "sim-envelope", "runtime-session", "media-key", "signup-ticket", "ip-hash"]);
     const subkeys = SUBKEY_PURPOSES.map((purpose) => hex(deriveSubkey(MASTER, purpose)));
     expect(new Set(subkeys).size).toBe(SUBKEY_PURPOSES.length);
     for (const subkey of subkeys) expect(subkey).toMatch(/^[0-9a-f]{64}$/);
@@ -43,6 +43,21 @@ describe("HKDF subkeys", () => {
   it("refuses an empty master key and an unknown purpose", () => {
     expect(() => deriveSubkey("", "session")).toThrow(RangeError);
     expect(() => deriveSubkey(MASTER, "other" as never)).toThrow(RangeError);
+    expect(() => deriveSubkey(MASTER, "signup" as never)).toThrow(RangeError);
+  });
+
+  it("gives the sign-up ticket and the IP hash subkeys of their own (ADR-0025 §3)", () => {
+    const ticket = hex(deriveSubkey(MASTER, "signup-ticket"));
+    const ip = hex(deriveSubkey(MASTER, "ip-hash"));
+    expect(ticket).not.toBe(ip);
+    for (const purpose of SUBKEY_PURPOSES.filter((name) => name !== "signup-ticket" && name !== "ip-hash")) {
+      const other = hex(deriveSubkey(MASTER, purpose));
+      expect(other, purpose).not.toBe(ticket);
+      expect(other, purpose).not.toBe(ip);
+    }
+    const signed = hmacSha256Base64Url(deriveSubkey(MASTER, "signup-ticket"), "nonce|hash|gst-01|exp");
+    expect(verifyHmacBase64Url(deriveSubkey(MASTER, "signup-ticket"), "nonce|hash|gst-01|exp", signed)).toBe(true);
+    expect(verifyHmacBase64Url(deriveSubkey(MASTER, "session"), "nonce|hash|gst-01|exp", signed)).toBe(false);
   });
 });
 

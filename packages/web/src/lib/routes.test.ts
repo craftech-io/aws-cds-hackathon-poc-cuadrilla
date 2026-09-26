@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { copy } from "../copy/console";
-import { CONSOLE_HOME, ROUTES, activeNavId, isConsoleRoot, matchRoute, navRoutes, pathOf, routeAllows, routeHref } from "../routes";
+import { CONSOLE_HOME, GUEST_HOME, ROUTES, SIGNUP_PATH, activeNavId, homeOf, isConsoleRoot, matchRoute, navRoutes, pathOf, routeAllows, routeHref } from "../routes";
 
-// Console views of docs/build-plan.md §1 (landing, login and join are public; the tour is the
-// shell's dock).
-const CONSOLE_VIEWS = ["orders", "order-detail", "cases", "evidence", "people", "clock", "simulator", "outbox", "manual", "metrics", "audit"];
+// Console views of docs/build-plan.md §1 (landing, login, signup and join are public; the tour is the
+// shell's dock). The guest's portada is a console view of the guest alone.
+const CONSOLE_VIEWS = ["guest-home", "orders", "order-detail", "cases", "evidence", "people", "clock", "simulator", "outbox", "manual", "metrics", "audit"];
+const GUEST_ONLY = new Set(["guest-home"]);
 
 describe("route table", () => {
   it("has one route per console view, each with its title and description", () => {
@@ -26,11 +27,17 @@ describe("route table", () => {
     expect(matchRoute("/app/unknown")).toBeUndefined();
   });
 
-  it("sends /app to the console's home", () => {
+  it("[FL-108] sends /app to the home of the role: the portada for a guest, the work orders for the staff", () => {
     expect(isConsoleRoot("/app")).toBe(true);
     expect(isConsoleRoot("/app/")).toBe(true);
     expect(isConsoleRoot("/app/orders")).toBe(false);
     expect(CONSOLE_HOME).toBe(pathOf("orders"));
+    expect(GUEST_HOME).toBe("/app/home");
+    expect(GUEST_HOME).toBe(pathOf("guest-home"));
+    expect(matchRoute("/app/home")?.route.id).toBe("guest-home");
+    expect(homeOf("GUEST")).toBe(GUEST_HOME);
+    expect([homeOf("SUPERVISOR"), homeOf("OPS"), homeOf(undefined)]).toEqual([CONSOLE_HOME, CONSOLE_HOME, CONSOLE_HOME]);
+    expect(SIGNUP_PATH).toBe("/signup");
   });
 
   it("lists the detail views under the view they come from", () => {
@@ -40,11 +47,13 @@ describe("route table", () => {
     expect(activeNavId("/nowhere")).toBeUndefined();
   });
 
-  it("opens every view to the three console roles and none to a principal without role", () => {
+  it("opens every view to the three console roles, the portada to guests only, and none to a principal without role", () => {
     for (const route of ROUTES) {
-      for (const role of ["SUPERVISOR", "OPS", "GUEST"] as const) expect(routeAllows(route, role)).toBe(true);
+      for (const role of ["SUPERVISOR", "OPS", "GUEST"] as const) expect(routeAllows(route, role), `${route.id} ${role}`).toBe(role === "GUEST" || !GUEST_ONLY.has(route.id));
       expect(routeAllows(route, undefined)).toBe(false);
     }
+    expect(navRoutes("GUEST").map((route) => route.id)).toContain("guest-home");
+    expect(navRoutes("SUPERVISOR").map((route) => route.id)).not.toContain("guest-home");
     expect(navRoutes(undefined)).toEqual([]);
   });
 });

@@ -78,13 +78,18 @@ function errorType(raw: string | undefined): string {
   return name.slice(0, name.indexOf(":") === -1 ? undefined : name.indexOf(":"));
 }
 
-export function createCognitoApi(config: CognitoApiConfig): CognitoApi {
+/** One Cognito operation: the body, the zod shape of the answer, and whether a retry is harmless. */
+export type CognitoCall = <T>(operation: string, body: Record<string, unknown>, schema: z.ZodType<T>, idempotent: boolean) => Promise<T>;
+
+/**
+ * The transport of every Cognito client of the console (the sign-in's `ConsoleWeb`, the sign-up's
+ * `GuestSignup`): idempotent reads and the SRP start retry a network failure; a call that consumes a
+ * code, a session or a password is sent once, so a timeout never replays it.
+ */
+export function createCognitoCaller(config: Pick<CognitoApiConfig, "region" | "fetch">): CognitoCall {
   const endpoint = `https://cognito-idp.${config.region}.amazonaws.com/`;
   const doFetch = config.fetch ?? fetchWithRetry;
-
-  // Idempotent reads and the SRP start retry a network failure; a call that consumes a code, a
-  // session or a password is sent once, so a timeout never replays it.
-  async function call<T>(operation: string, body: Record<string, unknown>, schema: z.ZodType<T>, idempotent: boolean): Promise<T> {
+  return async (operation, body, schema, idempotent) => {
     const response = await doFetch(
       endpoint,
       {
@@ -105,8 +110,11 @@ export function createCognitoApi(config: CognitoApiConfig): CognitoApi {
     const parsed = schema.safeParse(payload);
     if (!parsed.success) throw new CognitoError("InvalidResponse", `unexpected ${operation} response`);
     return parsed.data;
-  }
+  };
+}
 
+export function createCognitoApi(config: CognitoApiConfig): CognitoApi {
+  const call = createCognitoCaller(config);
   const clientId = config.clientId;
   return {
     initiateSrp: (username, srpA) =>

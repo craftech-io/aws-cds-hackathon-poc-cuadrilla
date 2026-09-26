@@ -75,6 +75,10 @@ export const copy = {
     },
   },
   views: {
+    "guest-home": {
+      title: "Tu mundo de prueba",
+      description: "El estado de tu mundo de prueba, lo que ya puedes usar de la consola y tu cuenta.",
+    },
     orders: {
       title: "Órdenes del día",
       description: "Cada orden de trabajo con su instalador, ventana, checklist, estado de la ONU y casos abiertos.",

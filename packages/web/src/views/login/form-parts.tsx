@@ -3,7 +3,7 @@
 import { useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { FIELD_CLASS } from "../../components/form-classes";
 import { missingPasswordRules, type PasswordRule } from "../../lib/auth/credentials";
-import { loginCopy } from "./copy";
+import { useLoginCopy } from "./auth-lang";
 
 interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "id"> {
   readonly label: string;
@@ -27,6 +27,7 @@ export function Field({ label, trailing, ...input }: FieldProps) {
 
 export function PasswordField(props: Omit<FieldProps, "type" | "trailing">) {
   const [visible, setVisible] = useState(false);
+  const copy = useLoginCopy();
   return (
     <Field
       {...props}
@@ -35,7 +36,7 @@ export function PasswordField(props: Omit<FieldProps, "type" | "trailing">) {
       autoCapitalize="off"
       trailing={
         <button type="button" className="rounded px-2 py-1 text-xs font-semibold text-cyan-deep hover:bg-cyan-soft" onClick={() => setVisible((shown) => !shown)} aria-pressed={visible}>
-          {visible ? loginCopy.password.hide : loginCopy.password.show}
+          {visible ? copy.password.hide : copy.password.show}
         </button>
       }
     />
@@ -59,11 +60,12 @@ export function CodeField({ label, value, onChange }: { readonly label: string; 
 
 /** The pool's password policy as a checklist that ticks while the person types. */
 export function PasswordRules({ password }: { readonly password: string }) {
+  const copy = useLoginCopy();
   const missing = new Set<PasswordRule>(missingPasswordRules(password));
-  const rules = Object.entries(loginCopy.password.rules) as Array<[PasswordRule, string]>;
+  const rules = Object.entries(copy.password.rules) as Array<[PasswordRule, string]>;
   return (
     <div className="rounded-md bg-paper px-3 py-2 text-xs text-slate">
-      <p className="font-medium">{loginCopy.password.rulesTitle}</p>
+      <p className="font-medium">{copy.password.rulesTitle}</p>
       <ul className="mt-1 grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
         {rules.map(([rule, text]) => {
           const met = password.length > 0 && !missing.has(rule);
@@ -95,21 +97,22 @@ export function NoticeNote({ children }: { readonly children: ReactNode }) {
   );
 }
 
-export function SubmitButton({ busy, children }: { readonly busy: boolean; readonly children: ReactNode }) {
+export function SubmitButton({ busy, disabled = false, children }: { readonly busy: boolean; readonly disabled?: boolean; readonly children: ReactNode }) {
+  const copy = useLoginCopy();
   return (
     <button
       type="submit"
-      disabled={busy}
-      className="inline-flex w-full items-center justify-center rounded-md bg-navy px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={busy || disabled}
+      className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-navy px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {busy ? loginCopy.working : children}
+      {busy ? copy.working : children}
     </button>
   );
 }
 
 export function LinkButton({ onClick, children }: { readonly onClick: () => void; readonly children: ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className="text-sm font-medium text-cyan-deep underline-offset-2 hover:underline">
+    <button type="button" onClick={onClick} className="inline-flex min-h-11 items-center text-sm font-medium text-cyan-deep underline-offset-2 hover:underline">
       {children}
     </button>
   );

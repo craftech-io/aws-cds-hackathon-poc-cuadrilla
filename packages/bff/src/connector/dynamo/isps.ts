@@ -21,6 +21,11 @@ export function ispsRepo(ctx: RepoContext): IspsPort {
     return users.length === 1 ? users[0] : undefined;
   };
 
+  const listUsersBySub: IspsPort["listUsersBySub"] = async (sub, limit) => {
+    if (sub === "") return [];
+    return parseRows(ConsoleUser, await client.query(TABLE, { index: "GSI1", hashValue: cognitoSubKey(sub), limit }), TABLE);
+  };
+
   return {
     getIsp: (ispId) => getEntity(ctx, Isp, "Isp", { ispId }),
     putIsp: (isp) => upsertEntity(ctx, Isp, "Isp", isp),
@@ -74,6 +79,7 @@ export function ispsRepo(ctx: RepoContext): IspsPort {
       return upsertEntity(ctx, ConsoleUser, "ConsoleUser", { ...user, cognitoSub });
     },
     findUserBySub,
+    listUsersBySub,
     async findBySub(ispId, sub) {
       const user = await findUserBySub(sub);
       return user === undefined || user.ispId !== ispId ? undefined : { userId: user.userId, active: user.active };

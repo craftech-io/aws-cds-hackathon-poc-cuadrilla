@@ -10,6 +10,7 @@ import { createMemoryConnector } from "../connector/index";
 import type { Connector } from "../connector/ports";
 import { createLogger } from "../lib/log";
 import type { ContextDeps } from "../routers/deps";
+import { memorySignupPorts } from "../signup/testing";
 import { cognitoIssuer } from "./config";
 import { type IdTokenVerifier, createCognitoIdTokenVerifier, staticJwksFetcher } from "./jwt";
 import { createUserDirectory } from "./staff";
@@ -98,11 +99,13 @@ export interface TestContextDeps extends ContextDeps {
 
 /**
  * The console's dependencies for a router test: the issuer's verifier, an in-memory connector (or
- * the one given), its user directory and healthy mocks; `overrides` replace any of them.
+ * the one given), its user directory, healthy mocks and the sign-up's ports over memory (nothing
+ * reaches the network); `overrides` replace any of them.
  */
 export function testContextDeps(issuer: TestIssuer, overrides: Partial<ContextDeps> & { readonly connector?: Connector } = {}): TestContextDeps {
   const lines: string[] = [];
   const connector = overrides.connector ?? createMemoryConnector().connector;
+  const signup = memorySignupPorts(overrides.wallClock);
   return {
     lines,
     verifier: issuer.verifier(),
@@ -111,6 +114,7 @@ export function testContextDeps(issuer: TestIssuer, overrides: Partial<ContextDe
     mocks: () => Promise.resolve({ network: "OK", dispatch: "OK" }),
     wallClock: () => new Date(),
     loggerFor: (correlationId) => createLogger({ correlationId, level: "debug", sink: (line) => void lines.push(line) }),
+    signup: () => signup,
     ...overrides,
   };
 }

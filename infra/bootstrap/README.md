@@ -14,7 +14,16 @@
 - Response headers policy `<app>-poc-console` (CSP, HSTS, `X-Frame-Options DENY`, nosniff,
   referrer), which the deploy role cannot change. Its CSP is `CONSOLE_CSP` of `infra/ci-spec.ts`:
   uploads only to `Media`, images and audio only from `Media`, `Evidence` and `Seed` (the design
-  partner's logos under `Seed/brand/`).
+  partner's logos under `Seed/brand/`), scripts from the app and the AWS WAF SDK
+  (`https://*.sdk.awswaf.com`) and calls to AWS WAF's token hosts (`https://*.token.awswaf.com`):
+  the silent challenge of the sign-up (ADR-0025 §4). Wildcards because the integration URL is born
+  with the web ACL, after this template is applied. The AWS WAF guide ("Using the JavaScript API
+  with content security policies") allowlists the apex `https://*.awswaf.com` in `script-src`,
+  `script-src-elem` and `connect-src`; the console narrows it to the SDK and token hosts it uses.
+- Origin request policy `<app>-poc-api` for `/api/*` of the Router (ADR-0025 §3): every viewer
+  header, cookie and query string (the headers AWS WAF inserts included) plus
+  `CloudFront-Viewer-Address`, which the managed `AllViewerExceptHostHeader` (`allExcept [host]`)
+  does not forward. The deploy role only reads it; `infra/web.ts` finds it by name.
 - Optionally the GitHub OIDC provider, only for an account that has none.
 
 Explanations live here, not in the template: CloudFormation accepts 51,200 bytes inline and IAM
@@ -68,7 +77,14 @@ What each group of statements is for:
 | `DenyPublicFunctionUrlsBesidesTheEdge` | A Function URL with `AuthType NONE` only on `Bff`; the mocks, the QA driver and every other function keep `AWS_IAM` |
 | `HarnessUnderlyingRuntime` | The runtime AgentCore creates under the Harness, named `harness_<AgentNamePrefix>*` |
 | `CloudControlTransport` | `awsnative.*` resources go through the Cloud Control API, IAM prefix `cloudformation` |
-| Edge policy | CloudFront functions `<app>-poc-*`, the bootstrap key-value store and the declared cache policy only |
+| Edge policy | CloudFront functions `<app>-poc-*`, the bootstrap key-value store and the declared cache policy only; reads of the origin request policy of `/api/*` |
+| `WebAclsOfThisApp` (edge policy) | Create, update, delete, tag and associate only the web ACLs `<app>-*` of both scopes (`<app>-poc-edge` on the Router, `<app>-poc-auth` on the user pool). AWS WAF has no tag fence on create, so the fence is the name |
+| `ManagedRuleGroupReads` (edge policy) | Read AWS's managed rule groups the ACLs reference (IP reputation, anonymous IP list) and check capacity. No action on AWS WAF API keys exists anywhere: no CAPTCHA (ADR-0025 §4) |
+| `CognitoWebAclAssociation` | `AssociateWebACL`, `DisassociateWebACL` and `GetWebACLForResource` of Cognito only on a pool tagged `sst:app` = this app (the pool's ARN has an opaque id) |
+| `EventSourceMappingsOfThisApp` | Create, update and delete event source mappings only onto functions `<app>-*` (`lambda:FunctionArn`): the installer queue and the `Leads` stream |
+| `SesEventDestinationsOfThisApp` | Event destinations only on the configuration set `<app>-email-poc`: EventBridge for ChannelEvents and CloudWatch by `kind` for the cut of the sign-up |
+| `WebAclReadsOfThisApp` (boundary) | App roles may read only the app's two web ACLs (the QaDriver's `waf.probe`) |
+| `InvokeAccountDeletionByName` (boundary) | `GuestAccountDeletion` has the fixed name `<app>-poc-guest-account-deletion`: the operator invokes it by name (`npm run leads:delete`) and app roles only through their own grants |
 
 What is deliberately absent: every SES receipt-rule action and any inbound mail bucket (this app
 never receives email, ADR-0003; the only active rule set of the account belongs to another project),
@@ -104,6 +120,18 @@ aws --profile craftech-demos cloudformation deploy \
 The same command applies every later change. Edit statements, not the `Description` of a managed
 policy: IAM cannot change it in place and the replacement fails with `already exists`.
 
+**Wave 2b (own sign-up, WAF, leads).** The template changed (web ACLs, Cognito association, event
+source mappings, SES event destinations, the CSP with AWS WAF's hosts and the origin request policy
+of `/api/*`): the operator applies it again with the command above **before** the push that deploys
+the wave, loads the new secrets `OriginVerifyKey` and `LeadConfig` (`infra/secrets.ts`), and checks
+the new statements with `simulate-principal-policy` (below). Before the pool changes, the operator
+records whether the live pool distinguishes case in usernames (it cannot change on an existing pool;
+the email always arrives lowercased, so either value keeps one account per email):
+
+```bash
+aws --profile craftech-demos cognito-idp describe-user-pool --user-pool-id <id> --query UserPool.UsernameConfiguration
+```
+
 The SST bootstrap of the account and the stage passphrase are created by the operator's first
 `npx sst secret set ... --stage poc` (step 3), never by CI.
 
@@ -135,6 +163,21 @@ outside `cuadrilla-poc-*`, and with `bedrock-agentcore:CreatePolicy`, `UpdatePol
 `aws_cds_hackathon_poc_cuadrilla_poc`. `simulate-principal-policy` does not model every condition key, so a real
 deploy is the final check.
 
+The wave-2b statements: the deploy role is allowed on its own web ACLs and denied on another's, and
+has no action on AWS WAF API keys:
+
+```bash
+aws --profile craftech-demos iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy \
+  --action-names wafv2:CreateWebACL wafv2:UpdateWebACL wafv2:AssociateWebACL \
+  --resource-arns arn:aws:wafv2:us-east-1:776805327629:global/webacl/aws-cds-hackathon-poc-cuadrilla-poc-edge/x \
+                  arn:aws:wafv2:us-east-1:776805327629:regional/webacl/aws-cds-hackathon-poc-cuadrilla-poc-auth/x
+aws --profile craftech-demos iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy \
+  --action-names wafv2:UpdateWebACL wafv2:DeleteWebACL wafv2:CreateAPIKey \
+  --resource-arns <arn of a web ACL of another project>
+```
+
 ## Residual risks
 
 Stated instead of hidden.
@@ -144,7 +187,13 @@ Stated instead of hidden.
   SES client), not in IAM, when the secret is not readable at deploy time.
 - **Public Function URL.** `Bff` answers on a Function URL with `AuthType NONE` behind the Router
   and authenticates every call with the Cognito id token. Its name is fenced by
-  `DenyPublicFunctionUrlsBesidesTheEdge`.
+  `DenyPublicFunctionUrlsBesidesTheEdge`. Called directly it answers 403 before parsing: the Router
+  adds `x-cuadrilla-origin` with `OriginVerifyKey` on every origin request. That value lives in the
+  distribution's configuration, readable by whoever can read CloudFront in the account (ADR-0025,
+  residual risk 2); rotating it is `sst secret set` and a deploy.
+- **Managed rule group reads on `*`.** `ManagedRuleGroupReads` describes and lists AWS's managed
+  rule groups account-wide; they are AWS's, carry no data of any project and grant nothing on a web
+  ACL.
 - **Transcribe tagging on `*`.** `TagResource` with `aws:RequestTag/Project` could, in theory, tag
   a Transcribe resource of another project with this app's `Project`; it cannot remove or change
   that project's other tags (`aws:TagKeys` limits the keys) and grants nothing on it afterwards,

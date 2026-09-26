@@ -86,8 +86,8 @@ export default $config({
     // Infra modules, in dependency order (docs/build-plan.md §1). Every module exists since WP-02;
     // the stubs export nothing until their work package fills them, so a later wave edits its module
     // and never this list. Pure helpers (ci-spec, web-spec, iam-capabilities, late-links, *-spec,
-    // storage-tables, storage-buckets, storage-keys, guardrail-policies, policy-rules, agentcore-iam)
-    // are imported by the modules that use them.
+    // leads-spec, waf-spec, storage-tables, storage-buckets, storage-keys, guardrail-policies,
+    // policy-rules, agentcore-iam) are imported by the modules that use them.
     await import("./infra/tags");
     // Registers the $transform that stamps the IAM path and the CI permissions boundary on every
     // role, so it must come before any module that creates one.
@@ -102,23 +102,29 @@ export default $config({
     await import("./infra/media"); // WP-21
     await import("./infra/guardrail"); // WP-08
     await import("./infra/policy"); // WP-08
-    await import("./infra/auth"); // WP-10
-    await import("./infra/auth-email"); // WP-10
     await import("./infra/messaging-email"); // WP-20
     await import("./infra/messaging-whatsapp"); // WP-24
     await import("./infra/mocks"); // WP-24
     await import("./infra/feeds"); // WP-24
+    // Own sign-up, guest worlds and leads (wave 2b, WP-56): the templates and the leads before the
+    // pool, whose triggers link them; the pool's web ACL after it.
+    await import("./infra/world-templates"); // WP-56
+    await import("./infra/leads"); // WP-56
+    await import("./infra/guest-worlds"); // WP-56
+    await import("./infra/auth"); // WP-10, WP-56
+    await import("./infra/auth-email"); // WP-10, WP-56
+    await import("./infra/waf"); // WP-56
     await import("./infra/agent-tool-schemas"); // WP-25
     await import("./infra/agent-tools"); // WP-26
     await import("./infra/agentcore"); // WP-26
     await import("./infra/workers"); // WP-27
     await import("./infra/scheduler"); // WP-27
     await import("./infra/certificates"); // WP-38
-    await import("./infra/bff"); // WP-38
+    await import("./infra/bff"); // WP-56 (minimal Bff), WP-38
     const { appUrl } = await import("./infra/dns");
     await import("./infra/web"); // WP-04
     await import("./infra/observability"); // WP-38
-    await import("./infra/cost-guard"); // WP-38
+    await import("./infra/cost-guard"); // WP-56 (cut of the sign-up), WP-38
 
     return {
       stage: $app.stage,

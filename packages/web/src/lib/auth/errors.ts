@@ -54,3 +54,25 @@ export function errorCodeOf(error: unknown, step: FlowStep): AuthFlowErrorCode {
       return "UNAVAILABLE";
   }
 }
+
+/** What went wrong in a Cognito step of the own sign-up; texts never say whether an email has an account (except EMAIL_TAKEN). */
+export type SignupCognitoErrorCode = "TICKET_INVALID" | "EMAIL_TAKEN" | "CAP_REACHED" | "WEAK_PASSWORD" | "INVALID_CODE" | "TOO_MANY_ATTEMPTS" | "UNAVAILABLE";
+
+export type SignupCognitoStep = "signUp" | "confirm" | "resend";
+
+// The triggers answer with a bare code (`PreSignUp failed with error TICKET_INVALID.`).
+const TRIGGER_CODE = /\b(TICKET_INVALID|EMAIL_TAKEN|CAP_REACHED)\b/;
+
+export function signupErrorCodeOf(error: unknown, step: SignupCognitoStep): SignupCognitoErrorCode {
+  if (!(error instanceof CognitoError)) return "UNAVAILABLE";
+  const { type } = error;
+  if (THROTTLED.has(type)) return "TOO_MANY_ATTEMPTS";
+  if (type === "UserLambdaValidationException") {
+    const code = TRIGGER_CODE.exec(error.message)?.[1];
+    return code === "TICKET_INVALID" || code === "EMAIL_TAKEN" || code === "CAP_REACHED" ? code : "UNAVAILABLE";
+  }
+  if (type === "InvalidPasswordException") return "WEAK_PASSWORD";
+  if (type === "AliasExistsException") return "EMAIL_TAKEN";
+  if (step === "confirm" && BAD_CODE.has(type)) return "INVALID_CODE";
+  return "UNAVAILABLE";
+}

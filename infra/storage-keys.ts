@@ -130,6 +130,14 @@ export const ABORT_MULTIPART_AFTER_DAYS = 7;
 export const QA_PREFIXES = ["qa/", "eval/"] as const;
 export const QA_RETENTION_DAYS = 2;
 
+/**
+ * Media and evidence of every guest world live under `guest/<seg>/` (packages/shared/src/media/keys.ts):
+ * a guest's own voice and photos, kept 9 days (the 7-day TTL of a sign-up generation plus its grace;
+ * ADR-0026, retention). `GuestAccountDeletion` deletes the prefixes of the current generation earlier.
+ */
+export const GUEST_PREFIX = "guest/";
+export const GUEST_RETENTION_DAYS = 9;
+
 /** Output of Transcribe: deleted as soon as it is read and masked; a one-day rule is the backstop. */
 export const MEDIA_TRANSCRIPTS_PREFIX = "transcripts/";
 export const TRANSCRIPTS_RETENTION_DAYS = 1;
@@ -168,23 +176,26 @@ const QA_EXPIRATIONS: readonly Expiration[] = QA_PREFIXES.map((prefix) => ({
   days: QA_RETENTION_DAYS,
 }));
 
+const GUEST_EXPIRATION: Expiration = { id: "expire-guest", prefix: GUEST_PREFIX, days: GUEST_RETENTION_DAYS };
+
 export const BUCKET_SPECS = {
-  // WhatsApp media (live), the simulator's uploads and the output of Transcribe; 30 days.
+  // WhatsApp media (live), the simulator's uploads and the output of Transcribe; 30 days, guest/ 9.
   Media: {
     naming: { kind: "browser", purpose: "media" },
-    prefixes: ["wa/", "sim/", MEDIA_TRANSCRIPTS_PREFIX],
+    prefixes: ["wa/", "sim/", MEDIA_TRANSCRIPTS_PREFIX, GUEST_PREFIX],
     expirations: [
       { id: "expire", days: 30 },
       { id: "expire-transcripts", prefix: MEDIA_TRANSCRIPTS_PREFIX, days: TRANSCRIPTS_RETENTION_DAYS },
       ...QA_EXPIRATIONS,
+      GUEST_EXPIRATION,
     ],
     browserUploads: true,
   },
-  // Validated photos (JPEG without metadata) and installation certificates; life of the stage.
+  // Validated photos (JPEG without metadata) and installation certificates; life of the stage, guest/ 9 days.
   Evidence: {
     naming: { kind: "browser", purpose: "evidence" },
-    prefixes: ["photos/", "certificates/"],
-    expirations: QA_EXPIRATIONS,
+    prefixes: ["photos/", "certificates/", GUEST_PREFIX],
+    expirations: [...QA_EXPIRATIONS, GUEST_EXPIRATION],
     browserUploads: false,
   },
   // The procedures manual the Knowledge Base ingests; life of the stage.

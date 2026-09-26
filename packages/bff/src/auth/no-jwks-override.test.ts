@@ -11,7 +11,9 @@ import { fetch as jwksFetch } from "aws-jwt-verify/https";
 import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetResourceCache } from "../lib/resource";
+import { resetSecretCache } from "../lib/secrets";
 import { defaultDeps, resetDefaultDeps } from "../routers/deps";
+import { ORIGIN_HEADER } from "../routers/edge";
 import { handler } from "../routers/handler";
 import { INTERNAL_ERROR_MESSAGE, createContext } from "../routers/trpc";
 import { AUTH_REASON } from "./errors";
@@ -38,6 +40,8 @@ vi.mock("aws-jwt-verify/https", async (importOriginal) => ({ ...(await importOri
 
 const AUTH_LINK = { userPoolId: TEST_POOL.userPoolId, clientId: TEST_POOL.clientId, issuerUrl: TEST_ISSUER, region: TEST_POOL.region };
 const ATTACKER_JWKS = "https://keys.attacker.test/.well-known/jwks.json";
+/** The deployed handler answers only what came through CloudFront (ADR-0025 §3): a test origin key. */
+const ORIGIN_KEY = "Pw7Dn2Rk9Tz4Lm1Qv8Xc3Hb6Js0Fy5Ga+Ne/Ku7Wd2E=";
 const pool = createTestIssuer();
 
 let requested: string[];
@@ -45,13 +49,16 @@ let written: string[];
 
 function link(auth: unknown): void {
   links.clear();
+  links.set("OriginVerifyKey", { value: ORIGIN_KEY });
   if (auth !== undefined) links.set("Auth", auth);
   resetResourceCache();
+  resetSecretCache();
   resetDefaultDeps();
 }
 
 const contextFor = (token: string) => createContext({ event: { headers: { authorization: `Bearer ${token}` } } });
-const ping = async (headers: Record<string, string>) => trpcResponse(await handler(functionUrlEvent("/api/health.ping", { headers }), testLambdaContext));
+const throughEdge = (headers: Record<string, string>) => ({ ...headers, [ORIGIN_HEADER]: ORIGIN_KEY });
+const ping = async (headers: Record<string, string>) => trpcResponse(await handler(functionUrlEvent("/api/health.ping", { headers: throughEdge(headers) }), testLambdaContext));
 
 beforeEach(() => {
   requested = [];
@@ -109,7 +116,7 @@ describe("the BFF Lambda trusts only the keys of its linked pool [FL-079]", () =
     expect(refused.body.error?.data).toMatchObject({ code: "UNAUTHORIZED", reason: AUTH_REASON.TOKEN_INVALID });
     expect(requested.every((uri) => uri === TEST_JWKS_URI)).toBe(true);
     // Only the principal was refused: the public probe of the same handler answers.
-    expect(trpcResponse(await handler(functionUrlEvent("/api/health", { headers }), testLambdaContext)).status).toBe(200);
+    expect(trpcResponse(await handler(functionUrlEvent("/api/health", { headers: throughEdge(headers) }), testLambdaContext)).status).toBe(200);
     const log = written.join("");
     expect(log).toContain("console.auth.refused");
     expect(log).not.toContain(token);

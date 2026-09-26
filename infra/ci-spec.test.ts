@@ -133,7 +133,7 @@ describe("security headers of the console", () => {
     expect(web).toContain("args.defaultCacheBehavior = withHeadersPolicy(args.defaultCacheBehavior, consoleHeadersPolicyId)");
   });
 
-  it("uploads only to Media and reaches only its own origin and Cognito besides", () => {
+  it("uploads only to Media and reaches only its own origin, Cognito and AWS WAF's challenge besides", () => {
     expect(UPLOAD_BUCKETS).toEqual(["media"]);
     const connect = CONSOLE_CSP.split("; ").find((directive) => directive.startsWith("connect-src")) ?? "";
     expect(connect.split(" ")).toEqual([
@@ -141,10 +141,14 @@ describe("security headers of the console", () => {
       "'self'",
       "https://cognito-idp.${Region}.amazonaws.com",
       "https://${BucketPrefix}-${DeployStage}-media-${AWS::AccountId}.s3.${Region}.amazonaws.com",
+      "https://*.sdk.awswaf.com",
+      "https://*.token.awswaf.com",
     ]);
     expect(CONSOLE_CSP).toContain("frame-ancestors 'none'");
-    expect(CONSOLE_CSP).toContain("script-src 'self'");
-    expect(CONSOLE_CSP).not.toMatch(/unsafe-eval|script-src[^;]*unsafe-inline|\*/);
+    expect(CONSOLE_CSP).toContain("script-src 'self' https://*.sdk.awswaf.com;");
+    // The only wildcards are the AWS WAF hosts (infra/web-spec.ts WAF_CSP_SOURCES, ADR-0025 §4).
+    const withoutWaf = CONSOLE_CSP.replaceAll("https://*.sdk.awswaf.com", "").replaceAll("https://*.token.awswaf.com", "");
+    expect(withoutWaf).not.toMatch(/unsafe-eval|script-src[^;]*unsafe-inline|\*/);
   });
 
   it("shows images and audio from Media, Evidence and Seed (the brand logos), never from another origin", () => {

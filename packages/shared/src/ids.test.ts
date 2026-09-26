@@ -5,13 +5,18 @@ import {
   clockIdOfIsp,
   clockTagOf,
   evalClockId,
+  generationDateTag,
+  guestOriginOfIsp,
   isQaReachableClock,
+  isSignupGuestIsp,
   ispIdOfClock,
   ispKindOfClock,
   ispKindOfIspId,
   guestClockId,
   parseClockId,
   qaClockId,
+  signupGenerationDay,
+  signupGenerationIspId,
 } from "./clock-ids";
 import {
   ID_PREFIX,
@@ -200,6 +205,38 @@ describe("clock ids", () => {
     expect(clockTagOf("GUEST#isp-guest-03")).toBe("g03");
     expect(clockTagOf(DEMO_CLOCK_ID)).toBeUndefined();
     expect(clockTagOf("qa-812-1-sc-02")).toBeUndefined();
+  });
+
+  it("[FL-107] a generation of the own sign-up is a guest world with its own tag (docs/guest-rename-map.md §A row 5)", () => {
+    const ispId = "isp-guest-s261001abcde";
+    const clockId = `GUEST#${ispId}`;
+    expect(parseClockId(clockId)).toEqual({ kind: "GUEST", ispId });
+    expect(clockIdOfIsp(ispId)).toBe(clockId);
+    expect(ispKindOfIspId(ispId)).toBe("GUEST");
+    expect(clockTagOf(clockId)).toBe("gs261001abcde");
+    expect(workOrderId("24817", clockTagOf(clockId))).toBe("wo-24817-gs261001abcde");
+    expect(isId("installer", "inst-rogelio-gs261001abcde")).toBe(true);
+    expect(isQaReachableClock(clockId)).toBe(false);
+    for (const bad of ["GUEST#isp-guest-s26100abcde", "GUEST#isp-guest-s261001ABCDE", "GUEST#isp-guest-s261001abcd1", "GUEST#isp-guest-s261001abcdef", "GUEST#isp-guest-sx61001abcde"]) {
+      expect(parseClockId(bad), bad).toBeUndefined();
+    }
+  });
+
+  it("[FL-111] generation ids carry the real creation date; every guest operator has its origin", () => {
+    const createdAt = new Date("2026-10-09T23:59:59.000Z");
+    expect(generationDateTag(createdAt)).toBe("261009");
+    expect(signupGenerationIspId(createdAt, "vwxyz")).toBe("isp-guest-s261009vwxyz");
+    expect(() => signupGenerationIspId(createdAt, "VWXYZ")).toThrow(RangeError);
+    expect(() => signupGenerationIspId(createdAt, "abc01")).toThrow(RangeError);
+    expect(signupGenerationDay("isp-guest-s261009vwxyz")).toBe("2026-10-09");
+    expect(signupGenerationDay("isp-guest-s261332vwxyz")).toBeUndefined();
+    expect(signupGenerationDay("isp-guest-07")).toBeUndefined();
+    expect(isSignupGuestIsp("isp-guest-s261009vwxyz")).toBe(true);
+    expect(isSignupGuestIsp("isp-guest-07")).toBe(false);
+    expect(guestOriginOfIsp("isp-guest-07")).toBe("INVITED");
+    expect(guestOriginOfIsp("isp-guest-test")).toBe("TEST");
+    expect(guestOriginOfIsp("isp-guest-s261009vwxyz")).toBe("SIGNUP");
+    expect(guestOriginOfIsp("isp-demo")).toBeUndefined();
   });
 
   it("the QaDriver reaches its own worlds and the guest rehearsal world only", () => {

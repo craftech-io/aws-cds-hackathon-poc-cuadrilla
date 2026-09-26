@@ -5,7 +5,12 @@
 // is keyed by `PK` + `SK`, GSI key attributes are strings, and `expiresAt` is epoch seconds.
 import type { DomainTable } from "../domain/registry";
 
-export type Table = DomainTable;
+/**
+ * Tables the client reaches: the domain's, plus the mocks' `Network` and `Dispatch`, which only the
+ * world factory writes through this client (their rows are the mocks' own shapes, never an entity).
+ */
+export type MockTable = "Network" | "Dispatch";
+export type Table = DomainTable | MockTable;
 
 export const TTL_ATTRIBUTE = "expiresAt";
 
@@ -51,7 +56,7 @@ export const INDEXES: Readonly<Partial<Record<Table, Readonly<Partial<Record<Ind
 };
 
 /** Tables whose items DynamoDB expires by `expiresAt` (all but `Reference`). */
-export const TTL_TABLES: readonly Table[] = ["Isps", "People", "WorkOrders", "Cases", "Conversations", "AuditLog", "Runtime", "CuadrillaMetrics"];
+export const TTL_TABLES: readonly Table[] = ["Isps", "People", "WorkOrders", "Cases", "Conversations", "AuditLog", "Runtime", "CuadrillaMetrics", "Network", "Dispatch"];
 
 export function indexKeys(table: Table, index: IndexName): IndexKeys {
   const keys = INDEXES[table]?.[index];

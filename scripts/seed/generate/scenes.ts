@@ -4,6 +4,8 @@
 // world, advances the clock to its instant firing the due timers in order (the 07:30 day start) and
 // seeds its presets through the product's repositories (docs/tool-catalog.md, `world.create`); the
 // agent-only buttons ("Cerrar instalación") are seeded with `offer`, evidence with seeding renders.
+// Each scene sits just before its moment of the main story (packages/bff/src/story/main-story.ts), so
+// "Checklist completo" is at 10:00 and the certificate goes out at 10:05, as in docs/design-brief.md §4.
 import type { Scene, Tour } from "../lib/worlds";
 import { DAYS, TOUR_WINDOW, addMinutes, sim } from "./time";
 import type { WorldSpec } from "./world";
@@ -81,10 +83,10 @@ export function guestScenes(world: WorldSpec): Scene[] {
     },
     {
       sceneId: "checklist-completo",
-      title: { es: "Checklist completo (10:20)", en: "Checklist complete (10:20)" },
+      title: { es: "Checklist completo (10:00)", en: "Checklist complete (10:00)" },
       steps: { express: ["X3"], full: ["8"] },
-      advanceToSim: at("10:20"),
-      installer: onSite("10:20", first),
+      advanceToSim: at("10:00"),
+      installer: onSite("10:00", first),
       orders: {
         [first]: {
           onu: { behaviour: "LOS_THEN_ONLINE", fixed: true },

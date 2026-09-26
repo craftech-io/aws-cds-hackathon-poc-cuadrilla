@@ -1,101 +1,75 @@
 // `/login`: the console's own sign-in against the Cognito pool (USER_SRP_AUTH and its challenges,
-// lib/auth/flow.ts), under the brand of the stage (BrandMark: "Cuadrilla · Powered by Craftech", or
-// the co-branding with its disclaimer, ADR-0018). A finished sign-in stores the tokens in the
-// session and lands on `returnTo`.
-import { useMemo } from "react";
-import { PoweredByCraftech } from "../../components/brand/Brand";
-import { BrandMark } from "../../components/brand/BrandMark";
-import { useDemoBrand } from "../../context/BrandContext";
+// lib/auth/flow.ts) inside the AuthShell it shares with the sign-up, in Spanish or English
+// (`?lang=`, the switch). `?forgot=1` opens the recovery; a finished sign-up whose automatic sign-in did
+// not work arrives with its email already typed (lib/auth/handoff.ts, memory only). A finished sign-in
+// stores the tokens in the session and lands on `returnTo`, or on the home of its role: the guest's
+// portada (`/app/home`) for a guest, the day's work orders for the operator's staff.
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "../../context/SessionContext";
-import { copy } from "../../copy/console";
 import { flowDeps } from "../../lib/auth/deps";
+import type { AuthFlowState } from "../../lib/auth/flow";
+import { forgetHandedOffEmail, handedOffEmail } from "../../lib/auth/handoff";
 import { safeReturnTo } from "../../lib/auth/tokens";
-import { Redirect, useRouter } from "../../lib/router";
-import { CONSOLE_HOME, LOGIN_PATH } from "../../routes";
+import { Link, Redirect, useRouter } from "../../lib/router";
+import { LOGIN_PATH, SIGNUP_PATH, homeOf } from "../../routes";
 import { AuthFlowPanel } from "./AuthFlowPanel";
-import { loginCopy } from "./copy";
+import { AuthShell } from "./AuthShell";
+import { Unconfigured } from "./Unconfigured";
+import { AuthLangProvider, authLangFromSearch, useAuthLang, useLoginCopy, withAuthLang } from "./auth-lang";
 import { useAuthFlow } from "./use-auth-flow";
 
-function BrandPanel() {
-  const brand = useDemoBrand("es");
+function TryTheDemo() {
+  const copy = useLoginCopy();
+  const { lang } = useAuthLang();
   return (
-    <section className="relative flex flex-col justify-between gap-10 overflow-hidden bg-navy px-6 py-8 text-white sm:px-10 lg:min-h-screen lg:py-12">
-      <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-navy-soft/60" />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-cyan/10" />
-      <div className="relative">
-        <BrandMark brand={brand} tone="dark" size="xl" withPoweredBy={false} />
-        <p className="mt-3 text-sm text-cyan-soft">{loginCopy.panel.tagline}</p>
-      </div>
-      <div className="relative hidden max-w-md lg:block">
-        <p className="text-4xl font-semibold leading-tight">{loginCopy.panel.title}</p>
-        <p className="mt-4 text-base text-mist">{loginCopy.panel.lead}</p>
-        <ul className="mt-6 space-y-2 text-sm text-cyan-soft">
-          {loginCopy.panel.points.map((point) => (
-            <li key={point} className="flex items-center gap-2">
-              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-cyan" />
-              {point}
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="relative hidden lg:block">
-        <PoweredByCraftech tone="dark" />
-      </div>
-    </section>
+    <p className="text-sm text-ink">
+      {copy.credentials.tryDemo.before}
+      <Link to={withAuthLang(SIGNUP_PATH, lang)} className="font-semibold text-cyan-deep underline underline-offset-2 hover:text-navy">
+        {copy.credentials.tryDemo.link}
+      </Link>
+    </p>
   );
 }
 
-function Unconfigured({ missing }: { readonly missing: readonly string[] }) {
-  return (
-    <div className="space-y-3">
-      <h1 className="text-2xl font-semibold text-navy">{copy.login.unconfiguredTitle}</h1>
-      <p className="text-sm text-slate">{copy.login.unconfiguredLead}</p>
-      <ul className="list-disc pl-5 font-mono text-xs text-danger">
-        {missing.map((name) => (
-          <li key={name}>{name}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-export function LoginView() {
+function LoginContent({ initial, initialEmail }: { readonly initial: AuthFlowState; readonly initialEmail: string | undefined }) {
   const { state, auth, completeSignIn } = useSession();
   const { search } = useRouter();
-  const returnTo = safeReturnTo(search.get("returnTo"), LOGIN_PATH, CONSOLE_HOME);
+  const copy = useLoginCopy();
   const deps = useMemo(() => (auth ? flowDeps(auth.cognito, auth.srp, { kind: "signIn" }) : undefined), [auth]);
-  const flow = useAuthFlow(deps, (done) => completeSignIn(done.tokens));
+  const flow = useAuthFlow(deps, (done) => completeSignIn(done.tokens), initial);
 
-  if (state.status === "authenticated") return <Redirect to={returnTo} />;
+  if (state.status === "authenticated") return <Redirect to={safeReturnTo(search.get("returnTo"), LOGIN_PATH, homeOf(state.principal.role))} />;
 
   let content;
   if (state.status === "unconfigured") content = <Unconfigured missing={state.missing} />;
-  else if (state.status === "loading") content = <p className="text-sm text-slate">{copy.app.loading}</p>;
+  else if (state.status === "loading") content = <p className="text-sm text-slate">{copy.working}</p>;
   else {
-    const expired = state.reason === "expired" ? loginCopy.credentials.sessionExpired : undefined;
-    content = <AuthFlowPanel flow={flow} {...(expired !== undefined ? { credentialsNotice: expired } : {})} />;
+    const expired = state.reason === "expired" ? copy.credentials.sessionExpired : undefined;
+    content = <AuthFlowPanel flow={flow} {...(expired !== undefined ? { credentialsNotice: expired } : {})} {...(initialEmail !== undefined ? { initialEmail } : {})} />;
   }
 
+  const below =
+    flow.state.step === "credentials" ? (
+      <>
+        <TryTheDemo />
+        <p>{copy.credentials.hint}</p>
+      </>
+    ) : undefined;
+  return <AuthShell below={below}>{content}</AuthShell>;
+}
+
+export function LoginView() {
+  const { search } = useRouter();
+  // Read once per visit of the page: the query only sets the start, the handed-off email is forgotten once shown.
+  const [start] = useState(() => ({
+    lang: authLangFromSearch(search),
+    initial: (search.get("forgot") === "1" ? { step: "forgotRequest" } : { step: "credentials" }) satisfies AuthFlowState,
+    email: handedOffEmail(),
+  }));
+  useEffect(() => forgetHandedOffEmail(), []);
   return (
-    <div className="min-h-screen bg-paper lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      <BrandPanel />
-      <main className="flex flex-col items-center justify-center px-4 py-10 sm:px-8">
-        <div className="w-full max-w-md">
-          <div className="rounded-card bg-white p-6 shadow-card sm:p-8">{content}</div>
-          <p className="mt-4 text-center text-xs text-slate">{loginCopy.credentials.hint}</p>
-          <footer className="mt-8 flex flex-col items-center gap-3 text-xs text-slate">
-            <PoweredByCraftech tone="light" className="lg:hidden" />
-            <nav className="flex gap-4">
-              <a className="hover:text-navy hover:underline" href="/legal/privacy.html">
-                {loginCopy.legal.privacy}
-              </a>
-              <a className="hover:text-navy hover:underline" href="/legal/terms.html">
-                {loginCopy.legal.terms}
-              </a>
-            </nav>
-          </footer>
-        </div>
-      </main>
-    </div>
+    <AuthLangProvider initial={start.lang}>
+      <LoginContent initial={start.initial} initialEmail={start.email} />
+    </AuthLangProvider>
   );
 }

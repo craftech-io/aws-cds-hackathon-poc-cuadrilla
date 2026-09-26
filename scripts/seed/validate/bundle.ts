@@ -1,9 +1,13 @@
 // The seed as the invariants read it (docs/seed-spec.md §14): every file of a data directory, parsed
 // with its schema, plus the committed media of WP-18. The same bundle comes from the files the
 // generator is about to write (before writing them) or from a directory on disk (`seed:validate`).
+// The `guest` template carries markers (generate/guest-template.ts): the bundle keeps it as written
+// (`guestTemplate`, invariant 26) and, for every other invariant, the world it gives with the sample
+// tokens (`guest`), the one the generator marked.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import type { z } from "zod";
 import { join, relative } from "node:path";
+import { GuestTemplateFile, SAMPLE_GUEST_TOKENS, instantiateGuestTemplate } from "../generate/guest-template";
 import { readMedia, type Media } from "../generate/media";
 import { DATA_LAYOUT, tableFile, worldFile } from "../lib/paths";
 import { QuestionsFile } from "../lib/questions";
@@ -20,6 +24,9 @@ export interface SeedBundle {
   readonly files: ReadonlyMap<string, string>;
   readonly tables: Readonly<Record<SeedTable, readonly SeedItem[]>>;
   readonly demo?: WorldTablesTemplate;
+  /** The `guest` template as written, with its markers. */
+  readonly guestTemplate?: GuestTemplateFile;
+  /** The world the `guest` template gives with the sample tokens. */
   readonly guest?: WorldTablesTemplate;
   readonly models?: ModelsTemplate;
   readonly qaMin?: QaMinTemplate;
@@ -65,6 +72,15 @@ function parse<S extends z.ZodType>(files: ReadonlyMap<string, string>, path: st
   return parsed.data;
 }
 
+function sampleGuest(template: GuestTemplateFile, problems: string[]): WorldTablesTemplate | undefined {
+  try {
+    return instantiateGuestTemplate(template, SAMPLE_GUEST_TOKENS);
+  } catch (error) {
+    problems.push(`${worldFile("guest")}: the sample world does not come out of the template: ${(error as Error).message.slice(0, 300)}`);
+    return undefined;
+  }
+}
+
 export function bundleOf(files: ReadonlyMap<string, string>, media: Media = readMedia()): SeedBundle {
   const problems: string[] = [];
   const tables = emptyTables();
@@ -75,7 +91,8 @@ export function bundleOf(files: ReadonlyMap<string, string>, media: Media = read
     tables[table] = file.items;
   }
   const demo = parse(files, worldFile("demo"), WorldTablesTemplate, problems);
-  const guest = parse(files, worldFile("guest"), WorldTablesTemplate, problems);
+  const guestTemplate = parse(files, worldFile("guest"), GuestTemplateFile, problems);
+  const guest = guestTemplate === undefined ? undefined : sampleGuest(guestTemplate, problems);
   const models = parse(files, worldFile("models"), ModelsTemplate, problems);
   const qaMin = parse(files, worldFile("qa-min"), QaMinTemplate, problems);
   const evalTemplate = parse(files, worldFile("eval"), EvalTemplate, problems);
@@ -86,6 +103,7 @@ export function bundleOf(files: ReadonlyMap<string, string>, media: Media = read
     media,
     problems,
     ...(demo === undefined ? {} : { demo }),
+    ...(guestTemplate === undefined ? {} : { guestTemplate }),
     ...(guest === undefined ? {} : { guest }),
     ...(models === undefined ? {} : { models }),
     ...(qaMin === undefined ? {} : { qaMin }),

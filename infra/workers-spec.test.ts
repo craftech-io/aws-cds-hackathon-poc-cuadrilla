@@ -373,10 +373,13 @@ describe("least privilege (docs/architecture.md §14)", () => {
   });
 
   // Once an owner stops being a WP-02 stub, its real source has to export the name, or the deploy only warns.
+  // The minimal Bff of WP-56 (wave 2b) has no QaDriver yet: WP-38 adds it, and this exception leaves with it.
+  const PENDING: ReadonlyArray<readonly [string, string]> = [["bff", "qaDriver"]];
   it.each(LATE)("infra/%s.ts exports %s once it is built", (owner, name) => {
     const source = read(`infra/${owner}.ts`);
     const built = !/^\/\/ Stub created by WP-\d/m.test(source);
-    expect(built ? new RegExp(`export (?:const|function) ${name}\\b`).test(source) : true, `infra/${owner}.ts`).toBe(true);
+    const pending = PENDING.some(([file, value]) => file === owner && value === name) && /MINIMAL Bff of the own sign-up/.test(source);
+    expect(built && !pending ? new RegExp(`export (?:const|function) ${name}\\b`).test(source) : true, `infra/${owner}.ts`).toBe(true);
   });
 });
 

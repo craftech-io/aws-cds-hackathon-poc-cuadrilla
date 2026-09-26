@@ -1,16 +1,26 @@
 // tRPC v11 foundation of the console BFF: request context, principal and the procedure builders
 // every feature router starts from (docs/architecture.md §10).
 //
-//   publicProcedure       no principal: only `health.live` and `brand.get`, which carry no world's data
+//   publicProcedure       no principal: `health.live`, `brand.get` and the own sign-up (`signup.start`),
+//                         which carry no world's data
 //   ispProcedure          a verified principal of an active registry user, bound to its operator's
 //                         world; every id of the input is fenced to that operator (auth/fence.ts):
 //                         an id of another one → 403 + `AuditLog DENY CROSS_ISP`
 //   supervisorProcedure   + role SUPERVISOR or GUEST (a guest acts as supervisor in its own world)
+//   guestProcedure        + role GUEST: what only a guest asks about its own account and world
+//                         (`guest.world`, `guest.retryWorld`, ADR-0025 §2)
 //   recentLoginProcedure  + an interactive sign-in at most 15 minutes old (manual validation, ADR-0011)
 //
 // `ispId`, `role` and the world come from the principal, never from the input. A request's principal
 // comes only from a verified id token (`createContextFactory`); the `QaDriver` builds its principals
 // on the server (`createServerContext`, auth/qa-principal.ts) and the same middlewares run for both.
+//
+// Where a request came from is part of the context, never of the input (ADR-0025 §3):
+//   edge   set by routers/edge.ts only after the origin header matched: the viewer's IP (from
+//          `CloudFront-Viewer-Address`) and whether AWS WAF labelled it anonymous
+//   qa     set only by the `QaDriver` (`createServerContext`, `createQaPublicContext`): its run id, so
+//          the limits of the sign-up count under keys of their own (`…#qa-<runId>#…`)
+// A request with neither (a call that skipped the edge) has no viewer: `signup.start` answers UNAVAILABLE.
 import { TRPCError, initTRPC } from "@trpc/server";
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { z } from "zod";
@@ -27,6 +37,19 @@ import { type LogFields, type Logger, correlationIdFrom } from "../lib/log";
 import { type ContextDeps, defaultDeps } from "./deps";
 import { reasonOf, toTrpcError } from "./errors";
 
+/** What the edge verified before tRPC ran (routers/edge.ts); never built from the request's input. */
+export interface EdgeContext {
+  /** The viewer's IP from `CloudFront-Viewer-Address`, read only after the origin header matched. */
+  readonly viewerIp: string;
+  /** AWS WAF labelled the IP anonymous (its inserted header `x-amzn-waf-cuadrilla-anon`): stricter limits. */
+  readonly anonymousIp?: boolean;
+}
+
+/** A call of the `QaDriver` (ADR-0025 §7): its counters live under `…#qa-<runId>#…`. */
+export interface QaContext {
+  readonly runId: string;
+}
+
 export interface Context {
   readonly correlationId: string;
   /** `null` when the request carries no acceptable token; `authFailure` says why. */
@@ -34,6 +57,10 @@ export interface Context {
   readonly authFailure: AuthError | null;
   readonly deps: ContextDeps;
   readonly log: Logger;
+  /** `null` unless the request came through the Router and passed the origin check. */
+  readonly edge: EdgeContext | null;
+  /** `null` unless the `QaDriver` made the call. */
+  readonly qa: QaContext | null;
 }
 
 /** The one world a principal acts on. */
@@ -53,6 +80,8 @@ export interface IspContext extends Context {
 
 export interface CreateContextOptions {
   readonly event: Pick<APIGatewayProxyEventV2, "headers"> & { readonly requestContext?: { readonly requestId?: string } };
+  /** Set by the handler after routers/edge.ts checked the origin header; absent otherwise. */
+  readonly edge?: EdgeContext;
 }
 
 const CORRELATION_HEADER = "x-correlation-id";
@@ -73,17 +102,18 @@ function correlationIdOf(event: CreateContextOptions["event"]): string {
  * turns it into the right HTTP status, so public procedures keep working.
  */
 export function createContextFactory(resolveDeps: () => ContextDeps) {
-  return async ({ event }: CreateContextOptions): Promise<Context> => {
+  return async ({ event, edge }: CreateContextOptions): Promise<Context> => {
     const deps = resolveDeps();
     const correlationId = correlationIdOf(event);
     const log = deps.loggerFor(correlationId);
+    const origin = { edge: edge ?? null, qa: null };
     try {
       const claims = await deps.verifier.verify(bearerToken(header(event.headers, "authorization")));
-      return { correlationId, principal: principalFromClaims(claims), authFailure: null, deps, log };
+      return { correlationId, principal: principalFromClaims(claims), authFailure: null, deps, log, ...origin };
     } catch (error) {
       const authFailure =
         error instanceof AuthError ? error : new AuthError(AUTH_REASON.AUTH_UNAVAILABLE, "authentication failed unexpectedly", { cause: error });
-      return { correlationId, principal: null, authFailure, deps, log };
+      return { correlationId, principal: null, authFailure, deps, log, ...origin };
     }
   };
 }
@@ -93,6 +123,16 @@ export const createContext = createContextFactory(defaultDeps);
 
 export interface ServerCallOptions extends QaPrincipalInput {
   readonly correlationId?: string;
+  /** The scenario run the call belongs to (`qa.runId`). */
+  readonly runId?: string;
+}
+
+const QA_RUN_ID = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
+
+function qaContextOf(runId: string | undefined): QaContext | null {
+  if (runId === undefined) return null;
+  if (!QA_RUN_ID.test(runId) || runId.length > 64) throw new RangeError("a QA run id is letters, digits and single dashes (at most 64)");
+  return { runId };
 }
 
 /**
@@ -103,7 +143,17 @@ export interface ServerCallOptions extends QaPrincipalInput {
 export function createServerContext(options: ServerCallOptions, deps: ContextDeps): Context {
   const correlationId = correlationIdFrom(options.correlationId);
   const principal = qaPrincipal(options, deps.wallClock());
-  return { correlationId, principal, authFailure: null, deps, log: deps.loggerFor(correlationId) };
+  return { correlationId, principal, authFailure: null, deps, log: deps.loggerFor(correlationId), edge: null, qa: qaContextOf(options.runId) };
+}
+
+/**
+ * Context of a public call of the `QaDriver` (the own sign-up of `SC-20`, ADR-0025 §7): no principal
+ * and no viewer, only its run id, so every limit counts under the run's own keys.
+ */
+export function createQaPublicContext(options: { readonly runId: string; readonly correlationId?: string }, deps: ContextDeps): Context {
+  const correlationId = correlationIdFrom(options.correlationId);
+  const authFailure = new AuthError(AUTH_REASON.TOKEN_MISSING, "a public call carries no principal");
+  return { correlationId, principal: null, authFailure, deps, log: deps.loggerFor(correlationId), edge: null, qa: qaContextOf(options.runId) };
 }
 
 /** What the browser reads of an unexpected failure; the log keeps the rest under the correlation id. */
@@ -231,6 +281,12 @@ function enforceRole(ctx: IspContext, path: string, roles: readonly ConsoleRole[
 /** Operator + role SUPERVISOR or GUEST. */
 export const supervisorProcedure = ispProcedure.use(({ ctx, next, path }) => {
   enforceRole(ctx, path, ["SUPERVISOR", "GUEST"]);
+  return next();
+});
+
+/** Operator + role GUEST: a guest's own account and world (any origin; the procedure decides per origin). */
+export const guestProcedure = ispProcedure.use(({ ctx, next, path }) => {
+  enforceRole(ctx, path, ["GUEST"]);
   return next();
 });
 

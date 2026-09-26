@@ -1,7 +1,8 @@
-// Shapes of the `sst.Secret` values of infra/secrets.ts (docs/architecture.md §3, ADR-0002, ADR-0018),
-// as pure zod schemas: packages/bff/src/lib/secrets.ts parses every value with them at first use,
-// and infra/secrets.test.ts checks them without an SST link.
+// Shapes of the `sst.Secret` values of infra/secrets.ts (docs/architecture.md §3, ADR-0002, ADR-0018,
+// ADR-0025, ADR-0026), as pure zod schemas: packages/bff/src/lib/secrets.ts parses every value with
+// them at first use, and infra/secrets.test.ts checks them without an SST link.
 import { z } from "zod";
+import { isCraftechMailbox } from "../leads/notify-fence";
 
 export const SECRET_NAMES = [
   "SessionTokenKey",
@@ -10,6 +11,8 @@ export const SECRET_NAMES = [
   "WhatsAppMetaPhoneNumberId",
   "SeedOverrides",
   "BrandConfig",
+  "OriginVerifyKey",
+  "LeadConfig",
 ] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];
 
@@ -29,11 +32,17 @@ const BrandAssetKey = z.string().regex(/^brand\/[a-z0-9-]+\.svg$/);
 
 const NonEmpty = z.string().trim().min(1);
 
+/** Brand of the worlds of the own sign-up (ADR-0018, ADR-0025 §2); `neutral` when absent. */
+export const SignupBrandMode = z.enum(["neutral", "cobrand"]);
+export type SignupBrandMode = z.infer<typeof SignupBrandMode>;
+
 export const BrandConfigValue = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("neutral") }).strict(),
+  // Without the partner's data there is nothing to co-brand a sign-up world with.
+  z.object({ mode: z.literal("neutral"), signupMode: z.literal("neutral").optional() }).strict(),
   z
     .object({
       mode: z.literal("cobrand"),
+      signupMode: SignupBrandMode.optional(),
       partnerDisplayName: NonEmpty.max(60),
       partnerShortName: NonEmpty.max(30),
       logoAssetKeys: z.object({ onLight: BrandAssetKey, onDark: BrandAssetKey }).strict(),
@@ -42,6 +51,40 @@ export const BrandConfigValue = z.discriminatedUnion("mode", [
     .strict(),
 ]);
 export type BrandConfigValue = z.infer<typeof BrandConfigValue>;
+
+/**
+ * The brand of a world of the own sign-up: `signupMode`, `neutral` by default, so a visitor's console
+ * is co-branded only when the CTO says the partner's authorization covers it (ADR-0018).
+ */
+export function signupBrandMode(config: BrandConfigValue): SignupBrandMode {
+  return config.signupMode ?? "neutral";
+}
+
+/**
+ * `OriginVerifyKey` (ADR-0025 §3): 32 random bytes in base64 (`openssl rand -base64 32`, 44 characters),
+ * or any value of at least 43 characters of that alphabet; never a short, guessable or placeholder value.
+ */
+export const OriginVerifyKeyValue = z
+  .string()
+  .min(43)
+  .max(256)
+  .regex(/^[A-Za-z0-9+/_-]+={0,2}$/, "expected a random value in base64")
+  .refine((value) => new Set(value).size >= 16, "expected a random value");
+
+/** One mailbox of the exact domain `craftech.io`, by the strict parser of the demo's fence. */
+const CraftechMailbox = z.string().refine(isCraftechMailbox, "expected a mailbox of the exact domain craftech.io");
+
+/**
+ * `LeadConfig` (ADR-0026): 1 to 5 Craftech mailboxes for the lead notice and, optionally, the privacy
+ * contact the notice of privacy publishes (docs/pending.md P-06). Never written in the code.
+ */
+export const LeadConfigValue = z
+  .object({
+    notifyRecipients: z.array(CraftechMailbox).min(1).max(5),
+    privacyContact: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict();
+export type LeadConfigValue = z.infer<typeof LeadConfigValue>;
 
 const Email = z.email();
 const E164 = z.string().regex(/^\+[1-9]\d{7,14}$/);

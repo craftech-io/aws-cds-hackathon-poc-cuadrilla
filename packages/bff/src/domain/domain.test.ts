@@ -113,6 +113,31 @@ describe("world policy", () => {
     expect(defaultWorldPolicy(undefined, "Runtime", NOW)).toEqual({});
     expect(defaultWorldPolicy("qa-812-1-sc-02", "Reference", NOW)).toEqual({});
   });
+
+  it("[FL-107] every item of a sign-up generation expires at the end of its real creation day plus 9 days, also what its activity writes later", () => {
+    const generation = "GUEST#isp-guest-s261013abcde";
+    const expiry = Date.UTC(2026, 9, 14) / 1000 + 9 * 86_400;
+    for (const table of ["Isps", "People", "WorkOrders", "Cases", "Runtime", "CuadrillaMetrics", "Network", "Dispatch", "Conversations", "AuditLog"] as const) {
+      expect(defaultWorldPolicy(generation, table, NOW), table).toEqual({ world: "guest", expiresAt: expiry });
+    }
+    expect(defaultWorldPolicy(generation, "WorkOrders", new Date("2026-10-19T23:00:00.000Z"))).toEqual({ world: "guest", expiresAt: expiry });
+    expect(defaultWorldPolicy("GUEST#isp-guest-07", "WorkOrders", NOW)).toEqual({ world: "guest" });
+  });
+});
+
+describe("guest rows", () => {
+  const meta = { createdAt: NOW.toISOString(), updatedAt: NOW.toISOString(), version: 1 };
+
+  it("a guest of the own sign-up carries its origin, its Cognito user and its last sign-in", () => {
+    const row = { PK: "ISP#isp-guest-s261013abcde", SK: "USER#usr-g01J9ZQX00000000000000000000", entity: "ConsoleUser", ...meta, ispId: "isp-guest-s261013abcde", userId: "usr-g01J9ZQX00000000000000000000", role: "GUEST", name: "Invitado", cognitoSub: "sub-1", guestOrigin: "SIGNUP", cognitoUsername: "gst-01J9ZQX00000000000000000000", lastLoginAt: NOW.toISOString() };
+    expect(checkEntity("Isps", row)).toMatchObject({ ok: true, entity: "ConsoleUser" });
+    expect(checkEntity("Isps", { ...row, guestOrigin: "VISITOR" }).ok).toBe(false);
+  });
+
+  it("a historical certificate of a new world waits for its PDF", () => {
+    const row = { PK: "WO#wo-24801-g07", SK: "CERT", entity: "Certificate", ...meta, workOrderId: "wo-24801-g07", clockId: "GUEST#isp-guest-07", certificateId: "cert-wo-24801-g07-1", n: 1, issuedAtSim: "2026-10-12T10:35:00-06:00", pdfPending: true };
+    expect(checkEntity("WorkOrders", row)).toMatchObject({ ok: true, entity: "Certificate" });
+  });
 });
 
 describe("rows ops/ writes in Runtime", () => {

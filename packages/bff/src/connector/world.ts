@@ -1,9 +1,12 @@
 // World scoping of stored items (docs/architecture.md §5, docs/seed-spec.md §13): which cloned world
 // an item belongs to and when DynamoDB may expire it. QA and evaluation worlds expire 48 h after
-// each write; `GUEST#isp-guest-test` is tagged `qa` without expiry; other guest worlds live for the
-// evaluation window (the world janitor resets them); the demo world keeps its items. Conversations
-// keep 90 days and the audit log 12 months everywhere. The world factory may pass its own policy.
-import { parseClockId, GUEST_TEST_CLOCK_ID } from "@cuadrilla/shared";
+// each write; `GUEST#isp-guest-test` is tagged `qa` without expiry; invited guest worlds live for the
+// window of their accounts (the world janitor resets them); every item of a generation of the own
+// sign-up (`GUEST#isp-guest-s<yymmdd>…`) expires at the end of its real creation day plus 9 days
+// (7 of life and 2 of grace, ADR-0025 §2), also what the guest's activity writes later; the demo world
+// keeps its items. Conversations keep 90 days and the audit log 12 months everywhere. The world
+// factory may pass its own policy.
+import { parseClockId, GUEST_TEST_CLOCK_ID, signupGenerationDay } from "@cuadrilla/shared";
 import type { WorldTag } from "../domain/common";
 import type { Table } from "./table-client";
 
@@ -25,6 +28,19 @@ export const TABLE_TTL_SECONDS: Readonly<Partial<Record<Table, number>>> = { Con
 
 const epoch = (now: Date, seconds: number): number => Math.floor(now.getTime() / 1000) + seconds;
 
+/** Days after the end of its creation day that a sign-up generation's items live (ADR-0025 §2). */
+export const SIGNUP_GENERATION_TTL_DAYS = 9;
+
+/**
+ * Epoch seconds at which every item of a sign-up generation expires: the end (UTC) of the real day
+ * its id carries plus 9 days; `undefined` for any operator that is not a sign-up generation.
+ */
+export function signupGenerationExpiresAt(ispId: string): number | undefined {
+  const day = signupGenerationDay(ispId);
+  if (day === undefined) return undefined;
+  return Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000) + (1 + SIGNUP_GENERATION_TTL_DAYS) * DAY;
+}
+
 function earliest(...values: Array<number | undefined>): number | undefined {
   const defined = values.filter((value): value is number => value !== undefined);
   return defined.length === 0 ? undefined : Math.min(...defined);
@@ -41,5 +57,7 @@ export const defaultWorldPolicy: WorldPolicy = (clockId, table, now) => {
     return { world, expiresAt: earliest(tableExpiry, epoch(now, WORLD_TTL_SECONDS[world])) as number };
   }
   const world: WorldTag = clockId === GUEST_TEST_CLOCK_ID ? "qa" : "guest";
-  return tableExpiry === undefined ? { world } : { world, expiresAt: tableExpiry };
+  const generationExpiry = signupGenerationExpiresAt(parsed.ispId);
+  const expiresAt = earliest(tableExpiry, generationExpiry);
+  return expiresAt === undefined ? { world } : { world, expiresAt };
 };

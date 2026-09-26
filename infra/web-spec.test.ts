@@ -2,9 +2,18 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { API_PREFIX } from "../packages/bff/src/routers/api-path";
+import { CONSOLE_CSP } from "./ci-spec";
+import { ANONYMOUS_IP_HEADER_AT_ORIGIN } from "./waf-spec";
 import {
   API_PATH,
+  API_PATH_PATTERN,
   EDGE_BUDGETS,
+  ORIGIN_VERIFY_HEADER,
+  VIEWER_ADDRESS_HEADER,
+  WAF_CSP_SOURCES,
+  WAF_SDK_ORIGIN,
+  WAF_TOKEN_ORIGIN,
+  apiOriginRequestPolicyName,
   LAMBDA_ROUTES,
   LEGAL_PAGES,
   ROUTER_READ_TIMEOUT_MAX_SECONDS,
@@ -119,5 +128,50 @@ describe("static file options", () => {
       expect(option?.contentType).toBe("text/html; charset=utf-8");
       expect(option?.cacheControl).toBe("max-age=300,public");
     }
+  });
+});
+
+// ---- The edge of the own sign-up (ADR-0025 §3 and §4, docs/test-plan.md §3) ---------------------------
+
+const template = readFileSync(resolve(process.cwd(), "infra/bootstrap/ci-role.yaml"), "utf8");
+const directive = (name: string): string[] => (CONSOLE_CSP.split("; ").find((entry) => entry.startsWith(`${name} `)) ?? "").split(" ").slice(1);
+
+describe("CSP of the console with AWS WAF's silent challenge [FL-114]", () => {
+  it("loads the WAF SDK only from *.sdk.awswaf.com and talks to it and to *.token.awswaf.com", () => {
+    expect([WAF_SDK_ORIGIN, WAF_TOKEN_ORIGIN]).toEqual(["https://*.sdk.awswaf.com", "https://*.token.awswaf.com"]);
+    expect(directive("script-src")).toEqual(["'self'", WAF_SDK_ORIGIN]);
+    expect(directive("connect-src")).toEqual(expect.arrayContaining([WAF_SDK_ORIGIN, WAF_TOKEN_ORIGIN]));
+    expect(directive("connect-src").filter((source) => source.includes("awswaf"))).toEqual([...WAF_CSP_SOURCES["connect-src"]]);
+    for (const other of ["img-src", "media-src", "default-src", "style-src", "font-src"]) expect(directive(other).join(" "), other).not.toContain("awswaf");
+    expect(CONSOLE_CSP).not.toMatch(/captcha\.awswaf|https:\/\/\*\.awswaf\.com/);
+  });
+
+  it("is the CSP the bootstrap's response headers policy applies", () => {
+    expect(template).toContain(`ContentSecurityPolicy: !Sub "${CONSOLE_CSP}"`);
+  });
+});
+
+describe("origin of /api/* [FL-114]", () => {
+  it("names the origin header, the viewer's address and the WAF header the Bff reads", () => {
+    expect(ORIGIN_VERIFY_HEADER).toBe("x-cuadrilla-origin");
+    expect(VIEWER_ADDRESS_HEADER).toBe("CloudFront-Viewer-Address");
+    expect(ANONYMOUS_IP_HEADER_AT_ORIGIN).toBe("x-amzn-waf-cuadrilla-anon");
+    expect(API_PATH_PATTERN).toBe("/api/*");
+  });
+
+  it("forwards every viewer value and CloudFront-Viewer-Address on /api/* by the bootstrap's policy", () => {
+    expect(apiOriginRequestPolicyName("aws-cds-hackathon-poc-cuadrilla", "poc")).toBe("aws-cds-hackathon-poc-cuadrilla-poc-api");
+    const policy = template.slice(template.indexOf("  ApiOriginRequestPolicy:"), template.indexOf("  # ---- Permissions boundary"));
+    expect(policy).toContain('Name: !Sub "${AppName}-${DeployStage}-api"');
+    expect(policy).toContain("HeaderBehavior: allViewerAndWhitelistCloudFront");
+    expect(policy).toContain(`Headers: [${VIEWER_ADDRESS_HEADER}]`);
+    expect(policy).toContain("QueryStringBehavior: all");
+    expect(web).toContain("aws.cloudfront.getOriginRequestPolicyOutput({ name: apiOriginRequestPolicyName($app.name, $app.stage) })");
+  });
+
+  it("puts the origin header on the distribution's origins from OriginVerifyKey, never a literal", () => {
+    expect(web).toContain("$util.all([origins, OriginVerifyKey.value])");
+    expect(web).toContain("{ name: ORIGIN_VERIFY_HEADER, value: key }");
+    expect(web).not.toMatch(/x-cuadrilla-origin["']\s*,\s*value:\s*["']/);
   });
 });

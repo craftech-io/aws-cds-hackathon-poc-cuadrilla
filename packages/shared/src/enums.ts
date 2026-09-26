@@ -147,8 +147,11 @@ export type MessageKind = z.infer<typeof MessageKind>;
 export const WhatsAppMode = z.enum(["simulated", "live"]);
 export type WhatsAppMode = z.infer<typeof WhatsAppMode>;
 
-/** Scopes of the runtime kill switch `Runtime/KILL#<scope>` (ADR-0019). */
-export const KillScope = z.enum(["ALL", "SIMULATOR", "AGENT"]);
+/**
+ * Scopes of the runtime kill switch `Runtime/KILL#<scope>` (ADR-0019): `SIGNUP` cuts only the own
+ * sign-up (ADR-0025 §4); `ALL` stays above every other scope.
+ */
+export const KillScope = z.enum(["ALL", "SIMULATOR", "AGENT", "SIGNUP"]);
 export type KillScope = z.infer<typeof KillScope>;
 
 /** `BrandConfig.mode` (ADR-0018): the fictitious operator or co-branding with the design partner. */
@@ -186,6 +189,21 @@ export type ClockMode = z.infer<typeof ClockMode>;
 /** `Isp.kind` (docs/architecture.md §5): the operator of the demo, a guest's copy, a QA or an evaluation world. */
 export const IspKind = z.enum(["DEMO", "GUEST", "QA", "EVAL"]);
 export type IspKind = z.infer<typeof IspKind>;
+
+/**
+ * How a `GUEST` account was born (ADR-0024): invited by the operator (`guest-NN`), the operator's
+ * rehearsal and the `QaDriver` (`TEST`), or the own sign-up with a verified email (`SIGNUP`, ADR-0025).
+ * The origin changes only the account's birth, the world's lifecycle and its caps, never what it may do.
+ */
+export const GuestOrigin = z.enum(["INVITED", "TEST", "SIGNUP"]);
+export type GuestOrigin = z.infer<typeof GuestOrigin>;
+
+/**
+ * State of a guest's world (`Runtime/GUESTACCOUNT#<userId>.status`, ADR-0025 §2-§3): being built, ready,
+ * failed (retryable) or without room under the cap of active sign-up worlds (retryable).
+ */
+export const GuestWorldStatus = z.enum(["PROVISIONING", "READY", "FAILED", "CAP_FULL"]);
+export type GuestWorldStatus = z.infer<typeof GuestWorldStatus>;
 
 /** People of an operator by role (`People` GSI2 `ispKindKey`, docs/architecture.md §5). */
 export const PersonRole = z.enum(["INSTALLER", "SUPERVISOR", "ZONE_CHIEF", "CUSTOMER"]);

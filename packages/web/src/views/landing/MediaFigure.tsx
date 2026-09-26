@@ -1,81 +1,71 @@
-// A picture of the landing, from the manifest: lazy-loaded, sized up front (no layout shift), and
-// marked when it is still a placeholder of a console capture. Nothing renders while the manifest
-// loads or if it cannot be read.
-import { type MediaState, mediaOf } from "./media";
+// One visual of the landing's gallery, from the manifest: a render of a console view drawn live and
+// scaled into its thumbnail, or a capture as a <picture> (AVIF/WebP, lazy, sized up front). A
+// placeholder says so ("capture pending"). The thumbnail is a button that opens the viewer.
+import { useReducedMotion } from "./motion";
 import { useGallery } from "./gallery";
-import { useLandingCopy } from "./lang";
+import { useLandingCopy, useLandingLang } from "./lang";
+import { type MediaItem, type PictureItem, isPicture } from "./media";
+import { FitToWidth } from "./renders/FitToWidth";
+import { RENDERS, isRenderId } from "./renders/registry";
 
-interface MediaFigureProps {
-  readonly media: MediaState;
-  readonly id: string;
-  readonly caption?: string;
-  readonly className?: string;
-  readonly framed?: boolean;
+/** Width the console views are drawn at before scaling (a desktop console's content column). */
+export const CONSOLE_DESIGN_WIDTH = 960;
+
+/** A render of the registry, in its final state, fitted to the width it gets. */
+export function RenderView({ id, crop = false, minScale }: { readonly id: string; readonly crop?: boolean; readonly minScale?: number }) {
+  const reduced = useReducedMotion();
+  if (!isRenderId(id)) return null;
+  const Render = RENDERS[id];
+  return (
+    <FitToWidth designWidth={CONSOLE_DESIGN_WIDTH} crop={crop} minScale={minScale}>
+      <Render run={false} still reduced={reduced} />
+    </FitToWidth>
+  );
 }
 
-export function MediaFigure({
-  media,
-  id,
-  caption,
-  className = "",
-  framed = true,
-}: MediaFigureProps) {
-  const landingCopy = useLandingCopy();
-  const gallery = useGallery();
-  const item = mediaOf(media, id);
-  if (!item)
-    return media.status === "loading" ? (
-      <div
-        aria-hidden="true"
-        className={`animate-pulse rounded-card bg-mist ${className}`}
-      />
-    ) : null;
-  const placeholder = item.status === "placeholder";
+export function MediaPicture({ item, alt, eager = false }: { readonly item: PictureItem; readonly alt: string; readonly eager?: boolean }) {
   return (
-    <figure className={className}>
-      <div
-        className={`relative overflow-hidden ${framed ? "rounded-card border border-mist bg-white shadow-card" : ""}`}
-      >
+    <picture>
+      {item.sources.map((source) => (
+        <source key={source.type} type={source.type} srcSet={source.srcset} />
+      ))}
+      <img src={item.file} alt={alt} width={item.width} height={item.height} loading={eager ? "eager" : "lazy"} decoding="async" className="block h-auto w-full" />
+    </picture>
+  );
+}
+
+interface MediaFigureProps {
+  readonly id: string;
+  readonly item: MediaItem;
+}
+
+export function MediaFigure({ id, item }: MediaFigureProps) {
+  const copy = useLandingCopy();
+  const lang = useLandingLang()?.lang ?? "es";
+  const gallery = useGallery();
+  const alt = item.alt[lang];
+  // A thumbnail crops the top of the view at a legible scale rather than shrinking all of it.
+  const visual = isPicture(item) ? <MediaPicture item={item} alt={gallery ? "" : alt} /> : <RenderView id={id} crop minScale={0.42} />;
+  return (
+    <figure className="min-w-0">
+      <div className="group relative overflow-hidden rounded-card border border-mist bg-paper shadow-card">
+        <div className="transition-transform duration-150 group-active:scale-98 motion-reduce:transition-none">{visual}</div>
         {gallery ? (
+          // Over the visual, not around it: a render may draw the console's own buttons, and a button never nests in another.
           <button
             type="button"
-            onClick={() => gallery.open(id)}
-            aria-label={`${landingCopy.zoom.open}: ${item.alt}`}
-            className="group block w-full cursor-zoom-in"
-          >
-            <img
-              src={item.file}
-              alt={item.alt}
-              width={item.width}
-              height={item.height}
-              loading="lazy"
-              decoding="async"
-              className="block h-auto w-full transition group-hover:opacity-95"
-            />
-          </button>
-        ) : (
-          <img
-            src={item.file}
-            alt={item.alt}
-            width={item.width}
-            height={item.height}
-            loading="lazy"
-            decoding="async"
-            className="block h-auto w-full"
+            onClick={(event) => gallery.open(id, event.currentTarget)}
+            aria-label={`${copy.zoom.open}: ${alt}`}
+            className="absolute inset-0 cursor-zoom-in rounded-card hover:bg-navy/5"
           />
-        )}
-        {placeholder ? (
-          <span
-            title={landingCopy.media.placeholderTitle}
-            className="absolute bottom-2 right-2 rounded-full bg-navy/85 px-2 py-0.5 text-xs font-medium text-white"
-          >
-            {landingCopy.media.placeholderNote}
+        ) : null}
+        {item.status === "placeholder" ? (
+          <span title={copy.media.placeholderTitle} className="absolute bottom-2 right-2 rounded-full bg-navy/85 px-2 py-0.5 text-xs font-medium text-white">
+            {copy.media.placeholderNote}
           </span>
         ) : null}
       </div>
-      {caption ? (
-        <figcaption className="mt-2 text-xs text-slate">{caption}</figcaption>
-      ) : null}
+      <figcaption className="mt-2 text-xs text-slate">{alt}</figcaption>
     </figure>
   );
 }

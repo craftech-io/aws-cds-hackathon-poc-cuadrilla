@@ -7,6 +7,14 @@
 //   OPERATOR   TURNCAP#<ispId>#<period>               the operator's turn caps (IspSettings.turnCaps)
 //   GLOBAL     TURNCAP|VALCAP|TRANSCRIBE#GLOBAL#<day> the stage's ceiling (infra/cost-caps.ts, `CostCaps`)
 //
+// A world of the own sign-up (`GUEST#isp-guest-s…`, ADR-0025 §3) spends inside two more ceilings, both
+// checked with the global one and in this order: world → account → sub-ceiling → global ceiling, so
+// the sign-up guests never use up the capacity of the invited ones and a new generation never resets
+// its guest's quota (`KILL#` stays above everything):
+//
+//   TURNCAP#GUESTUSER#<userId>#<day>                  turns of one account (`IspSettings.ownerUserId`)
+//   TURNCAP|VALCAP|TRANSCRIBE#GUESTSIGNUP#<day>       every sign-up world together (`CostCaps.guestSignup`)
+//
 // QA and evaluation worlds never touch the real global ceiling (they have a budget per run). A `qa-*`
 // world with `globalCapsOverride` gets a test scope instead: `…#GLOBAL#<clockId>#<day>` (its clock id
 // is `qa-<runId>-<scenario>`) with the values given, so a scenario proves the ceiling without ever
@@ -15,7 +23,7 @@
 // `ToolEvidence` reserve it at the spend. The kill switch is read first; physical safety never
 // calls this module.
 import { z } from "zod";
-import { ClockId, type KillScope, type ToolFailure, fail, ispIdOfClock, ispKindOfClock } from "@cuadrilla/shared";
+import { ClockId, type KillScope, type ToolFailure, fail, ispIdOfClock, ispKindOfClock, isSignupGuestIsp } from "@cuadrilla/shared";
 import { type Clock, systemClock } from "../lib/clock";
 import type { Logger } from "../lib/log";
 import { readLinked } from "../lib/resource";
@@ -35,8 +43,12 @@ export const CAP_TTL_AFTER_PERIOD_SECONDS = 48 * 3_600;
 
 const Limit = z.number().int().nonnegative();
 
+/** `CostCaps.guestSignup`: the sub-ceiling of the sign-up worlds and the quota of one account (ADR-0025 §3). */
+export const GuestSignupCaps = z.object({ turnsPerDay: Limit, validationsPerDay: Limit, transcribeSecondsPerDay: Limit, perUserTurnsPerDay: Limit });
+export type GuestSignupCaps = z.infer<typeof GuestSignupCaps>;
+
 /** `sst.Linkable("CostCaps")` of infra/cost-caps.ts: the stage's ceiling per real day. */
-export const GlobalCostCaps = z.object({ turnsPerDay: Limit, validationsPerDay: Limit, transcribeSecondsPerDay: Limit });
+export const GlobalCostCaps = z.object({ turnsPerDay: Limit, validationsPerDay: Limit, transcribeSecondsPerDay: Limit, guestSignup: GuestSignupCaps.optional() });
 export type GlobalCostCaps = z.infer<typeof GlobalCostCaps>;
 
 export function linkedGlobalCostCaps(): GlobalCostCaps {
@@ -49,7 +61,9 @@ export const CapSettings = z.object({
   simulatorCaps: z
     .object({ turnsPerHour: Limit.optional(), turnsPerDay: Limit.optional(), validationsPerDay: Limit.optional(), transcribeSecPerDay: Limit.optional(), emailsPerDay: Limit.optional() })
     .optional(),
-  globalCapsOverride: GlobalCostCaps.partial().optional(),
+  globalCapsOverride: GlobalCostCaps.omit({ guestSignup: true }).partial().optional(),
+  /** A sign-up generation's guest: the account whose quota its turns take. */
+  ownerUserId: z.string().min(1).optional(),
 });
 export type CapSettings = z.infer<typeof CapSettings>;
 
@@ -66,7 +80,11 @@ export interface CapCounter {
   readonly expiresAt: number;
   /** Real instant the period ends and the counter starts over ("cuándo se libera"). */
   readonly resetsAtReal: string;
+  /** Inside the GLOBAL ledger of a sign-up world: the account's quota or the sub-ceiling of every sign-up world. */
+  readonly tier?: CapTier;
 }
+
+export type CapTier = "GUEST_ACCOUNT" | "GUEST_SIGNUP";
 
 export type CapStoreReserveResult = { readonly ok: true } | { readonly ok: false; readonly failedKey: string; readonly used?: number };
 
@@ -143,6 +161,25 @@ interface CounterSpec {
   readonly ledger: CapLedger;
   readonly period: CapPeriod;
   readonly limit: number | undefined;
+  readonly tier?: CapTier;
+}
+
+/**
+ * The account and the sub-ceiling of a sign-up world, before its global ceiling. A world without its
+ * guest, or a stage without the sub-ceiling, gets a limit of 0: it spends nothing (fails closed).
+ */
+function signupSpecs(clockId: string, resource: GlobalResource, settings: CapSettings, globalCaps: GlobalCostCaps): CounterSpec[] {
+  const ledger = "GLOBAL";
+  const caps = globalCaps.guestSignup;
+  const { prefix, field } = GLOBAL_LEDGER[resource];
+  const specs: CounterSpec[] = [];
+  if (resource === "turns") {
+    const owner = settings.ownerUserId;
+    const key = owner === undefined ? (token: string) => `TURNCAP#GUESTUSER#${ispIdOfClock(clockId)}#${token}` : (token: string) => `TURNCAP#GUESTUSER#${owner}#${token}`;
+    specs.push({ ledger, period: "DAY", tier: "GUEST_ACCOUNT", limit: owner === undefined ? 0 : (caps?.perUserTurnsPerDay ?? 0), key });
+  }
+  specs.push({ ledger, period: "DAY", tier: "GUEST_SIGNUP", limit: caps?.[field] ?? 0, key: (token) => `${prefix}#GUESTSIGNUP#${token}` });
+  return specs;
 }
 
 function ledgerSpecs(ledger: CapLedger, clockId: string, resource: CostResource, settings: CapSettings, globalCaps: GlobalCostCaps): CounterSpec[] {
@@ -166,7 +203,8 @@ function ledgerSpecs(ledger: CapLedger, clockId: string, resource: CostResource,
         return [{ ledger, period: "DAY", limit: settings.globalCapsOverride[field], key: (token) => `${prefix}#GLOBAL#${clockId}#${token}` }];
       }
       if (kind === "QA" || kind === "EVAL") return [];
-      return [{ ledger, period: "DAY", limit: globalCaps[field], key: (token) => `${prefix}#GLOBAL#${token}` }];
+      const global: CounterSpec = { ledger, period: "DAY", limit: globalCaps[field], key: (token) => `${prefix}#GLOBAL#${token}` };
+      return isSignupGuestIsp(ispIdOfClock(clockId)) ? [...signupSpecs(clockId, resource, settings, globalCaps), global] : [global];
     }
   }
 }
@@ -196,6 +234,7 @@ export function planCounters(request: ReserveCostRequest, globalCaps: GlobalCost
         amount: reserved.has(ledger) ? amount : 0,
         expiresAt: Math.floor(period.endsAt.getTime() / 1000) + CAP_TTL_AFTER_PERIOD_SECONDS,
         resetsAtReal: period.endsAt.toISOString(),
+        ...(spec.tier === undefined ? {} : { tier: spec.tier }),
       });
     }
   }
@@ -224,6 +263,7 @@ export interface CostCapsDeps {
 
 // Metric names the log lines carry (docs/architecture.md §12, metric filters of WP-38).
 function capMetric(counter: CapCounter): { readonly metric: string; readonly scope?: string } {
+  if (counter.tier !== undefined) return { metric: "GuestSignupCapHits", scope: counter.tier };
   if (counter.ledger === "SIMULATOR") return { metric: "SimulatorCapHits" };
   if (counter.resource === "turns") return { metric: "TurnCapHits", scope: counter.ledger };
   return { metric: "GlobalCapHits", scope: counter.resource };
@@ -270,7 +310,7 @@ export async function releaseCost(deps: Pick<CostCapsDeps, "store">, reserved: r
 /** The envelope a tool or the simulator returns for a denied reservation. */
 export function costFailure(outcome: Exclude<ReserveCostOutcome, { readonly ok: true }>): ToolFailure {
   if (outcome.code === "KILL_SWITCH_ACTIVE") return fail("UNAVAILABLE", "the service is paused", "KILL_SWITCH_ACTIVE");
-  return fail("CAP_REACHED", `the ${outcome.counter.resource} cap of this period is reached until ${outcome.counter.resetsAtReal}`, outcome.counter.ledger);
+  return fail("CAP_REACHED", `the ${outcome.counter.resource} cap of this period is reached until ${outcome.counter.resetsAtReal}`, outcome.counter.tier ?? outcome.counter.ledger);
 }
 
 export interface GlobalCapUsage {

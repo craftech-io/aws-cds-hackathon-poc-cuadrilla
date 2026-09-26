@@ -3,17 +3,23 @@
 //
 //   GLOBAL#<ispId>             demo world of the operator (GLOBAL#isp-demo)       Isp.kind DEMO
 //   GUEST#isp-guest-<nn|test>  a guest's own world, and the operator's rehearsal  Isp.kind GUEST
+//   GUEST#isp-guest-s<yymmdd><5 base32>  one generation of an own sign-up's world    Isp.kind GUEST
 //   qa-<runId>-<scenario>      a scenario of the runner  ↔ isp-qa-<runId>-<scenario>   QA
 //   eval-<runId>               an evaluation run         ↔ isp-eval-<runId>            EVAL
 //
 // Clock ids carry `#`, so they never go raw into an S3 key or URI (media/keys.ts).
 import { z } from "zod";
-import { IspKind } from "./enums";
+import { type GuestOrigin, IspKind } from "./enums";
 import { IspId } from "./ids";
 
 // QA run ids may be `<github run id>-<attempt>` or `local-<ULID>` (docs/test-plan.md §4.4).
 const TOKEN = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
-const GUEST_ISP = /^isp-guest-(?:\d{2}|test)$/;
+/** Operators of guest worlds: invited (`07`), the rehearsal (`test`) and each sign-up generation (`s…`). */
+const GUEST_ISP = /^isp-guest-(?:\d{2}|test|s\d{6}[a-z2-7]{5})$/;
+/** One generation of an own sign-up's world (ADR-0025 §2): the real creation date and 5 random base32 letters. */
+export const SIGNUP_GUEST_ISP = /^isp-guest-s(\d{2})(\d{2})(\d{2})[a-z2-7]{5}$/;
+/** The random part of a generation id: 5 characters of `[a-z2-7]` (about 33.5 million per day). */
+export const GENERATION_SUFFIX = /^[a-z2-7]{5}$/;
 const QA_ISP_PREFIX = "isp-qa-";
 const EVAL_ISP_PREFIX = "isp-eval-";
 
@@ -37,7 +43,7 @@ export function parseClockId(value: string): ParsedClockId | undefined {
   return undefined;
 }
 
-export const ClockId = z.string().refine((value) => parseClockId(value) !== undefined, "expected GLOBAL#<ispId>, GUEST#isp-guest-<nn>, qa-<runId>-<scenario> or eval-<runId>");
+export const ClockId = z.string().refine((value) => parseClockId(value) !== undefined, "expected GLOBAL#<ispId>, GUEST#isp-guest-<nn|test|s…>, qa-<runId>-<scenario> or eval-<runId>");
 export type ClockId = z.infer<typeof ClockId>;
 
 function parsed(clockId: string): ParsedClockId {
@@ -94,8 +100,9 @@ export function evalClockId(runId: string): ClockId {
 
 /**
  * Tag the ids of a cloned world carry where the table is shared and the numbers repeat
- * (docs/seed-spec.md §2): guest worlds reuse the demo numbers (`wo-24817-g03`, `wo-24817-gtest`).
- * The demo world keeps the original ids, and QA and evaluation worlds lease their own numbers.
+ * (docs/seed-spec.md §2): guest worlds reuse the demo numbers (`wo-24817-g03`, `wo-24817-gtest`,
+ * `wo-24817-gs260926abcde`). The demo world keeps the original ids, and QA and evaluation worlds
+ * lease their own numbers.
  */
 export function clockTagOf(clockId: string): string | undefined {
   const { kind, ispId } = parsed(clockId);
@@ -117,4 +124,43 @@ export const GUEST_TEST_CLOCK_ID: ClockId = "GUEST#isp-guest-test";
 export function isQaReachableClock(clockId: string): boolean {
   const result = parseClockId(clockId);
   return result !== undefined && (result.kind === "QA" || result.kind === "EVAL" || clockId === GUEST_TEST_CLOCK_ID);
+}
+
+// ---- Guest worlds by origin (ADR-0024, ADR-0025 §2) ----------------------------------------------
+
+/** Whether an operator is a generation of an own sign-up's world (`isp-guest-s<yymmdd><5 base32>`). */
+export function isSignupGuestIsp(ispId: string): boolean {
+  return SIGNUP_GUEST_ISP.test(ispId);
+}
+
+/** Origin of a guest operator by its id; `undefined` for any other operator. */
+export function guestOriginOfIsp(ispId: string): GuestOrigin | undefined {
+  if (!GUEST_ISP.test(ispId)) return undefined;
+  if (ispId === GUEST_TEST_ISP_ID) return "TEST";
+  return isSignupGuestIsp(ispId) ? "SIGNUP" : "INVITED";
+}
+
+/** `yymmdd` of a real instant, in UTC: the creation date a generation id carries. */
+export function generationDateTag(createdAtReal: Date): string {
+  const iso = createdAtReal.toISOString();
+  return `${iso.slice(2, 4)}${iso.slice(5, 7)}${iso.slice(8, 10)}`;
+}
+
+/** `isp-guest-s<yymmdd><suffix>`: the operator of a new generation created at `createdAtReal`. */
+export function signupGenerationIspId(createdAtReal: Date, suffix: string): IspId {
+  if (!GENERATION_SUFFIX.test(suffix)) throw new RangeError("a generation suffix is 5 characters of [a-z2-7]");
+  return IspId.parse(`isp-guest-s${generationDateTag(createdAtReal)}${suffix}`);
+}
+
+/**
+ * The real creation day of a generation (`2026-09-26`, UTC) from its id; `undefined` for an operator
+ * that is not a sign-up generation or whose date is not a calendar day.
+ */
+export function signupGenerationDay(ispId: string): string | undefined {
+  const match = SIGNUP_GUEST_ISP.exec(ispId);
+  if (match === null) return undefined;
+  const [, yy = "", mm = "", dd = ""] = match;
+  const day = `20${yy}-${mm}-${dd}`;
+  const parsed = new Date(`${day}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day ? undefined : day;
 }

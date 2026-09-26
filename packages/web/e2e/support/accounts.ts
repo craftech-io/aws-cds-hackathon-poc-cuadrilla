@@ -11,6 +11,14 @@ import { signIdToken } from "./tokens";
 /** Build-time variables of the Vite server the specs run against (src/lib/env.ts). */
 export const E2E_POOL_ID = "us-east-1_E2eFakePool";
 export const E2E_CLIENT_ID = "e2e-console-client";
+/** The sign-up's `GuestSignup` client and the AWS WAF integration URL (its `challenge.js` is a route of the spec). */
+export const E2E_SIGNUP_CLIENT_ID = "e2e-guest-signup-client";
+export const E2E_WAF_INTEGRATION_URL = "https://e2e0waf.us-east-1.sdk.awswaf.com/e2e0waf/e2e0token/";
+
+// The config imports this module in the main process: the web server it starts inherits these (like
+// the run's key of tokens.ts), so the sign-up is configured without touching the config's own list.
+process.env.VITE_COGNITO_SIGNUP_CLIENT_ID ??= E2E_SIGNUP_CLIENT_ID;
+process.env.VITE_WAF_INTEGRATION_URL ??= E2E_WAF_INTEGRATION_URL;
 
 export type AccountRole = "SUPERVISOR" | "OPS" | "GUEST";
 

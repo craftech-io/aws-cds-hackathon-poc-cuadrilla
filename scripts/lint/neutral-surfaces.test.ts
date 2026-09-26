@@ -242,10 +242,12 @@ describe("rendered authentication emails [FL-120]", () => {
     ]);
   });
 
-  it("renders the pool's templates of infra/auth-email.ts, and none carries a word", async () => {
-    expect(AUTH_EMAIL_RENDERERS.map((renderer) => renderer.source)).toEqual(["infra/auth-email.ts invitationEmail", "infra/auth-email.ts verificationEmail"]);
+  it("renders the pool's templates and the trigger emails, and none carries a word", async () => {
+    const triggers = ["SIGN_UP", "RESEND_CODE", "FORGOT_PASSWORD", "ADMIN_CREATE_USER"].map((kind) => `packages/bff/src/copy/auth-emails.ts ${kind}`);
+    expect(AUTH_EMAIL_RENDERERS.map((renderer) => renderer.source)).toEqual(["infra/auth-email.ts invitationEmail", "infra/auth-email.ts verificationEmail", ...triggers]);
     const rendered = renderAuthEmails();
-    expect(rendered).toHaveLength(4);
+    // The pool's two templates in es, the four trigger emails in es and en; each with both test brands.
+    expect(rendered).toHaveLength(2 * 1 * 2 + 4 * 2 * 2);
     expect(rendered.find((email) => email.source.endsWith("(rendered, es, cobrand)"))?.text).toContain("Design Partner Demo");
     const { findings } = await scanSources(tree({}), { files: [] });
     expect(findings).toEqual([]);

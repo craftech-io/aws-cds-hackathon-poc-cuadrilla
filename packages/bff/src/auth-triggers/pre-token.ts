@@ -13,11 +13,18 @@
 // evaluation operator) gets no operator and no role: its token opens nothing (PRINCIPAL_INCOMPLETE).
 // An inactive user is stamped like any other; the BFF refuses it on every request (USER_INACTIVE).
 // Registry or audit failures fail the sign-in (Cognito waits 5 s; the deadline here is shorter).
+//
+// The same rows as the post triggers decide (ADR-0025 §2): a guest of the own sign-up is stamped with
+// the operator of its current generation. The `SUB#` index is eventually consistent, and a row moves
+// between generations (the old one deleted, the new one created, in one transaction) right before
+// this trigger runs, and is created right before the first sign-in after a confirmation: every row
+// the index lists is read again by its key, and an index that shows no live row yet is read again a
+// couple of times within the deadline.
 import type { ClaimsAndScopeOverrideDetails, PreTokenGenerationV2TriggerEvent } from "aws-lambda";
 import { z } from "zod";
 import { IspId, clockIdOfIsp, ispKindOfIspId } from "@cuadrilla/shared";
 import { connector } from "../connector/index";
-import type { AuditPort } from "../connector/ports";
+import type { AuditPort, IspsPort } from "../connector/ports";
 import { userActor } from "../domain/common";
 import type { ConsoleUser } from "../domain/isps";
 import { withDeadline } from "../lib/deadline";
@@ -127,13 +134,36 @@ export function createPreTokenHandler(resolveDeps: () => PreTokenDeps) {
   };
 }
 
+/** Waits between reads of the index while it lists no live row for the `sub` (inside the 4 s deadline). */
+export const INDEX_RETRY_DELAYS_MS: readonly number[] = [300, 900];
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * The one live registry row of a `sub`: every row the index lists, read again by its key (a row the
+ * index still shows after it moved to another generation is gone from the table); none yet → the
+ * index is read again after each delay. Two live rows open nothing.
+ */
+export async function resolveRegistryUser(isps: Pick<IspsPort, "listUsersBySub" | "getUser">, sub: string, wait: (ms: number) => Promise<void> = sleep): Promise<ConsoleUser | undefined> {
+  if (sub === "") return undefined;
+  for (let attempt = 0; ; attempt += 1) {
+    const listed = await isps.listUsersBySub(sub, 3);
+    const live = await Promise.all(listed.map((user) => isps.getUser(user.ispId, user.userId)));
+    const verified = live.filter((user): user is ConsoleUser => user !== undefined && user.cognitoSub === sub);
+    if (verified.length === 1) return verified[0];
+    const delay = INDEX_RETRY_DELAYS_MS[attempt];
+    if (verified.length > 1 || delay === undefined) return undefined;
+    await wait(delay);
+  }
+}
+
 let defaults: PreTokenDeps | undefined;
 
 function defaultPreTokenDeps(): PreTokenDeps {
   if (defaults) return defaults;
   const data = connector();
   defaults = {
-    findUserBySub: (sub) => data.isps.findUserBySub(sub),
+    findUserBySub: (sub) => resolveRegistryUser(data.isps, sub),
     audit: data.audit,
     newLogger: () => createLogger({ bindings: { service: "auth-pre-token" } }),
   };

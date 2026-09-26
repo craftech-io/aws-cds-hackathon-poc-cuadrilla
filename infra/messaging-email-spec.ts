@@ -131,17 +131,40 @@ export function defaultEventBusArn(region: string, accountId: string): string {
   return `arn:aws:events:${region}:${accountId}:event-bus/default`;
 }
 
+/** Tag every product email carries (`EmailTags.mailId`, packages/bff/src/channels/email/tags.ts). */
+export const PRODUCT_EMAIL_TAG = "mailId";
+
 /**
  * The rule of ChannelEvents on the default bus. SES stamps `ses:configuration-set` on every event it
- * publishes, so the other app's SES events (same bus) never match. The event types are chosen by the
- * event destination (EMAIL_EVENT_TYPES), so the rule does not repeat them as `detail-type`.
+ * publishes, so the other app's SES events (same bus) never match. Cognito's emails also go through
+ * this configuration set (to be measured as `kind = AUTH`) but carry no tags: requiring the product's
+ * `mailId` tag keeps them, and the visitor's address they name, away from ChannelEvents. The event
+ * types are chosen by the event destination (EMAIL_EVENT_TYPES), so the rule does not repeat them.
  */
 export function emailEventPattern(configurationSetName: string = CONFIGURATION_SET_NAME) {
   return {
     source: [SES_EVENT_SOURCE],
-    detail: { mail: { tags: { "ses:configuration-set": [configurationSetName] } } },
+    detail: { mail: { tags: { "ses:configuration-set": [configurationSetName], [PRODUCT_EMAIL_TAG]: [{ exists: true }] } } },
   };
 }
+
+// ---- Metrics of the authentication emails (ADR-0025 §4) --------------------------------------------
+
+/**
+ * Second destination of the configuration set: CloudWatch metrics with the dimension `kind` taken from
+ * the message tag. Product emails and the lead notice tag their `kind`; Cognito's emails (sign-up
+ * code, resend, recovery, invitation) carry no tag, so they fall on the default `AUTH`.
+ */
+export const AUTH_METRICS_DESTINATION_NAME = "auth-metrics";
+export const METRIC_EVENT_TYPES = ["SEND", "BOUNCE", "COMPLAINT"] as const;
+export const KIND_DIMENSION = { dimensionName: "kind", dimensionValueSource: "MESSAGE_TAG", defaultDimensionValue: "AUTH" } as const;
+
+/** `Send`, `Bounce` and `Complaint` of `AWS/SES` with `kind = AUTH` (docs/architecture.md §12). */
+export const AUTH_EMAIL_METRICS = {
+  AuthEmailSends: { namespace: "AWS/SES", metricName: "Send", dimensions: { kind: "AUTH" } },
+  AuthEmailBounces: { namespace: "AWS/SES", metricName: "Bounce", dimensions: { kind: "AUTH" } },
+  AuthEmailComplaints: { namespace: "AWS/SES", metricName: "Complaint", dimensions: { kind: "AUTH" } },
+} as const;
 
 // ---- Sending permission --------------------------------------------------------------------------
 

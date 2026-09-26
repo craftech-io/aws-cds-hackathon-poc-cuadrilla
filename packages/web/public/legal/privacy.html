@@ -1,77 +1,205 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-MX">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="legal-version" content="2026-09-26">
 <title>Aviso de privacidad · Cuadrilla</title>
-<meta name="description" content="Aviso de privacidad de Cuadrilla, prueba de concepto de Craftech con datos sintéticos.">
+<meta name="description" content="Aviso de privacidad de la demo de Cuadrilla, de Craftech: qué datos se tratan, dónde, para qué, cuánto tiempo y cómo ejercer tus derechos.">
 <style>
-:root{color-scheme:light;--navy:#0b1f3a;--cyan:#12b5d9;--cyan-deep:#0a7f99;--cyan-soft:#d8f4fa;--ink:#111a2b;--slate:#5a6a80;--mist:#e4e9f0;--paper:#f5f7fa}
+:root{color-scheme:light;--navy:#1b1f24;--cyan:#f4c430;--cyan-deep:#8a6400;--cyan-soft:#fbf0cf;--ink:#12161b;--slate:#57626e;--mist:#dfe3e8;--paper:#f4f5f7}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
-header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
-.lockup{display:flex;align-items:center;gap:12px;text-decoration:none}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;overflow-wrap:anywhere}
+.skip{position:absolute;left:-9999px;top:8px;background:#fff;color:var(--navy);padding:10px 14px;border-radius:8px;z-index:10}
+.skip:focus{left:8px}
+header{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
+.lockup{display:inline-flex;align-items:center;min-height:44px;text-decoration:none}
 .brand{font-weight:700;font-size:18px;color:#fff;white-space:nowrap}.brand span{color:var(--cyan)}
 .badge{font-size:12px;color:var(--cyan-soft)}
-main{max-width:760px;margin:24px auto;padding:0 16px}
-article{background:#fff;border:1px solid var(--mist);border-radius:12px;box-shadow:0 1px 2px rgb(11 31 58/.06),0 4px 12px rgb(11 31 58/.06);padding:28px}
+nav.langs{display:flex;gap:8px}
+nav.langs a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;color:#fff;text-decoration:none;border:1px solid rgb(255 255 255/.35)}
+a:focus-visible{outline:3px solid var(--cyan-deep);outline-offset:2px}nav.langs a:focus-visible{outline-color:var(--cyan)}
+main{max-width:780px;margin:24px auto;padding:0 16px}
+article{background:#fff;border:1px solid var(--mist);border-radius:12px;box-shadow:0 1px 2px rgb(11 31 58/.06),0 4px 12px rgb(11 31 58/.06);padding:24px 20px;margin-bottom:24px}
+@media (min-width:640px){article{padding:32px}}
 h1{font-size:26px;line-height:1.25;margin:0 0 4px;color:var(--navy)}
-h2{font-size:18px;margin:28px 0 8px;color:var(--navy)}
+h2{font-size:22px;line-height:1.3;margin:0 0 4px;color:var(--navy)}
+h3{font-size:18px;margin:28px 0 8px;color:var(--navy)}
+article>h2+.muted{margin-bottom:12px}
 p,li{margin:0 0 10px}ul{padding-left:22px}
 .muted{color:var(--slate);font-size:14px}
 .notice{background:var(--cyan-soft);border-radius:10px;padding:12px 14px;margin:16px 0}
-.table{overflow-x:auto}
+blockquote{margin:8px 0 12px;padding:10px 14px;border-left:4px solid var(--cyan);background:var(--paper);border-radius:0 8px 8px 0}
+.table{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0 12px}
 th,td{border-bottom:1px solid var(--mist);padding:8px 10px;text-align:left;vertical-align:top}
 th{color:var(--slate);font-weight:600}
 a{color:var(--cyan-deep)}
-footer{max-width:760px;margin:0 auto 32px;padding:16px;font-size:13px;color:var(--slate)}
-.powered{display:inline-flex;align-items:center;gap:8px;margin-top:10px;color:var(--slate);text-decoration:none;font-size:12px}.powered img{display:block;height:20px;width:auto}
+code{font-size:14px;overflow-wrap:anywhere}
+footer{max-width:780px;margin:0 auto 32px;padding:16px;font-size:13px;color:var(--slate)}
+footer a{display:inline-block;min-height:44px;line-height:44px}
+.powered{display:inline-flex;align-items:center;gap:8px;color:var(--slate);text-decoration:none;font-size:12px}.powered img{display:block;height:20px;width:auto}
 </style>
 </head>
 <body>
-<header><a class="lockup" href="/legal/privacy.html"><span class="brand">Cuadrilla<span>.</span></span></a><div class="badge">Prueba de concepto · demo sintética</div></header>
-<main>
-<article>
+<a class="skip" href="#contenido">Ir al contenido</a>
+<header>
+<a class="lockup" href="/" aria-label="Cuadrilla, ir al inicio"><span class="brand">Cuadrilla<span>.</span></span></a>
+<div class="badge">Demo sintética · Powered by Craftech</div>
+<nav class="langs" aria-label="Idioma / Language"><a href="#es" lang="es-MX">Español</a><a href="#en" lang="en">English</a></nav>
+</header>
+<main id="contenido">
+
+<article id="es" lang="es-MX" data-legal-version="2026-09-26">
 <h1>Aviso de privacidad</h1>
-<p class="muted">Última actualización: 26 de septiembre de 2026</p>
+<p class="muted">Versión 2026-09-26 · Última actualización: 26 de septiembre de 2026</p>
 
-<div class="notice"><strong>Esto es una prueba de concepto.</strong> Cuadrilla es una demo de Craftech. El manual, las políticas, los precios, las órdenes de trabajo, los instaladores y los clientes son inventados. Los mensajes solo llegan al simulador de teléfono de la consola, al simulador de buzones de Amazon SES y a destinatarios de prueba registrados por el equipo.</div>
+<div class="notice"><strong>Demo con datos sintéticos.</strong> Cuadrilla es un producto de Craftech que puedes probar con tu propia cuenta. El manual, las políticas, las órdenes, los instaladores y los clientes de la demo son inventados. Lo que sí es real son los datos de tu cuenta y lo que tú escribes, grabas o subes en la demo; este aviso explica qué hacemos con ellos.</div>
 
-<h2>1. Qué es Cuadrilla</h2>
-<p>Cuadrilla es un copiloto de campo en WhatsApp para instaladores de fibra óptica. El instalador escribe o manda una nota de voz; el agente lee su orden de trabajo y el estado del equipo, lo guía con el manual de procedimientos de la operadora, valida las fotos de evidencia, escala a un supervisor cuando hace falta y emite el acta de instalación. La validación manual de evidencia y las decisiones de un caso son siempre de una persona.</p>
+<h3 id="es-responsable">1. Responsable</h3>
+<p>El responsable del tratamiento es <strong>Craftech</strong> (<a href="https://craftech.io">craftech.io</a>).</p>
+<p data-pending="domicilio">Domicilio legal: en confirmación. Mientras se publica en esta sección, puedes solicitarlo por el canal de contacto del punto 8.</p>
 
-<h2>2. Quién es responsable</h2>
-<p>El responsable de los datos de esta demo es <strong>Craftech</strong> (<a href="https://craftech.io">craftech.io</a>), que la opera. En un uso productivo, cada operadora es responsable de los datos de su personal y sus clientes, y Craftech actúa como encargada, siguiendo sus instrucciones.</p>
-
-<h2>3. Qué datos tratamos y para qué</h2>
+<h3 id="es-datos">2. Qué datos tratamos</h3>
 <ul>
-<li><strong>Teléfono del personal de campo</strong> (instaladores y supervisores), registrado por la operadora: para reconocer quién escribe y responder por el mismo medio. En los registros internos guardamos un identificador cifrado del teléfono, no el teléfono.</li>
-<li><strong>Consentimiento para WhatsApp</strong> (mensaje "ALTA"), con su fecha y el texto aceptado: sin él, el agente no escribe por WhatsApp.</li>
-<li><strong>Mensajes, notas de voz y fotos de evidencia</strong> de cada orden: para guiar la instalación y armar el acta. Antes de guardarse se enmascaran CURP, RFC, CLABE, tarjetas y teléfonos. Nunca pedimos documentos de identidad ni datos bancarios por chat.</li>
-<li><strong>Email del cliente</strong>, para enviarle el acta de instalación.</li>
-<li><strong>Bitácora de decisiones</strong>: qué hizo el agente, qué regla aplicó y quién intervino, para que la operadora pueda auditarlo.</li>
+<li><strong>Los del formulario de alta</strong>: tu email y, si los das, tu nombre, tu empresa y tu cargo; el idioma en que usaste la página.</li>
+<li><strong>Tus consentimientos</strong>: el de términos y privacidad y, si lo das, el de contacto, cada uno con su fecha y la versión del texto que aceptaste.</li>
+<li><strong>Cómo llegaste</strong>: las etiquetas de campaña (UTM) del enlace por el que entraste y el sitio de referencia (solo su dirección principal, nunca la página completa).</li>
+<li><strong>Fechas</strong> de tu alta y de tu último ingreso.</li>
+<li><strong>Tu dirección IP</strong>: la procesa AWS WAF para proteger el alta contra el abuso; la aplicación solo guarda una huella cifrada (hash) de tu IP, durante 48 horas, para limitar la cantidad de altas.</li>
+<li><strong>La cookie <code>aws-waf-token</code></strong>, que pone AWS WAF para comprobar en silencio que el alta la hace un navegador, y el <strong>almacenamiento de sesión (<code>sessionStorage</code>) de tu navegador</strong>, donde la página guarda las etiquetas de campaña y el sitio de referencia hasta que te das de alta.</li>
+<li><strong>El contenido que creas en la demo</strong>: los mensajes que escribes, las <strong>notas de voz que grabas con tu micrófono (llevan tu voz real)</strong>, las fotos que subes y las actas que resultan de ellos. Antes de guardarse, los textos y las transcripciones se enmascaran (identificaciones, cuentas bancarias, tarjetas y teléfonos).</li>
+<li>Si ligas tu propio teléfono a tu mundo de prueba con un código de alta por WhatsApp, cuando esa opción esté disponible: tu número y los mensajes que envíes desde él.</li>
 </ul>
-<p>No vendemos datos ni los usamos para publicidad. No usamos cookies ni scripts de terceros en las páginas públicas.</p>
+<p>No vendemos datos ni los usamos para publicidad. Las páginas públicas no usan cookies de publicidad ni de analítica.</p>
 
-<h2>4. Dónde se procesan</h2>
-<p>Los datos se procesan en Amazon Web Services, región <code>us-east-1</code> (Virginia del Norte, Estados Unidos). Esta prueba de concepto procesa exclusivamente datos sintéticos y los teléfonos de prueba del equipo.</p>
-
-<h2>5. Cómo dejar de recibir mensajes</h2>
+<h3 id="es-encargados">3. Encargados y lugares de tratamiento</h3>
 <ul>
-<li><strong>WhatsApp</strong>: responde <strong>BAJA</strong>. Confirmamos la baja y el agente no vuelve a escribirte por ese canal.</li>
-<li>También puedes pedírselo a la operadora que te registró.</li>
+<li><strong>Amazon Web Services</strong>, en la región <code>us-east-1</code> (Virginia del Norte, Estados Unidos), para toda la infraestructura: la página, tu cuenta, tu mundo de prueba y el envío de emails.</li>
+<li><strong>Amazon Bedrock</strong>: el modelo del agente y el de la validación de fotos corren con la <strong>inferencia global</strong> de Amazon Bedrock, que no se limita a Estados Unidos y puede procesar tus textos, tus transcripciones y tus fotos en otras regiones de AWS.</li>
+<li><strong>Amazon Transcribe</strong> convierte tus notas de voz en texto.</li>
+<li>Si ligas tu teléfono por WhatsApp, AWS End User Messaging y WhatsApp transportan esos mensajes.</li>
+<li>La <strong>casilla de Craftech</strong> que recibe un aviso con tus datos de contacto cada vez que se confirma un alta.</li>
 </ul>
 
-<h2>6. Tus derechos</h2>
-<p>Puedes pedir el acceso a tus datos, su rectificación o cancelación y oponerte a su tratamiento, conforme a la legislación mexicana de protección de datos personales en posesión de los particulares, escribiendo a Craftech desde <a href="https://craftech.io">craftech.io</a>.</p>
+<h3 id="es-transferencia">4. Transferencia internacional</h3>
+<p>Tus datos se transfieren a Estados Unidos (región <code>us-east-1</code>) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global. Esta transferencia internacional (artículo 12 de la Ley 25.326) se basa en tu consentimiento expreso, que das al marcar esta casilla del formulario de alta:</p>
+<blockquote data-consent="TERMS_PRIVACY" lang="es-MX">Acepto los Términos y el Aviso de privacidad de Craftech, incluida la transferencia de mis datos a Estados Unidos y a otras regiones de AWS descrita en el aviso.</blockquote>
 
-<h2>7. Inteligencia artificial</h2>
-<p>El agente usa modelos de Amazon Bedrock con reglas y controles propios: una política de contacto escrita en código, filtros de contenido y un catálogo cerrado de acciones. Toda política o procedimiento sale del manual y se cita; lo que no está en el manual no se inventa y se escala a un supervisor. Ante un riesgo físico, la instrucción de seguridad es un texto fijo del manual, nunca redactado por el modelo.</p>
+<h3 id="es-finalidades">5. Finalidades</h3>
+<ul>
+<li>Darte acceso a la demo y operar tu mundo de prueba sintético.</li>
+<li>Proteger el servicio contra el abuso (límites de altas y de uso).</li>
+<li>Solo si aceptaste la casilla de contacto: que Craftech te contacte por esta solución.</li>
+</ul>
 
-<h2>8. Cambios</h2>
-<p>Si este aviso cambia, publicamos la nueva versión en esta misma dirección con su fecha de actualización.</p>
-<p class="muted">Ver también los <a href="/legal/terms.html">términos y condiciones</a>.</p>
+<h3 id="es-retencion">6. Cuánto tiempo guardamos los datos</h3>
+<div class="table"><table>
+<thead><tr><th scope="col">Dato</th><th scope="col">Plazo</th></tr></thead>
+<tbody>
+<tr><td>Alta sin confirmar y sus usuarios sin confirmar</td><td>7 días desde el primer intento (8 como máximo, por el barrido diario)</td></tr>
+<tr><td>Cuenta confirmada y tus datos de contacto</td><td>24 meses desde tu último ingreso</td></tr>
+<tr><td>Contenido de tu mundo de prueba (mensajes, notas de voz, fotos y actas)</td><td>Hasta 9 días desde que se creó ese mundo; al volver a entrar se crea uno nuevo</td></tr>
+<tr><td>Memoria del agente de tu mundo</td><td>Hasta 30 días</td></tr>
+<tr><td>Contadores del alta, con tu IP y tu email en hash</td><td>48 horas</td></tr>
+<tr><td>Registros técnicos, enmascarados</td><td>30 días</td></tr>
+<tr><td>Bitácora de altas y bajas, sin datos que te identifiquen</td><td>24 meses</td></tr>
+</tbody>
+</table></div>
+
+<h3 id="es-derechos">7. Tus derechos</h3>
+<ul>
+<li><strong>Acceso</strong>: gratuito; respondemos en 10 días corridos. El titular de los datos personales tiene la facultad de ejercer el derecho de acceso a los mismos en forma gratuita a intervalos no inferiores a seis meses, salvo que se acredite un interés legítimo al efecto conforme lo establecido en el artículo 14, inciso 3 de la Ley 25.326.</li>
+<li><strong>Rectificación, actualización y supresión</strong>: las resolvemos en 5 días hábiles.</li>
+<li><strong>Retiro del consentimiento de contacto</strong>: puedes pedir que no te contactemos sin borrar tu cuenta.</li>
+</ul>
+<p>Cómo ejercerlos: borra tu cuenta cuando quieras desde la consola ("Borrar mi cuenta", en tu portada), o escríbenos por el canal del punto 8.</p>
+<p>La Agencia de Acceso a la Información Pública, en su carácter de Órgano de Control de la Ley 25.326, tiene la atribución de atender las denuncias y reclamos que interpongan quienes resulten afectados en sus derechos por incumplimiento de las normas vigentes en materia de protección de datos personales.</p>
+
+<h3 id="es-contacto">8. Canal de contacto</h3>
+<p>Para cualquier pedido sobre tus datos, escríbenos en <a href="https://craftech.io/contact/">craftech.io/contact</a>.</p>
+
+<h3 id="es-sinteticos">9. Datos de la demo</h3>
+<p>Los datos de la demo son sintéticos: personas, clientes, domicilios, órdenes y equipos inventados. Nunca cargues en la demo datos reales de terceros (nombres, teléfonos, domicilios, documentos ni fotos de otras personas).</p>
+
+<p class="muted">Si este aviso cambia, publicamos una versión nueva en esta misma dirección, con su fecha, y te pedimos aceptarla de nuevo en el alta. Ver también los <a href="/legal/terms.html">términos</a>.</p>
+</article>
+
+<article id="en" lang="en" data-legal-version="2026-09-26">
+<h2>Privacy notice</h2>
+<p class="muted">Version 2026-09-26 · Last updated: September 26, 2026</p>
+
+<div class="notice"><strong>A demo with synthetic data.</strong> Cuadrilla is a Craftech product you can try with your own account. The demo's manual, policies, work orders, installers and customers are made up. What is real is your account's data and what you type, record or upload in the demo; this notice explains what we do with it.</div>
+
+<h3 id="en-controller">1. Controller</h3>
+<p>The data controller is <strong>Craftech</strong> (<a href="https://craftech.io">craftech.io</a>).</p>
+<p data-pending="address">Registered address: being confirmed. Until it is published in this section, you can ask for it through the contact channel in point 8.</p>
+
+<h3 id="en-data">2. What data we process</h3>
+<ul>
+<li><strong>The sign-up form</strong>: your email and, if you give them, your name, company and job title; the language you used the page in.</li>
+<li><strong>Your consents</strong>: the terms and privacy one and, if you give it, the contact one, each with its date and the version of the text you accepted.</li>
+<li><strong>How you arrived</strong>: the campaign tags (UTM) of the link you came through and the referring site (only its main address, never the full page).</li>
+<li><strong>Dates</strong> of your sign-up and your last sign-in.</li>
+<li><strong>Your IP address</strong>: AWS WAF processes it to protect the sign-up against abuse; the application only stores an encrypted fingerprint (hash) of your IP, for 48 hours, to limit the number of sign-ups.</li>
+<li><strong>The <code>aws-waf-token</code> cookie</strong>, set by AWS WAF to silently check that a browser is signing up, and your <strong>browser's session storage (<code>sessionStorage</code>)</strong>, where the page keeps the campaign tags and the referring site until you sign up.</li>
+<li><strong>The content you create in the demo</strong>: the messages you type, the <strong>voice notes you record with your microphone (they carry your real voice)</strong>, the photos you upload and the certificates that come out of them. Before they are stored, texts and transcripts are masked (ID numbers, bank accounts, cards and phone numbers).</li>
+<li>If you link your own phone to your test world with a WhatsApp sign-up code, once that option is available: your number and the messages you send from it.</li>
+</ul>
+<p>We do not sell data or use it for advertising. The public pages use no advertising or analytics cookies.</p>
+
+<h3 id="en-processors">3. Processors and places of processing</h3>
+<ul>
+<li><strong>Amazon Web Services</strong>, in the <code>us-east-1</code> region (Northern Virginia, United States), for the whole infrastructure: the page, your account, your test world and the emails.</li>
+<li><strong>Amazon Bedrock</strong>: the agent's model and the photo validation model run on Amazon Bedrock's <strong>global inference</strong>, which is not limited to the United States and may process your texts, transcripts and photos in other AWS regions.</li>
+<li><strong>Amazon Transcribe</strong> turns your voice notes into text.</li>
+<li>If you link your phone through WhatsApp, AWS End User Messaging and WhatsApp carry those messages.</li>
+<li>The <strong>Craftech mailbox</strong> that receives a notice with your contact details each time a sign-up is confirmed.</li>
+</ul>
+
+<h3 id="en-transfer">4. International transfer</h3>
+<p>Your data is transferred to the United States (<code>us-east-1</code> region) and, for the model's inference, to other AWS regions where Amazon Bedrock processes global inference. This international transfer (article 12 of Argentina's Law 25.326) is based on your express consent, which you give by checking this box of the sign-up form:</p>
+<blockquote data-consent="TERMS_PRIVACY" lang="en">I accept Craftech's Terms and Privacy Notice, including the transfer of my data to the United States and other AWS regions described in the notice.</blockquote>
+
+<h3 id="en-purposes">5. Purposes</h3>
+<ul>
+<li>To give you access to the demo and run your synthetic test world.</li>
+<li>To protect the service against abuse (sign-up and usage limits).</li>
+<li>Only if you checked the contact box: for Craftech to contact you about this solution.</li>
+</ul>
+
+<h3 id="en-retention">6. How long we keep data</h3>
+<div class="table"><table>
+<thead><tr><th scope="col">Data</th><th scope="col">Period</th></tr></thead>
+<tbody>
+<tr><td>An unconfirmed sign-up and its unconfirmed users</td><td>7 days from the first attempt (8 at most, through the daily sweep)</td></tr>
+<tr><td>A confirmed account and your contact details</td><td>24 months from your last sign-in</td></tr>
+<tr><td>Content of your test world (messages, voice notes, photos and certificates)</td><td>Up to 9 days from the creation of that world; a new one is created when you sign in again</td></tr>
+<tr><td>The agent's memory of your world</td><td>Up to 30 days</td></tr>
+<tr><td>Sign-up counters, with your IP and email hashed</td><td>48 hours</td></tr>
+<tr><td>Technical logs, masked</td><td>30 days</td></tr>
+<tr><td>Log of sign-ups and deletions, with nothing that identifies you</td><td>24 months</td></tr>
+</tbody>
+</table></div>
+
+<h3 id="en-rights">7. Your rights</h3>
+<ul>
+<li><strong>Access</strong>: free of charge; we answer within 10 calendar days. The data subject may exercise the right of access free of charge at intervals of no less than six months, unless a legitimate interest is proven, as set out in article 14, section 3 of Law 25.326.</li>
+<li><strong>Rectification, update and erasure</strong>: we handle them within 5 business days.</li>
+<li><strong>Withdrawal of the contact consent</strong>: you can ask us not to contact you without deleting your account.</li>
+</ul>
+<p>How to exercise them: delete your account whenever you want from the console ("Delete my account", on your home page), or write to us through the channel in point 8.</p>
+<p>Argentina's Agency for Access to Public Information (Agencia de Acceso a la Información Pública), as the Control Body of Law 25.326, has the power to handle the complaints and claims filed by anyone whose rights are affected by a breach of the rules on personal data protection.</p>
+
+<h3 id="en-contact">8. Contact channel</h3>
+<p>For any request about your data, write to us at <a href="https://craftech.io/contact/">craftech.io/contact</a>.</p>
+
+<h3 id="en-synthetic">9. The demo's data</h3>
+<p>The demo's data is synthetic: made-up people, customers, addresses, work orders and equipment. Never load real third-party data into the demo (other people's names, phone numbers, addresses, documents or photos).</p>
+
+<p class="muted">If this notice changes, we publish a new version at this same address, with its date, and ask you to accept it again when you sign up. See also the <a href="/legal/terms.html">terms</a>.</p>
 </article>
 </main>
 <footer>Cuadrilla · Demo sintética de Craftech · <a href="/legal/privacy.html">Privacidad</a> · <a href="/legal/terms.html">Términos</a><br><a class="powered" href="https://craftech.io" rel="noopener">Powered by <img src="/brand/logo-craftech-color.svg" alt="Craftech" width="62" height="20"></a></footer>
