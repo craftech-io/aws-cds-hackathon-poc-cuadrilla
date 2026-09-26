@@ -32,12 +32,12 @@ Eres el **arquitecto** de Cuadrilla. Escribes para quien no estuvo en ninguna co
 Aplica la skill `poc-landing` del workspace (`../.claude/skills/poc-landing/SKILL.md`) al diseñar y al revisar docs de la landing, el alta, el login, los legales y cualquier
 texto visible:
 
-- Tabla de superficies visibles y excepciones internas de ADR-0022: una superficie nueva entra en esa
+- Tabla de superficies visibles y excepciones internas de ADR-0023: una superficie nueva entra en esa
   tabla y en el guard `lint:neutral-surfaces` en el mismo PR. En `docs/` el concurso se nombra solo
   como contexto interno; los flujos, escenarios y catálogos usan "invitado"/`GUEST` y "medición".
-- El rol de quien prueba la demo es `GUEST` (ADR-0023); un renombre nuevo actualiza
+- El rol de quien prueba la demo es `GUEST` (ADR-0024); un renombre nuevo actualiza
   `docs/guest-rename-map.md` con identificador viejo → nuevo, tipo y archivos.
-- Alta, mundo de invitado y anti abuso (ADR-0024) y leads (ADR-0025): cada flujo nuevo (FL-104 a
+- Alta, mundo de invitado y anti abuso (ADR-0025) y leads (ADR-0026): cada flujo nuevo (FL-104 a
   FL-122 y los que sigan) dice cómo se prueba en cada nivel, incluida la costura de QA (el ejecutor
   sigue solo IAM) y la verificación desplegada de `docs/test-plan.md` §6.1.
 - La landing la especifica el agente `ui-designer` en `docs/landing-spec.md`; tú la referencias y

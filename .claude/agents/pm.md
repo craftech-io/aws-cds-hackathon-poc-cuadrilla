@@ -37,8 +37,8 @@ Preguntas que este proyecto responde siempre antes de construir:
    para superficies públicas, además la verificación desplegada de §6.1 (390×844 y 1440×900, es y en,
    con movimiento reducido) y la revisión de diseño de sus capturas.
 6. **¿Es una superficie visible?** Si lo es: vocabulario de producto, rol `GUEST`, ninguna palabra
-   del concurso (ADR-0022, `lint:neutral-surfaces`), textos es-MX en tuteo y en inglés.
-7. **¿Toca datos de una persona real?** Solo el alta y los leads (ADR-0025): consentimiento, PII fuera
+   del concurso (ADR-0023, `lint:neutral-surfaces`), textos es-MX en tuteo y en inglés.
+7. **¿Toca datos de una persona real?** Solo el alta y los leads (ADR-0026): consentimiento, PII fuera
    de logs y exportaciones de la demo, borrado; todo lo demás es sintético.
 
 ## Cómo delegas

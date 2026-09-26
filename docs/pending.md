@@ -69,7 +69,7 @@ Dónde se usa el id: el formulario de Devpost (§3, paso 6) y el README de la su
 
 Dueño: CTO con el operador. Verificación: proyecto visible en Devpost; `aws --profile craftech-demos cognito-idp list-users-in-group --user-pool-id <id> --group-name GUEST` (estado de cada cuenta).
 
-**Qué va dónde (ADR-0022).** Las credenciales de las cuentas `guest-NN` van **solo** en el campo privado de instrucciones de prueba del formulario; nunca en la landing, el README, el repo, un log ni un chat. La descripción pública del proyecto en el formulario y el video pueden nombrar el concurso; la app publicada y el README de producto no (la sección `## Submission notes` del final del README sí).
+**Qué va dónde (ADR-0023).** Las credenciales de las cuentas `guest-NN` van **solo** en el campo privado de instrucciones de prueba del formulario; nunca en la landing, el README, el repo, un log ni un chat. La descripción pública del proyecto en el formulario y el video pueden nombrar el concurso; la app publicada y el README de producto no (la sección `## Submission notes` del final del README sí).
 
 ## 4. Video de 3 minutos (P-04)
 
@@ -103,14 +103,14 @@ Desbloquea la marca de la landing (WP-55, WP-44) y la carga de `BrandConfig`; el
 
 ## 6. Privacidad de los leads (P-06)
 
-El alta registra leads reales (ADR-0025). Lo que falta del lado del CTO:
+El alta registra leads reales (ADR-0026). Lo que falta del lado del CTO:
 
-1. **Domicilio del responsable**: el domicilio legal de Craftech que el aviso de privacidad nombra junto al responsable (ADR-0025, punto 1). Sin él, la página no se usa en ninguna promoción pública.
+1. **Domicilio del responsable**: el domicilio legal de Craftech que el aviso de privacidad nombra junto al responsable (ADR-0026, punto 1). Sin él, la página no se usa en ninguna promoción pública.
 2. **Vía de contacto de privacidad**: la casilla o el formulario de Craftech donde una persona pide acceso, rectificación, supresión o la baja del contacto. Hasta que se confirme, `/legal/privacy.html` usa `https://craftech.io/contact/` (interino aceptable) y el borrado autoservicio de la consola. Al confirmarse, se carga en `LeadConfig.privacyContact` y en el texto de la página (versión nueva de `TERMS_PRIVACY`).
-3. **Validación legal** del aviso de privacidad y de los términos con los nueve puntos de ADR-0025 (responsable y domicilio; datos tratados, incluidos la IP en hash, la cookie de WAF y el contenido que el invitado crea en la demo; encargados y la inferencia global del modelo; transferencia internacional (art. 12) a Estados Unidos (región `us-east-1`) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global, con el consentimiento expreso de la casilla `TERMS_PRIVACY`, cuyo texto la nombra; finalidades; retención; derechos con sus plazos —acceso en 10 días corridos, rectificación y supresión en 5 días hábiles—, retiro del consentimiento de contacto y el texto sobre la Agencia de Acceso a la Información Pública; canal de contacto) y decisión sobre la **inscripción de la base** en el registro de la autoridad de control si corresponde.
+3. **Validación legal** del aviso de privacidad y de los términos con los nueve puntos de ADR-0026 (responsable y domicilio; datos tratados, incluidos la IP en hash, la cookie de WAF y el contenido que el invitado crea en la demo; encargados y la inferencia global del modelo; transferencia internacional (art. 12) a Estados Unidos (región `us-east-1`) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global, con el consentimiento expreso de la casilla `TERMS_PRIVACY`, cuyo texto la nombra; finalidades; retención; derechos con sus plazos —acceso en 10 días corridos, rectificación y supresión en 5 días hábiles—, retiro del consentimiento de contacto y el texto sobre la Agencia de Acceso a la Información Pública; canal de contacto) y decisión sobre la **inscripción de la base** en el registro de la autoridad de control si corresponde.
 4. **Destinatarios del aviso de lead**: la casilla `@craftech.io` que recibe los avisos. Carga (operador con `devops`, sin pegar valores en ningún chat): `npx sst secret set LeadConfig '{"notifyRecipients":["<casilla>@craftech.io"]}' --stage poc`, con la casilla del CTO como valor inicial; después `npm run leads:notify-test -- --stage poc` y confirmar que llegó.
 
-5. **Procedimiento de borrado fuera de la tabla**: quién borra, en la casilla que recibe los avisos, el aviso de un lead borrado o vencido (por su `leadId`) y cómo se destruyen los CSV exportados (a más tardar a los 30 días; ADR-0025).
+5. **Procedimiento de borrado fuera de la tabla**: quién borra, en la casilla que recibe los avisos, el aviso de un lead borrado o vencido (por su `leadId`) y cómo se destruyen los CSV exportados (a más tardar a los 30 días; ADR-0026).
 
 Dueño: CTO. Verificación: `npx sst secret list --stage poc` (sin compartir valores); el aviso de prueba recibido; las páginas legales con la versión validada y el domicilio.
 

@@ -35,7 +35,7 @@ Para la landing, el alta, el login y los legales aplica la skill `poc-landing` d
   evidencia, después las cuatro completas dentro del límite por IP y el chequeo anti abuso al final, en
   una hora nueva (`docs/test-plan.md` §6.1); la Function URL directa del `Bff` debe responder `403`.
 - **Guard de superficies neutrales**: `scripts/lint/neutral-surfaces.test.ts` falla por cada palabra de
-  ADR-0022 (mayúsculas, acentos, dentro de una oración) y respeta las excepciones internas; en cada
+  ADR-0023 (mayúsculas, acentos, dentro de una oración) y respeta las excepciones internas; en cada
   verificación, `lint:neutral-surfaces -- --dist` sobre el build.
 - Casos, escenarios y reportes usan "invitado"/`GUEST` y "medición"; ningún reporte incluye el email de
   un lead (solo enmascarado).

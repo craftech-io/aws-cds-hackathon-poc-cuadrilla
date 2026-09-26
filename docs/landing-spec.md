@@ -39,8 +39,8 @@ funcionan; esta spec no los descarta, los **extiende**:
 | `media.ts`, `public/landing/manifest.json` | Manifiesto versionado ya definido (`version`, `video`, `media: {file, width, height, alt, status}`) | Se agrega `status: "render"` (nuevo) junto a los ya tipados `"placeholder"` y `"capture"`, y se listan los ids reales del manifiesto de §6.3 |
 | `index.css` `@theme` | Paleta navy/cyan + semánticos ya en producción en consola y login | §2 **re-tunea los valores hex de los mismos nombres de token** (identidad propia de Cuadrilla, §2.1) y agrega los tres tokens nuevos ya justificados; ningún nombre de token cambia, ningún componente de la consola o del login cambia de clase — cambian solo los `--color-*` de `index.css`, en el mismo PR de WP-55 |
 | `LoginView.tsx`, `AuthFlowPanel.tsx`, `steps.tsx`, `use-auth-flow.ts` | Máquina de pasos del login (`credentials → newPassword → totp → mfaSetup → forgotRequest → forgotConfirm → done`), panel de marca a la izquierda, tarjeta blanca a la derecha | El signup (§7) es una máquina de pasos **nueva y paralela** (`signUp → confirmCode → done`, sin paso intermedio: §7.1) con el mismo lenguaje visual; el login no cambia de flujo, solo de copy (ya no dice "tu usuario se crea por invitación" como única vía, §7.7) |
-| `infra/auth.ts` | `AllowAdminCreateUserOnly: true`; grupos `SUPERVISOR`/`JUDGE`/`OPS`; sin self-service | Decidido por **ADR-0024** (alta propia, mundo de invitado, anti abuso) y construido por WP-56/WP-57/WP-58 (`docs/build-plan.md`, ola 2b.2); esta spec no decide el mecanismo, especifica la UX y los textos sobre lo que ADR-0024 ya fija (Cognito `SignUp`/`ConfirmSignUp`, login SRP automático tras confirmar, §7.1) |
-| `public/legal/privacy.html`, `terms.html` | Ya existen, en es, mencionan "jurado" y la hackathon | Los reescribe `typescript-dev` en WP-59 según **ADR-0025** (responsable, finalidades, retención, derechos, Ley 25.326) y los textos de consentimiento de `packages/shared/src/legal/consents.ts`; no los especifica este documento |
+| `infra/auth.ts` | `AllowAdminCreateUserOnly: true`; grupos `SUPERVISOR`/`JUDGE`/`OPS`; sin self-service | Decidido por **ADR-0025** (alta propia, mundo de invitado, anti abuso) y construido por WP-56/WP-57/WP-58 (`docs/build-plan.md`, ola 2b.2); esta spec no decide el mecanismo, especifica la UX y los textos sobre lo que ADR-0025 ya fija (Cognito `SignUp`/`ConfirmSignUp`, login SRP automático tras confirmar, §7.1) |
+| `public/legal/privacy.html`, `terms.html` | Ya existen, en es, mencionan "jurado" y la hackathon | Los reescribe `typescript-dev` en WP-59 según **ADR-0026** (responsable, finalidades, retención, derechos, Ley 25.326) y los textos de consentimiento de `packages/shared/src/legal/consents.ts`; no los especifica este documento |
 
 ---
 
@@ -97,7 +97,7 @@ nota de confianza. Derecha: el **loop del producto** (`hero-loop`) — una anima
 video con controles) que muestra, comprimido, el corazón del recorrido de §1.6: nota de voz → respuesta
 citada → foto rechazada → ✅ → PDF, dentro de un marco de teléfono. La nota de voz se ve como en WhatsApp
 (forma de onda, duración y ✓✓ leído), **nunca con su transcripción**: quien envía una nota de voz no ve su
-texto, y las transcripciones solo existen en la línea de tiempo de la orden de la consola (M0, ADR-0022 §6). Es la versión corta del recorrido
+texto, y las transcripciones solo existen en la línea de tiempo de la orden de la consola (M0, ADR-0023 §6). Es la versión corta del recorrido
 completo; un visitante que nunca baja de la primera pantalla ya vio el producto funcionando. El loop tiene
 motion propio con control de pausa y freno de repetición — fila **M0** de la tabla de motion (§3); no es
 una animación "libre" sin especificar, es el elemento más visible de toda la landing.
@@ -559,7 +559,7 @@ Ninguna animación bloquea la lectura: todo el contenido final es accesible sin 
 
 | # | Animación | Disparador | Duración / easing | Con `prefers-reduced-motion` |
 |---|---|---|---|---|
-| M0 | Loop del hero (`hero-loop`, B6 — antes sin fila propia) | Autoplay al entrar en viewport (`IntersectionObserver`) | 14-18s por vuelta; se detiene sola a las **2 vueltas** y descansa en el cuadro final, dentro del marco de teléfono y solo con lo que el simulador de teléfono muestra (`docs/design-brief.md` §6): la nota de voz (forma de onda y duración, ✓✓ leído — **sin transcripción**: en WhatsApp quien envía una nota de voz nunca ve su texto, y las transcripciones viven solo en la línea de tiempo de `/app/orders/:workOrderId`), la respuesta citada como texto plano, la foto rechazada con 🔁 y la siguiente con ✅, el PDF recibido — todo visible a la vez, no solo el cuadro más vistoso (R4-B1, ADR-0022 §6); un control visible **"Pausar animación" / "Pause animation"** de ≥44px alterna pausa/play; se pausa además con `:hover`, con `:focus` dentro del loop, al salir del viewport (mismo `IntersectionObserver`) y en `visibilitychange` (pestaña oculta) — cumple WCAG 2.2.2 (contenido en movimiento &gt;5s junto a otro contenido necesita pausa) | Sin loop: un póster estático del cuadro final (mismo que el descanso tras 2 vueltas), con un `<span class="sr-only">` que resume los **cinco** momentos del loop (voz → respuesta citada → foto rechazada → ✅ → PDF) en una frase; ahí, y solo ahí, puede decir qué dice la nota de voz ("la ONU no prende la luz PON"), como texto alternativo del audio, nunca como texto visible en el teléfono |
+| M0 | Loop del hero (`hero-loop`, B6 — antes sin fila propia) | Autoplay al entrar en viewport (`IntersectionObserver`) | 14-18s por vuelta; se detiene sola a las **2 vueltas** y descansa en el cuadro final, dentro del marco de teléfono y solo con lo que el simulador de teléfono muestra (`docs/design-brief.md` §6): la nota de voz (forma de onda y duración, ✓✓ leído — **sin transcripción**: en WhatsApp quien envía una nota de voz nunca ve su texto, y las transcripciones viven solo en la línea de tiempo de `/app/orders/:workOrderId`), la respuesta citada como texto plano, la foto rechazada con 🔁 y la siguiente con ✅, el PDF recibido — todo visible a la vez, no solo el cuadro más vistoso (R4-B1, ADR-0023 §6); un control visible **"Pausar animación" / "Pause animation"** de ≥44px alterna pausa/play; se pausa además con `:hover`, con `:focus` dentro del loop, al salir del viewport (mismo `IntersectionObserver`) y en `visibilitychange` (pestaña oculta) — cumple WCAG 2.2.2 (contenido en movimiento &gt;5s junto a otro contenido necesita pausa) | Sin loop: un póster estático del cuadro final (mismo que el descanso tras 2 vueltas), con un `<span class="sr-only">` que resume los **cinco** momentos del loop (voz → respuesta citada → foto rechazada → ✅ → PDF) en una frase; ahí, y solo ahí, puede decir qué dice la nota de voz ("la ONU no prende la luz PON"), como texto alternativo del audio, nunca como texto visible en el teléfono |
 | M1 | Reveal de sección (título + tarjetas) | `IntersectionObserver`, 20% visible, `once: true` | `opacity 0→1` + `translateY(12px→0)`, 400ms `ease-out`, stagger 80-120ms entre hijos | Sin transición: aparece en su posición final, opacity 1, sin delay |
 | M2 | Auto-tipeo del chat — solo mensajes `exampleAgentReply` y texto de la historia escrito por una persona (S1, S2, y la instrucción de Héctor en S5); nunca un mensaje `fixedCopy` (plantillas `caso_escalado`/`caso_reasignado` de S5, instrucción `safetyInstruction` de §SEG-01 en S6), que siempre aparece completo de una sola vez — así se ve que el modelo no lo redacta | Escena activa del recorrido (§4.1) | `ms/carácter = min(35, 4000 / longitud)` (techo de 4s por mensaje, WCAG 2.2.2 — §9.1), cursor parpadeante `opacity` 0/1 cada 500ms mientras tipea, se detiene al terminar | El mensaje aparece completo de una vez, sin cursor parpadeante ni demora — nunca se oculta contenido esperando la animación |
 | M3 | Nota de voz (forma de onda) | Con S1, al empezar la reproducción simulada de la nota de voz | Corre **una vez**, la duración real de la nota (≤4s) — barras con `transform: scaleY()` entre 0.3 y 1, offsets escalonados por barra (look de audio real) — y descansa fija en su estado final; nunca en loop mientras la escena sigue activa | Forma de onda estática en su estado "medio" (barras a 0.6 de escala), sin animar |
@@ -776,7 +776,7 @@ de los renders es un componente propio de la landing (`views/landing/`) — no e
 reemplaza. Los **recortes de consola** (galería, checklist, buzón de salida) sí reusan los componentes
 reales de `packages/web/src/components/*` (`BrandMark`, `Table`, `Badge`, `Callout`, `StatTile`, etc.), con
 datos fijos. **En la landing en inglés, el teléfono sigue en es-MX** (el producto le habla al instalador en
-es-MX, ADR-0022): cada escena agrega una sola leyenda en inglés junto al mensaje, tomada de una glosa
+es-MX, ADR-0023): cada escena agrega una sola leyenda en inglés junto al mensaje, tomada de una glosa
 (`en-gloss.ts` para las plantillas de WhatsApp, o la glosa que acompaña a cada mensaje de `main-story.ts`),
 nunca una traducción del chat completo.
 
@@ -793,7 +793,7 @@ corra, §6.1 (renders con componentes reales) es la única fuente de las 18 entr
 
 1. `scripts/landing/console-server.ts` (adaptado por WP-60 del scaffolding reusado, `docs/reuse-map.md`
    línea 156) sirve la consola localmente contra un mundo sintético determinista — el mismo mundo `guest`
-   de la plantilla curada (ADR-0023), nunca datos reales.
+   de la plantilla curada (ADR-0024), nunca datos reales.
 2. `scripts/landing/console-world.ts` siembra el estado exacto de cada escena (S1-S6, más las capturas
    de galería de §6.3) usando los mismos presets de "Saltar a escena" (`world.create`, `docs/seed-spec.md`)
    — así una captura nunca depende de que un turno del agente haya salido bien en el momento de capturar.
@@ -838,7 +838,7 @@ orden). Los ids siguen el orden de escenas de §1.6 (N5); ninguna fila describe 
 | `gallery-orders` | Galería: tabla de órdenes del día | `render` | `/app/orders` · 1440×900 y 390×844 | Landing |
 | `gallery-order-detail` | Galería: línea de tiempo unificada de una orden | `render` | `/app/orders/:workOrderId` · 1440×900 | Landing |
 | `gallery-manual` | Galería: vista del manual con una sección citada abierta | `render` | `/app/manual/:sectionId` (§DIAG-02) · 1440×900 | Landing |
-| `gallery-metrics` | Galería: pestaña "Medición del manual" con N y meta (B4: renombrado de ADR-0022 — nunca "evaluación" en una superficie visible) | `render` | `/app/metrics` · pestaña "Medición del manual" · 1440×900 | Landing |
+| `gallery-metrics` | Galería: pestaña "Medición del manual" con N y meta (B4: renombrado de ADR-0023 — nunca "evaluación" en una superficie visible) | `render` | `/app/metrics` · pestaña "Medición del manual" · 1440×900 | Landing |
 | `gallery-audit` | Galería: bitácora con una decisión y su regla | `render` | `/app/audit` · 1440×900 | Landing |
 | `gallery-clock` | Galería: barra de hora simulada con "Avanzar al próximo evento" | `render` | `/app/clock` · 1440×900 | Landing |
 | `signup-form` | Signup: formulario con los dos consentimientos separados | `render` (construido junto con la vista real de `/signup`, §7) | Es la vista real: no hay "reemplazo", es captura directa una vez que existe | Signup |
@@ -849,7 +849,7 @@ captura real porque el signup se construye directo, sin una consola previa que r
 antes, porque N5 agrega la escena de seguridad (S6) como sus dos propias entradas en vez de reusar las de
 S2/S5. Ninguna muestra una funcionalidad que el producto no vaya a tener: cada una corresponde a una vista
 o un flujo ya descrito en `docs/design-brief.md`. **`architect` puede retirar en el mismo PR** la excepción
-que `docs/build-plan.md` WP-55 registra para `gallery-metrics` ("ADR-0022 prevalece sobre el texto de
+que `docs/build-plan.md` WP-55 registra para `gallery-metrics` ("ADR-0023 prevalece sobre el texto de
 §6.3"): esta tabla ya dice "Medición del manual", así que la excepción queda sin objeto.
 
 ### 6.4 Galería con zoom
@@ -877,7 +877,7 @@ lightbox al cerrar (accesibilidad de diálogo modal).
   toggle es/en y lee `?lang=` (§7.9, B9).
 - **Máquina de pasos corregida, sin paso intermedio ni destino equivocado (B8a)**: la versión anterior
   saltaba de `confirmCode` directo a `CONSOLE_HOME`, pero `ConfirmSignUp` de Cognito **no inicia sesión** —
-  confirma el email, nada más (ADR-0024 §1). La máquina real es `signUp → confirmCode → done`:
+  confirma el email, nada más (ADR-0025 §1). La máquina real es `signUp → confirmCode → done`:
   1. `signUp`: llama `signup.start` (ticket) y `SignUp` de Cognito (§7.3).
   2. `confirmCode`: `ConfirmSignUp` con el código (§7.4).
   3. Al confirmar, el propio paso **inicia sesión por SRP automáticamente**, con la contraseña que el
@@ -886,11 +886,11 @@ lightbox al cerrar (accesibilidad de diálogo modal).
      vez de por un formulario. Un error de login en este paso (poco probable, mismo usuario recién
      confirmado) cae al paso `credentials` del login normal con el email precargado, nunca a un error
      genérico.
-  4. `done` redirige a **`/app/home`** (portada del invitado, `guest-home`, ADR-0024 §2) — no a
+  4. `done` redirige a **`/app/home`** (portada del invitado, `guest-home`, ADR-0025 §2) — no a
      `CONSOLE_HOME`, que no es el punto de entrada de un `GUEST` (§7.8).
 
   No hay paso `worldPending`: el aprovisionamiento del mundo corre asíncrono desde `post-confirmation`
-  (ADR-0024 §2) y su estado se muestra en la portada del invitado, no en la máquina de signup (§7.6).
+  (ADR-0025 §2) y su estado se muestra en la portada del invitado, no en la máquina de signup (§7.6).
 
 ### 7.2 Rutas
 
@@ -926,17 +926,17 @@ Debajo de los campos, **dos casillas separadas, ninguna tildada por defecto**:
 - Casilla A (obligatoria para enviar el formulario): texto con dos links inline a `/legal/terms.html` y
   `/legal/privacy.html`.
 - Casilla B (opcional, no bloquea el envío): consentimiento de contacto comercial.
-- **Protección contra bots, invisible (B8d/N2, corregido — ADR-0024 §4 descarta CAPTCHA, "ninguna regla usa
+- **Protección contra bots, invisible (B8d/N2, corregido — ADR-0025 §4 descarta CAPTCHA, "ninguna regla usa
   CAPTCHA")**: la protección contra bots es invisible: `lib/waf-token.ts` adquiere el token de AWS WAF
   (Challenge silencioso) antes de habilitar "Crear cuenta"; no hay widget ni texto propio. El único texto
   visible es el de la fila "Challenge silencioso de WAF" de §7.5, para el caso en que el token no llega.
 
 Textos exactos (es-MX y en); el texto y la **versión** de las dos casillas de consentimiento no viven en
 este documento ni en el código del signup — vienen de la fuente única `packages/shared/src/legal/
-consents.ts` (`TERMS_PRIVACY`, `CONTACT`, ADR-0025), que el signup importa y valida; esta tabla los cita
+consents.ts` (`TERMS_PRIVACY`, `CONTACT`, ADR-0026), que el signup importa y valida; esta tabla los cita
 tal como están hoy en esa fuente, versión `2026-09-26` (R2-B4: `consents.ts` es la única fuente y su texto
 de `TERMS_PRIVACY` tiene que coincidir con el de la fila "Casilla A" de abajo, que ahora nombra la
-transferencia internacional que ADR-0025 §4 basa en este consentimiento). El texto más largo de la Casilla
+transferencia internacional que ADR-0026 §4 basa en este consentimiento). El texto más largo de la Casilla
 A se verifica en QA (§9.1) para que siga envolviendo con claridad a 360px junto al objetivo táctil de 44px
 de la casilla:
 
@@ -981,44 +981,44 @@ Al confirmar (B8a), este paso encadena el login SRP automático y navega a `/app
 para ese instante — es el mismo spinner corto de "Un momento…" que ya usa `loginCopy.working` en
 `LoginView.tsx`, reusado tal cual.
 
-### 7.5 Anti-abuso, visible para quien prueba — reescrito contra ADR-0024 (B8c/d, N13)
+### 7.5 Anti-abuso, visible para quien prueba — reescrito contra ADR-0025 (B8c/d, N13)
 
 Ninguno de estos límites se explica como "seguridad" en la UI (sería ruido); se explican solo si el
 visitante los toca, con un mensaje claro y sin tecnicismos. Cada código de error de `signup.start` /
 `SignUp` / `ConfirmSignUp` tiene su propio mensaje — ninguno revela si un email existe, salvo
-`EMAIL_TAKEN`, que es intencional (ADR-0024 asume ese riesgo acotado por los límites por IP y por email):
+`EMAIL_TAKEN`, que es intencional (ADR-0025 asume ese riesgo acotado por los límites por IP y por email):
 
 | Código / situación | Dónde ocurre | Mensaje, es-MX | en |
 |---|---|---|---|
 | `EMAIL_TAKEN` (una cuenta por email) | `signup.start` | Ya existe una cuenta con este email. ¿Quieres [iniciar sesión](/login) o [restablecer tu contraseña](/login?forgot=1)? | There's already an account with this email. Want to [sign in](/login) or [reset your password](/login?forgot=1)? |
-| `RATE_LIMITED` — agrupa **cinco** límites de ADR-0024 §3 (5 altas/hora por IP; IP anónima 1/hora y 30/día en el stage; 3/hora o 5/día por persona; 3 usuarios sin confirmar por el mismo email; 2 cuentas confirmadas por persona), neutral y sin promesa de tiempo porque la mayoría no se resuelve "en minutos" | `signup.start` | Llegaste al límite de altas desde esta conexión o con este email. Intenta más tarde o [hablemos](https://craftech.io/contact/) y te preparamos una demo guiada. | You've reached the sign-up limit for this connection or email. Try again later, or [let's talk](https://craftech.io/contact/) and we'll set up a guided demo. |
-| `CAP_REACHED` — tope diario de altas *iniciadas* en el stage (300/día, ADR-0024 §3) **o** `KILL#SIGNUP` encendido (ADR-0024 §4): los dos casos comparten el mismo código, así que el texto no promete "mañana" | `signup.start` | Por ahora no estamos abriendo cuentas nuevas de prueba. Vuelve más tarde o [hablemos](https://craftech.io/contact/) y te preparamos una demo guiada. | We're not opening new test accounts right now. Try again later, or [let's talk](https://craftech.io/contact/) and we'll set up a guided demo. |
-| `TICKET_INVALID` — el ticket de alta venció (10 min) o llegó a sus **a lo sumo dos usos** (ADR-0024 §3) | `SignUp` | La sesión del formulario venció, intenta de nuevo. | The form session expired, please try again. |
+| `RATE_LIMITED` — agrupa **cinco** límites de ADR-0025 §3 (5 altas/hora por IP; IP anónima 1/hora y 30/día en el stage; 3/hora o 5/día por persona; 3 usuarios sin confirmar por el mismo email; 2 cuentas confirmadas por persona), neutral y sin promesa de tiempo porque la mayoría no se resuelve "en minutos" | `signup.start` | Llegaste al límite de altas desde esta conexión o con este email. Intenta más tarde o [hablemos](https://craftech.io/contact/) y te preparamos una demo guiada. | You've reached the sign-up limit for this connection or email. Try again later, or [let's talk](https://craftech.io/contact/) and we'll set up a guided demo. |
+| `CAP_REACHED` — tope diario de altas *iniciadas* en el stage (300/día, ADR-0025 §3) **o** `KILL#SIGNUP` encendido (ADR-0025 §4): los dos casos comparten el mismo código, así que el texto no promete "mañana" | `signup.start` | Por ahora no estamos abriendo cuentas nuevas de prueba. Vuelve más tarde o [hablemos](https://craftech.io/contact/) y te preparamos una demo guiada. | We're not opening new test accounts right now. Try again later, or [let's talk](https://craftech.io/contact/) and we'll set up a guided demo. |
+| `TICKET_INVALID` — el ticket de alta venció (10 min) o llegó a sus **a lo sumo dos usos** (ADR-0025 §3) | `SignUp` | La sesión del formulario venció, intenta de nuevo. | The form session expired, please try again. |
 | `INVALID` — consentimiento (versión vieja, o `TERMS_PRIVACY` sin marcar) | `signup.start` | Reusa el error de validación de la casilla A (no se envía) — no hay un mensaje aparte, el botón sigue deshabilitado. | Same. |
-| `INVALID` — dominio del email sin MX ni A/AAAA (ADR-0024 §3; `docs/test-plan.md` §6.1 lo prueba) | `signup.start` | Revisa tu email: ese dominio no puede recibir correo. | Check your email: that domain can't receive mail. |
-| `UNAVAILABLE` — sin `edge.viewerIp` (el pedido no pasó por CloudFront, ADR-0024 §3) | `signup.start` | No pudimos crear tu cuenta en este momento. Intenta de nuevo en unos minutos. | We couldn't create your account right now. Please try again in a few minutes. |
+| `INVALID` — dominio del email sin MX ni A/AAAA (ADR-0025 §3; `docs/test-plan.md` §6.1 lo prueba) | `signup.start` | Revisa tu email: ese dominio no puede recibir correo. | Check your email: that domain can't receive mail. |
+| `UNAVAILABLE` — sin `edge.viewerIp` (el pedido no pasó por CloudFront, ADR-0025 §3) | `signup.start` | No pudimos crear tu cuenta en este momento. Intenta de nuevo en unos minutos. | We couldn't create your account right now. Please try again in a few minutes. |
 | Errores de Cognito en `SignUp`/`ConfirmSignUp` (código inválido, contraseña débil, etc.) | Cognito | Traducidos a los textos de §7.3/§7.4 — nunca el texto crudo de Cognito. | Same. |
-| Challenge silencioso de WAF (`lib/waf-token.ts`, ADR-0024 §4 — "ninguna regla usa CAPTCHA") | Antes de `signup.start` | Sin texto propio: el botón "Crear cuenta" se habilita recién cuando `lib/waf-token.ts` consigue el token. Si no lo consigue en 10s (bloqueador de contenido, extensión de navegador o error de red): "No pudimos verificar tu navegador. Recarga la página, desactiva el bloqueador de contenido para este sitio o intenta desde otro navegador." | "We couldn't verify your browser. Reload the page, turn off your content blocker for this site, or try another browser." |
-| **Tope de mundos `SIGNUP` activos (`CAP_FULL`)** | **Ya no es un error del formulario (B8c)** — ADR-0024 §3: la cuenta y el lead ya existen; el mundo queda pendiente | Se muestra en la **portada del invitado** después de iniciar sesión, no en el signup (§7.6) | Same |
+| Challenge silencioso de WAF (`lib/waf-token.ts`, ADR-0025 §4 — "ninguna regla usa CAPTCHA") | Antes de `signup.start` | Sin texto propio: el botón "Crear cuenta" se habilita recién cuando `lib/waf-token.ts` consigue el token. Si no lo consigue en 10s (bloqueador de contenido, extensión de navegador o error de red): "No pudimos verificar tu navegador. Recarga la página, desactiva el bloqueador de contenido para este sitio o intenta desde otro navegador." | "We couldn't verify your browser. Reload the page, turn off your content blocker for this site, or try another browser." |
+| **Tope de mundos `SIGNUP` activos (`CAP_FULL`)** | **Ya no es un error del formulario (B8c)** — ADR-0025 §3: la cuenta y el lead ya existen; el mundo queda pendiente | Se muestra en la **portada del invitado** después de iniciar sesión, no en el signup (§7.6) | Same |
 
 **Corrección de fondo (B8c)**: la versión anterior de esta tabla trataba el tope de mundos como un rechazo
-del formulario de alta. Per ADR-0024 §3, ese tope (`CAP_FULL`) se descubre **después** de confirmar el
+del formulario de alta. Per ADR-0025 §3, ese tope (`CAP_FULL`) se descubre **después** de confirmar el
 email: la cuenta de Cognito y el lead ya se crearon, y es la portada del invitado (§7.6) la que muestra el
 estado y el "Reintentar" — el signup nunca lo bloquea antes de crear la cuenta. Lo que sí puede rechazar
 `signup.start` **antes** de crear nada es `CAP_REACHED` (el tope diario de altas *iniciadas*, no de
 mundos), agregado arriba.
 
 **Corrección de fondo (B8d/N2, reescrita — R2-B2/NB-1)**: la versión anterior de esta sección pedía un
-widget de **AWS WAF JS CAPTCHA API** que ADR-0024 §4 **descarta explícitamente** ("Ninguna regla usa
+widget de **AWS WAF JS CAPTCHA API** que ADR-0025 §4 **descarta explícitamente** ("Ninguna regla usa
 CAPTCHA"; la opción A' — CAPTCHA para IP anónimas — queda "Descartada por ahora" porque una acción CAPTCHA
 sobre el `fetch` del alta responde `405` con HTML que la página no puede mostrar, y bloquearía a
 prospectos detrás de una VPN corporativa); WP-56 no crea ninguna clave de API de WAF y CLAUDE.md pide
-"AWS WAF … sin CAPTCHA". La protección real, la opción **A** elegida por ADR-0024 §4, es **AWS WAF en el
+"AWS WAF … sin CAPTCHA". La protección real, la opción **A** elegida por ADR-0025 §4, es **AWS WAF en el
 Router** (reputación de IP, tasa por IP, un **Challenge silencioso** en `/api/signup.*`, la regla
 `AnonymousIpSignup` que solo **etiqueta** la IP anónima o de VPN corporativa, sin bloquear ni mostrar nada)
 **+ AWS WAF regional en el user pool** (tasa por operación de Cognito) — nunca un widget visible. Una IP
 anónima o de VPN corporativa no ve ninguna interfaz distinta: solo tiene el límite de altas más estricto
-de ADR-0024 §3 (1 por hora por IP, 30 por día en el stage), que el visitante experimenta como
+de ADR-0025 §3 (1 por hora por IP, 30 por día en el stage), que el visitante experimenta como
 `RATE_LIMITED` (misma tabla de arriba). El Challenge no tiene UI propia — `lib/waf-token.ts` adquiere el
 token antes de habilitar "Crear cuenta" — y solo hay texto visible cuando el token no llega (fila
 "Challenge silencioso de WAF" de arriba).
@@ -1033,7 +1033,7 @@ demo.
 **Por qué se reescribe**: la versión anterior mezclaba el estado del mundo en dos lugares (un paso
 `worldPending` del signup y "los tres estados" de la portada) y solo definía copy para `PROVISIONING` y
 una variante lenta. `docs/build-plan.md` WP-58 ya cita "§7.6 los tres estados" para construir la portada;
-esta sección es ahora esa única fuente, con los **cuatro** estados reales de ADR-0024 §2-§3: `PROVISIONING`
+esta sección es ahora esa única fuente, con los **cuatro** estados reales de ADR-0025 §2-§3: `PROVISIONING`
 → `READY` (o `FAILED`, reintentable) o `CAP_FULL`. No hay paso de signup para esto (§7.1): todo vive acá,
 en `/app/home`, el destino de todo login de un `GUEST` (§7.2).
 
@@ -1045,7 +1045,7 @@ login/signup — ya es una vista autenticada), tarjeta central con el estado del
 | `PROVISIONING` (spinner, **sin porcentaje falso** — no hay forma honesta de estimarlo) | **Título**: Estamos preparando tu mundo de prueba. **Bajada**: Tu instalador, tus órdenes y tu manual sintéticos ya casi están listos. **Espera prolongada (&gt;8s)**: Está tardando más de lo normal. Si no carga en un momento, [escríbenos](https://craftech.io/contact/). | **Title**: We're setting up your test world. **Lead**: Your synthetic installer, work orders and manual are almost ready. **Long wait (&gt;8s)**: This is taking longer than usual. If it doesn't load in a moment, [reach out](https://craftech.io/contact/). |
 | `READY` | **Título**: Tu mundo está listo. **Resumen**: nombre del instalador y de la operadora sembrados, fecha de creación. **Vencimiento**: Tu mundo vence el {fecha}; al volver a entrar se recrea. **Habilitación por etapas**: Se habilita por etapas — lista de lo que ya puedes usar (calculada con `lib/view-registry.ts`, igual que §1.11/§1.12), sin fechas para lo que falta. **Borrar cuenta**: link "Borrar mi cuenta" → confirmación con tu contraseña y el texto "Esto borra tu cuenta, tus datos de contacto y tu mundo de prueba. No se puede deshacer." **Logout**: "Cerrar sesión" | **Title**: Your world is ready. **Summary**: seeded installer and operator names, creation date. **Expiry**: Your world expires on {date}; it's recreated the next time you sign in. **Rolling out in stages**: what you can already use (from `lib/view-registry.ts`), no dates for what's still rolling out. **Delete account**: "Delete my account" link → confirm with your password, "This deletes your account, your contact details and your test world. This can't be undone." **Logout**: "Sign out" |
 | `FAILED` (aprovisionamiento falló, reintentable) | **Título**: No pudimos preparar tu mundo. **Bajada**: Puede ser algo temporal. **Botón**: Reintentar (`guest.retryWorld`, 1 por minuto) | **Title**: We couldn't set up your world. **Lead**: This might be temporary. **Button**: Retry (`guest.retryWorld`, once a minute) |
-| `CAP_FULL` (tope de 150 mundos `SIGNUP` activos, ADR-0024 §3 — **ya no es un error del formulario, B8c**) | **Título**: Por ahora llegamos al límite de mundos de prueba disponibles. **Bajada**: Tu cuenta ya está creada; solo falta lugar para tu mundo. **Botón**: Reintentar. **Alternativa**: [Hablemos](https://craftech.io/contact/) si quieres una demo guiada mientras tanto. | **Title**: We've hit the limit of test worlds available right now. **Lead**: Your account is already created; we just need room for your world. **Button**: Retry. **Alternative**: [Let's talk](https://craftech.io/contact/) if you'd like a guided demo meanwhile. |
+| `CAP_FULL` (tope de 150 mundos `SIGNUP` activos, ADR-0025 §3 — **ya no es un error del formulario, B8c**) | **Título**: Por ahora llegamos al límite de mundos de prueba disponibles. **Bajada**: Tu cuenta ya está creada; solo falta lugar para tu mundo. **Botón**: Reintentar. **Alternativa**: [Hablemos](https://craftech.io/contact/) si quieres una demo guiada mientras tanto. | **Title**: We've hit the limit of test worlds available right now. **Lead**: Your account is already created; we just need room for your world. **Button**: Retry. **Alternative**: [Let's talk](https://craftech.io/contact/) if you'd like a guided demo meanwhile. |
 
 `PROVISIONING` usa `<FullScreenMessage>` (componente ya existente en `packages/web/src/components/`) con
 un spinner; `READY`/`FAILED`/`CAP_FULL` son la vista normal de `/app/home` con su tarjeta de estado.
@@ -1070,14 +1070,14 @@ mismo patrón que `views/login/copy.ts`); especifica los cambios de fondo:
 para un invitado que se registró solo — nunca recibió una invitación. El texto neutral sirve para los dos
 caminos; el hint de invitación queda como aclaración secundaria para quien sí llegó por `console:invite`.
 
-### 7.8 Roles internos — reescrito contra ADR-0023 (B4)
+### 7.8 Roles internos — reescrito contra ADR-0024 (B4)
 
 **La versión anterior citaba el rol viejo** ("el futuro nombre no-`JUDGE`… el rol de evaluador"), que
-ADR-0023 ya resolvió: no hay un nombre pendiente, y no hay un rol aparte para pruebas internas. El estado
+ADR-0024 ya resolvió: no hay un nombre pendiente, y no hay un rol aparte para pruebas internas. El estado
 real:
 
 - **`GUEST` es el único rol de quien prueba la demo**, con tres orígenes que solo cambian cómo nace la
-  cuenta y el ciclo de vida de su mundo (ADR-0023): **`INVITED`** (cuentas `guest-01`..`guest-NN` creadas
+  cuenta y el ciclo de vida de su mundo (ADR-0024): **`INVITED`** (cuentas `guest-01`..`guest-NN` creadas
   por el operador con `console:invite --guest`, credenciales solo en las instrucciones privadas de la
   submission), **`TEST`** (`guest-test`, ensayo del operador) y **`SIGNUP`** (alta propia por `/signup`,
   esta spec). Los tres orígenes tienen exactamente el mismo comportamiento en la consola: el de
@@ -1110,7 +1110,7 @@ pierda.
 (N11/N13); ninguna implementación necesita convertir nada.
 
 Este documento ya trae, inline, el texto es-MX/en de cada bloque (§1, §7). Al implementar, con las rutas
-de archivo corregidas contra ADR-0025 (N9/N13 — la versión anterior decía que el consentimiento vivía "en
+de archivo corregidas contra ADR-0026 (N9/N13 — la versión anterior decía que el consentimiento vivía "en
 el código del signup" y el aviso de lead en `copy/es-MX.ts`, y ninguno de los dos es correcto):
 
 | Bloque | Archivo destino |
@@ -1118,9 +1118,9 @@ el código del signup" y el aviso de lead en `copy/es-MX.ts`, y ninguno de los d
 | Landing (hero, problema, recorrido, actores, confianza, impacto, integración, real/simulado, CTA final, footer) | `packages/web/src/views/landing/copy.ts` (extiende el objeto `es`/`en` ya existente) |
 | Signup, verificación, portada del invitado (§7.6) | `packages/web/src/views/signup/copy.ts` y `packages/web/src/views/guest-home/copy.ts` (nuevos, mismo patrón que `views/login/copy.ts`) |
 | Login, columna en completa (§7.7) | `packages/web/src/views/login/copy.ts` (es, ya existente) y `packages/web/src/views/login/copy.en.ts` (nuevo) |
-| Texto de los dos consentimientos y su versión (§7.3) | `packages/shared/src/legal/consents.ts` (ADR-0025) — **no** el código del signup; el signup y la vista lo importan |
-| Emails de autenticación (código de alta, reenvío, recuperación) | `packages/bff/src/copy/auth-emails.ts` (es-MX) y `auth-emails.en.ts` (ADR-0024 §1) |
-| Texto del aviso de lead nuevo a Craftech | `packages/bff/src/copy/lead-notify.ts` (ADR-0025) — **no** `copy/es-MX.ts`, que es el copy de producto de la demo (personal, plantillas, acta) |
+| Texto de los dos consentimientos y su versión (§7.3) | `packages/shared/src/legal/consents.ts` (ADR-0026) — **no** el código del signup; el signup y la vista lo importan |
+| Emails de autenticación (código de alta, reenvío, recuperación) | `packages/bff/src/copy/auth-emails.ts` (es-MX) y `auth-emails.en.ts` (ADR-0025 §1) |
+| Texto del aviso de lead nuevo a Craftech | `packages/bff/src/copy/lead-notify.ts` (ADR-0026) — **no** `copy/es-MX.ts`, que es el copy de producto de la demo (personal, plantillas, acta) |
 
 ---
 
@@ -1232,4 +1232,4 @@ de habilitación por etapas), galería con zoom, CTA final (+ "qué puedes hacer
 más 6 de galería —, 2 de signup), todas partiendo como `render` construido con componentes y textos
 reales, cada una con su reemplazo real nombrado (ruta de consola, viewport, estado del mundo) y ninguna
 mostrando una función que el producto no vaya a tener; `gallery-metrics` apunta a "Medición del manual"
-(ADR-0022), no a "evaluación".
+(ADR-0023), no a "evaluación".

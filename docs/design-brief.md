@@ -1,6 +1,6 @@
 # Design brief · Cuadrilla
 
-**Cuadrilla**: copiloto de campo en WhatsApp para instaladores de fibra hasta el hogar (FTTH) de una operadora de internet latinoamericana. La POC publicada es un **producto para un cliente futuro** de Craftech: toda superficie visible habla del producto y nunca del concurso (ADR-0022). Contexto interno: Craftech la presenta a la AWS CDS Agentic AI Partner Hackathon (cierre de submissions 2026-10-28 13:00 PT; objetivo: ranking general y **Best of WhatsApp**); ese contexto vive solo en los docs internos, en la sección "Submission notes" del README y en los materiales de la submission. Concepto aprobado por el CTO el 2026-09-26; superficies públicas, rol invitado, alta propia y leads decididos por el CTO el mismo día (ADR-0022 a ADR-0025, skill `poc-landing`).
+**Cuadrilla**: copiloto de campo en WhatsApp para instaladores de fibra hasta el hogar (FTTH) de una operadora de internet latinoamericana. La POC publicada es un **producto para un cliente futuro** de Craftech: toda superficie visible habla del producto y nunca del concurso (ADR-0023). Contexto interno: Craftech la presenta a la AWS CDS Agentic AI Partner Hackathon (cierre de submissions 2026-10-28 13:00 PT; objetivo: ranking general y **Best of WhatsApp**); ese contexto vive solo en los docs internos, en la sección "Submission notes" del README y en los materiales de la submission. Concepto aprobado por el CTO el 2026-09-26; superficies públicas, rol invitado, alta propia y leads decididos por el CTO el mismo día (ADR-0023 a ADR-0026, skill `poc-landing`).
 
 Fuente de verdad del diseño funcional. Vocabulario: `CONTEXT.md`. Decisiones: `docs/adr/`. Topología, datos, seguridad y deploy: `docs/architecture.md` y `docs/architecture-integrations.md`. Flujos: `docs/flows-catalog.md`. Tools: `docs/tool-catalog.md`. Datos: `docs/seed-spec.md`. Pruebas: `docs/test-plan.md`. Plan de construcción: `docs/build-plan.md`. Pendientes externos: `docs/pending.md`.
 
@@ -46,8 +46,8 @@ Lo que **no** es: no cobra, no cambia planes ni precios, no promete bonificacion
 | Cliente (sintético) | Titular del servicio | es-MX | Email (SES) con el acta | Su acta de instalación |
 | Buzón de operaciones | Mesa de la operadora | es-MX | Email (SES) con copia del acta | Registro de cada instalación cerrada |
 | Usuario de consola (`SUPERVISOR`, `OPS`) | Supervisores y operaciones | es-MX | Consola web | Ver órdenes, conversaciones, casos, evidencia, actas y métricas; validar manualmente una foto (solo `SUPERVISOR`) |
-| Invitado (`GUEST`) | Quien prueba la demo: un prospecto o partner que se registra solo (alta propia) o una persona a la que el operador le dio una cuenta `guest-NN` (ADR-0023) | es/en | Landing, alta y login propios, consola con su propio mundo sembrado, simulador de teléfono (hace de instalador y de supervisor), reloj de demo, recorrido guiado | Entender en segundos qué resuelve el producto y ver la historia completa en minutos, solo, sin depender de nosotros ni de otro invitado |
-| Craftech (comercial) | Equipo que recibe los leads | es | Email de aviso por SES a una casilla `@craftech.io` configurable; exportación CSV del operador | Saber quién probó la demo y si aceptó que lo contacten (ADR-0025) |
+| Invitado (`GUEST`) | Quien prueba la demo: un prospecto o partner que se registra solo (alta propia) o una persona a la que el operador le dio una cuenta `guest-NN` (ADR-0024) | es/en | Landing, alta y login propios, consola con su propio mundo sembrado, simulador de teléfono (hace de instalador y de supervisor), reloj de demo, recorrido guiado | Entender en segundos qué resuelve el producto y ver la historia completa en minutos, solo, sin depender de nosotros ni de otro invitado |
+| Craftech (comercial) | Equipo que recibe los leads | es | Email de aviso por SES a una casilla `@craftech.io` configurable; exportación CSV del operador | Saber quién probó la demo y si aceptó que lo contacten (ADR-0026) |
 
 Personas de demo (sintéticas, detalle en `docs/seed-spec.md` §4-§5): Rogelio Méndez (instalador, historia principal), Karina Olvera (instaladora, fotos rechazadas), Julián Torres (instalador nuevo, sin opt-in), Adriana Solís (supervisora de turno), Héctor Ibarra (supervisor de respaldo), Marisol Cárdenas (jefa de zona Norte). Operadora: el socio de diseño en co-branding, que es el modo de `poc` (ADR-0018, P-05; las personas, clientes y políticas siguen siendo inventados), o **Tulvara Fibra** (ficticia) en modo `neutral`; el nombre visible siempre sale de `BrandConfig` en runtime. Ciudad **Ciudad Esmeralda** (ficticia).
 
@@ -319,7 +319,7 @@ Presentarse como el asistente de campo de la operadora; mensajes cortos para lee
 
 ## 6. Consola de la operadora
 
-Web React 19 + Vite + Tailwind v4 detrás de login propio sobre Cognito (SRP, sin hosted UI, tokens de 15 min), BFF tRPC v11. Roles `SUPERVISOR` y `OPS` (solo por invitación) y `GUEST` (invitado: alta propia o cuenta `guest-NN`; ADR-0023). El `ispId` sale del token, nunca del input; un id de otra operadora → 403 + bitácora.
+Web React 19 + Vite + Tailwind v4 detrás de login propio sobre Cognito (SRP, sin hosted UI, tokens de 15 min), BFF tRPC v11. Roles `SUPERVISOR` y `OPS` (solo por invitación) y `GUEST` (invitado: alta propia o cuenta `guest-NN`; ADR-0024). El `ispId` sale del token, nunca del input; un id de otra operadora → 403 + bitácora.
 
 Shell fijo: marca (`BrandMark`: "Cuadrilla" + "for <socio>" en co-branding + "Powered by Craftech", con el aviso de demo sintética de ADR-0018 cuando corresponde); **barra de hora simulada** ("Hora simulada · mar 13/10 09:20 · reloj de demo en pausa") con "Avanzar al próximo evento", "+10 min" y "+1 h"; mientras el mundo está ocupado, esos botones y los controles de demo se deshabilitan y la barra dice qué espera ("Transcribiendo nota de voz (~15 s)", "El agente está escribiendo… (~30 s)", "Validando foto (~10 s)"); panel **Recorrido guiado** (es/en, §15); actualización en vivo cada 3 s con algo en curso y cada 15 s en reposo.
 
@@ -344,21 +344,21 @@ Componentes reusados del scaffolding (`Table`, `DataTable`, `SelectField`, `Filt
 
 ## 7. Superficies públicas
 
-Estándar: skill `poc-landing`; diseño de la landing y de la UX del alta: `docs/landing-spec.md`. Ninguna superficie visible nombra el concurso, a sus evaluadores ni la palabra "evaluación"; `npm run lint:neutral-surfaces` lo verifica sobre las fuentes y el build (ADR-0022).
+Estándar: skill `poc-landing`; diseño de la landing y de la UX del alta: `docs/landing-spec.md`. Ninguna superficie visible nombra el concurso, a sus evaluadores ni la palabra "evaluación"; `npm run lint:neutral-surfaces` lo verifica sobre las fuentes y el build (ADR-0023).
 
 | Superficie | Ruta | Contenido |
 |---|---|---|
 | Landing comercial | `/` | Producto para un cliente futuro (`docs/landing-spec.md` §1): hero con la propuesta de valor y los CTA **"Probar la demo"** (`/signup`), **"Ingresar"** (`/login`) y **"Hablemos"** (`https://craftech.io/contact/`); el problema; el **recorrido del producto** sticky o por scroll en desktop y apilado en mobile, donde cada paso cambia la visual; qué hace por actor; las reglas que el sistema garantiza en código; impacto como **metas** rotuladas ("meta", "supuesto"; nunca resultados de producción); cómo se integra; **qué es real y qué es simulado** (§7.2); galería con zoom; CTA final y "Powered by Craftech". Visuales: **renders animados hechos con los componentes y los textos reales** mientras la consola no existe, cada uno en el manifiesto `public/landing/manifest.json` con la captura real que lo reemplaza; después, capturas reales del pipeline de captura sobre la consola. Animaciones solo con `transform`/`opacity`, contenido completo con `prefers-reduced-motion`; de 360 a 1440+ px sin scroll horizontal; es/en; `BrandMark` y aviso de demo sintética según `brand.get` |
-| Alta propia | `/signup` | Formulario corto (email y contraseña; nombre, empresa y cargo opcionales), dos consentimientos separados y sin tildar, código de verificación por email, "Estamos preparando tu mundo de prueba" (ADR-0024, ADR-0025, `docs/landing-spec.md` §7) |
+| Alta propia | `/signup` | Formulario corto (email y contraseña; nombre, empresa y cargo opcionales), dos consentimientos separados y sin tildar, código de verificación por email, "Estamos preparando tu mundo de prueba" (ADR-0025, ADR-0026, `docs/landing-spec.md` §7) |
 | Login y recuperación | `/login` | Login propio (SRP); recuperación de contraseña por código; logout desde la consola; MFA TOTP opcional para `SUPERVISOR`/`OPS`; `GUEST` sin cambio de contraseña ni MFA; link "Probar la demo" |
-| Legales | `/legal/privacy.html`, `/legal/terms.html` | Aviso de privacidad (Craftech responsable, finalidades, retención, derechos y cómo pedir la baja según la Ley 25.326; ADR-0025) y términos de la demo (también requisito de Meta para la WABA) |
+| Legales | `/legal/privacy.html`, `/legal/terms.html` | Aviso de privacidad (Craftech responsable, finalidades, retención, derechos y cómo pedir la baja según la Ley 25.326; ADR-0026) y términos de la demo (también requisito de Meta para la WABA) |
 | Alta de personal | `/join` | Página estática con el QR de alta de WhatsApp ("Envía ALTA a este número"); en modo simulado el QR abre el simulador de la consola |
 
 El **simulador de teléfono no es público**: cada mensaje dispara Bedrock, Transcribe y validaciones. Vive en la consola detrás de la cuenta de cada invitado, con topes por mundo (los de un alta propia son menores, §7.3): en un mundo `INVITED`, turnos del agente (60 por hora, 300 por día real), validaciones de foto (100 por día), minutos de transcripción (30 por día), emails (20 por día), notas de voz ≤ 60 s, fotos ≤ 3,5 MB, 20 mensajes por hora simulada y por hora real por identidad; al llegar a un tope, el simulador lo dice y el mundo sigue navegable (FL-083). Como los topes son por mundo, hay hasta 16 cuentas invitadas con credenciales en un campo compartido y cualquiera puede darse de alta, hay además un **techo global del stage** por día real para todos los mundos que no son QA ni evaluación (1.500 turnos, 400 validaciones, 90 min de transcripción) y un **corte de emergencia en runtime** (`KILL#ALL|SIMULATOR|AGENT`) que el operador enciende con `npm run ops:kill` y que se enciende solo desde AWS Budgets o las alarmas de costo (ADR-0019). El `TURN_CAP` por operadora y el presupuesto del proyecto son las capas siguientes.
 
 ### 7.1 Acceso de los invitados
 
-1. **Alta propia** (`GUEST`, origen `SIGNUP`; ADR-0024): cualquiera se registra en `/signup`; al confirmar el email con el código recibe su propio mundo sembrado desde la plantilla `guest` (reloj en pausa el 13/10 07:00), que dura 7 días reales y se recrea en el ingreso siguiente; la cuenta y el lead sobreviven. Topes de invitado por alta con el reloj real, sub-techo de invitados por alta y tope de 150 mundos activos (§7.3).
+1. **Alta propia** (`GUEST`, origen `SIGNUP`; ADR-0025): cualquiera se registra en `/signup`; al confirmar el email con el código recibe su propio mundo sembrado desde la plantilla `guest` (reloj en pausa el 13/10 07:00), que dura 7 días reales y se recrea en el ingreso siguiente; la cuenta y el lead sobreviven. Topes de invitado por alta con el reloj real, sub-techo de invitados por alta y tope de 150 mundos activos (§7.3).
 2. **Cuentas invitadas** `guest-01` a `guest-NN` (origen `INVITED`; NN = cantidad de evaluadores que publique el concurso, 15 si no se publica, nunca menos de 10) y `guest-test` (origen `TEST`: ensayo del operador; su mundo `GUEST#isp-guest-test` es el que recorren `SC-18` y `SC-19` con el principal `GUEST` armado por el `QaDriver`), creadas por el operador con `console:invite --guest`: contraseña aleatoria de ≥ 24 caracteres por cuenta, grupo `GUEST`, MFA apagado; habilitadas solo durante la ventana de prueba del concurso (`docs/pending.md` P-03). Las credenciales van **solo** en las instrucciones de prueba privadas del formulario de la submission; esas personas pueden usar el alta propia igual que cualquiera.
 3. Una cuenta invitada por persona, con una regla de asignación por apellido (texto en `docs/pending.md` P-03); aviso fijo si otra sesión usó el mismo mundo en las últimas 2 h, sin ofrecer reiniciar.
 4. Cada cuenta tiene su operadora y su mundo; nada de lo que hace un invitado toca el mundo de otro. `WorldJanitor` reinicia de noche los mundos `INVITED` sin actividad en 24 h.
@@ -377,7 +377,7 @@ Bloque fijo en la landing (es/en), en el README y en 5 segundos del video:
 
 ### 7.3 Alta propia y anti abuso
 
-Detalle en ADR-0024 y `docs/architecture-integrations.md` §9.
+Detalle en ADR-0025 y `docs/architecture-integrations.md` §9.
 
 | Capa | Qué hace |
 |---|---|
@@ -392,7 +392,7 @@ Detalle en ADR-0024 y `docs/architecture-integrations.md` §9.
 
 ### 7.4 Captación de leads
 
-Cada alta confirmada es un **lead** (pedido del CTO; ADR-0025): tabla `Leads` propia, separada de la demo, con email, nombre, empresa y cargo si se dieron, idioma, los dos consentimientos con fecha y versión, POC de origen, UTM y origen del referrer, fecha de alta y último ingreso. Aviso por SES a una casilla `@craftech.io` configurable (secreto `LeadConfig`, cerco que solo admite `@craftech.io`); `npm run leads:export` genera el CSV para el operador (por defecto solo contactables); baja del contacto sin borrar la cuenta y borrado a pedido (lead, cuenta de Cognito, usuarios sin confirmar, registro y mundo); los emails son PII y nunca aparecen en logs, bitácoras ni exportaciones de la demo.
+Cada alta confirmada es un **lead** (pedido del CTO; ADR-0026): tabla `Leads` propia, separada de la demo, con email, nombre, empresa y cargo si se dieron, idioma, los dos consentimientos con fecha y versión, POC de origen, UTM y origen del referrer, fecha de alta y último ingreso. Aviso por SES a una casilla `@craftech.io` configurable (secreto `LeadConfig`, cerco que solo admite `@craftech.io`); `npm run leads:export` genera el CSV para el operador (por defecto solo contactables); baja del contacto sin borrar la cuenta y borrado a pedido (lead, cuenta de Cognito, usuarios sin confirmar, registro y mundo); los emails son PII y nunca aparecen en logs, bitácoras ni exportaciones de la demo.
 
 ---
 
@@ -468,9 +468,9 @@ Considerados para después de la hackathon (no se construyen ahora): respuesta e
 | Costo de Bedrock sin techo | Topes por mundo y por operadora, **techo global del stage** por día real y **corte en runtime** encendido por el operador o automáticamente por AWS Budgets y las alarmas de costo (ADR-0019), simulador solo con login, contraseñas aleatorias y cuentas habilitadas solo en la ventana de evaluación, mundos en pausa, presupuesto por corrida |
 | Marca del socio escrita en el repo | Marca como configuración de runtime; `FORBIDDEN_TERMS` la conserva (ADR-0018) |
 | Un invitado rompe la historia de otro | Un mundo por invitado, reloj en pausa, "Reiniciar demo" por mundo |
-| Altas automatizadas que agotan el presupuesto | Ticket de alta, límites por IP, email y stage, tope de mundos activos, TTL, topes por mundo con el reloj real, sub-techo de invitados por alta y techo global; AWS WAF en el Router y en el user pool (ADR-0024) |
-| Fuga de datos personales de los leads | Tabla propia fuera de la demo, emails nunca en logs ni exportaciones de la demo, IAM mínimo, aviso con cerco `@craftech.io`, borrado a pedido y retención con TTL (ADR-0025) |
-| Una superficie visible nombra el concurso | `lint:neutral-surfaces` en CI y en el deploy sobre fuentes y `dist` (ADR-0022) |
+| Altas automatizadas que agotan el presupuesto | Ticket de alta, límites por IP, email y stage, tope de mundos activos, TTL, topes por mundo con el reloj real, sub-techo de invitados por alta y techo global; AWS WAF en el Router y en el user pool (ADR-0025) |
+| Fuga de datos personales de los leads | Tabla propia fuera de la demo, emails nunca en logs ni exportaciones de la demo, IAM mínimo, aviso con cerco `@craftech.io`, borrado a pedido y retención con TTL (ADR-0026) |
+| Una superficie visible nombra el concurso | `lint:neutral-surfaces` en CI y en el deploy sobre fuentes y `dist` (ADR-0023) |
 
 ## 13. Criterios de aceptación
 

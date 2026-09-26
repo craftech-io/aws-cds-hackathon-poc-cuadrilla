@@ -24,7 +24,7 @@ Para la infraestructura de la landing, el alta y los leads aplica la skill `poc-
    `WhatsAppMetaPhoneNumberId`, `SeedOverrides`, `BrandConfig`, `LeadConfig`), cargados por el operador con
    `sst secret set --stage poc`; nunca en el chat. El nombre del socio de diseño vive solo en `BrandConfig`.
 6. **`Resource` de SST, nunca `process.env`**; recursos crudos `aws.*`/`awsnative.*` expuestos con `sst.Linkable`.
-7. **Removal `remove`** (salvo la protección contra borrado declarada de `Leads`, ADR-0025); tags `Project`, `Stage`, `ManagedBy`, `Owner` (+ `sst:app`, `sst:stage` en `awsnative.*` con `tagMap()`).
+7. **Removal `remove`** (salvo la protección contra borrado declarada de `Leads`, ADR-0026); tags `Project`, `Stage`, `ManagedBy`, `Owner` (+ `sst:app`, `sst:stage` en `awsnative.*` con `tagMap()`).
 8. **Mínimo privilegio por capacidad**: cada rol recibe exactamente lo de `infra/iam-capabilities.ts`;
    `iam-capabilities.test.ts` falla ante cualquier deriva, acción de receipt rules, `phone-number-id/*`
    o `Resource *` fuera de los justificados.
@@ -33,7 +33,7 @@ Para la infraestructura de la landing, el alta y los leads aplica la skill `poc-
    `ci-role-fences.test.ts`). Las explicaciones van a `infra/bootstrap/README.md`. Lo aplica el operador,
    nunca CI; el id del repo de GitHub es un parámetro.
 
-10. **Alta propia y anti abuso** (ADR-0024): el pool con `allowAdminCreateUserOnly = false`, los tres
+10. **Alta propia y anti abuso** (ADR-0025): el pool con `allowAdminCreateUserOnly = false`, los tres
     clientes (`ConsoleWeb`, `GuestSignup`, `QaProbe`) con sus flujos, `readAttributes` y `writeAttributes`
     exactos, `attributesRequireVerificationBeforeUpdate = ["email"]`, el configuration set del app en
     `EmailConfiguration` y los cinco triggers con nombre fijo; los roles internos nunca se crean por alta.
@@ -46,7 +46,7 @@ Para la infraestructura de la landing, el alta y los leads aplica la skill `poc-
     Bot Control y Account Creation Fraud Prevention solo con un ADR nuevo); los comodines de AWS WAF en
     la CSP del bootstrap; métricas por regla, sin logs completos (guardarían IP). **Corte del alta**:
     alarmas de los emails `kind = AUTH` y de ráfaga → `CostAlerts` → `CostGuard` → `KILL#SIGNUP`.
-11. **Leads** (ADR-0025): tabla `Leads` separada de la demo (nunca en la capacidad `WORLDS`), stream
+11. **Leads** (ADR-0026): tabla `Leads` separada de la demo (nunca en la capacidad `WORLDS`), stream
     con filtros hacia `LeadStream` y su DLQ con alarma, `GuestAccountDeletion` con nombre fijo y sin `ListUsers`; `Leads` con protección contra borrado y
     PITR apagado (excepción declarada a `remove`); el `Bff` sobre `Leads` solo con los atributos del
     formulario (`dynamodb:Attributes`); ciclo de vida de 9 días en `guest/` de `Media` y `Evidence`;

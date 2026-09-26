@@ -28,11 +28,11 @@ superficie visible: aplica la skill `poc-landing` del workspace (`../.claude/ski
   una marca o modelo real de equipos de red. Teléfonos del bloque sintético.
 - **Sin dominios reservados**: los clientes sintéticos reciben en el simulador de buzones de SES.
 - **Textos del seed** importados de `packages/bff/src/copy/`, nunca duplicados (§SEG-01 incluido).
-- **Textos neutrales** (ADR-0022): el manual, personas, órdenes, notas del cliente, mensajes
+- **Textos neutrales** (ADR-0023): el manual, personas, órdenes, notas del cliente, mensajes
   históricos, plantillas de mundo, textos de fotos y guiones de voz nunca nombran el concurso, a sus
   evaluadores ni la palabra "evaluación" (usa "valoración", "revisión", "medición"); lo verifica la
   invariante 25 con la lista de `scripts/lint/neutral-terms.ts` y el guard `lint:neutral-surfaces`.
-- **Mundos de invitado** (ADR-0023, ADR-0024): una sola plantilla `guest` para los orígenes `INVITED`,
+- **Mundos de invitado** (ADR-0024, ADR-0025): una sola plantilla `guest` para los orígenes `INVITED`,
   `TEST` y `SIGNUP`, parametrizada con `{{phoneBlock}}`, `{{clockTag}}` y `{{capsProfile}}` (invariante
   26); etiquetas `g<nn>`, `gtest`, `gs…`; nunca `judge`. Las cuentas `guest-NN` no se siembran con
   credenciales: las crea el operador y se entregan solo por las instrucciones privadas de prueba.

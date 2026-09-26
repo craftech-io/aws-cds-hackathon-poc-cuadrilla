@@ -655,7 +655,7 @@ Convenciones:
 - Actores: público, invitado, prospecto · Canal: web · Disparador: `/`, `/join`, `/legal/*`.
 - Pasos: hero con la propuesta de valor y los CTA "Probar la demo" (`/signup`), "Ingresar" (`/login`) y "Hablemos" (contacto de Craftech); problema; recorrido del producto (sticky o por scroll en desktop, apilado en mobile) donde cada paso cambia la visual; qué hace por actor; reglas garantizadas en código; impacto como metas rotuladas; cómo se integra; qué es real y qué es simulado; galería con zoom (teclado, swipe, Escape, foco de vuelta); conmutador es/en; `BrandMark` según `brand.get`; renders animados con componentes y textos reales, cada uno en el manifiesto con su captura de reemplazo (`docs/landing-spec.md` §6); `/join` con el QR; legales.
 - Estado esperado: 200 con cabeceras de seguridad; sin scroll horizontal de 360 a 1440 px (barrido de 360, 768 y 1024 además de los dos viewports); en 360×640 el CTA principal está en la primera pantalla; el loop del hero se pausa con su control; con `prefers-reduced-motion` todo el contenido visible sin animación y el hero muestra su póster estático; ningún término prohibido ni palabra del concurso en las fuentes ni en el build (FL-120); "operadora ficticia" visible en modo neutral o el aviso de demo sintética en co-branding; toda cifra de impacto rotulada meta o supuesto; toda entrada `render` del manifiesto con su reemplazo declarado y ningún mockup de una función inexistente.
-- Reglas: ADR-0008, ADR-0018, ADR-0022; skill `poc-landing`.
+- Reglas: ADR-0008, ADR-0018, ADR-0023; skill `poc-landing`.
 - Prueba: U `views/landing/landing.test.ts`, `views/landing/manifest.test.ts` · UI `landing.spec.ts`, `landing-motion.spec.ts` · SMK `SMK/1`. Notas: `landing.spec.ts` y `landing-motion.spec.ts` corren en 390×844 y 1440×900, es y en, con y sin movimiento reducido; `landing.spec.ts` suma el barrido de anchos 360, 768 y 1024 (`scrollWidth ≤ clientWidth`) y el CTA principal en la primera pantalla a 360×640; `landing-motion.spec.ts` asierta la pausa del loop del hero con su control y el póster estático con movimiento reducido; la verificación desplegada con capturas y la revisión de diseño van en `docs/test-plan.md` §6.1.
 
 ### FL-090 · Buzón de salida y visor del manual
@@ -760,137 +760,137 @@ Convenciones:
 
 ## Área L · Alta propia, acceso y leads
 
-Decisiones en ADR-0022 a ADR-0025; UX en `docs/landing-spec.md` §7. Los pasos `SR` usan la costura de QA de ADR-0024 §7 (confirmación administrativa solo para direcciones `success+qa-…@simulator.amazonses.com`); el ejecutor sigue siendo solo IAM.
+Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `SR` usan la costura de QA de ADR-0025 §7 (confirmación administrativa solo para direcciones `success+qa-…@simulator.amazonses.com`); el ejecutor sigue siendo solo IAM.
 
 ### FL-104 · Alta propia con código por email
 - Actores: visitante · Canal: web, email · Disparador: formulario de `/signup` enviado con los datos válidos y el consentimiento de términos.
 - Pasos: 1) la web valida la contraseña contra la política del pool, adquiere el token de WAF y llama `signup.start`, que pasa por el Router con el encabezado de origen (zod, consentimientos vigentes, dominio del email con MX o A/AAAA, límites, usuario `gst-<ULID>`, lead pendiente con ese usuario en `pendingUsernames`, ticket ligado al email y al usuario). 2) `SignUp` con el cliente `GuestSignup`, el usuario del ticket y el ticket. 3) El pre sign-up valida el ticket (mismo email, mismo usuario, a lo sumo dos usos) y no confirma. 4) El trigger de mensaje personalizado arma el email del código en el idioma del alta, con la marca neutral y sin interpolar datos del visitante. 5) La web pasa al paso del código. Alternativa: un dominio sin MX, A ni AAAA → `INVALID` y ningún lead.
 - Estado esperado: usuario `UNCONFIRMED`; lead pendiente con consentimientos, atribución y el usuario en `pendingUsernames`; ticket consumido; email con el código desde `no-reply@`, neutral, en es o en, por el configuration set del app (`kind = AUTH`); la contraseña nunca llegó al BFF.
-- Reglas: ADR-0024 §1 y §3.
+- Reglas: ADR-0025 §1 y §3.
 - Prueba: U `auth-triggers/pre-sign-up.test.ts`, `auth-triggers/custom-message.test.ts`, `routers/signup.test.ts`, `copy/auth-emails.test.ts`, `infra/auth-signup.test.ts` · UI `signup.spec.ts` · SR `SC-20/1`, `SC-20/2`. Notas: El `SignUp` real y el pre sign-up en `SR`; el email con el código se prueba renderizado (`U`), porque nadie lee el buzón del simulador.
 
 ### FL-105 · Confirmación del código y alta del invitado
 - Actores: visitante · Canal: web · Disparador: código correcto en el paso de verificación.
 - Pasos: `ConfirmSignUp` → post confirmation (usuario `gst-*`, lead pendiente que lo lista, `sub` sin registro): lead `CONFIRMED` con `sub`, `cognitoUsername`, `userId` y fecha; `Isps/USER#` con `role GUEST` y `guestOrigin SIGNUP`; reserva de mundo; invocación asíncrona de `GuestWorlds`; `LeadStream` borra los demás usuarios pendientes del mismo email. Después, la web ingresa sola por SRP con el email y la contraseña que tuvo en memoria y abre `/app/home` (si falla, `/login` con el email completado). Un código inválido o vencido muestra el error neutral y no cambia nada.
 - Estado esperado: usuario `CONFIRMED`; lead `CONFIRMED` y evento `CONFIRMED`; registro `GUEST`; `GUESTACCOUNT#` en `PROVISIONING`; ningún otro usuario pendiente de ese email en Cognito; ninguna fila `SUPERVISOR`/`OPS` creada por un alta; la contraseña fuera de todo almacenamiento del navegador.
-- Reglas: ADR-0024 §1.
+- Reglas: ADR-0025 §1.
 - Prueba: U `auth-triggers/post-confirmation.test.ts`, `leads/store.test.ts` · UI `signup.spec.ts` · SR `SC-20/3`. Notas: En `SR` la confirmación entra por la costura de QA (`AdminConfirmSignUp`), que dispara el mismo trigger; el código inválido en `UI` con el Cognito falso.
 
 ### FL-106 · Reenvío del código
 - Actores: visitante · Canal: web, email · Disparador: "Reenviar código".
 - Pasos: `ResendConfirmationCode` con el cliente `GuestSignup`; el trigger de mensaje personalizado arma el email (`CustomMessage_ResendCode`); los límites de Cognito y del WAF del pool acotan la frecuencia.
 - Estado esperado: un email nuevo con código, neutral y en el idioma del alta; aviso "Código reenviado."; al superar el límite, el mensaje neutral de "Demasiados intentos".
-- Reglas: ADR-0024 §3 y §4.
+- Reglas: ADR-0025 §3 y §4.
 - Prueba: U `auth-triggers/custom-message.test.ts` · UI `signup.spec.ts`. Notas: Sin `SR`: el reenvío llega al simulador de SES y no deja estado propio; la regla de tasa del pool se verifica con `waf.probe` (FL-114).
 
 ### FL-107 · Mundo del invitado sembrado
 - Actores: sistema, invitado · Canal: consola · Disparador: invocación de `GuestWorlds` después de la confirmación (o del primer login de una cuenta `INVITED`).
 - Pasos: fábrica mínima desde `Seed/worlds/guest.json` con los marcadores del mundo (bloque telefónico, etiqueta de reloj, perfil de topes); reloj `PAUSED` el 13/10 07:00; `DAY_START` como datos; filas de `Network` y `Dispatch`; `GUESTACCOUNT#.status = READY`. La portada (`/app/home`, única fuente del estado del mundo: el alta no tiene paso `worldPending`) muestra los cuatro estados de `docs/landing-spec.md` §7.6: `PROVISIONING` ("Estamos preparando tu mundo de prueba"), `READY` (resumen del mundo y qué partes de la consola están habilitadas), `FAILED` ("Reintentar") y `CAP_FULL` (cuenta creada, sin lugar para el mundo, "Reintentar").
 - Estado esperado: mundo `READY` en ≤ 60 s con los conteos de la plantilla; identidades del bloque `+52 55 0300 0xxx`; emails del simulador etiquetados; `displayName` de `resolveBrand`; nada escrito fuera de la operadora del invitado; idempotente ante una segunda invocación.
-- Reglas: ADR-0023, ADR-0024 §2.
+- Reglas: ADR-0024, ADR-0025 §2.
 - Prueba: U `worlds/factory.test.ts`, `worlds/guest-lifecycle.test.ts`, `guest/world-status.test.ts`, `routers/guest.test.ts` · UI `guest-home.spec.ts` · SR `SC-20/3`. Notas: La portada en `UI` en los cuatro estados (`PROVISIONING`, `READY`, `FAILED`, `CAP_FULL`) de `docs/landing-spec.md` §7.6; la lista de partes habilitadas sale del registro de vistas y refleja solo lo que existe.
 
 ### FL-108 · Ingreso de un invitado con su email
 - Actores: invitado de alta propia · Canal: consola · Disparador: `/login` con el email y la contraseña.
 - Pasos: SRP con `ConsoleWeb` (el email es alias verificado); post authentication (solo para un registro `GUEST` de origen `SIGNUP`) actualiza `lastLoginAt` y la retención del lead; pre token estampa `ispId`, `role GUEST` e `isGuest`; la web abre la portada del invitado.
 - Estado esperado: tokens de 15 min con el `ispId` de la generación vigente; evento `LOGIN` del lead; `expiresAt` del lead a 24 meses; sin TOTP ni cambio de contraseña para `GUEST`.
-- Reglas: ADR-0024 §1.
+- Reglas: ADR-0025 §1.
 - Prueba: U `auth-triggers/post-authentication.test.ts` · UI `guest-login.spec.ts` · SR `SC-20/5`. Notas: En `SR`, `auth.qaLogin` (cliente `QaProbe`) dispara los mismos triggers; el SRP en el navegador en `UI` y en la verificación desplegada; el pre-token sigue probado por sus tests de FL-079.
 
 ### FL-109 · Recuperación de contraseña
 - Actores: invitado, usuario de consola · Canal: web, email · Disparador: "¿Olvidaste tu contraseña?" en `/login`.
 - Pasos: `ForgotPassword` → email con código (`CustomMessage_ForgotPassword`, neutral, es/en) → `ConfirmForgotPassword` con la contraseña nueva que cumple la política.
 - Estado esperado: la respuesta nunca dice si el email existe (`preventUserExistenceErrors`); contraseña cambiada; login con la nueva.
-- Reglas: ADR-0024 §1.
+- Reglas: ADR-0025 §1.
 - Prueba: U `auth-triggers/custom-message.test.ts`, `lib/auth/flow.test.ts` · UI `recovery.spec.ts`. Notas: Sin `SR`: el código llega al simulador de SES y nadie lo lee; la verificación desplegada (`docs/test-plan.md` §6.1) prueba el pedido con un email existente y uno inexistente (misma respuesta neutral) y la confirmación con el código se prueba en `UI` con el Cognito falso.
 
 ### FL-110 · Cierre de sesión
 - Actores: invitado, usuario de consola · Canal: consola · Disparador: "Salir".
 - Pasos: `RevokeToken` del refresh token; borrado de los tokens del navegador; vuelta a la landing.
 - Estado esperado: el refresh token revocado no renueva; `/app/*` redirige a `/login`.
-- Reglas: ADR-0024 §1.
+- Reglas: ADR-0025 §1.
 - Prueba: U `lib/auth/logout.test.ts` · UI `logout.spec.ts`.
 
 ### FL-111 · Recreación del mundo después del TTL
 - Actores: invitado de alta propia · Canal: consola · Disparador: ingreso después de los 7 días reales de la generación vigente.
 - Pasos: post authentication ve la generación vencida → reserva lugar → generación nueva (`isp-guest-s<yymmdd><5>`) en `GUESTACCOUNT#` y en `Isps/USER#` (transacción) → `GuestWorlds` → portada en "preparando" hasta `READY`.
 - Estado esperado: cuenta y lead intactos; mundo nuevo igual a la plantilla con época nueva; el mundo anterior no aparece en ninguna consulta de la operadora nueva y vence por TTL.
-- Reglas: ADR-0024 §2.
+- Reglas: ADR-0025 §2.
 - Prueba: U `worlds/guest-lifecycle.test.ts`, `auth-triggers/post-authentication.test.ts` · SR `SC-20/6`. Notas: En `SR`, `guest.forceExpire` adelanta el vencimiento de una cuenta QA.
 
 ### FL-112 · Topes del alta y de los mundos de invitado
 - Actores: visitante, invitado, `CostGuard`, operador · Canal: web, consola · Disparador: (a) tope de mundos de alta propia activos; (b) altas confirmadas del día; (c) altas iniciadas del día en el stage; (d) sub-techo diario de los invitados por alta, cuota por cuenta o topes del mundo con el reloj real; (e) corte del alta `KILL#SIGNUP`, encendido por `CostGuard` ante una alarma de rebotes o quejas de los emails de autenticación o de ráfaga de altas, o por el operador (`npm run ops:kill -- --scope SIGNUP --on`).
 - Pasos: (a)(b) la cuenta y el lead se crean y el mundo queda `CAP_FULL` con el mensaje honesto y "Reintentar"; (c) `signup.start` responde `CAP_REACHED`; (d) el simulador y el worker reservan antes de gastar y muestran el tope, como FL-083; (e) `signup.start` y el pre sign-up responden `CAP_REACHED` y el trigger de mensaje no manda códigos de alta ni reenvíos; login, recuperación y los mundos existentes siguen; solo el operador lo apaga.
 - Estado esperado: ningún mundo por encima del tope; ninguna llamada a Bedrock ni a Transcribe por encima del sub-techo; los invitados `INVITED` no pierden capacidad por los de alta propia; con el corte encendido, ningún email de alta sale de la cuenta.
-- Reglas: ADR-0024 §3 y §4, ADR-0019.
+- Reglas: ADR-0025 §3 y §4, ADR-0019.
 - Prueba: U `guest/slots.test.ts`, `routers/signup.test.ts`, `worker/cost-caps.test.ts`, `scripts/ops/kill.test.ts`, `handlers/cost-guard.test.ts`, `auth-triggers/custom-message.test.ts`, `infra/messaging-email-spec.test.ts` · UI `guest-home.spec.ts` · SR `SC-20/7`. Notas: En `SR` con `guest.capsOverride` (claves de prueba del escenario; el tope real nunca se toca); el corte del alta no se enciende en `poc` desde `SR` (afectaría a los visitantes): lo prueban los `U` y la verificación post-deploy de `devops` (`docs/architecture.md` §15, paso 6).
 
 ### FL-113 · Límites de frecuencia del alta
 - Actores: visitante · Canal: web · Disparador: más de 5 altas iniciadas por IP en una hora (1 desde una IP anónima, con 30 por día en el stage); más de 3 por persona en una hora o 5 en el día (clave de abuso: sin etiqueta `+…` ni puntos de Gmail); un cuarto usuario sin confirmar para el mismo email; una tercera cuenta confirmada de la misma persona.
 - Pasos: `signup.start` cuenta por `ipHash` y `abuseHash` (nunca la IP ni el email en claro), usa el encabezado de IP anónima que inserta WAF y responde `RATE_LIMITED`; la regla de tasa del WAF de borde bloquea antes cualquier ráfaga mayor.
 - Estado esperado: ningún ticket nuevo por encima del límite; `me+1@…` y `me@…` cuentan como la misma persona; métrica `SignupRejected{reason=RATE_LIMITED}`; mensaje neutral "Demasiados intentos".
-- Reglas: ADR-0024 §3 y §4.
+- Reglas: ADR-0025 §3 y §4.
 - Prueba: U `routers/signup.test.ts`, `infra/waf-spec.test.ts` · UI `signup.spec.ts` · SR `SC-20/8`.
 
 ### FL-114 · Protección contra bots
 - Actores: bot, visitante · Canal: web, API de Cognito, Function URL · Disparador: (a) `POST /api/signup.start` sin token de WAF; (b) IP de la lista de anónimas o de un proveedor de nube; (c) `SignUp` directo a la API de Cognito sin ticket, o con un ticket de otro usuario; (d) ráfaga de operaciones de Cognito desde una IP; (e) pedido directo a la Function URL del `Bff`, sin el encabezado de origen o con otro valor (y con un `CloudFront-Viewer-Address` inventado); (f) pedido por CloudFront que nombra `signup.start` fuera de la forma única: en un lote de tRPC (`/api/x,signup.start?batch=1`), codificado (`/api/%73ignup.start?batch=1`), con `GET` o con `batch`.
 - Pasos: (a) Challenge silencioso (la web lo resuelve con el SDK de integración); (b) sin prueba humana: la IP anónima llega con el encabezado de WAF y `signup.start` le aplica el límite más estricto; la de un proveedor de nube solo se etiqueta; (c) rechazo del pre sign-up (`TICKET_INVALID`); (d) regla de tasa del WAF del pool; (e) `403` sin cuerpo antes de parsear, sin leer la IP; (f) el alcance del alta del WAF coincide igual (`CONTAINS signup.` después de `URL_DECODE` y `LOWERCASE`: Challenge, tasa y etiqueta de IP anónima) y, si algo llega al `Bff`, `routers/edge.ts` responde `400` sin cuerpo antes de tRPC (`EdgeRejected{reason=SIGNUP_SHAPE}`).
 - Estado esperado: ningún lead, contador ni usuario creado sin pasar por el borde y por `signup.start`; las dos web ACL con sus reglas, sobrescrituras y asociaciones como `infra/waf-spec.ts`, ninguna con CAPTCHA; `OriginRejected` cuenta los pedidos directos; ningún lote ni ruta codificada ejecuta `signup.start`.
-- Reglas: ADR-0024 §3 y §4.
+- Reglas: ADR-0025 §3 y §4.
 - Prueba: U `infra/waf-spec.test.ts`, `auth-triggers/pre-sign-up.test.ts`, `lib/waf-token.test.ts`, `views/signup/signup-client.test.ts`, `routers/edge.test.ts`, `routers/signup.test.ts`, `infra/auth-signup.test.ts` · SR `SC-20/2`, `SC-20/10` · SMK `SMK/9`, `SMK/10`. Notas: `SMK/9` (desafío, también para un lote que nombra `signup.start`, desde el runner de `deploy.yml`) y `SMK/10` (Function URL directa → `403`) corren en cada deploy; una IP anónima no se puede originar desde el ejecutor: su límite se prueba en `U` con el encabezado de WAF.
 
 ### FL-115 · Registro del lead con consentimientos
 - Actores: visitante · Canal: web · Disparador: alta confirmada.
 - Pasos: el formulario muestra los dos consentimientos separados y sin tildar (términos y privacidad obligatorio; contacto opcional), con su texto versionado de `packages/shared/src/legal/consents.ts`; `signup.start` rechaza una versión vieja o el obligatorio sin aceptar; el lead guarda cada uno con fecha, versión e idioma, más POC de origen, idioma, UTM y origen del referrer; la confirmación lo pasa a `CONFIRMED`.
 - Estado esperado: lead en la tabla `Leads` (nunca en tablas de la demo) con todos los campos; el botón "Crear cuenta" deshabilitado sin el consentimiento obligatorio; UTM fuera de formato descartados; referrer reducido a esquema y host.
-- Reglas: ADR-0025.
+- Reglas: ADR-0026.
 - Prueba: U `leads/consent.test.ts`, `leads/attribution.test.ts`, `leads/store.test.ts`, `views/signup/signup-model.test.ts` · UI `signup.spec.ts` · SR `SC-20/1`, `SC-20/3`.
 
 ### FL-116 · Aviso de lead nuevo a Craftech
 - Actores: sistema, equipo comercial de Craftech · Canal: email · Disparador: un lead pasa a `CONFIRMED`.
 - Pasos: stream de `Leads` → `LeadStream` → email por SES desde `leads@` a `LeadConfig.notifyRecipients` con el cerco `@craftech.io`; `notifiedAt` condicional; los leads de QA se suprimen.
 - Estado esperado: exactamente un aviso por lead; un destinatario fuera de `@craftech.io` (incluido un sufijo engañoso) nunca recibe (zod del secreto, código e IAM); los campos del visitante escapados, rotulados "sin verificar" y con sus URLs neutralizadas; "NO CONTACTAR" en el asunto y la primera línea si no dio el consentimiento de contacto; `notifyOutcome` registrado; el email del lead nunca en los logs.
-- Reglas: ADR-0025.
+- Reglas: ADR-0026.
 - Prueba: U `leads/notify.test.ts`, `leads/notify-fence.test.ts`, `infra/leads-spec.test.ts` · SR `SC-20/3`. Notas: En `SR` se asierta `SUPPRESSED_QA`; el envío real a la casilla de Craftech lo verifica el operador con `npm run leads:notify-test` (§2.1).
 
 ### FL-117 · Exportación de leads y baja del contacto
 - Actores: operador · Canal: script con el profile del operador · Disparador: (a) `npm run leads:export -- --out <ruta>`; (b) `npm run leads:unsubscribe` (email por entrada estándar o `--email-file`) al recibir un pedido de no ser contactado.
-- Pasos: (a) lee la tabla, filtra por defecto los leads contactables (`CONFIRMED`, `origin WEB`, `CONTACT` vigente aceptado; `--all` suma los demás con `contactConsent = no`), escribe el CSV con las columnas de ADR-0025, escapa celdas y registra `EXPORTED` en cada lead; (b) agrega a la historia un registro `CONTACT` con `accepted: false` y registra `CONTACT_WITHDRAWN`, sin tocar la cuenta.
+- Pasos: (a) lee la tabla, filtra por defecto los leads contactables (`CONFIRMED`, `origin WEB`, `CONTACT` vigente aceptado; `--all` suma los demás con `contactConsent = no`), escribe el CSV con las columnas de ADR-0026, escapa celdas y registra `EXPORTED` en cada lead; (b) agrega a la historia un registro `CONTACT` con `accepted: false` y registra `CONTACT_WITHDRAWN`, sin tocar la cuenta.
 - Estado esperado: CSV fuera del repo (una ruta dentro del árbol se rechaza); ninguna celda empieza con `=`, `+`, `-` o `@` sin escapar; ningún invitado puede exportar ni ver leads; después de la baja, la cuenta sigue y el lead no sale en la exportación por defecto; el email nunca como argumento de la línea de comandos.
-- Reglas: ADR-0025.
+- Reglas: ADR-0026.
 - Prueba: U `scripts/leads/export.test.ts`, `scripts/leads/unsubscribe.test.ts`, `routers/public-surface.test.ts`. Notas: Sin `SR` (lo corre el operador, nunca CI); verificación desplegada de `docs/test-plan.md` §6.1.
 
 ### FL-118 · Borrado de la cuenta y del lead
 - Actores: invitado, operador, sistema · Canal: consola, script, TTL, schedule · Disparador: (a) "Borrar mi cuenta" (invitado de origen `SIGNUP`, login ≤ 15 min); (b) `npm run leads:delete` (email por entrada estándar o `--email-file`); (c) vencimiento del lead por TTL, pendiente o confirmado; (d) barrido diario de usuarios sin confirmar.
 - Pasos: (a)(b) `GuestAccountDeletion` verifica el objetivo (usuario `gst-*` con registro `GUEST` de origen `SIGNUP`, o sin registro con lead) y, con el usuario guardado, borra el usuario de Cognito y los pendientes, el lead y sus eventos, el registro, `GUESTACCOUNT#` y la generación vigente del mundo (con sus prefijos `guest/` de media y evidencia y su Memory), y registra `LEAD_DELETED` con el `leadId`; un `SUPERVISOR`, un `OPS` o una cuenta `guest-NN` se rechaza con `NOT_A_SIGNUP_GUEST` (`DELETION_REFUSED`); (c) `LeadStream` recibe el `REMOVE`: de un lead pendiente borra cada usuario de `pendingUsernames`; de uno confirmado invoca `GuestAccountDeletion` con el `userId` (`LEAD_EXPIRED`); (d) `LeadStream` borra los usuarios `gst-*` `UNCONFIRMED` de más de 7 días. Fuera de la tabla, el operador borra el aviso de ese `leadId` de la casilla y la fila de todo CSV exportado.
 - Estado esperado: ni usuario (tampoco sin confirmar), ni lead, ni registro, ni mundo, ni media alcanzables; la bitácora de leads con el `leadId`, sin email ni `emailHash`; ninguna llamada de Cognito con el email como usuario; idempotente.
-- Reglas: ADR-0024 §6, ADR-0025.
+- Reglas: ADR-0025 §6, ADR-0026.
 - Prueba: U `leads/deletion.test.ts`, `leads/notify.test.ts`, `handlers/lead-stream.test.ts`, `handlers/guest-account-deletion.test.ts`, `routers/account.test.ts`, `scripts/leads/delete.test.ts` · UI `guest-home.spec.ts` · SR `SC-20/9`.
 
 ### FL-119 · Aviso de privacidad y términos
 - Actores: visitante · Canal: web · Disparador: `/legal/privacy.html`, `/legal/terms.html` y los links del formulario.
-- Pasos: páginas estáticas es-MX con versión en inglés, con los nueve puntos de ADR-0025 ("Política de privacidad y términos"): Craftech responsable con su domicilio; qué se trata (formulario, consentimientos, atribución, fechas, IP en hash por 48 h, cookie de WAF y `sessionStorage`, contenido que el invitado crea en la demo: texto, voz y fotos); encargados y lugares (AWS `us-east-1`, inferencia global del modelo en otras regiones de AWS, Transcribe, la casilla de Craftech del aviso); transferencia internacional (art. 12 de la Ley 25.326) a Estados Unidos (región `us-east-1`) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global, con el consentimiento expreso de la casilla `TERMS_PRIVACY`, cuyo texto nombra la transferencia; finalidades; retención; derechos con sus plazos legales (acceso en 10 días corridos, rectificación y supresión en 5 días hábiles), retiro del consentimiento de contacto sin borrar la cuenta y el aviso sobre la Agencia de Acceso a la Información Pública; el canal de contacto; que los datos de la demo son sintéticos.
+- Pasos: páginas estáticas es-MX con versión en inglés, con los nueve puntos de ADR-0026 ("Política de privacidad y términos"): Craftech responsable con su domicilio; qué se trata (formulario, consentimientos, atribución, fechas, IP en hash por 48 h, cookie de WAF y `sessionStorage`, contenido que el invitado crea en la demo: texto, voz y fotos); encargados y lugares (AWS `us-east-1`, inferencia global del modelo en otras regiones de AWS, Transcribe, la casilla de Craftech del aviso); transferencia internacional (art. 12 de la Ley 25.326) a Estados Unidos (región `us-east-1`) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global, con el consentimiento expreso de la casilla `TERMS_PRIVACY`, cuyo texto nombra la transferencia; finalidades; retención; derechos con sus plazos legales (acceso en 10 días corridos, rectificación y supresión en 5 días hábiles), retiro del consentimiento de contacto sin borrar la cuenta y el aviso sobre la Agencia de Acceso a la Información Pública; el canal de contacto; que los datos de la demo son sintéticos.
 - Estado esperado: 200 con cabeceras; la versión de cada página igual a la `textVersion` de `TERMS_PRIVACY`; los nueve puntos presentes en es y en; el texto de la casilla `TERMS_PRIVACY` (es y en) nombra la transferencia a Estados Unidos y a otras regiones de AWS; ninguna palabra del concurso.
-- Reglas: ADR-0025, ADR-0022.
+- Reglas: ADR-0026, ADR-0023.
 - Prueba: U `leads/consent.test.ts` · UI `legal.spec.ts` · SMK `SMK/1`.
 
 ### FL-120 · Guard de superficies neutrales
 - Actores: CI, autor de un cambio · Canal: CI · Disparador: un PR o un deploy con una palabra del concurso en una superficie visible.
 - Pasos: `npm run lint:neutral-surfaces` recorre las fuentes visibles, los emails de autenticación renderizados, los PDFs versionados y el README hasta `## Submission notes`; `-- --dist` recorre el build.
 - Estado esperado: CI rojo con archivo, línea y término; las excepciones internas (docs, tests, `## Submission notes`) no reportan.
-- Reglas: ADR-0022.
+- Reglas: ADR-0023.
 - Prueba: U `scripts/lint/neutral-surfaces.test.ts`. Notas: Corre en `ci.yml` y `deploy.yml` junto a `lint:forbidden`; no toca AWS.
 
 ### FL-121 · Email ya registrado
 - Actores: visitante · Canal: web · Disparador: alta con un email que ya tiene una cuenta confirmada.
 - Pasos: `signup.start` (o el pre sign-up, si el lead pasó a `CONFIRMED` entre medio) responde `EMAIL_TAKEN`; `ConfirmSignUp` sin mover el alias es la segunda capa.
 - Estado esperado: ninguna cuenta ni lead nuevos; el mensaje ofrece ingresar o recuperar la contraseña.
-- Reglas: ADR-0024 §1.
+- Reglas: ADR-0025 §1.
 - Prueba: U `routers/signup.test.ts`, `auth-triggers/pre-sign-up.test.ts` · UI `signup.spec.ts` · SR `SC-20/4`.
 
 ### FL-122 · Roles internos solo por invitación
 - Actores: visitante, operador · Canal: web, script · Disparador: un alta propia que intenta un atributo `custom:*` o un rol distinto de `GUEST`; una invitación de `SUPERVISOR`/`OPS` (o de una cuenta `guest-NN`) por `console:invite`, incluido su primer ingreso con el cambio de contraseña inicial.
 - Pasos: el pre sign-up niega todo origen salvo `SignUp` con ticket y `AdminCreateUser`, y rechaza `custom:*`; el post confirmation solo actúa para un `gst-*` con lead pendiente que lo lista y sin registro del `sub`, y solo escribe `role GUEST`; un usuario creado por el operador que completa el cambio de contraseña no recibe fila ni mundo (`SIGNUP_CONFIRM_IGNORED`); el post authentication no hace nada para `SUPERVISOR`/`OPS`; el pre-token solo estampa lo que dice el registro.
 - Estado esperado: ninguna cuenta de alta propia con un rol interno; ningún usuario interno con una segunda fila de registro (que lo dejaría sin acceso) ni un mundo de alta propia; las invitadas conservan su flujo.
-- Reglas: ADR-0024 §1.
+- Reglas: ADR-0025 §1.
 - Prueba: U `auth-triggers/pre-sign-up.test.ts`, `auth-triggers/post-confirmation.test.ts`, `auth-triggers/post-authentication.test.ts` · SR `SC-20/5`. Notas: El pre-token, que solo estampa lo que dice el registro, sigue probado por sus tests de FL-079.

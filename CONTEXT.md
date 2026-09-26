@@ -165,7 +165,7 @@ Tema que el agente nunca responde, bloqueado por el guardrail G1: cambios de pre
 _Avoid_: tema prohibido (en UI)
 
 **Set de medición** (`EvalSet`, corridas `EV-01` y `EV-02`):
-50 preguntas escritas de cero sobre el manual (40 respondibles con la sección esperada, 10 fuera de alcance o riesgosas) y 60 fotos sintéticas etiquetadas, con las que se miden las métricas del agente. En la consola y la landing se llama **medición** ("Medición del manual", "Medición de fotos"); los identificadores internos (`EV-01`, `EvalResult`, `eval-<runId>`) no se muestran nunca (ADR-0022).
+50 preguntas escritas de cero sobre el manual (40 respondibles con la sección esperada, 10 fuera de alcance o riesgosas) y 60 fotos sintéticas etiquetadas, con las que se miden las métricas del agente. En la consola y la landing se llama **medición** ("Medición del manual", "Medición de fotos"); los identificadores internos (`EV-01`, `EvalResult`, `eval-<runId>`) no se muestran nunca (ADR-0023).
 _Avoid_: evaluación (en superficies visibles), dataset de pruebas (suelto), benchmark
 
 ### Casos y seguridad
@@ -281,11 +281,11 @@ _Avoid_: regaño, feedback
 ### Acceso, invitados y leads
 
 **Invitado** (`GUEST`, `isGuest`, `GuestOrigin` `INVITED` | `SIGNUP` | `TEST`):
-Persona que prueba la demo en su propio mundo, con los permisos de `SUPERVISOR` solo dentro de él (ADR-0023). `INVITED`: cuentas `guest-NN` que crea el operador (credenciales solo por vía privada); `SIGNUP`: alta propia con email verificado; `TEST`: `guest-test`, el ensayo del operador y el principal `usr-qa-guest` del ejecutor. Los roles internos (`SUPERVISOR`, `OPS`) nunca nacen de un alta propia.
+Persona que prueba la demo en su propio mundo, con los permisos de `SUPERVISOR` solo dentro de él (ADR-0024). `INVITED`: cuentas `guest-NN` que crea el operador (credenciales solo por vía privada); `SIGNUP`: alta propia con email verificado; `TEST`: `guest-test`, el ensayo del operador y el principal `usr-qa-guest` del ejecutor. Los roles internos (`SUPERVISOR`, `OPS`) nunca nacen de un alta propia.
 _Avoid_: jurado, juez, evaluador, judge (en código, datos y superficies visibles), demo user
 
 **Alta propia** (`signup`):
-Creación de una cuenta de invitado desde `/signup`: formulario, **ticket de alta**, `SignUp` de Cognito, **código de verificación** por email y confirmación (ADR-0024). Cada alta confirmada es un **lead**.
+Creación de una cuenta de invitado desde `/signup`: formulario, **ticket de alta**, `SignUp` de Cognito, **código de verificación** por email y confirmación (ADR-0025). Cada alta confirmada es un **lead**.
 _Avoid_: registro (suelto; ver "Flagged ambiguities"), onboarding
 
 **Ticket de alta** (`signupTicket`):
@@ -293,7 +293,7 @@ Credencial de 10 minutos que emite `signup.start` después de validar el formula
 _Avoid_: token de alta, captcha
 
 **Encabezado de origen** (`x-cuadrilla-origin`, secreto `OriginVerifyKey`):
-Valor secreto que CloudFront agrega a todo pedido que manda al BFF; el BFF rechaza con `403`, antes de leer nada, un pedido que no lo trae. Es lo que hace del borde (WAF incluido) la única entrada al BFF y lo que permite confiar en la IP de `CloudFront-Viewer-Address` (ADR-0024 §3).
+Valor secreto que CloudFront agrega a todo pedido que manda al BFF; el BFF rechaza con `403`, antes de leer nada, un pedido que no lo trae. Es lo que hace del borde (WAF incluido) la única entrada al BFF y lo que permite confiar en la IP de `CloudFront-Viewer-Address` (ADR-0025 §3).
 _Avoid_: token, API key
 
 **Clave de abuso** (`abuseHash`):
@@ -317,7 +317,7 @@ Primera vista después del login de un invitado: estado de su mundo (`PROVISIONI
 _Avoid_: dashboard, home
 
 **Lead** (`Lead`, tabla `Leads`):
-Registro de contacto de una persona que inició (lead **pendiente**, `PENDING`: sin `status`, vence a los 7 días) o confirmó (`CONFIRMED`) un alta propia: email, nombre, empresa y cargo si los dio, idioma, consentimientos, origen y fechas (ADR-0025). Vive en una tabla propia, separada de los datos de la demo; nunca aparece en logs, bitácoras ni exportaciones de la demo. Un lead pendiente lista sus **usuarios pendientes** (`pendingUsernames`), los usuarios de Cognito sin confirmar que guardan su email, para poder borrarlos.
+Registro de contacto de una persona que inició (lead **pendiente**, `PENDING`: sin `status`, vence a los 7 días) o confirmó (`CONFIRMED`) un alta propia: email, nombre, empresa y cargo si los dio, idioma, consentimientos, origen y fechas (ADR-0026). Vive en una tabla propia, separada de los datos de la demo; nunca aparece en logs, bitácoras ni exportaciones de la demo. Un lead pendiente lista sus **usuarios pendientes** (`pendingUsernames`), los usuarios de Cognito sin confirmar que guardan su email, para poder borrarlos.
 _Avoid_: cliente (es el del domicilio), contacto (suelto), usuario
 
 **Consentimiento del alta** (`TERMS_PRIVACY`, `CONTACT`):
@@ -329,7 +329,7 @@ Email por SES a las casillas `@craftech.io` de la configuración `LeadConfig` po
 _Avoid_: notificación (suelta), alerta
 
 **Superficie visible** y **guard de superficies neutrales** (`lint:neutral-surfaces`):
-Todo texto que puede leer o escuchar una persona fuera del equipo (landing, alta, consola, legales, emails, PDF, plantillas, textos del seed que ve un usuario, build y el README antes de `## Submission notes`). Ninguna nombra el concurso ni a sus evaluadores; el guard lo verifica en CI (ADR-0022).
+Todo texto que puede leer o escuchar una persona fuera del equipo (landing, alta, consola, legales, emails, PDF, plantillas, textos del seed que ve un usuario, build y el README antes de `## Submission notes`). Ninguna nombra el concurso ni a sus evaluadores; el guard lo verifica en CI (ADR-0023).
 _Avoid_: UI (suelto)
 
 **Costura de QA** (`auth.confirmQaSignup`, `npm run qa:confirm-signup`):

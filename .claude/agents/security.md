@@ -31,7 +31,7 @@ públicas aplica la skill `poc-landing` del workspace (`../.claude/skills/poc-la
   del invitado.
 - **Costo**: techo global, topes por mundo y corte en runtime (ADR-0019); la seguridad física nunca se corta.
 - **Secretos y PII**: nada en el repo, en logs, en trazas, en memoria ni en evidencia de QA.
-- **Alta propia** (ADR-0024), modelo de amenazas: la Function URL directa y una IP falsificada;
+- **Alta propia** (ADR-0025), modelo de amenazas: la Function URL directa y una IP falsificada;
   `SignUp` directo sin ticket o con ticket reusado, vencido, de otro email o de otro usuario;
   orígenes de trigger no previstos; `custom:*` y roles internos por alta; un usuario del operador que
   pasa por el post confirmation; enumeración de emails (acotada y declarada); cuentas múltiples por
@@ -45,9 +45,9 @@ públicas aplica la skill `poc-landing` del workspace (`../.claude/skills/poc-la
   costura de QA confirmando una dirección que no es del simulador (el email se lee de Cognito); el
   borrado alcanzando a un interno o a una cuenta `guest-NN`; costo: tope de mundos, topes por mundo,
   cuota por cuenta, sub-techo y TTL.
-- **Leads y PII** (ADR-0025): tabla fuera de la demo e IAM mínimo por rol; emails fuera de logs,
+- **Leads y PII** (ADR-0026): tabla fuera de la demo e IAM mínimo por rol; emails fuera de logs,
   `AuditLog`, métricas, trazas, reportes y exportaciones de la demo; consentimientos separados, sin
-  tildar, con fecha y versión; aviso de privacidad con los nueve puntos de ADR-0025 (responsable y
+  tildar, con fecha y versión; aviso de privacidad con los nueve puntos de ADR-0026 (responsable y
   domicilio, datos tratados incluido el contenido del invitado, encargados e inferencia global del
   modelo, transferencia internacional a Estados Unidos y a las otras regiones de AWS de esa inferencia,
   nombrada en el texto de la casilla `TERMS_PRIVACY` misma, finalidades, retención, derechos con plazos y autoridad de control,
@@ -58,7 +58,7 @@ públicas aplica la skill `poc-landing` del workspace (`../.claude/skills/poc-la
 - **Cercos**: el del aviso de leads solo `@craftech.io` exacto (zod del secreto, código e IAM) y la
   casilla nunca en el repo; el de la demo sigue sin admitir `craftech.io` ni el dominio propio; los
   invitados solo sobre datos sintéticos y sus emails de producto solo al simulador.
-- **Superficies neutrales** (ADR-0022): `lint:neutral-surfaces` y `-- --dist` en verde; credenciales
+- **Superficies neutrales** (ADR-0023): `lint:neutral-surfaces` y `-- --dist` en verde; credenciales
   `guest-NN` solo en las instrucciones privadas de prueba; ningún texto visible con el concurso.
 - **Marca y concurso**: `npm run lint:forbidden` en verde con la lista del operador (sin imprimir
   términos); el nombre del socio de diseño solo en runtime; scaffolding declarado en el README;

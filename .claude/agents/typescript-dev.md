@@ -27,13 +27,13 @@ todo texto visible aplica la skill `poc-landing` del workspace (`../.claude/skil
 
 ## Superficies públicas, invitados y leads
 
-- **Copy neutral** (ADR-0022): ningún texto visible, comentario de una fuente visible, email, PDF,
+- **Copy neutral** (ADR-0023): ningún texto visible, comentario de una fuente visible, email, PDF,
   plantilla ni texto del seed nombra el concurso ni a sus evaluadores; lo que el producto mide es
   "medición". Corre `npm run lint:neutral-surfaces` (y `-- --dist` después del build) antes del PR.
   Textos es-MX en tuteo ("Prueba la demo", nunca voseo) y en inglés, cada uno con una sola fuente.
-- **Nombres de invitado** (ADR-0023): `GUEST`, `isGuest`, `guest-NN`, `isp-guest-*`, `GUEST#…`,
+- **Nombres de invitado** (ADR-0024): `GUEST`, `isGuest`, `guest-NN`, `isp-guest-*`, `GUEST#…`,
   `usr-qa-guest`; nunca judge/jurado en identificadores, fixtures, títulos de tests ni comentarios.
-- **Flujos de autenticación** (ADR-0024): todo pedido a `/api/*` pasa primero por la verificación del
+- **Flujos de autenticación** (ADR-0025): todo pedido a `/api/*` pasa primero por la verificación del
   encabezado de origen (`403` sin cuerpo antes de parsear) y la IP solo se lee después; después, y
   antes de tRPC, `routers/edge.ts` exige la forma única del alta: todo pedido que nombra un
   procedimiento `signup.` (en un lote o codificado) y no es `POST /api/signup.start` sin `batch`
@@ -49,7 +49,7 @@ todo texto visible aplica la skill `poc-landing` del workspace (`../.claude/skil
   Cognito (leído con `AdminGetUser`, nunca del input) es `success+qa-…@simulator.amazonses.com`.
   `GuestAccountDeletion` se invoca solo con `{userId}` del principal y llama a Cognito con el `gst-*`
   guardado, nunca con el email.
-- **PII de los leads** (ADR-0025): el email del lead solo en la tabla `Leads` y en Cognito; en logs,
+- **PII de los leads** (ADR-0026): el email del lead solo en la tabla `Leads` y en Cognito; en logs,
   `emailHash[0:8]`; nunca en `AuditLog`, métricas, trazas, reportes ni exportaciones de la demo; los
   consentimientos con fecha, versión e idioma; el aviso pasa por `leads/notify-fence.ts` (`@craftech.io`)
   y la casilla es configuración, nunca un literal.

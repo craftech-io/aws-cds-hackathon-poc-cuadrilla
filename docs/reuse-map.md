@@ -134,7 +134,7 @@ Regla de verificación: después de cada WP que copie o adapte, `npm run lint:fo
 | Componente de teléfono del prototipo de la referencia B | B | Adaptar → `views/simulator/` | Identidades, voz, fotos, listas | WP-43 |
 | `src/views/**` (resto) | A | Descartar | Vistas nuevas | — |
 | `public/brand/logo-craftech-*` | A | Copiar | — | WP-11 |
-| `public/legal/*.html` | A | Adaptar | Legales de esta demo con Craftech como responsable y la Ley 25.326 (ADR-0025) | WP-59 |
+| `public/legal/*.html` | A | Adaptar | Legales de esta demo con Craftech como responsable y la Ley 25.326 (ADR-0026) | WP-59 |
 | `e2e/support/**`, `e2e/playwright.config.ts`, `e2e/tsconfig.json` | A | Copiar / adaptar | Clave efímera, sesiones por rol | WP-11 |
 | `index.html`, `vite.config.ts` | A | Adaptar | Título y marca | WP-11 |
 
