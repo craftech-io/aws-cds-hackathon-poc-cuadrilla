@@ -18,4 +18,5 @@ Decidimos subir el provider `aws` a **7.33.0**, el salto mínimo que acepta `es-
 ## Consequences
 
 - `sst.config.ts`, `CLAUDE.md`, `.claude/agents/devops.md` y `docs/architecture.md` dicen `aws` 7.33.0.
+- terraform-provider-aws v6.49 agrega tags a `aws_cloudfront_function`: la función del Router nace con los tags por defecto y el provider los lee con `ListTagsForResource` tras crearla y en cada refresh. El rol de CI suma `cloudfront:{ListTagsForResource,TagResource,UntagResource}` en el sid `CloudFrontFunctionsOfThisApp`, con el mismo cerco por ARN `function/<app>-poc-*` (`infra/bootstrap/ci-role.yaml`, `ci-role.test.ts`).
 - Si Transcribe no admite vocabularios propios en `es-MX`, el vocabulario queda `FAILED` y el deploy falla ahí (`infra/media.ts`), nunca en una nota de voz; la salida es un ADR nuevo, no un cambio silencioso de idioma.

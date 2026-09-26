@@ -170,7 +170,7 @@ describe("CloudFront parts of the Router (no tags, shared account)", () => {
   });
 
   it("updates, publishes and deletes only the functions named after this app", () => {
-    for (const action of ["cloudfront:UpdateFunction", "cloudfront:PublishFunction", "cloudfront:DeleteFunction"]) {
+    for (const action of ["cloudfront:UpdateFunction", "cloudfront:PublishFunction", "cloudfront:DeleteFunction", "cloudfront:UntagResource"]) {
       for (const { sid, body } of allows.filter((candidate) => candidate.body.includes(action))) {
         expect(body, sid).toContain(`Resource: !Sub "arn:\${AWS::Partition}:cloudfront::\${AWS::AccountId}:${FUNCTION_FENCE}`);
       }
@@ -181,6 +181,15 @@ describe("CloudFront parts of the Router (no tags, shared account)", () => {
     for (const action of ["cloudfront:UpdateFunction", "cloudfront:PublishFunction", "cloudfront:DeleteFunction"]) {
       expect(deny).toContain(action);
     }
+  });
+
+  it("reads and changes the tags of the functions named after this app by ARN (aws 7.33.0 tags them)", () => {
+    const functions = statement("CloudFrontFunctionsOfThisApp");
+    for (const action of ["cloudfront:ListTagsForResource", "cloudfront:TagResource", "cloudfront:UntagResource"]) {
+      expect(functions).toContain(`- ${action}\n`);
+    }
+    expect(functions).toContain(`Resource: !Sub "arn:\${AWS::Partition}:cloudfront::\${AWS::AccountId}:${FUNCTION_FENCE}`);
+    expect(functions).not.toContain("Condition:");
   });
 
   it("writes routes only into the store the bootstrap creates, and never creates or deletes a store", () => {
