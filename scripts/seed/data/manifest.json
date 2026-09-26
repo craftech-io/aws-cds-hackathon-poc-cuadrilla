@@ -1,0 +1,179 @@
+{
+  "app": "aws-cds-hackathon-poc-cuadrilla",
+  "clock": {
+    "generatedAt": "2026-09-26T00:00:00.000Z",
+    "worldStartSim": "2026-10-13T07:00:00-06:00"
+  },
+  "eval": {
+    "photos": {
+      "count": 60,
+      "sha256": "64c8e1358e198b8d7c2233ab35414ec980d19eec41cd471dd9d49d534de2ab16"
+    },
+    "questions": {
+      "count": 50,
+      "sha256": "792145a282c3b933d7ecbb72fdc741b9afcf61a4204edb05954b8198f5bcdfaf"
+    }
+  },
+  "generator": "scripts/seed/generate.ts",
+  "generatorVersion": "1.0.0",
+  "manual": {
+    "files": {
+      "manual/v001/CAL-01.md": "7412e9cf9dac45f62940cbd67bac34baee9ea2294e4f19e93dd5f0a36c043f64",
+      "manual/v001/CAL-01.md.metadata.json": "ac52fb3f62f1007dd59eae7f07fc50c8b3ec84d7301ee5d74dd27e06bbdfe706",
+      "manual/v001/COM-01.md": "13705d15c993b0a4af80d5bbbdd0e22260571ad684c593732632bd9961190af6",
+      "manual/v001/COM-01.md.metadata.json": "1d90fd1183ed1ad69c30ec3b8a39abd78cac6a2991350703383d6f6c475ba62d",
+      "manual/v001/COM-02.md": "c83dbed64943de131b5df4ff17da6f72693eca43238e59d490e2b285678e2ba3",
+      "manual/v001/COM-02.md.metadata.json": "120abbd32533b76c706fb17a8ae673ec2c0349695f75bcc2c2d192fd805d6c0b",
+      "manual/v001/COM-03.md": "dbb2fadbbaff2295dba97356d0546f1679eabe6320a58b39e50a90e234398269",
+      "manual/v001/COM-03.md.metadata.json": "bff18de1ccf6ddb55b23cca63effd41552ef399e7d94f48da11cc8b49e50077a",
+      "manual/v001/COM-04.md": "473ddf21ea21b31ac3174dbea7c4c696aeed0805e1d9221d574e403c8fd51396",
+      "manual/v001/COM-04.md.metadata.json": "c972f20cda18c978686b45a0e2a33753224d73262f3ecd043a0412e9d56d3418",
+      "manual/v001/COM-05.md": "3a6304644302fa121ededc9d9bbd1e2aa700687e02c2111b38dd568731dd5a06",
+      "manual/v001/COM-05.md.metadata.json": "ddbac510ede984db371dc32b7fd2da127ae95dd618610ed38d7422aee2cc07b0",
+      "manual/v001/COM-06.md": "8db00c789200989a252bcb1a785c3b502d15b338deefc2b8ac27f7945fa55906",
+      "manual/v001/COM-06.md.metadata.json": "f014fbdc987775af46680ca9561afdb6dc457f58630ac37f8503dd62b3b2e0bc",
+      "manual/v001/DIAG-01.md": "fb716dbfb66e25891a603e893eb53c1e3526de4fd042c5cb7ec769040da2029e",
+      "manual/v001/DIAG-01.md.metadata.json": "5e7fb23c5968f9887ef0bee8eb484444a9163362dbd546e5a3e83a763fae5bef",
+      "manual/v001/DIAG-02.md": "da547295c086a4927ab82dcabbf442fd6ac966edee2e729c5bf3d3338d450e8a",
+      "manual/v001/DIAG-02.md.metadata.json": "651f49e48068447fdacda8b2cac271b711a5fc8b920abd5cd230602c3108057e",
+      "manual/v001/DIAG-03.md": "00091217ba20cc3fb1ffd442c643cee207c3823b8e190216986af6a78e8143a8",
+      "manual/v001/DIAG-03.md.metadata.json": "bde1b0ea87d9c9916e2f5ad9893f56341a77faaf33509222d5afd9a6d251b25a",
+      "manual/v001/DIAG-04.md": "49158cb7760aac10d2987a29871f0febb235e9b39a78df016bae5331575b4da6",
+      "manual/v001/DIAG-04.md.metadata.json": "697b35a81266e8ef6554f33ebbd425b5c4048f9dd9597d5c0fcc4c1951bf480d",
+      "manual/v001/DIAG-05.md": "c9190487767d74217a0f8315d2621f865f6b6fac9e9c525a3afc4cc0ef92cc0b",
+      "manual/v001/DIAG-05.md.metadata.json": "dff90b290337d4b8ba37151106acf8ef26daf0612e561a0d478a2b59141368c1",
+      "manual/v001/ESC-01.md": "832dfb166de1e2dfe5bcb6019b64d624a4a1e3b76e91f425d1fd5a14e06401ad",
+      "manual/v001/ESC-01.md.metadata.json": "251541b08605ac03f1fd60a8f0513ae7a410e7a71a31b46ffd1fa49cb4757d30",
+      "manual/v001/ESC-02.md": "d22df734ce324d89db17ab2c03d70166ca00ea10ce992ac4c16cf05d757f00f4",
+      "manual/v001/ESC-02.md.metadata.json": "babe76e292fd6d93839556616c4d4df398d5163779edd4006f124935d7aa86f4",
+      "manual/v001/EVI-01.md": "345345c128707d7850ec8ec2f8a0b6bda9a2958df13106383fcda8f20ba59a61",
+      "manual/v001/EVI-01.md.metadata.json": "a00257559540ccd3b58f5ed19457f248d8a0596441872816885dc16d2436711f",
+      "manual/v001/EVI-02.md": "ad0ef4a9e244f19ec0ac42c2ab2e674e7f6f1f6dc64d89837f68f85e713adab7",
+      "manual/v001/EVI-02.md.metadata.json": "3d0e7d936497378aed4276d3e433c9fb318f4c94b80356c46f4942f1a5ce7aea",
+      "manual/v001/GEN-01.md": "d5aab3af5d61c099ee6eba4320f3b08df4b0206ed536a22db6c965f85e7c664c",
+      "manual/v001/GEN-01.md.metadata.json": "3b88353a6bcf136ed25afdeba4eb8754f806c901db712fb310857a5f3070f78f",
+      "manual/v001/GEN-02.md": "6a69f7913c92d165dfc23793b08bf17fadad0926ca678d2a2b0f3e240e51ba20",
+      "manual/v001/GEN-02.md.metadata.json": "6d823fb0bc9f8d9c05563e0e6144621848b336596989a0e054209be321eda433",
+      "manual/v001/INS-01.md": "10e163c7e9fb48a88a23be58edcfcd4f377e05d6322e2a6cef339c69f75c675f",
+      "manual/v001/INS-01.md.metadata.json": "e1ff5730f5bf11bad125fa9c1648c506d72f788298b30136a355ad684fac42d7",
+      "manual/v001/INS-02.md": "836f30ac266ecb20a55dc26b1bbc40bb6e92e2aed306ac8baa47fd3159258304",
+      "manual/v001/INS-02.md.metadata.json": "954cd475e4a96346e359933bc942a38af0c8d0dc07a8347f99a6b6ac549a126d",
+      "manual/v001/INS-03.md": "1e091772810384af4ade9d5f70f87038aad9399be5b0d892530784e520a5ab92",
+      "manual/v001/INS-03.md.metadata.json": "78c77bfa4a2368b21a94ed3d66eab7eaa0e2d99795f6c9530b9baed0f06dd98e",
+      "manual/v001/INS-04.md": "19b015fcba9bb3668adef6c3a91f7b5328fa7b704ec4383b9b97bd6e1be9fc83",
+      "manual/v001/INS-04.md.metadata.json": "a084733535fccf45612ee33e294a9ab8af4ec4bdab7677e74ef88289e3bf1d54",
+      "manual/v001/INS-05.md": "728ba32e24acd039272af25f61521926d39d96b4b303ffe2cab045c21a02ffcb",
+      "manual/v001/INS-05.md.metadata.json": "4179d732da75e5965bd984464ac159261ef6b57dc4ca92b5ac67566cbdfd88b7",
+      "manual/v001/INS-06.md": "f19c1750ad0acd81ddb140c50ac8f52f118a5a29ce523df14c065ea794ed2a7e",
+      "manual/v001/INS-06.md.metadata.json": "d1c131354776518eb006a0214965cf9864284de998140cb11347007f44d467aa",
+      "manual/v001/INS-07.md": "fd47c6002d45cbc47264c46b12f72a868fd29e21e05017de0af3b4922744a0ad",
+      "manual/v001/INS-07.md.metadata.json": "424eb558f6ddc1510edcfe02d012c9a233cdd53b74116219cbb8562445a19908",
+      "manual/v001/MED-01.md": "287a089d744c53baf3d8deb5abfde8ac254af2005690366110e605b110797ea9",
+      "manual/v001/MED-01.md.metadata.json": "2d7f4ca096257e4c498d270d57eaaa512410ba9901819ecccf98eab41c24b647",
+      "manual/v001/MED-02.md": "7f7a31d8d38e67bacb5871eb6c6cf2987d20038a73fc3327abc58d2132eac8dd",
+      "manual/v001/MED-02.md.metadata.json": "0eb9c1949eb74763c6499f2e8b662ca629408486c1f759d0311841a7bdf18742",
+      "manual/v001/SEG-01.md": "cc3b6a5c01e084c30510cefaca262577ae7e5943d3a4453b2583d08904291a7b",
+      "manual/v001/SEG-01.md.metadata.json": "c4283a6a8d14dac83fc0f1a439d949e1bb9dfa329cf876a33f15765de5d126fd",
+      "manual/v001/SEG-02.md": "add6984205f8d49fc6c3699ed378731296d88860606612896351cc0c8f2eb60e",
+      "manual/v001/SEG-02.md.metadata.json": "b481dbb384efbd06f51d655358b28dc02eef4a6e7079670820a5be7643f3c1a1",
+      "manual/v001/SEG-03.md": "f214d9218c685938beae6740552cdfa9f81ae43e2711f3acfb7284570d54ec96",
+      "manual/v001/SEG-03.md.metadata.json": "44b64610123ea5fc5b0147044bc8b017bb8f2849c6cc0b3feafda51204aa3836",
+      "manual/v001/SEG-04.md": "81de44690e5b6e435f797653a33f59df73a5c268c96a023094ceb11b3a7c91b4",
+      "manual/v001/SEG-04.md.metadata.json": "ab3f2174e97c912ca6be295b9ec1c7a79b91d13231126de9c72d35557d271ed2",
+      "manual/v001/SEG-05.md": "5134032b57a7265e1d8c3be44cf453da5a1d79b790db054a62e5eaa0a849a78a",
+      "manual/v001/SEG-05.md.metadata.json": "91d57513afcc5e415ad5410ae138203e0c6ddecbfba1198f3892e9a7d1569830"
+    },
+    "fingerprint": "bb5f204eb5d486db287f853a24140f6c3bce118d519578a1be7e94eab659c999",
+    "sections": 32,
+    "version": "v001"
+  },
+  "media": {
+    "photos": {
+      "aux": 88,
+      "auxDatasheet": "ab44472a51fb90c099c3d6f327e7c9a65ddebd738590f26eefb16a1d820c05ba",
+      "datasheet": "00a93cdaf5aea4e2f13a61f1dcd3e09789b062c7cde1be780ed24ad577d100c6",
+      "set": 60
+    },
+    "voices": {
+      "datasheet": "f33bd99d5a07d8feebfe3686688393408d3ac190e284161caf0cb76cee7c1c0f",
+      "notes": 12
+    }
+  },
+  "seed": 20260926,
+  "tables": {
+    "AuditLog": {
+      "count": 33,
+      "sha256": "aa757d677d9c4f373394f0cbd1f80ff61b06c0fb7dfd4703ad4a4ddc53ae8e2b"
+    },
+    "Cases": {
+      "count": 0,
+      "sha256": "450ad201274c147cfcffad47b102bccf8dff7ad3ba69d8027839ab4c1226ae64"
+    },
+    "Conversations": {
+      "count": 82,
+      "sha256": "10c9ec7d5ecec712d8f937160bd2f5fea237affdb23ff23dad08faca36a14b23"
+    },
+    "CuadrillaMetrics": {
+      "count": 12,
+      "sha256": "7ae4b3eb332156b5982065e811ccabccc03c0ba42f258b089eb87a555ac21904"
+    },
+    "Dispatch": {
+      "count": 29,
+      "sha256": "a2c2db547703542033ec0faf84c1a75cba16287ed16cb133da4e8e752b8861fb"
+    },
+    "Isps": {
+      "count": 14,
+      "sha256": "1440a56f687cf3814fcb06ddd395f155493e90e69134b6cafa585c3dadbad2f8"
+    },
+    "Network": {
+      "count": 29,
+      "sha256": "2e095f4e52675aac079ccb0ccb395c09f3c90f8043dd562c0bb76f763520f341"
+    },
+    "People": {
+      "count": 73,
+      "sha256": "910b6e1b07b64fbd7b63a58a165281d566c22c5a1d2ed461bc120920f17718c0"
+    },
+    "Reference": {
+      "count": 255,
+      "sha256": "a362540db9a9280d469eeac475bf82218778269aecf76569456f1f9db95867f8"
+    },
+    "WorkOrders": {
+      "count": 272,
+      "sha256": "994982640f4115f1a8323bed8aeb3bc370d4e92650a3657be107b55284675b77"
+    }
+  },
+  "validation": {
+    "invariants": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      11,
+      12,
+      13,
+      14,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24
+    ],
+    "passed": true
+  },
+  "worlds": {
+    "demo": "cdddaf8754441ee4456fa2de72a38f5e8c3d0ac9206d9f0847789df6e7bde60f",
+    "eval": "5e859ea2697779cefd32428c89b37be80102b971207d0b89b5e28ffe9da7ed5c",
+    "judge": "6541d7e68122680522d5c714ea060d0c50aed8fe2c9e1b99d1fd0e121fbbf5e9",
+    "models": "53fec92c419918f30906c0d7d31aa50ac066e4a2ba6cc39d9eb4a23ff61f0c5a",
+    "qa-min": "6b7ec2055c585ffaeac2ab20467006baa20691d4c21aaa83a0f8a81904a40378"
+  }
+}

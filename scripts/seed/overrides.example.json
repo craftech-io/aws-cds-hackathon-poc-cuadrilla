@@ -1,0 +1,16 @@
+{
+  "demoRecipients": {
+    "emails": [],
+    "phones": []
+  },
+  "liveWorldClockId": null,
+  "operatorEmail": "success+operator@simulator.amazonses.com",
+  "opsMailbox": "success+ops-demo@simulator.amazonses.com",
+  "personPhones": {
+    "inst-rogelio": "+525501010001"
+  },
+  "zoneChiefEmails": {
+    "zc-marisol": "success+zc-marisol@simulator.amazonses.com",
+    "zc-ricardo": "success+zc-ricardo@simulator.amazonses.com"
+  }
+}

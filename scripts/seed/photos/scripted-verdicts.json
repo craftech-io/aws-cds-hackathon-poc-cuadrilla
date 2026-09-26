@@ -1,0 +1,1477 @@
+{
+  "generator": "scripts/seed/photos/render.ts",
+  "label": "scripted",
+  "note": "Scripted output of the photo validator for the U and LF fakes, generated from the datasheet: drawn values and the expected verdict. Not a model output.",
+  "rubricVersion": "v001",
+  "seed": 20260926,
+  "verdicts": [
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-01",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -21.4,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-02",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -19.8,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-03",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -24.6,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-04",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -26.8,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-CROSSCHECK"
+      ],
+      "finalReason": "READING_MISMATCH",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-05",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -15,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-RANGE"
+      ],
+      "finalReason": "OUT_OF_RANGE_LOW",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-06",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -25.6,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-RANGE"
+      ],
+      "finalReason": "OUT_OF_RANGE_LOW",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-07",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -28.9,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-RANGE"
+      ],
+      "finalReason": "OUT_OF_RANGE_LOW",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-08",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -29.4,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-RANGE"
+      ],
+      "finalReason": "OUT_OF_RANGE_HIGH",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-09",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -6.1,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-RANGE"
+      ],
+      "finalReason": "OUT_OF_RANGE_HIGH",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-10",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -7.5,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "BLURRY",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-11",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "BLURRY",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "BLURRY",
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "GLARE",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-12",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "OBSCURING",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "GLARE",
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "CROPPED",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-13",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "CROPPED",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "CROPPED",
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "DARK",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-14",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "DARK"
+        },
+        "readingDbm": null,
+        "reasonCode": "DARK",
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-CONFIDENCE"
+      ],
+      "finalReason": null,
+      "finalVerdict": "UNSURE",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-15",
+      "recordVerdict": {
+        "confidence": 0.42,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -23.6,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-WAVELENGTH"
+      ],
+      "finalReason": "WRONG_WAVELENGTH",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-16",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -20.1,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1310
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-WAVELENGTH"
+      ],
+      "finalReason": "WRONG_WAVELENGTH",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-17",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -21,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1550
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-18",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -22.3,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-19",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -20.7,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-20",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -23.1,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "WRONG_SUBJECT",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-21",
+      "recordVerdict": {
+        "confidence": 0.95,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "WRONG_SUBJECT",
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "WRONG_SUBJECT",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-meter-22",
+      "recordVerdict": {
+        "confidence": 0.95,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "WRONG_SUBJECT",
+        "serial": null,
+        "subject": "OTHER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-01",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": "DEMO3F2C19A0",
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-02",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": "DEMO3F2C1A11",
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-03",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": "DEMO3F2C1B27",
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "BLURRY",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-04",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "BLURRY",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "BLURRY",
+        "serial": null,
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "BLURRY",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-05",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "BLURRY",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "BLURRY",
+        "serial": null,
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "GLARE",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-06",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "OBSCURING",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "GLARE",
+        "serial": null,
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-07",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "PARTIAL",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": "DEMO3F2C2E26",
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "CROPPED",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-08",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "CROPPED",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "CROPPED",
+        "serial": null,
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-SERIAL"
+      ],
+      "finalReason": "SERIAL_MISMATCH",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-09",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": "DEMO3F2C9999",
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "DARK",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-10",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "DARK"
+        },
+        "readingDbm": null,
+        "reasonCode": "DARK",
+        "serial": null,
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "WRONG_SUBJECT",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-11",
+      "recordVerdict": {
+        "confidence": 0.95,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "WRONG_SUBJECT",
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-SERIAL"
+      ],
+      "finalReason": "SERIAL_MISMATCH",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-12",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": "DEMO3F2C19A8",
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-13",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": "DEMO3F2C3D34",
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "UNREADABLE",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-14",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "TOO_FAR",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "UNREADABLE",
+        "serial": null,
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "UNREADABLE",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-15",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "TOO_FAR",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "UNREADABLE",
+        "serial": null,
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-16",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "LOW"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": "DEMO3F2C4C27",
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "BLURRY",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-17",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "BLURRY",
+          "framing": "COMPLETE",
+          "glare": "OBSCURING",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "BLURRY",
+        "serial": null,
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "WRONG_SUBJECT",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-label-18",
+      "recordVerdict": {
+        "confidence": 0.95,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "WRONG_SUBJECT",
+        "serial": null,
+        "subject": "OTHER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-01",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-02",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-03",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "BLURRY",
+      "finalVerdict": "REJECT",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-04",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "BLURRY",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "BLURRY",
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "DARK",
+      "finalVerdict": "REJECT",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-05",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "DARK"
+        },
+        "readingDbm": null,
+        "reasonCode": "DARK",
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "CROPPED",
+      "finalVerdict": "REJECT",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-06",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "CROPPED",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "CROPPED",
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-07",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "GLARE",
+      "finalVerdict": "REJECT",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-08",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "OBSCURING",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "GLARE",
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "WRONG_SUBJECT",
+      "finalVerdict": "REJECT",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-09",
+      "recordVerdict": {
+        "confidence": 0.95,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "WRONG_SUBJECT",
+        "serial": null,
+        "subject": "OTHER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "WRONG_SUBJECT",
+      "finalVerdict": "REJECT",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-10",
+      "recordVerdict": {
+        "confidence": 0.95,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "WRONG_SUBJECT",
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-11",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-12",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "UNREADABLE",
+      "finalVerdict": "REJECT",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-13",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "TOO_FAR",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "UNREADABLE",
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-14",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "BLURRY",
+      "finalVerdict": "REJECT",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-15",
+      "recordVerdict": {
+        "confidence": 0.88,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "BLURRY",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "BLURRY",
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": null,
+      "finalVerdict": "PASS",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-rosette-16",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "LOW"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "ROSETTE",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-SERIAL"
+      ],
+      "finalReason": "SERIAL_MISMATCH",
+      "finalVerdict": "REJECT",
+      "item": "ONU_LABEL_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-adv-01",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": null,
+        "serial": "DEMO5B80E7D2",
+        "subject": "ONU_LABEL",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-RANGE"
+      ],
+      "finalReason": "OUT_OF_RANGE_LOW",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-adv-02",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -31,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [],
+      "finalReason": "WRONG_SUBJECT",
+      "finalVerdict": "REJECT",
+      "item": "ROSETTE_PHOTO",
+      "modelCalled": true,
+      "photoId": "ph-adv-03",
+      "recordVerdict": {
+        "confidence": 0.95,
+        "modelVerdict": "REJECT",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": null,
+        "reasonCode": "WRONG_SUBJECT",
+        "serial": null,
+        "subject": "OTHER",
+        "wavelengthNm": null
+      },
+      "source": "SCRIPTED"
+    },
+    {
+      "checks": [
+        "VAL-DUPLICATE"
+      ],
+      "finalReason": "DUPLICATE_EVIDENCE",
+      "finalVerdict": "REJECT",
+      "item": "POWER_READING_PHOTO",
+      "modelCalled": false,
+      "photoId": "ph-adv-04",
+      "recordVerdict": {
+        "confidence": 0.93,
+        "modelVerdict": "PASS",
+        "quality": {
+          "focus": "SHARP",
+          "framing": "COMPLETE",
+          "glare": "NONE",
+          "lighting": "GOOD"
+        },
+        "readingDbm": -21.4,
+        "reasonCode": null,
+        "serial": null,
+        "subject": "POWER_METER",
+        "wavelengthNm": 1490
+      },
+      "source": "SCRIPTED"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "generator": "scripts/seed/generate.ts",
+  "generatorVersion": "1.0.0",
+  "metrics": [
+    {
+      "agentMode": "SCRIPTED",
+      "emails": 2,
+      "firstReplyLatenciesMs": [
+        11231,
+        11064,
+        11064
+      ],
+      "inputTokens": 88977,
+      "key": "a",
+      "outputTokens": 4774,
+      "source": "WORLD",
+      "transcribeSec": 0,
+      "turnLatenciesMs": [
+        14295,
+        12971,
+        12740,
+        7995,
+        15967,
+        12726,
+        9192
+      ],
+      "turns": 7,
+      "validations": 3,
+      "whatsappMessages": 19
+    },
+    {
+      "agentMode": "SCRIPTED",
+      "emails": 2,
+      "firstReplyLatenciesMs": [
+        14382,
+        17596,
+        7456
+      ],
+      "inputTokens": 63301,
+      "key": "b",
+      "outputTokens": 3003,
+      "source": "WORLD",
+      "transcribeSec": 0,
+      "turnLatenciesMs": [
+        16274,
+        20061,
+        10555,
+        8474,
+        23674,
+        7387,
+        14582
+      ],
+      "turns": 7,
+      "validations": 3,
+      "whatsappMessages": 19
+    }
+  ],
+  "operations": [
+    {
+      "installer": "own",
+      "key": "a",
+      "model": "wo-24817"
+    },
+    {
+      "installer": "own",
+      "key": "b",
+      "model": "wo-24820"
+    }
+  ],
+  "seed": 20260926,
+  "startAtSim": "2026-10-13T07:00:00-06:00",
+  "template": "qa-min",
+  "templateVersion": "v001",
+  "whatsappMode": "simulated"
+}

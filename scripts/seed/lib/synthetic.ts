@@ -1,0 +1,52 @@
+// What makes a phone or an email synthetic (docs/seed-spec.md §2): Mexico City numbers whose local
+// part starts with 0, which the numbering plan does not assign to subscribers, in one block per use;
+// and addresses of the SES mailbox simulator, so nothing the demo sends reaches a person. The
+// generator builds addresses with these blocks, the validator checks every one against them
+// (invariants 3 and 17) and the world factory takes a judge world's block from `judgeBlock`.
+import { z } from "zod";
+
+/** Country and area code of every synthetic phone: Mexico, Mexico City. */
+export const PHONE_PREFIX = "+5255";
+
+/** The blocks of docs/seed-spec.md §2, as the national number after `+52 55`. */
+export const PHONE_BLOCKS = {
+  demoInstallers: { label: "+52 55 0101 00xx", pattern: /^\+5255010100\d{2}$/ },
+  demoSupervisors: { label: "+52 55 0102 00xx", pattern: /^\+5255010200\d{2}$/ },
+  demoCustomers: { label: "+52 55 0103 0xxx", pattern: /^\+52550103[0]\d{3}$/ },
+  unknownNumber: { label: "+52 55 0199 0001", pattern: /^\+525501990001$/ },
+  judgeWorlds: { label: "+52 55 02nn 0xxx", pattern: /^\+525502\d{2}0\d{3}$/ },
+  qaLeases: { label: "+52 55 09xx xxxx", pattern: /^\+525509\d{6}$/ },
+} as const;
+export type PhoneBlock = keyof typeof PHONE_BLOCKS;
+
+/** Block a phone belongs to, or `undefined` when it is outside every synthetic block. */
+export function phoneBlockOf(phone: string): PhoneBlock | undefined {
+  return (Object.keys(PHONE_BLOCKS) as PhoneBlock[]).find((block) => PHONE_BLOCKS[block].pattern.test(phone));
+}
+
+/** The simulator of SES mailboxes: `success+…`, `bounce+…`, `complaint+…` (docs/architecture-integrations.md §1). */
+export const SIMULATOR_DOMAIN = "simulator.amazonses.com";
+export const SimulatorOutcome = z.enum(["success", "bounce", "complaint"]);
+export type SimulatorOutcome = z.infer<typeof SimulatorOutcome>;
+
+export function simulatorEmail(outcome: SimulatorOutcome, label: string): string {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(label)) throw new RangeError(`invalid simulator label "${label}"`);
+  return `${outcome}+${label}@${SIMULATOR_DOMAIN}`;
+}
+
+const SIMULATOR_ADDRESS = new RegExp(`^(success|bounce|complaint)\\+[a-z0-9]+(?:-[a-z0-9]+)*@${SIMULATOR_DOMAIN.replace(/\./g, "\\.")}$`);
+
+export function isSimulatorEmail(email: string): boolean {
+  return SIMULATOR_ADDRESS.test(email);
+}
+
+/**
+ * Tokens of a judge world's copy of the `judge` template (docs/seed-spec.md §2-§3): its number in
+ * ids (`inst-rogelio-j07`, `wo-24817-j07`), its operator and clock, and its phone block `+52 55 02nn`
+ * (`test`, the operator's rehearsal world, takes `99`).
+ */
+export function judgeBlock(judge: number | "test"): { readonly number: string; readonly clockTag: string; readonly phoneBlock: string } {
+  if (judge !== "test" && (!Number.isInteger(judge) || judge < 0 || judge > 98)) throw new RangeError(`judge number out of range: ${judge}`);
+  const number = judge === "test" ? "test" : String(judge).padStart(2, "0");
+  return { number, clockTag: `j${number}`, phoneBlock: `${PHONE_PREFIX}02${judge === "test" ? "99" : number}` };
+}

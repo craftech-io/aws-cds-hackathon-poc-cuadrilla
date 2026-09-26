@@ -69,6 +69,9 @@ jobs:
         run: npm test
 
       - name: Seed invariants (seed:validate)
+        # Invariant 11 runs the forbidden-terms list over the seed and fails closed without it.
+        env:
+          FORBIDDEN_TERMS: ${{ secrets.FORBIDDEN_TERMS }}
         run: |
           if [ ! -f scripts/seed/validate.ts ]; then
             echo "::notice::seed:validate skipped: scripts/seed/validate.ts is not in the repository yet (WP-17)."

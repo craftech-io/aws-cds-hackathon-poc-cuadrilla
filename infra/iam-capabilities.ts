@@ -147,6 +147,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityName, Capability>> = {
   PIPELINE: {
     grants: [{ actions: ["bedrock:ApplyGuardrail"], resources: ["{G2}", "{G3}"] }],
     includes: ["SEND_EMAIL", "SEND_WHATSAPP", "TIMERS"],
+    // What every send writes: the message and outbox (Conversations), caps and PENDING# (Runtime), the policy audit.
+    tables: { Conversations: "write", Runtime: "write", AuditLog: "write", Isps: "read" },
   },
   MOCK_NETWORK: { grants: invokeMock("NetworkMock") },
   MOCK_DISPATCH: { grants: invokeMock("DispatchMock") },
@@ -219,7 +221,7 @@ export const LAMBDA_CAPABILITIES = {
   InstallerWorker: {
     capabilities: ["PIPELINE", "TRANSCRIBE", "MOCK_NETWORK"],
     tables: { WorkOrders: "write", People: "write", Cases: "write", Conversations: "write", Runtime: "write", AuditLog: "write", Isps: "read", Reference: "read", CuadrillaMetrics: "write" },
-    grants: [g(["bedrock-agentcore:InvokeHarness"], ["{Harness}"]), guardrailG1, sqsSend(), g(["sqs:ChangeMessageVisibility"], ["{InstallerEvents}"])],
+    grants: [g(["bedrock-agentcore:InvokeHarness"], ["{Harness}"]), guardrailG1, sqsSend(), g(["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"], ["{InstallerEvents}"])],
   },
   ToolOrders: {
     capabilities: ["MOCK_NETWORK"],
@@ -227,19 +229,20 @@ export const LAMBDA_CAPABILITIES = {
   },
   ToolKnowledge: {
     capabilities: [],
-    tables: { Reference: "read", Runtime: "write", AuditLog: "write" },
+    // WorkOrders, People, Cases and Isps: the wrapper's LAM-SCOPE (session day, a caller's subject).
+    tables: { Reference: "read", Runtime: "write", AuditLog: "write", WorkOrders: "read", People: "read", Cases: "read", Isps: "read" },
     grants: [g(["bedrock:Retrieve"], ["{KnowledgeBase}"])],
   },
   ToolEvidence: {
     capabilities: ["MOCK_NETWORK", "PIPELINE"],
-    tables: { WorkOrders: "write", Reference: "read", Runtime: "write", AuditLog: "write" },
+    tables: { WorkOrders: "write", Reference: "read", Runtime: "write", AuditLog: "write", People: "read", Cases: "read", Isps: "read" },
     buckets: { Media: "read" },
     // `Converse` is authorized by bedrock:InvokeModel; PIPELINE only for the VERDICT_REACTION kind (FL-103).
     grants: [invokeModels("PHOTO", ["bedrock:InvokeModel"]), g(["s3:PutObject"], ["{Evidence}/photos/*"])],
   },
   ToolMessaging: {
     capabilities: ["PIPELINE"],
-    tables: { WorkOrders: "write", People: "write", Cases: "write", Conversations: "write", Runtime: "write", AuditLog: "write", Reference: "read" },
+    tables: { WorkOrders: "write", People: "write", Cases: "write", Conversations: "write", Runtime: "write", AuditLog: "write", Reference: "read", Isps: "read" },
   },
   ToolCases: {
     capabilities: ["PIPELINE", "MOCK_NETWORK"],
@@ -259,7 +262,7 @@ export const LAMBDA_CAPABILITIES = {
   },
   ChannelEvents: { capabilities: [], tables: { Conversations: "write", WorkOrders: "write", Runtime: "write" }, grants: [sqsSend()] },
   FeedEvents: { capabilities: [], tables: { WorkOrders: "write", Runtime: "write", AuditLog: "write" }, grants: [sqsSend()] },
-  ScheduleDispatch: { capabilities: [], tables: { WorkOrders: "read", Cases: "read" }, grants: [sqsSend()] },
+  ScheduleDispatch: { capabilities: [], tables: { WorkOrders: "read", Cases: "read", People: "read", Runtime: "write" }, grants: [sqsSend()] },
   Bff: {
     capabilities: ["MOCK_NETWORK", "MOCK_DISPATCH", "WORLDS"],
     tables: { ...writeAll(APP_TABLES), Reference: "read" },

@@ -1,0 +1,1238 @@
+{
+  "consoleUsers": [
+    {
+      "name": "Supervisión QA",
+      "role": "SUPERVISOR",
+      "userId": "usr-qa-sup"
+    },
+    {
+      "name": "Operaciones QA",
+      "role": "OPS",
+      "userId": "usr-qa-ops"
+    }
+  ],
+  "crews": [
+    {
+      "crewId": "crew-n3",
+      "name": "Equipo Norte 3",
+      "primary": {
+        "firstName": "Adriana",
+        "lastName": "Solís",
+        "optIn": "GRANTED",
+        "personId": "sup-adriana",
+        "role": "SUPERVISOR"
+      },
+      "secondary": {
+        "firstName": "Héctor",
+        "lastName": "Ibarra",
+        "optIn": "GRANTED",
+        "personId": "sup-hector",
+        "role": "SUPERVISOR"
+      },
+      "shift": {
+        "end": "19:00",
+        "start": "07:00"
+      },
+      "zoneChief": {
+        "firstName": "Marisol",
+        "lastName": "Cárdenas",
+        "optIn": "NONE",
+        "personId": "zc-marisol",
+        "role": "ZONE_CHIEF"
+      },
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-s1",
+      "name": "Equipo Sur 1",
+      "primary": {
+        "firstName": "Paola",
+        "lastName": "Reyes",
+        "optIn": "GRANTED",
+        "personId": "sup-paola",
+        "role": "SUPERVISOR"
+      },
+      "secondary": {
+        "firstName": "Daniel",
+        "lastName": "Fuentes",
+        "optIn": "GRANTED",
+        "personId": "sup-daniel",
+        "role": "SUPERVISOR"
+      },
+      "shift": {
+        "end": "19:00",
+        "start": "07:00"
+      },
+      "zoneChief": {
+        "firstName": "Ricardo",
+        "lastName": "Luna",
+        "optIn": "NONE",
+        "personId": "zc-ricardo",
+        "role": "ZONE_CHIEF"
+      },
+      "zoneId": "zone-sur"
+    }
+  ],
+  "generator": "scripts/seed/generate.ts",
+  "generatorVersion": "1.0.0",
+  "models": [
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Cerrada Tulipán 403",
+        "customerId": "cust-10401",
+        "emailOutcome": "success",
+        "firstName": "Alma",
+        "lastName": "Escamilla",
+        "neighborhood": "El Mirador"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Rogelio",
+        "lastName": "Méndez",
+        "optIn": "GRANTED",
+        "personId": "inst-rogelio",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24801",
+      "oltPort": "OLT-N3/6/1",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -21.2
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0801",
+      "opticalClass": "B+",
+      "plan": "Fibra 300",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24801",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Av. Orquídea 143",
+        "customerId": "cust-10402",
+        "emailOutcome": "success",
+        "firstName": "Imelda",
+        "lastName": "Ocampo",
+        "neighborhood": "El Mirador"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Rogelio",
+        "lastName": "Méndez",
+        "optIn": "GRANTED",
+        "personId": "inst-rogelio",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24802",
+      "oltPort": "OLT-N3/7/1",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -18.2
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0802",
+      "opticalClass": "B+",
+      "plan": "Fibra 100",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "13:30",
+        "start": "11:30"
+      },
+      "workOrderNumber": "24802",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Andador Bugambilia 322",
+        "customerId": "cust-10403",
+        "emailOutcome": "success",
+        "firstName": "Samuel",
+        "lastName": "Trejo",
+        "neighborhood": "El Mirador"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Rogelio",
+        "lastName": "Méndez",
+        "optIn": "GRANTED",
+        "personId": "inst-rogelio",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24803",
+      "oltPort": "OLT-N3/8/1",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -19.9
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0803",
+      "opticalClass": "B+",
+      "plan": "Fibra 500",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "17:00",
+        "start": "15:00"
+      },
+      "workOrderNumber": "24803",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Privada Orquídea 116",
+        "customerId": "cust-10404",
+        "emailOutcome": "success",
+        "firstName": "Bernardo",
+        "lastName": "Barajas",
+        "neighborhood": "Arboledas"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Karina",
+        "lastName": "Olvera",
+        "optIn": "GRANTED",
+        "personId": "inst-karina",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24804",
+      "oltPort": "OLT-N3/6/2",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -21.5
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0804",
+      "opticalClass": "B+",
+      "plan": "Fibra 300",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24804",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Av. Dalia 398",
+        "customerId": "cust-10405",
+        "emailOutcome": "success",
+        "firstName": "Leonel",
+        "lastName": "Macías",
+        "neighborhood": "Las Lomitas"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Karina",
+        "lastName": "Olvera",
+        "optIn": "GRANTED",
+        "personId": "inst-karina",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24805",
+      "oltPort": "OLT-N3/7/2",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -18.3
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0805",
+      "opticalClass": "B+",
+      "plan": "Fibra 100",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "13:30",
+        "start": "11:30"
+      },
+      "workOrderNumber": "24805",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Andador Los Fresnos 373",
+        "customerId": "cust-10406",
+        "emailOutcome": "success",
+        "firstName": "Susana",
+        "lastName": "Rentería",
+        "neighborhood": "Arboledas"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Karina",
+        "lastName": "Olvera",
+        "optIn": "GRANTED",
+        "personId": "inst-karina",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24806",
+      "oltPort": "OLT-N3/8/2",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -22.6
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0806",
+      "opticalClass": "B+",
+      "plan": "Fibra 500",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "17:00",
+        "start": "15:00"
+      },
+      "workOrderNumber": "24806",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Calle Álamo 349",
+        "customerId": "cust-10407",
+        "emailOutcome": "success",
+        "firstName": "Consuelo",
+        "lastName": "Zepeda",
+        "neighborhood": "Valle Claro"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Beatriz",
+        "lastName": "Salazar",
+        "optIn": "GRANTED",
+        "personId": "inst-beatriz",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24807",
+      "oltPort": "OLT-S1/6/3",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -26.6
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0807",
+      "opticalClass": "C+",
+      "plan": "Fibra 300",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24807",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Av. Cedro 357",
+        "customerId": "cust-10408",
+        "emailOutcome": "success",
+        "firstName": "Maribel",
+        "lastName": "Galván",
+        "neighborhood": "Valle Claro"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Beatriz",
+        "lastName": "Salazar",
+        "optIn": "GRANTED",
+        "personId": "inst-beatriz",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24808",
+      "oltPort": "OLT-S1/7/3",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -24.8
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0808",
+      "opticalClass": "C+",
+      "plan": "Fibra 100",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "13:30",
+        "start": "11:30"
+      },
+      "workOrderNumber": "24808",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Privada Bugambilia 475",
+        "customerId": "cust-10409",
+        "emailOutcome": "success",
+        "firstName": "Tránsito",
+        "lastName": "Pacheco",
+        "neighborhood": "Los Encinos"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Beatriz",
+        "lastName": "Salazar",
+        "optIn": "GRANTED",
+        "personId": "inst-beatriz",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24809",
+      "oltPort": "OLT-S1/8/3",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -22.8
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0809",
+      "opticalClass": "C+",
+      "plan": "Fibra 500",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "17:00",
+        "start": "15:00"
+      },
+      "workOrderNumber": "24809",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Privada Tulipán 23",
+        "customerId": "cust-10410",
+        "emailOutcome": "success",
+        "firstName": "Efraín",
+        "lastName": "Urías",
+        "neighborhood": "Valle Claro"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Tomás",
+        "lastName": "Aguilar",
+        "optIn": "GRANTED",
+        "personId": "inst-tomas",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24810",
+      "oltPort": "OLT-S1/6/4",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -22.4
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0810",
+      "opticalClass": "C+",
+      "plan": "Fibra 300",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24810",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Calle Dalia 96",
+        "customerId": "cust-10411",
+        "emailOutcome": "success",
+        "firstName": "Noemí",
+        "lastName": "Cisneros",
+        "neighborhood": "Los Encinos"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Tomás",
+        "lastName": "Aguilar",
+        "optIn": "GRANTED",
+        "personId": "inst-tomas",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24811",
+      "oltPort": "OLT-S1/7/4",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -22.8
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0811",
+      "opticalClass": "C+",
+      "plan": "Fibra 100",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "13:30",
+        "start": "11:30"
+      },
+      "workOrderNumber": "24811",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Andador Ceiba 128",
+        "customerId": "cust-10412",
+        "emailOutcome": "success",
+        "firstName": "Ulises",
+        "lastName": "Nájera",
+        "neighborhood": "Valle Claro"
+      },
+      "dayOffset": -1,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Tomás",
+        "lastName": "Aguilar",
+        "optIn": "GRANTED",
+        "personId": "inst-tomas",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24812",
+      "oltPort": "OLT-S1/8/4",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -22.4
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3E1B0812",
+      "opticalClass": "C+",
+      "plan": "Fibra 500",
+      "status": "CLOSED",
+      "story": "Closed on 12/10 with certificate, evidence and validations (metrics and profile)",
+      "window": {
+        "end": "17:00",
+        "start": "15:00"
+      },
+      "workOrderNumber": "24812",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Calle Jacaranda 214",
+        "customerId": "cust-10421",
+        "emailOutcome": "success",
+        "firstName": "Lucía",
+        "lastName": "Treviño",
+        "neighborhood": "Las Lomitas"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Rogelio",
+        "lastName": "Méndez",
+        "optIn": "GRANTED",
+        "personId": "inst-rogelio",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24817",
+      "oltPort": "OLT-N3/1/4",
+      "onu": {
+        "behaviour": "LOS_THEN_ONLINE",
+        "rxPowerDbm": -21.4
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C19A0",
+      "opticalClass": "B+",
+      "plan": "Fibra 300",
+      "status": "SCHEDULED",
+      "story": "Main story: voice, diagnosis, policy, photos, certificate",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24817",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Av. Los Fresnos 88",
+        "customerId": "cust-10422",
+        "emailOutcome": "success",
+        "firstName": "Armando",
+        "lastName": "Guzmán",
+        "neighborhood": "Arboledas"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Rogelio",
+        "lastName": "Méndez",
+        "optIn": "GRANTED",
+        "personId": "inst-rogelio",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24818",
+      "oltPort": "OLT-N3/1/6",
+      "onu": {
+        "behaviour": "LOW_POWER_THEN_OK",
+        "rxPowerDbm": -22.1
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C1A11",
+      "opticalClass": "B+",
+      "plan": "Fibra 100",
+      "status": "SCHEDULED",
+      "story": "Ladder and bridge",
+      "window": {
+        "end": "13:30",
+        "start": "11:30"
+      },
+      "workOrderNumber": "24818",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Privada Olmo 12",
+        "customerId": "cust-10423",
+        "emailOutcome": "success",
+        "firstName": "Rosa Elena",
+        "lastName": "Pineda",
+        "neighborhood": "El Mirador"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Rogelio",
+        "lastName": "Méndez",
+        "optIn": "GRANTED",
+        "personId": "inst-rogelio",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24819",
+      "oltPort": "OLT-N3/2/1",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -20.6
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C1B27",
+      "opticalClass": "B+",
+      "plan": "Fibra 500",
+      "status": "SCHEDULED",
+      "story": "Safety",
+      "window": {
+        "end": "17:00",
+        "start": "15:00"
+      },
+      "workOrderNumber": "24819",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Privada Magnolia 186",
+        "customerId": "cust-10424",
+        "emailOutcome": "success",
+        "firstName": "Bernardo",
+        "lastName": "Zepeda",
+        "neighborhood": "El Mirador"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Karina",
+        "lastName": "Olvera",
+        "optIn": "GRANTED",
+        "personId": "inst-karina",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24820",
+      "oltPort": "OLT-N3/2/3",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -20.2
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C2C04",
+      "opticalClass": "B+",
+      "plan": "Fibra 300",
+      "status": "SCHEDULED",
+      "story": "Three rejected labels → PHOTO_ATTEMPTS",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24820",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Andador Ciprés 273",
+        "customerId": "cust-10425",
+        "emailOutcome": "success",
+        "firstName": "Noemí",
+        "lastName": "Sepúlveda",
+        "neighborhood": "Arboledas",
+        "note": "Titular confirmó sus datos por teléfono con ventas; CURP registrada en el alta: SEPN000101MNESPR00."
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Karina",
+        "lastName": "Olvera",
+        "optIn": "GRANTED",
+        "personId": "inst-karina",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24821",
+      "oltPort": "OLT-N3/2/5",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -22.8
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C2D15",
+      "opticalClass": "B+",
+      "plan": "Fibra 100",
+      "status": "SCHEDULED",
+      "story": "Label with another serial (DEMO3F2C9999)",
+      "window": {
+        "end": "13:30",
+        "start": "11:30"
+      },
+      "workOrderNumber": "24821",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Privada Bugambilia 107",
+        "customerId": "cust-10426",
+        "emailOutcome": "success",
+        "firstName": "Susana",
+        "lastName": "Pacheco",
+        "neighborhood": "El Mirador"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Karina",
+        "lastName": "Olvera",
+        "optIn": "GRANTED",
+        "personId": "inst-karina",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24822",
+      "oltPort": "OLT-N3/3/2",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -21.9
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C2E26",
+      "opticalClass": "B+",
+      "plan": "Fibra 300",
+      "status": "SCHEDULED",
+      "story": "Customer absent → failed visit",
+      "window": {
+        "end": "17:00",
+        "start": "15:00"
+      },
+      "workOrderNumber": "24822",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Av. Gardenia 162",
+        "customerId": "cust-10430",
+        "emailOutcome": "success",
+        "firstName": "Efraín",
+        "lastName": "Sepúlveda",
+        "neighborhood": "Los Encinos"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Beatriz",
+        "lastName": "Salazar",
+        "optIn": "GRANTED",
+        "personId": "inst-beatriz",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24830",
+      "oltPort": "OLT-S1/1/2",
+      "onu": {
+        "behaviour": "NOT_PROVISIONED"
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C3A01",
+      "opticalClass": "C+",
+      "plan": "Fibra 300",
+      "status": "SCHEDULED",
+      "story": "NOT_PROVISIONED case",
+      "window": {
+        "end": "12:00",
+        "start": "10:00"
+      },
+      "workOrderNumber": "24830",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Privada Olmo 9",
+        "customerId": "cust-10431",
+        "emailOutcome": "bounce",
+        "firstName": "Genaro",
+        "lastName": "Vega",
+        "neighborhood": "Los Encinos"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Beatriz",
+        "lastName": "Salazar",
+        "optIn": "GRANTED",
+        "personId": "inst-beatriz",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24831",
+      "oltPort": "OLT-S1/1/5",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -23.9
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C3B12",
+      "opticalClass": "C+",
+      "plan": "Fibra 100",
+      "status": "SCHEDULED",
+      "story": "Bounced certificate",
+      "window": {
+        "end": "15:00",
+        "start": "13:00"
+      },
+      "workOrderNumber": "24831",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Av. Sauce 437",
+        "customerId": "cust-10432",
+        "emailOutcome": "complaint",
+        "firstName": "Consuelo",
+        "lastName": "Arriaga",
+        "neighborhood": "Valle Claro"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Tomás",
+        "lastName": "Aguilar",
+        "optIn": "GRANTED",
+        "personId": "inst-tomas",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24832",
+      "oltPort": "OLT-S1/2/2",
+      "onu": {
+        "behaviour": "DYING_GASP",
+        "rxPowerDbm": -22.1
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C3C23",
+      "opticalClass": "C+",
+      "plan": "Fibra 500",
+      "status": "SCHEDULED",
+      "story": "§DIAG-01; certificate complaint",
+      "window": {
+        "end": "12:00",
+        "start": "10:00"
+      },
+      "workOrderNumber": "24832",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Calle Olmo 332",
+        "customerId": "cust-10433",
+        "emailOutcome": "success",
+        "firstName": "Elvira",
+        "lastName": "Quiroz",
+        "neighborhood": "Los Encinos"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Tomás",
+        "lastName": "Aguilar",
+        "optIn": "GRANTED",
+        "personId": "inst-tomas",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24833",
+      "oltPort": "OLT-S1/2/4",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -26.1
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C3D34",
+      "opticalClass": "C+",
+      "plan": "Fibra 100",
+      "status": "SCHEDULED",
+      "story": "In range in C+, out of range in B+ (class test)",
+      "window": {
+        "end": "15:00",
+        "start": "13:00"
+      },
+      "workOrderNumber": "24833",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Andador Tulipán 288",
+        "customerId": "cust-10440",
+        "emailOutcome": "success",
+        "firstName": "Reyna",
+        "lastName": "Rentería",
+        "neighborhood": "El Mirador"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Julián",
+        "lastName": "Torres",
+        "optIn": "NONE",
+        "personId": "inst-julian",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24840",
+      "oltPort": "OLT-N3/3/6",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -21.2
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C4A05",
+      "opticalClass": "B+",
+      "plan": "Fibra 100",
+      "status": "SCHEDULED",
+      "story": "No opt-in: day start denied",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24840",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-s1",
+      "customer": {
+        "addressLine": "Andador Ciprés 193",
+        "customerId": "cust-10441",
+        "emailOutcome": "success",
+        "firstName": "Alma",
+        "lastName": "Zepeda",
+        "neighborhood": "Valle Claro"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-s1",
+        "firstName": "Ernesto",
+        "lastName": "Villalobos",
+        "optIn": "REVOKED",
+        "personId": "inst-ernesto",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24841",
+      "oltPort": "OLT-S1/3/1",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -23.3
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C4B16",
+      "opticalClass": "C+",
+      "plan": "Fibra 300",
+      "status": "SCHEDULED",
+      "story": "Opted out: day start denied",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24841",
+      "zoneId": "zone-sur"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Av. Bugambilia 377",
+        "customerId": "cust-10442",
+        "emailOutcome": "success",
+        "firstName": "Imelda",
+        "lastName": "Galván",
+        "neighborhood": "Las Lomitas"
+      },
+      "dayOffset": 0,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Karina",
+        "lastName": "Olvera",
+        "optIn": "GRANTED",
+        "personId": "inst-karina",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24842",
+      "oltPort": "OLT-N3/4/1",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -19.7
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C4C27",
+      "opticalClass": "B+",
+      "plan": "Fibra 100",
+      "status": "SCHEDULED",
+      "story": "ORDER_CHOICE list (Karina's four orders)",
+      "window": {
+        "end": "19:00",
+        "start": "17:00"
+      },
+      "workOrderNumber": "24842",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Cerrada Camelia 274",
+        "customerId": "cust-10413",
+        "emailOutcome": "success",
+        "firstName": "Elvira",
+        "lastName": "Sepúlveda",
+        "neighborhood": "Las Lomitas"
+      },
+      "dayOffset": 1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Rogelio",
+        "lastName": "Méndez",
+        "optIn": "GRANTED",
+        "personId": "inst-rogelio",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24850",
+      "oltPort": "OLT-N3/4/3",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -20.8
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C5A01",
+      "opticalClass": "B+",
+      "plan": "Fibra 300",
+      "status": "SCHEDULED",
+      "story": "Tomorrow's order",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24850",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Av. Tulipán 190",
+        "customerId": "cust-10414",
+        "emailOutcome": "success",
+        "firstName": "Olga",
+        "lastName": "Arriaga",
+        "neighborhood": "Las Lomitas"
+      },
+      "dayOffset": 1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Rogelio",
+        "lastName": "Méndez",
+        "optIn": "GRANTED",
+        "personId": "inst-rogelio",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24851",
+      "oltPort": "OLT-N3/4/5",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -22.4
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C5B12",
+      "opticalClass": "B+",
+      "plan": "Fibra 100",
+      "status": "SCHEDULED",
+      "story": "Tomorrow's order",
+      "window": {
+        "end": "13:30",
+        "start": "11:30"
+      },
+      "workOrderNumber": "24851",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Av. Tabachín 8",
+        "customerId": "cust-10415",
+        "emailOutcome": "success",
+        "firstName": "Yesenia",
+        "lastName": "Lozano",
+        "neighborhood": "Arboledas"
+      },
+      "dayOffset": 1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Karina",
+        "lastName": "Olvera",
+        "optIn": "GRANTED",
+        "personId": "inst-karina",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24852",
+      "oltPort": "OLT-N3/5/2",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -19.9
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C5C23",
+      "opticalClass": "B+",
+      "plan": "Fibra 500",
+      "status": "SCHEDULED",
+      "story": "Tomorrow's order",
+      "window": {
+        "end": "11:00",
+        "start": "09:00"
+      },
+      "workOrderNumber": "24852",
+      "zoneId": "zone-norte"
+    },
+    {
+      "crewId": "crew-n3",
+      "customer": {
+        "addressLine": "Privada Roble 466",
+        "customerId": "cust-10416",
+        "emailOutcome": "success",
+        "firstName": "Fidel",
+        "lastName": "Quiroz",
+        "neighborhood": "El Mirador"
+      },
+      "dayOffset": 1,
+      "installer": {
+        "crewId": "crew-n3",
+        "firstName": "Karina",
+        "lastName": "Olvera",
+        "optIn": "GRANTED",
+        "personId": "inst-karina",
+        "role": "INSTALLER"
+      },
+      "model": "wo-24853",
+      "oltPort": "OLT-N3/5/4",
+      "onu": {
+        "behaviour": "ONLINE_OK",
+        "rxPowerDbm": -21.6
+      },
+      "onuModel": "ONU-G1 genérica",
+      "onuSerial": "DEMO3F2C5D34",
+      "opticalClass": "B+",
+      "plan": "Fibra 300",
+      "status": "SCHEDULED",
+      "story": "Tomorrow's order",
+      "window": {
+        "end": "13:30",
+        "start": "11:30"
+      },
+      "workOrderNumber": "24853",
+      "zoneId": "zone-norte"
+    }
+  ],
+  "seed": 20260926,
+  "settings": {
+    "caseTimeoutSec": 600,
+    "demoCaseTimeoutSec": 60,
+    "demoMode": true,
+    "quietHours": {
+      "end": "07:00",
+      "start": "21:00"
+    },
+    "simulatorCaps": {
+      "emailsPerDay": 20,
+      "messagesPerRealHourPerIdentity": 20,
+      "transcribeSecPerDay": 1800,
+      "turnsPerDay": 300,
+      "turnsPerHour": 60,
+      "validationsPerDay": 100
+    },
+    "templateStatus": {
+      "acta_instalacion": "APPROVED",
+      "alerta_seguridad": "APPROVED",
+      "caso_escalado": "APPROVED",
+      "caso_reasignado": "APPROVED",
+      "ordenes_del_dia": "APPROVED",
+      "respuesta_supervisor": "APPROVED"
+    },
+    "timezone": "America/Mexico_City",
+    "turnCaps": {
+      "perDay": 1000,
+      "perHour": 200
+    },
+    "whatsappMode": "simulated"
+  },
+  "startAtSim": "2026-10-13T07:00:00-06:00",
+  "template": "models",
+  "templateVersion": "v001",
+  "whatsappMode": "simulated",
+  "zones": [
+    {
+      "acceptanceRange": {
+        "maxDbm": -8,
+        "minDbm": -25
+      },
+      "name": "Zona Norte",
+      "opticalClass": "B+",
+      "zoneId": "zone-norte"
+    },
+    {
+      "acceptanceRange": {
+        "maxDbm": -8,
+        "minDbm": -28
+      },
+      "name": "Zona Sur",
+      "opticalClass": "C+",
+      "zoneId": "zone-sur"
+    }
+  ]
+}
