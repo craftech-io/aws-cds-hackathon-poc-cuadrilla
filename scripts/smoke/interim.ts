@@ -23,7 +23,6 @@ import { fileURLToPath } from "node:url";
 import { parseFlags } from "../channels/cli-args";
 
 export const DEFAULT_BASE_URL = "https://cuadrilla.demo.craftech.io";
-const APP = "aws-cds-hackathon-poc-cuadrilla";
 const ATTEMPTS = 3;
 const RETRY_DELAY_MS = 10_000;
 const TIMEOUT_MS = 10_000;
@@ -112,9 +111,9 @@ async function inventory(): Promise<{ lines: string[]; problems: string[] }> {
   const dynamo = new DynamoDBClient({ region: "us-east-1", maxAttempts: 3 });
   const lambda = new LambdaClient({ region: "us-east-1", maxAttempts: 3 });
   const { tables, functions } = stateInventory(await exportState());
+  // Every name comes from this app's state; no prefix check, since SST truncates the app name in
+  // function names (64 characters) and they no longer start with it.
   const problems: string[] = [];
-  const outside = [...tables, ...functions].filter((name) => !name.startsWith(`${APP}-`));
-  if (outside.length > 0) problems.push(`${outside.length} resource(s) in the state without the ${APP}- prefix`);
   for (const name of tables) {
     const status = (await dynamo.send(new DescribeTableCommand({ TableName: name }))).Table?.TableStatus;
     if (status !== "ACTIVE" && status !== "UPDATING") problems.push(`table ${name} is ${status ?? "missing"}`);
