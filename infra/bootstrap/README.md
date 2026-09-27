@@ -20,10 +20,10 @@
   with the web ACL, after this template is applied. The AWS WAF guide ("Using the JavaScript API
   with content security policies") allowlists the apex `https://*.awswaf.com` in `script-src`,
   `script-src-elem` and `connect-src`; the console narrows it to the SDK and token hosts it uses.
-- Origin request policy `<app>-poc-api` for `/api/*` of the Router (ADR-0025 §3): every viewer
-  header, cookie and query string (the headers AWS WAF inserts included) plus
-  `CloudFront-Viewer-Address`, which the managed `AllViewerExceptHostHeader` (`allExcept [host]`)
-  does not forward. The deploy role only reads it; `infra/web.ts` finds it by name.
+- Origin request policy `<app>-poc-api`: not referenced. It forwards the viewer's Host, and a
+  Lambda URL answers 403 AccessDeniedException to it, so `/api/*` uses AWS's
+  `AllViewerExceptHostHeader`, which also forwards `CloudFront-Viewer-Address`
+  (`infra/web-spec.ts`). Removing it from the template deletes the policy: the operator's call.
 - Optionally the GitHub OIDC provider, only for an account that has none.
 
 Explanations live here, not in the template: CloudFormation accepts 51,200 bytes inline and IAM

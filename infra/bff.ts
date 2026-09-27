@@ -7,8 +7,8 @@
 // The edge is the only way in. The Router adds the origin header `x-cuadrilla-origin` with the value
 // of `OriginVerifyKey` on every origin request (infra/web.ts, an origin custom header of the
 // distribution; CloudFront overwrites a viewer's header of the same name) and forwards
-// `CloudFront-Viewer-Address` and the headers AWS WAF inserts on `/api/*` (the bootstrap's origin
-// request policy). `routers/handler.ts` answers 403 without a body, before parsing, to any request
+// `CloudFront-Viewer-Address` and the headers AWS WAF inserts on `/api/*` (AWS's
+// AllViewerExceptHostHeader, infra/web-spec.ts). `routers/handler.ts` answers 403 without a body, before parsing, to any request
 // without the header or with another value, so the Function URL called directly skips neither the
 // web ACL nor the viewer's IP (smoke: scripts/smoke/interim.ts).
 //

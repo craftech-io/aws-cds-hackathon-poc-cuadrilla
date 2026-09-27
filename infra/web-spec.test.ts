@@ -15,7 +15,7 @@ import {
   WAF_TOKEN_ORIGIN,
   API_AUTHORIZATION_HEADER,
   apiCachePolicyName,
-  apiOriginRequestPolicyName,
+  API_ORIGIN_REQUEST_POLICY_ID,
   LAMBDA_ROUTES,
   LEGAL_PAGES,
   ROUTER_READ_TIMEOUT_MAX_SECONDS,
@@ -161,14 +161,10 @@ describe("origin of /api/* [FL-114]", () => {
     expect(API_PATH_PATTERN).toBe("/api/*");
   });
 
-  it("forwards every viewer value and CloudFront-Viewer-Address on /api/* by the bootstrap's policy", () => {
-    expect(apiOriginRequestPolicyName("aws-cds-hackathon-poc-cuadrilla", "poc")).toBe("aws-cds-hackathon-poc-cuadrilla-poc-api");
-    const policy = template.slice(template.indexOf("  ApiOriginRequestPolicy:"), template.indexOf("  # ---- Permissions boundary"));
-    expect(policy).toContain('Name: !Sub "${AppName}-${DeployStage}-api"');
-    expect(policy).toContain("HeaderBehavior: allViewerAndWhitelistCloudFront");
-    expect(policy).toContain(`Headers: [${VIEWER_ADDRESS_HEADER}]`);
-    expect(policy).toContain("QueryStringBehavior: all");
-    expect(web).toContain("aws.cloudfront.getOriginRequestPolicyOutput({ name: apiOriginRequestPolicyName($app.name, $app.stage) })");
+  it("forwards every viewer value but Host, and CloudFront-Viewer-Address, on /api/* by AWS's AllViewerExceptHostHeader", () => {
+    expect(API_ORIGIN_REQUEST_POLICY_ID).toBe("b689b0a8-53d0-40ab-baf2-68738e2966ac");
+    expect(web).toContain("originRequestPolicyId: API_ORIGIN_REQUEST_POLICY_ID");
+    expect(web).not.toContain("getOriginRequestPolicyOutput");
   });
 
   it("keeps Authorization on a GET query of /api/* with the bootstrap's cache policy, which caches nothing [FL-114]", () => {
@@ -181,7 +177,7 @@ describe("origin of /api/* [FL-114]", () => {
     expect(policy).toContain("QueryStringBehavior: all");
     for (const ttl of ["MinTTL: 0", "DefaultTTL: 0", "MaxTTL: 1"]) expect(policy).toContain(ttl);
     expect(web).toContain("aws.cloudfront.getCachePolicyOutput({ name: apiCachePolicyName($app.name, $app.stage) })");
-    expect(web).toMatch(/originRequestPolicyId: policyId, cachePolicyId \}/);
+    expect(web).toMatch(/originRequestPolicyId: API_ORIGIN_REQUEST_POLICY_ID, cachePolicyId \}/);
   });
 
   it("puts the origin header on the distribution's origins from OriginVerifyKey, never a literal", () => {

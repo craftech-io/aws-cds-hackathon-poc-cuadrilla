@@ -64,20 +64,17 @@ export const ORIGIN_VERIFY_HEADER = "x-cuadrilla-origin";
 /** The viewer's IP and port as CloudFront saw them; the Bff reads it only after the origin check. */
 export const VIEWER_ADDRESS_HEADER = "CloudFront-Viewer-Address";
 
-/** Cache behavior of the BFF: the origin request policy of the bootstrap applies to these paths only. */
+/** Cache behavior of the BFF: the cache policy of the bootstrap applies to these paths only. */
 export const API_PATH_PATTERN = `${API_PATH}/*`;
 
 /**
- * Origin request policy the bootstrap creates for `/api/*` (infra/bootstrap/ci-role.yaml,
- * ApiOriginRequestPolicy): every viewer header, cookie and query string (the WAF-inserted
- * `x-amzn-waf-*` headers included) plus `CloudFront-Viewer-Address`. The managed
- * AllViewerExceptHostHeader SST puts on the Router is `allExcept [host]`, which never forwards
- * CloudFront's own headers. The Host the Lambda URL sees is the origin's domain: the Router's
- * `updateRequestOrigin` names it, and a `domainName` there takes the place of the viewer's Host.
+ * Origin request policy of `/api/*`: AWS's managed AllViewerExceptHostHeader, the one SST puts on
+ * the Router. It forwards every viewer header, cookie and query string (the WAF-inserted
+ * `x-amzn-waf-*` headers included) except Host, plus CloudFront's device type and viewer location
+ * headers, `CloudFront-Viewer-Address` among them. A Lambda URL answers 403 AccessDeniedException to
+ * a viewer's Host, so a policy that forwards it (`allViewer*`) breaks the Bff.
  */
-export function apiOriginRequestPolicyName(app: string, stage: string): string {
-  return `${app}-${stage}-api`;
-}
+export const API_ORIGIN_REQUEST_POLICY_ID = "b689b0a8-53d0-40ab-baf2-68738e2966ac";
 
 /**
  * Cache policy the bootstrap creates for `/api/*` (infra/bootstrap/ci-role.yaml, ApiCachePolicy), read

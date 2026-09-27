@@ -115,7 +115,6 @@ beforeAll(async () => {
     cloudfront: {
       KeyValueStore: { get: () => ({ arn: out("kvs") }) },
       getResponseHeadersPolicyOutput: () => ({ id: out("headers-policy") }),
-      getOriginRequestPolicyOutput: (args: { name: string }) => ({ id: out(args.name === "aws-cds-hackathon-poc-cuadrilla-poc-api" ? "api-policy" : undefined) }),
       getCachePolicyOutput: (args: { name: string }) => ({ id: out(args.name === "aws-cds-hackathon-poc-cuadrilla-poc-api" ? "api-cache-policy" : undefined) }),
     },
   });
@@ -231,9 +230,9 @@ describe("the edge of the Bff (ADR-0025 §3) [FL-114]", () => {
     expect(origins[0]?.customHeaders).toEqual([{ name: "x-cuadrilla-origin", value: "value-of-OriginVerifyKey" }]);
   });
 
-  it("serves /api/* with the default routing, the bootstrap's policy that forwards CloudFront-Viewer-Address and the cache policy that keeps Authorization on a GET", async () => {
+  it("serves /api/* with the default routing, AllViewerExceptHostHeader (never the viewer's Host) and the cache policy that keeps Authorization on a GET", async () => {
     const { orderedCacheBehaviors, defaultCacheBehavior } = await transformed();
-    expect(orderedCacheBehaviors).toEqual([{ ...DEFAULT, pathPattern: "/api/*", originRequestPolicyId: "api-policy", cachePolicyId: "api-cache-policy", responseHeadersPolicyId: "headers-policy" }]);
+    expect(orderedCacheBehaviors).toEqual([{ ...DEFAULT, pathPattern: "/api/*", originRequestPolicyId: "b689b0a8-53d0-40ab-baf2-68738e2966ac", cachePolicyId: "api-cache-policy", responseHeadersPolicyId: "headers-policy" }]);
     expect(defaultCacheBehavior).toEqual({ ...DEFAULT, responseHeadersPolicyId: "headers-policy" });
   });
 
