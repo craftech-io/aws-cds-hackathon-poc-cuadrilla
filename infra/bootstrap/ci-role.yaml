@@ -764,9 +764,13 @@ Resources:
               - wafv2:TagResource
               - wafv2:UntagResource
               - wafv2:UpdateWebACL
+            # Create/UpdateWebACL also authorize every AWS managed rule group the ACL references
+            # (<scope>/managedruleset/<name>/<id>); the web ACL ARN above still fences the ACL.
             Resource:
               - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:global/webacl/${AppName}-*"
               - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:regional/webacl/${AppName}-*"
+              - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:global/managedruleset/*/*"
+              - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:regional/managedruleset/*/*"
           - Sid: ManagedRuleGroupReads
             Effect: Allow
             Action:

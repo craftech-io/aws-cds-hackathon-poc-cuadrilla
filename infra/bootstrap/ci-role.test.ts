@@ -337,7 +337,7 @@ describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
 
   it("manages web ACLs only by the app's name prefix, in both scopes, and never wafv2:*", () => {
     const acls = statement("WebAclsOfThisApp");
-    for (const arn of WEB_ACLS) expect(acls).toContain(arn);
+    for (const arn of [...WEB_ACLS, ...WEB_ACLS.map((arn) => arn.replace("webacl/${AppName}-*", "managedruleset/*/*"))]) expect(acls).toContain(arn);
     for (const action of ["CreateWebACL", "UpdateWebACL", "DeleteWebACL", "GetWebACL", "AssociateWebACL", "DisassociateWebACL", "TagResource"]) expect(acls).toContain(`- wafv2:${action}\n`);
     expect(acls).not.toContain('Resource: "*"');
     expect(template).not.toMatch(/wafv2:\*|webacl\/\*/);

@@ -194,6 +194,9 @@ Stated instead of hidden.
 - **Managed rule group reads on `*`.** `ManagedRuleGroupReads` describes and lists AWS's managed
   rule groups account-wide; they are AWS's, carry no data of any project and grant nothing on a web
   ACL.
+- **Managed rule set references.** `WebAclsOfThisApp` also lists `<scope>/managedruleset/*/*`,
+  because AWS WAF authorizes `CreateWebACL` and `UpdateWebACL` on every managed rule group the ACL
+  references; the same call is still authorized on the web ACL ARN, fenced by the app's prefix.
 - **Transcribe tagging on `*`.** `TagResource` with `aws:RequestTag/Project` could, in theory, tag
   a Transcribe resource of another project with this app's `Project`; it cannot remove or change
   that project's other tags (`aws:TagKeys` limits the keys) and grants nothing on it afterwards,
