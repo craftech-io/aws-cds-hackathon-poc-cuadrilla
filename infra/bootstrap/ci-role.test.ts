@@ -350,10 +350,10 @@ describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
     expect(template).not.toMatch(/APIKey|captcha/i);
   });
 
-  it("associates a web ACL only with a Cognito pool tagged as this app", () => {
+  it("associates the app's web ACLs with a Cognito pool and detaches only from a pool tagged as this app", () => {
     const association = statement("CognitoWebAclAssociation");
-    for (const action of ["AssociateWebACL", "DisassociateWebACL", "GetWebACLForResource"]) expect(association).toContain(`- cognito-idp:${action}`);
-    expect(association).toContain("aws:ResourceTag/sst:app: !Ref AppName");
+    for (const text of ["- cognito-idp:AssociateWebACL", "- cognito-idp:GetWebACLForResource", 'cognito-idp:${Region}:${AWS::AccountId}:userpool/*"']) expect(association).toContain(text);
+    expect(statement("CognitoWebAclDisassociation")).toMatch(/Action: cognito-idp:DisassociateWebACL[\s\S]*aws:ResourceTag\/sst:app: !Ref AppName/);
   });
 
   it("maps event sources only onto functions named after the app", () => {

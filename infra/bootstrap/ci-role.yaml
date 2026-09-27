@@ -697,12 +697,18 @@ Resources:
             Condition:
               ArnLike:
                 lambda:FunctionArn: !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${AppName}-*"
+          # Cognito's own check of AssociateWebACL (made on behalf of AWS WAF) does not see the pool's
+          # tags, and the pool's id is opaque: the fence is the web ACL, which WebAclsOfThisApp limits
+          # to the app's names. Disassociating stays on a pool tagged as this app.
           - Sid: CognitoWebAclAssociation
             Effect: Allow
             Action:
               - cognito-idp:AssociateWebACL
-              - cognito-idp:DisassociateWebACL
               - cognito-idp:GetWebACLForResource
+            Resource: !Sub "arn:${AWS::Partition}:cognito-idp:${Region}:${AWS::AccountId}:userpool/*"
+          - Sid: CognitoWebAclDisassociation
+            Effect: Allow
+            Action: cognito-idp:DisassociateWebACL
             Resource: "*"
             Condition:
               StringEquals:
