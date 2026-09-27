@@ -16,10 +16,10 @@
       "world": "visitor",
       "locale": "es-MX",
       "viewports": ["1440x900", "390x844"],
-      "visual": { "kind": "full" },
+      "visual": { "kind": "crop", "selector": "body", "margin": 0 },
       "manifest": { "id": "signup-form", "viewport": "1440x900" },
       "requires": { "views": ["signup"], "procedures": [] },
-      "moment": "The signup form as a visitor first sees it: email, password, the three optional fields and the two consents, separate and unticked"
+      "moment": "The whole signup page as a visitor first sees it: email, password, the three optional fields, the two consents separate and unticked, and the button waiting for the terms"
     },
     "signup-code": {
       "route": "/signup",
@@ -42,5 +42,72 @@
       "moment": "The guest's home once the signup world is READY: the seeded installer and operator, the expiry date and what can already be used"
     }
   },
-  "images": {}
+  "images": {
+    "landing/1440x900": {
+      "pixels": "e405ab2c043f3317b9294a7d05bc1e0a5b8c38446fb114b293552f3b23fadde8",
+      "width": 2880,
+      "height": 1800,
+      "files": {
+        "/landing/captures/landing-1440x900-1440w.avif": "a8fc25b03ab522f2c9be5e36fe4f71e3de41dd7432ebf42ca883d8c8fe2cc753",
+        "/landing/captures/landing-1440x900-2880w.avif": "1e5f67305e8beb994c102c9ff4227ca69fadb0c6f89b8aa93e31726c8b70bba8",
+        "/landing/captures/landing-1440x900-1440w.webp": "ce65af412a214af07f0789fdb8738ea24ad1b981ea4655883cb5da664564d6ce",
+        "/landing/captures/landing-1440x900-2880w.webp": "07cc7f15f5f2bb6a826a58cbd701ad8cd121633fec5a9bd581046aac1af6fab1"
+      }
+    },
+    "landing/390x844": {
+      "pixels": "8b14ff73532bc2373e3d883eec14e47dfdb732c16667ddff3d1d07a02df9f973",
+      "width": 780,
+      "height": 1688,
+      "files": {
+        "/landing/captures/landing-390x844-390w.avif": "0e66c5d314bc028a52578d5c9990d2072b6fbd6d1d117e6ea59e8de93a1ab0ad",
+        "/landing/captures/landing-390x844-780w.avif": "d88ecafad010c2508586507ba76a4312b0ac585989175bacda34158114675ea4",
+        "/landing/captures/landing-390x844-390w.webp": "9b8fcce6a6fb224aaab8e6f2b82d00786699468e4a91c86e9698b72b39520304",
+        "/landing/captures/landing-390x844-780w.webp": "b0475d78c76d014e52e91297521254f58272051dd6c5424290efe54d8344e548"
+      }
+    },
+    "signup-code/1440x900": {
+      "pixels": "36fd5a8b80902a846cd8adf57b4db6e8038d9eb67b6210fb0fc412ada5d161cc",
+      "width": 2880,
+      "height": 1800,
+      "files": {
+        "/landing/captures/signup-code-1440x900-1440w.avif": "433454708321e56924a2850359d7d4690a71e006111c22436512937574824599",
+        "/landing/captures/signup-code-1440x900-2880w.avif": "3ec690b5d4e95387b4677100ae4fc5cc23df5d2d03287bc9e60038a257e26e00",
+        "/landing/captures/signup-code-1440x900-1440w.webp": "01d4571d4d9c2d0edbc6a04c9b314e1dba5b997759d7e0b2639458abc7660ad9",
+        "/landing/captures/signup-code-1440x900-2880w.webp": "a2556f5bc4dfe2718174481ade53b203fa9f221c0e5793bd42f296003f493c8b"
+      }
+    },
+    "signup-code/390x844": {
+      "pixels": "a2274ecd98489d3cb5826bed9f7505fd942cb331760d58310a152db8483d3c87",
+      "width": 780,
+      "height": 1688,
+      "files": {
+        "/landing/captures/signup-code-390x844-390w.avif": "e3a911be29ca52f6bd71e325f1bc47580c2a123e33f5afaff2e130689f61a135",
+        "/landing/captures/signup-code-390x844-780w.avif": "54254dc0f9e3cc640636f2e74c3ac7e2f44999f3108505cbc92f500a441fcbce",
+        "/landing/captures/signup-code-390x844-390w.webp": "33e03e677f1ef66c5f33cbb57e5d057c377a663d5a134b9c814b118fa6723ca4",
+        "/landing/captures/signup-code-390x844-780w.webp": "1f91eac5d39e89687f83b7bb823ef3dd5cfece34072a3acbfcd0dedf5dc5e2e4"
+      }
+    },
+    "signup-form/1440x900": {
+      "pixels": "fd7f80ecdf709e2226521ecf99f06635268a1db8386bf44b2397c07cd9a9f2b5",
+      "width": 2880,
+      "height": 2414,
+      "files": {
+        "/landing/captures/signup-form-1440x900-1440w.avif": "10b0d58f907cd08c91fe8349fdf40dd9bd283e844ee8e043a45be9220958a718",
+        "/landing/captures/signup-form-1440x900-2880w.avif": "2c3ac120a8feca9ebf7ae8d88aae6a60357fe005b60a74a561a446fe07d09cc1",
+        "/landing/captures/signup-form-1440x900-1440w.webp": "87a84a7cf578fbdb7f0d432aef2182260fa9057d494d2f0d18626e4fefade647",
+        "/landing/captures/signup-form-1440x900-2880w.webp": "1626d937eef29a90e87c8ca7daf0bf9e8a97b2a9e39ec70a0818389dc1e6994b"
+      }
+    },
+    "signup-form/390x844": {
+      "pixels": "f75523dd386a67ce6beaf1e59c0ec5ca5f6da0f6ef16c94d918f9f164c2e332f",
+      "width": 780,
+      "height": 2860,
+      "files": {
+        "/landing/captures/signup-form-390x844-390w.avif": "3f3cf6ea65168ecde0c094381b5db9d540196d4edb979260d0a248c1ac27236d",
+        "/landing/captures/signup-form-390x844-780w.avif": "2380b70537a8d31fcf536fd7efffa40ff58f40220e5f4eee425c4f8d6f4a09fc",
+        "/landing/captures/signup-form-390x844-390w.webp": "d19c39cd8e933e514fffb7d95bda2b214c38129f85be7f6703a9a69a4f5a5d4e",
+        "/landing/captures/signup-form-390x844-780w.webp": "abac51c02423683a9093f946d66d8ed44e2ad9ed9adc543320dd8dc1360f7e51"
+      }
+    }
+  }
 }

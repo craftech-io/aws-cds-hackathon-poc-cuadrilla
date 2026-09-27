@@ -8,7 +8,12 @@
         "es": "Un teléfono con WhatsApp: la nota de voz del instalador, la respuesta que cita el manual, una foto rechazada con 🔁, la siguiente aceptada con ✅ y el acta en PDF.",
         "en": "A phone with WhatsApp: the installer's voice note, the reply citing the manual, a photo rejected with 🔁, the next one accepted with ✅ and the certificate as a PDF."
       },
-      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Rogelio, de la escena \"En sitio 09:20\" hasta \"Cierre 10:05\"", "by": "WP-44" }
+      "replacement": {
+        "routes": ["/app/simulator"],
+        "viewports": ["1440x900", "390x844"],
+        "worldState": "Identidad Rogelio, de la escena \"En sitio 09:20\" hasta \"Cierre 10:05\"",
+        "by": "WP-44"
+      }
     },
     "s1-voice-diagnosis": {
       "status": "render",
@@ -32,14 +37,16 @@
         "es": "La foto de la etiqueta con reflejo recibe la reacción 🔁 y un mensaje con el motivo; al lado, la revisión de evidencia de la consola.",
         "en": "The label photo with glare gets the 🔁 reaction and a message with the reason; next to it, the console's evidence review."
       },
-      "replacement": { "routes": ["/app/simulator", "/app/evidence"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"Evidencia\": reacción y mensaje del motivo", "by": "WP-44" }
+      "replacement": {
+        "routes": ["/app/simulator", "/app/evidence"],
+        "viewports": ["1440x900", "390x844"],
+        "worldState": "Escena \"Evidencia\": reacción y mensaje del motivo",
+        "by": "WP-44"
+      }
     },
     "s3-photo-pass": {
       "status": "render",
-      "alt": {
-        "es": "La segunda foto de la etiqueta, aceptada con ✅.",
-        "en": "The second label photo, accepted with ✅."
-      },
+      "alt": { "es": "La segunda foto de la etiqueta, aceptada con ✅.", "en": "The second label photo, accepted with ✅." },
       "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"Evidencia\", segundo envío", "by": "WP-44" }
     },
     "s4-checklist-complete": {
@@ -48,7 +55,12 @@
         "es": "El checklist de la orden 24817 completo, cinco de cinco validados, sin botón de cierre en la consola.",
         "en": "The checklist of order 24817 complete, five of five validated, with no close button in the console."
       },
-      "replacement": { "routes": ["/app/orders/:workOrderId"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"Checklist completo\"", "by": "WP-44" }
+      "replacement": {
+        "routes": ["/app/orders/:workOrderId"],
+        "viewports": ["1440x900", "390x844"],
+        "worldState": "Escena \"Checklist completo\"",
+        "by": "WP-44"
+      }
     },
     "s4-certificate-pdf": {
       "status": "render",
@@ -72,7 +84,12 @@
         "es": "El teléfono de Adriana con la plantilla del caso escalado y los botones Tomar caso y No puedo.",
         "en": "Adriana's phone with the escalated-case template and the Take case and Can't buttons."
       },
-      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Adriana, escena \"Escalación recibida\"", "by": "WP-44" }
+      "replacement": {
+        "routes": ["/app/simulator"],
+        "viewports": ["1440x900", "390x844"],
+        "worldState": "Identidad Adriana, escena \"Escalación recibida\"",
+        "by": "WP-44"
+      }
     },
     "s5-escalation-take": {
       "status": "render",
@@ -80,7 +97,12 @@
         "es": "Héctor toma el caso, recibe el resumen y su instrucción le llega a Rogelio con su nombre delante.",
         "en": "Héctor takes the case, gets the summary, and his instruction reaches Rogelio with his name in front."
       },
-      "replacement": { "routes": ["/app/cases/:caseId", "/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Héctor, escenas \"Vencimiento\" y \"Tomar y responder\"", "by": "WP-44" }
+      "replacement": {
+        "routes": ["/app/cases/:caseId", "/app/simulator"],
+        "viewports": ["1440x900", "390x844"],
+        "worldState": "Identidad Héctor, escenas \"Vencimiento\" y \"Tomar y responder\"",
+        "by": "WP-44"
+      }
     },
     "s6-safety-hazard": {
       "status": "render",
@@ -88,7 +110,12 @@
         "es": "Rogelio reporta un cable chispeando y recibe al instante la instrucción de seguridad fija del manual.",
         "en": "Rogelio reports a sparking cable and instantly gets the manual's fixed safety instruction."
       },
-      "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Rogelio, escena \"Riesgo detectado\"", "by": "WP-44" }
+      "replacement": {
+        "routes": ["/app/simulator"],
+        "viewports": ["1440x900", "390x844"],
+        "worldState": "Identidad Rogelio, escena \"Riesgo detectado\"",
+        "by": "WP-44"
+      }
     },
     "s6-safety-alerts": {
       "status": "render",
@@ -96,7 +123,12 @@
         "es": "La alerta de seguridad en el teléfono de Adriana y el email a la jefa de zona en el buzón de salida, segundos después del reporte.",
         "en": "The safety alert on Adriana's phone and the email to the zone lead in the outbox, seconds after the report."
       },
-      "replacement": { "routes": ["/app/simulator", "/app/outbox"], "viewports": ["1440x900", "390x844"], "worldState": "Identidad Adriana, escena \"Alertas de seguridad\"", "by": "WP-44" }
+      "replacement": {
+        "routes": ["/app/simulator", "/app/outbox"],
+        "viewports": ["1440x900", "390x844"],
+        "worldState": "Identidad Adriana, escena \"Alertas de seguridad\"",
+        "by": "WP-44"
+      }
     },
     "gallery-orders": {
       "status": "render",
@@ -124,10 +156,7 @@
     },
     "gallery-metrics": {
       "status": "render",
-      "alt": {
-        "es": "La vista de métricas de la consola, con las áreas que mide.",
-        "en": "The console's metrics view, with the areas it measures."
-      },
+      "alt": { "es": "La vista de métricas de la consola, con las áreas que mide.", "en": "The console's metrics view, with the areas it measures." },
       "replacement": { "routes": ["/app/metrics"], "viewports": ["1440x900"], "worldState": "Pestaña \"Medición del manual\" con N y meta", "by": "WP-44" }
     },
     "gallery-audit": {
@@ -147,19 +176,32 @@
       "replacement": { "routes": ["/app/clock"], "viewports": ["1440x900"], "worldState": "Escena \"En sitio 09:20\"", "by": "WP-44" }
     },
     "signup-form": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "El formulario de alta, con los dos consentimientos separados y sin marcar.",
         "en": "The signup form, with the two consents separate and unticked."
       },
+      "file": "/landing/captures/signup-form-1440x900-1440w.webp",
+      "width": 1440,
+      "height": 1207,
+      "sources": [
+        { "type": "image/avif", "srcset": "/landing/captures/signup-form-1440x900-1440w.avif 1440w, /landing/captures/signup-form-1440x900-2880w.avif 2880w" },
+        { "type": "image/webp", "srcset": "/landing/captures/signup-form-1440x900-1440w.webp 1440w, /landing/captures/signup-form-1440x900-2880w.webp 2880w" }
+      ],
+      "sha256": "87a84a7cf578fbdb7f0d432aef2182260fa9057d494d2f0d18626e4fefade647",
       "replacement": { "routes": ["/signup"], "viewports": ["1440x900", "390x844"], "worldState": "Paso \"signUp\" del alta", "by": "WP-63" }
     },
     "signup-code": {
-      "status": "render",
-      "alt": {
-        "es": "La pantalla de verificación por código del alta.",
-        "en": "The signup's code verification screen."
-      },
+      "status": "capture",
+      "alt": { "es": "La pantalla de verificación por código del alta.", "en": "The signup's code verification screen." },
+      "file": "/landing/captures/signup-code-1440x900-1440w.webp",
+      "width": 1440,
+      "height": 900,
+      "sources": [
+        { "type": "image/avif", "srcset": "/landing/captures/signup-code-1440x900-1440w.avif 1440w, /landing/captures/signup-code-1440x900-2880w.avif 2880w" },
+        { "type": "image/webp", "srcset": "/landing/captures/signup-code-1440x900-1440w.webp 1440w, /landing/captures/signup-code-1440x900-2880w.webp 2880w" }
+      ],
+      "sha256": "01d4571d4d9c2d0edbc6a04c9b314e1dba5b997759d7e0b2639458abc7660ad9",
       "replacement": { "routes": ["/signup"], "viewports": ["1440x900", "390x844"], "worldState": "Paso \"confirmCode\" del alta", "by": "WP-63" }
     }
   }
