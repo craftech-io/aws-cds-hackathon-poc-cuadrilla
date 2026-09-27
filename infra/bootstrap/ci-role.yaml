@@ -785,6 +785,11 @@ Resources:
               - wafv2:ListAvailableManagedRuleGroups
               - wafv2:ListAvailableManagedRuleGroupVersions
             Resource: "*"
+          # Reading back an association asks for the ACL of the pool before knowing it (webacl/*/*).
+          - Sid: WebAclLookupByResource
+            Effect: Allow
+            Action: wafv2:GetWebACLForResource
+            Resource: "*"
           - Sid: CloudFrontFunctionsOfThisApp
             Effect: Allow
             Action:

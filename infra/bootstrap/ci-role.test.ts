@@ -345,9 +345,9 @@ describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
   });
 
   it("reads AWS's managed rule groups and never creates an API key of AWS WAF (no CAPTCHA)", () => {
-    const reads = statement("ManagedRuleGroupReads");
-    expect([...reads.matchAll(/- (wafv2:\w+)/g)].map((match) => match[1]).sort()).toEqual(["wafv2:CheckCapacity", "wafv2:DescribeManagedRuleGroup", "wafv2:ListAvailableManagedRuleGroupVersions", "wafv2:ListAvailableManagedRuleGroups"]);
+    expect([...statement("ManagedRuleGroupReads").matchAll(/- (wafv2:\w+)/g)].map((match) => match[1]).sort()).toEqual(["wafv2:CheckCapacity", "wafv2:DescribeManagedRuleGroup", "wafv2:ListAvailableManagedRuleGroupVersions", "wafv2:ListAvailableManagedRuleGroups"]);
     expect(template).not.toMatch(/APIKey|captcha/i);
+    expect(statement("WebAclLookupByResource")).toMatch(/Action: wafv2:GetWebACLForResource\n\s+Resource: "\*"$/);
   });
 
   it("associates the app's web ACLs with a Cognito pool and detaches only from a pool tagged as this app", () => {
