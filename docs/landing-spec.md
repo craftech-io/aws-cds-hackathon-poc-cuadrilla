@@ -1140,7 +1140,9 @@ el código del signup" y el aviso de lead en `copy/es-MX.ts`, y ninguno de los d
 - [ ] El recorrido (`#recorrido`) muestra las 6 escenas en el orden de §1.6 (voz+diagnóstico, política,
       foto, acta+buzón, escalación, seguridad), con sticky en desktop y apiladas sin snap en mobile
       (visual ≤70svh por tarjeta); con `prefers-reduced-motion` no hay auto-tipeo ni crossfade, el
-      contenido final es legible igual; ninguna escena dibuja un contorno sobre una foto ni un link
+      contenido final es legible igual (un teléfono quieto cuya conversación no entra se desplaza por
+      dentro, abre en el último mensaje y, en sus extremos, la rueda o el dedo siguen con la página; uno
+      cuya conversación entra nunca retiene el scroll de la página); ninguna escena dibuja un contorno sobre una foto ni un link
       subrayado dentro de un mensaje.
 - [ ] Los contadores de impacto (§1.9) llegan a su valor final y **siempre** muestran su rótulo ("meta" /
       "supuesto") con su fuente y su N, en los dos idiomas; los dos topes "menos que" no cuentan hacia

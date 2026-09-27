@@ -110,6 +110,16 @@ describe("LeadStream [FL-118]", () => {
     expect(after?.retiredUsernames).toBeUndefined();
   });
 
+  it("[FL-114] a retired user that confirms keeps its Cognito user; the pending ones go", async () => {
+    for (const user of [1, 2, 3, 4]) await startLead(h.deps.store, { user });
+    const pending = (await h.deps.store.get(hashOf(EMAIL))) as Lead;
+    const result = await h.deps.store.confirm({ emailHash: hashOf(EMAIL), username: username(1), sub: "sub-0001", userId: signupUserId(1), at: T0 });
+    if (result.outcome !== "CONFIRMED") throw new Error("the retired user did not confirm the lead");
+    await handleLeadStream({ Records: [modify(pending, result.lead)] }, h.deps);
+    expect(h.sent).toHaveLength(1);
+    expect([...h.deleted].sort()).toEqual([2, 3, 4].map(username).sort());
+  });
+
   it("[FL-118] a retried batch does not notify twice, and a change after the confirmation is ignored", async () => {
     await startLead(h.deps.store);
     const before = await h.deps.store.get(hashOf(EMAIL));

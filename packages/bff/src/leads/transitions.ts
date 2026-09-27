@@ -9,7 +9,8 @@
 // is confirmed. So a start is kept apart, by user, in `pending[<username>]`, and never replaces what
 // another start said: the confirmation promotes the entry of the user who confirmed (its form, its
 // attribution and only its consents). A start past the third pending user retires the oldest one
-// instead of refusing, so three starts of a stranger never lock the owner out for the lead's 7 days.
+// instead of refusing, and a retired user keeps its entry and may still confirm: Cognito accepts its
+// code and gives it the email alias, so a lead that refused it would lock the address out.
 import type { LegalLocale } from "@cuadrilla/shared/legal/consents";
 import {
   type ConsentRecord,
@@ -24,6 +25,7 @@ import {
   confirmedExpiresAt,
   isPending,
   leadPartition,
+  mayConfirm,
   leadSubKey,
   pendingExpiresAt,
 } from "./model";
@@ -114,8 +116,8 @@ export function newLead(input: StartPendingInput, leadId: string): Lead {
 
 /**
  * Another start for a pending lead: one more pending user with its own entry, the oldest pending user
- * retired when there were already 3 (its Cognito user goes with the others; a confirmation of it finds no
- * pending lead that lists it), and nothing another start said touched: the lead's own fields stay the
+ * retired when there were already 3 (it keeps its entry and may still confirm; `LeadStream` deletes it
+ * from Cognito with the others), and nothing another start said touched: the lead's own fields stay the
  * first start's, and the first `signupStartedAt` and `expiresAt` are kept (7 days after the first start).
  * `undefined` for a lead that is no longer pending.
  */
@@ -124,8 +126,9 @@ export function restartedLead(current: Lead, input: StartPendingInput): Lead | u
   const listed = [...current.pendingUsernames, input.username];
   const retired = listed.slice(0, Math.max(0, listed.length - MAX_PENDING_USERNAMES));
   const kept = listed.slice(retired.length);
-  const pending = Object.fromEntries(kept.filter((name) => name !== input.username).flatMap((name) => (current.pending?.[name] === undefined ? [] : [[name, current.pending[name]] as const])));
   const retiredUsernames = [...(current.retiredUsernames ?? []), ...retired].slice(-MAX_RETIRED_USERNAMES);
+  const entries = [...retiredUsernames, ...kept].filter((name) => name !== input.username);
+  const pending = Object.fromEntries(entries.flatMap((name) => (current.pending?.[name] === undefined ? [] : [[name, current.pending[name]] as const])));
   return {
     ...current,
     pendingUsernames: kept,
@@ -154,13 +157,13 @@ function promoted(current: Lead, username: string): Omit<Lead, "pending"> {
 }
 
 /**
- * Post-confirmation: only a pending lead whose `pendingUsernames` lists the confirmed user becomes
- * `CONFIRMED` (ADR-0025 §1), with the form, attribution and consents of THAT user's start (what other
- * starts said is dropped with `pending`); its retention becomes 24 months. The other pending users stay
- * listed until `LeadStream` has deleted them from Cognito.
+ * Post-confirmation: only a pending lead that lists the confirmed user, as pending or as retired
+ * (`mayConfirm`), becomes `CONFIRMED` (ADR-0025 §1), with the form, attribution and consents of THAT
+ * user's start (what other starts said is dropped with `pending`); its retention becomes 24 months. The
+ * other pending and retired users stay listed until `LeadStream` has deleted them from Cognito.
  */
 export function confirmedLead(current: Lead, input: ConfirmInput): Lead | undefined {
-  if (!isPending(current) || !current.pendingUsernames.includes(input.username)) return undefined;
+  if (!mayConfirm(current, input.username)) return undefined;
   const at = input.at.toISOString();
   return {
     ...promoted(current, input.username),

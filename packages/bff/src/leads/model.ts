@@ -89,9 +89,12 @@ export const PendingStart = z
   .strict();
 export type PendingStart = z.infer<typeof PendingStart>;
 
-/** Users a pending lead may confirm, oldest first; a new start past it retires the oldest one. */
+/** The newest pending users of a lead, oldest first; a new start past it retires the oldest one. */
 export const MAX_PENDING_USERNAMES = 3;
-/** Retired users kept for the clean-up in Cognito (5 starts a day per person, 7 days of pending life). */
+/**
+ * Retired users kept, with their start, until the confirmation or the expiry: 5 starts a day per person
+ * over the 8 real days a 7-day pending lead can touch is 40 starts, so no start of a lead ever falls off.
+ */
 export const MAX_RETIRED_USERNAMES = 40;
 
 export const Lead = z.object({
@@ -115,9 +118,13 @@ export const Lead = z.object({
   abuseHash: EmailHash,
   /** The users that may still confirm the lead, oldest first. */
   pendingUsernames: z.array(SignupUsername).max(MAX_PENDING_USERNAMES),
-  /** What each pending user's start said, by user; gone once the lead is confirmed. */
+  /** What each pending or retired user's start said, by user; gone once the lead is confirmed. */
   pending: z.record(SignupUsername, PendingStart).optional(),
-  /** Users retired from `pendingUsernames` by later starts: `LeadStream` removes them from Cognito too. */
+  /**
+   * Users retired from `pendingUsernames` by later starts. They may still confirm the lead (Cognito keeps
+   * their code, and a confirmed user holds the email alias), and `LeadStream` removes them from Cognito
+   * with the other pending users once the lead is confirmed or expires.
+   */
   retiredUsernames: z.array(SignupUsername).max(MAX_RETIRED_USERNAMES).optional(),
   /** Absent while the lead is pending; `CONFIRMED` is written only by post-confirmation. */
   status: z.literal("CONFIRMED").optional(),
@@ -218,6 +225,14 @@ export const leadLogPartition = (at: Date): string => `${LEAD_LOG_PREFIX}${at.to
 
 /** Whether a lead is still pending (the `PENDING` of every other document is the absence of `status`). */
 export const isPending = (lead: Pick<Lead, "status">): boolean => lead.status === undefined;
+
+/**
+ * Whether a confirmation of `username` confirms the lead: a pending lead that lists the user as pending
+ * or as retired. A retired user stays confirmable because Cognito still accepts its code, and once
+ * confirmed it holds the email alias: refusing it would leave the address with no account that works.
+ */
+export const mayConfirm = (lead: Pick<Lead, "status" | "pendingUsernames" | "retiredUsernames">, username: string): boolean =>
+  isPending(lead) && (lead.pendingUsernames.includes(username) || (lead.retiredUsernames ?? []).includes(username));
 
 /** The consent in force of one id: the last record of its history. */
 export function currentConsent(lead: Pick<Lead, "consents">, id: z.infer<typeof ConsentId>): ConsentRecord {

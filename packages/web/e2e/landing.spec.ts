@@ -239,6 +239,51 @@ test.describe("commercial landing", () => {
       if (!(await region.isVisible())) continue;
       await expect(region).toHaveAttribute("tabindex", "0");
       expect(await region.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+      // It opens on its last message, the final state the motion version ends on.
+      expect(await region.evaluate((element) => element.scrollTop + element.clientHeight >= element.scrollHeight - 2)).toBe(true);
+    }
+  });
+
+  test("[FL-089] with reduced motion the wheel over a still phone keeps scrolling the page", async ({ page }) => {
+    const { reduced } = context();
+    test.skip(!reduced, "only with reduced motion");
+    await open(page);
+    await page.locator("#recorrido").scrollIntoViewIfNeeded();
+    const phones = page.locator('#recorrido [data-phone-frame="still"]').filter({ visible: true });
+    await expect(phones.first()).toBeVisible();
+    // A phone whose conversation fits never becomes a scroll container that could hold the page.
+    const trapped = await phones.evaluateAll(
+      (frames) =>
+        frames.filter((frame) => {
+          const viewport = frame.querySelector("ol")?.parentElement;
+          if (!viewport) return false;
+          const style = getComputedStyle(viewport);
+          const scrollable = style.overflowY === "auto" || style.overflowY === "scroll";
+          return style.overscrollBehaviorY !== "auto" || (scrollable && viewport.scrollHeight <= viewport.clientHeight + 1);
+        }).length,
+    );
+    expect(trapped).toBe(0);
+    // At 1024×768 the first scene's conversation overflows its phone: the wheel scrolls it, then the page.
+    const sizes = context().desktop ? [page.viewportSize(), { width: 1024, height: 768 }] : [page.viewportSize()];
+    for (const size of sizes) {
+      if (size !== null) await page.setViewportSize(size);
+      await page.locator("#recorrido").scrollIntoViewIfNeeded();
+      await phones.first().scrollIntoViewIfNeeded();
+      // The phone the pointer really lands on (the pinned column stacks every scene's phone).
+      const point = await phones.evaluateAll((frames) => {
+        for (const frame of frames) {
+          const rect = frame.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = Math.min(rect.top + rect.height / 2, window.innerHeight - 20);
+          if (y > 0 && frame.contains(document.elementFromPoint(x, y))) return { x, y };
+        }
+        return null;
+      });
+      if (point === null) throw new Error("no still phone under the pointer");
+      await page.mouse.move(point.x, point.y);
+      const before = await page.evaluate(() => window.scrollY);
+      for (let tick = 0; tick < 6; tick += 1) await page.mouse.wheel(0, 150);
+      await expect.poll(() => page.evaluate(() => window.scrollY), `the page scrolls at ${size?.width ?? 0} px`).toBeGreaterThan(before + 300);
     }
   });
 });

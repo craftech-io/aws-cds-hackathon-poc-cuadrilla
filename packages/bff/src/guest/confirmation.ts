@@ -2,7 +2,7 @@
 // sign-up becomes a `GUEST` with a world. It acts ONLY when the three conditions hold:
 //
 //   1. `PostConfirmation_ConfirmSignUp` of a user `gst-<ULID>`
-//   2. a PENDING lead for the event's email whose `pendingUsernames` lists that user
+//   2. a PENDING lead for the event's email that lists that user, pending or retired (`mayConfirm`)
 //   3. no registry for the `sub` (GSI1 `SUB#<sub>`, and `SIGNUPSUB#<sub>` with attribute_not_exists in
 //      the transaction itself: a condition cannot reach a GSI)
 //
@@ -25,7 +25,7 @@
 import type { TableClient } from "../connector/table-client";
 import type { Logger } from "../lib/log";
 import { hashPrefix } from "../leads/keys";
-import { type Lead, SIGNUP_USERNAME_PATTERN, isPending } from "../leads/model";
+import { type Lead, SIGNUP_USERNAME_PATTERN, mayConfirm } from "../leads/model";
 import type { LeadStore } from "../leads/store";
 import { SIGNUP_LIMITS, confirmedAccountsOf } from "../signup/limits";
 import { openGeneration } from "../worlds/guest-lifecycle";
@@ -72,7 +72,7 @@ async function ignore(deps: ConfirmationDeps, reason: IgnoredReason, sub: string
   return { kind: "IGNORED", reason };
 }
 
-const pendingFor = (lead: Lead | undefined, username: string): lead is Lead => lead !== undefined && isPending(lead) && lead.pendingUsernames.includes(username);
+const pendingFor = (lead: Lead | undefined, username: string): lead is Lead => lead !== undefined && mayConfirm(lead, username);
 
 /** The lead's side, after the registry exists: `CONFIRMED`, once. */
 async function confirmLead(deps: ConfirmationDeps, event: ConfirmationEvent, emailHash: string, userId: string, at: Date): Promise<void> {

@@ -96,6 +96,17 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     expect(ignoredLog(harness).map((entry) => entry.reason)).toEqual(["NO_PENDING_LEAD", "NO_PENDING_LEAD", "SUB_REGISTERED", "NOT_CONFIRM_SIGNUP"]);
   });
 
+  it("[FL-114] the owner confirms a user that three later starts retired: the confirmation opens the account and the lead is CONFIRMED", async () => {
+    const harness = guestHarness();
+    for (const user of [1, 2, 3, 4]) await pendingLead(harness, { user });
+    expect((await harness.leads.store.get(hashOf(EMAIL)))?.retiredUsernames).toEqual([username(1)]);
+    await handlerOf(harness, ["abcde"])(confirmationEvent({ user: 1 }));
+    expect(ignoredLog(harness)).toEqual([]);
+    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PROVISIONING" });
+    expect(await harness.leads.store.get(hashOf(EMAIL))).toMatchObject({ status: "CONFIRMED", cognitoUsername: username(1), userId: USER_ID });
+    expect(harness.provisioner.requests).toHaveLength(1);
+  });
+
   it("[FL-112] with the cap of active sign-up worlds full: account and lead created, world CAP_FULL, GuestWorlds not asked", async () => {
     const harness = guestHarness();
     await harness.client.put("Runtime", { PK: worldsDayKey("PUBLIC", "260930"), SK: "META", count: SIGNUP_WORLD_LIMITS.activeWorlds });

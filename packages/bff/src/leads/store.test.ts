@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { BFF_LEAD_ATTRIBUTES } from "../../../../infra/leads-spec";
 import { contactWithdrawal } from "./consent";
 import { MemoryLeadTable } from "./memory-table";
-import { CONFIRMED_TTL_MONTHS, LEAD_LOG_PREFIX, PENDING_TTL_SECONDS, addMonths, epochSeconds } from "./model";
+import { CONFIRMED_TTL_MONTHS, LEAD_LOG_PREFIX, MAX_PENDING_USERNAMES, MAX_RETIRED_USERNAMES, PENDING_TTL_SECONDS, addMonths, epochSeconds } from "./model";
 import { type LeadStore, createLeadStore } from "./store";
 import { EMAIL_KEY, T0, confirmedLead, hashOf, leadHarness, sequentialIds, signupUserId, startLead, username } from "./testing";
 import { leadAbuseHash } from "./keys";
@@ -75,14 +75,38 @@ describe("LeadStore [FL-115]", () => {
     const lead = await store.get(hashOf(EMAIL));
     expect(lead?.pendingUsernames).toEqual([username(2), username(3), username(4)]);
     expect(lead?.retiredUsernames).toEqual([username(1)]);
-    expect(Object.keys(lead?.pending ?? {}).sort()).toEqual([username(2), username(3), username(4)].sort());
-    // The retired user can no longer confirm the lead; the owner's can.
-    expect((await store.confirm({ emailHash: hashOf(EMAIL), username: username(1), sub: "sub-x", userId: signupUserId(1), at: later(HOUR) })).outcome).toBe("NOT_PENDING");
+    // The retired user keeps its start: Cognito still accepts its code.
+    expect(Object.keys(lead?.pending ?? {}).sort()).toEqual([username(1), username(2), username(3), username(4)].sort());
     const confirmed = await store.confirm({ emailHash: hashOf(EMAIL), username: username(4), sub: "sub-0004", userId: signupUserId(4), at: later(HOUR) });
     expect(confirmed.outcome === "CONFIRMED" && confirmed.lead).toMatchObject({ name: "Ana Dueña", consents: { CONTACT: { accepted: false } } });
     const other = "otra.persona@example.com";
     await confirmedLead(store, { email: other, user: 5 });
     expect((await startLead(store, { email: other, user: 6 })).outcome).toBe("EMAIL_TAKEN");
+  });
+
+  it("[FL-114] the owner confirming a user that later starts retired still confirms the lead, with its own start", async () => {
+    // The owner starts (user 1) and gets the code; a stranger starts three more times before the owner types it.
+    await startLead(store, { user: 1, name: "Ana Dueña", contact: false });
+    for (const user of [2, 3, 4]) await startLead(store, { user, name: "Desconocido", contact: true, at: later(user * HOUR) });
+    const pending = await store.get(hashOf(EMAIL));
+    expect(pending?.pendingUsernames).toEqual([username(2), username(3), username(4)]);
+    expect(pending?.retiredUsernames).toEqual([username(1)]);
+    // Cognito confirms the retired user and gives it the email alias: the lead has to follow it.
+    const confirmed = await store.confirm({ emailHash: hashOf(EMAIL), username: username(1), sub: "sub-0001", userId: signupUserId(1), at: later(5 * HOUR) });
+    expect(confirmed.outcome).toBe("CONFIRMED");
+    const lead = await store.get(hashOf(EMAIL));
+    expect(lead).toMatchObject({ status: "CONFIRMED", cognitoUsername: username(1), name: "Ana Dueña", consents: { CONTACT: { accepted: false } } });
+    expect(lead?.pending).toBeUndefined();
+    expect(JSON.stringify(lead)).not.toContain("Desconocido");
+  });
+
+  it("[FL-114] a retired user keeps its start while it is in retiredUsernames, and only then", async () => {
+    for (let user = 1; user <= MAX_PENDING_USERNAMES + MAX_RETIRED_USERNAMES + 1; user += 1) await startLead(store, { user, at: later(user * HOUR) });
+    const lead = await store.get(hashOf(EMAIL));
+    expect(lead?.retiredUsernames).toHaveLength(MAX_RETIRED_USERNAMES);
+    expect(lead?.retiredUsernames?.[0]).toBe(username(2));
+    expect(Object.keys(lead?.pending ?? {}).sort()).toEqual([...(lead?.retiredUsernames ?? []), ...(lead?.pendingUsernames ?? [])].sort());
+    expect((await store.confirm({ emailHash: hashOf(EMAIL), username: username(1), sub: "sub-0001", userId: signupUserId(1), at: later(HOUR) })).outcome).toBe("NOT_PENDING");
   });
 
   it("[FL-115] a start by a third party before the owner confirms never lends its consents nor its form to the owner's confirmation", async () => {

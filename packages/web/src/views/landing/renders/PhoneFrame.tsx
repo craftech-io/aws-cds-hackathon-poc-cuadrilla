@@ -6,9 +6,11 @@
 // so the frame never changes size; when the conversation outgrows the screen, the list slides up with a
 // transform. `still` shows the final state at once (reduced motion, posters, the gallery), always at
 // its reading size, never shrinking the text (a still frame is how the walkthrough reads without motion,
-// docs/landing-spec.md §4): a scene's phone keeps the height of its stage and its conversation scrolls
-// inside it, like a phone (focusable when it overflows); the hero's poster, a gallery render and a
-// short phone keep their width and grow to the whole conversation.
+// docs/landing-spec.md §4): a scene's phone keeps the height of its stage and, only when its conversation
+// does not fit, scrolls inside it like a phone (focusable), opening on the last message as the motion
+// version ends; the wheel or the finger goes on to the page at either end, and a phone whose
+// conversation fits never takes the page's scroll. The hero's poster, a gallery render and a short
+// phone keep their width and grow to the whole conversation.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Bubble, TypingDots } from "./bubbles";
 import { CONTACT_NAME, type PhoneMessage, type PhoneOwner, firstNameOf } from "./sources";
@@ -105,6 +107,11 @@ const GROWING: Readonly<Partial<Record<PhoneSize, string>>> = {
   still: "w-phone min-h-80",
 };
 
+function edgesOf(box: HTMLElement): { above: boolean; below: boolean } {
+  const hidden = box.scrollHeight - box.clientHeight;
+  return { above: box.scrollTop >= 2, below: hidden - box.scrollTop >= 2 };
+}
+
 export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, onDone, size = "solo" }: PhoneFrameProps) {
   const compact = size === "hero";
   const sequence = usePhoneSequence(messages, run, still, runKey, onDone);
@@ -113,7 +120,8 @@ export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, o
   // Playing, the list slides up to keep the latest message in sight; still, it scrolls or the frame grows.
   const [offset, setOffset] = useState(0);
   const [overflowing, setOverflowing] = useState(false);
-  const [atEnd, setAtEnd] = useState(false);
+  // Where a scrolling still conversation is: more above it, more below it.
+  const [edges, setEdges] = useState({ above: false, below: false });
   const grown = still ? GROWING[size] : undefined;
   const scrolls = still && grown === undefined;
 
@@ -139,6 +147,14 @@ export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, o
     return () => observer.disconnect();
   }, [sequence.visible, still, scrolls]);
 
+  // A conversation that does not fit opens on its last message: the same final state the motion version ends on.
+  useLayoutEffect(() => {
+    const box = viewport.current;
+    if (!box || !overflowing) return;
+    box.scrollTop = box.scrollHeight;
+    setEdges(edgesOf(box));
+  }, [overflowing]);
+
   return (
     <div data-phone-frame={still ? "still" : "playing"} className={`relative flex max-w-full flex-col overflow-hidden rounded-4xl border-8 border-navy-deep bg-paper shadow-float ${grown ?? SIZES[size]}`}>
       <div className="flex items-center gap-2 bg-navy px-3 py-2 text-white">
@@ -148,39 +164,42 @@ export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, o
         <span className="flex-1 truncate text-sm font-semibold">{CONTACT_NAME}</span>
         <span className="rounded-full bg-navy-soft px-2 py-0.5 text-2xs font-semibold text-cyan-soft">{firstNameOf(owner)}</span>
       </div>
-      <div
-        ref={viewport}
-        className={`relative min-h-0 flex-1 ${scrolls ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}
-        {...(overflowing ? { tabIndex: 0, role: "region", "aria-label": `${CONTACT_NAME} · ${firstNameOf(owner)}` } : {})}
-        onScroll={scrolls ? (event) => setAtEnd(event.currentTarget.scrollTop + event.currentTarget.clientHeight >= event.currentTarget.scrollHeight - 2) : undefined}
-      >
-        <ol
-          ref={list}
-          className="flex origin-top flex-col gap-2 p-3 transition-transform duration-300 ease-out motion-reduce:transition-none"
-          style={offset > 0 ? { transform: `translateY(${-offset}px)` } : undefined}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          ref={viewport}
+          className={`relative min-h-0 flex-1 ${overflowing ? "overflow-y-auto" : "overflow-hidden"}`}
+          {...(overflowing ? { tabIndex: 0, role: "region", "aria-label": `${CONTACT_NAME} · ${firstNameOf(owner)}` } : {})}
+          onScroll={overflowing ? (event) => setEdges(edgesOf(event.currentTarget)) : undefined}
         >
-          {messages.map((message, index) => {
-            const shown = index < sequence.visible;
-            const out = message.direction === "out";
-            return (
-              <li
-                key={message.entry.id}
-                aria-hidden={shown ? undefined : true}
-                className={`relative flex flex-col transition duration-300 ease-out motion-reduce:transition-none ${out ? "items-end" : "items-start"} ${shown ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}
-              >
-                {sequence.dotsAt === index && !shown ? (
-                  <span className="absolute left-0 top-0 opacity-100">
-                    <TypingDots />
-                  </span>
-                ) : null}
-                <Bubble message={message} shown={shown} playing={shown && run && !still} reduced={reduced || still} read={still || sequence.done || index < sequence.visible - 1} compact={compact} />
-              </li>
-            );
-          })}
-        </ol>
+          <ol
+            ref={list}
+            className="flex origin-top flex-col gap-2 p-3 transition-transform duration-300 ease-out motion-reduce:transition-none"
+            style={offset > 0 ? { transform: `translateY(${-offset}px)` } : undefined}
+          >
+            {messages.map((message, index) => {
+              const shown = index < sequence.visible;
+              const out = message.direction === "out";
+              return (
+                <li
+                  key={message.entry.id}
+                  aria-hidden={shown ? undefined : true}
+                  className={`relative flex flex-col transition duration-300 ease-out motion-reduce:transition-none ${out ? "items-end" : "items-start"} ${shown ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}
+                >
+                  {sequence.dotsAt === index && !shown ? (
+                    <span className="absolute left-0 top-0 opacity-100">
+                      <TypingDots />
+                    </span>
+                  ) : null}
+                  <Bubble message={message} shown={shown} playing={shown && run && !still} reduced={reduced || still} read={still || sequence.done || index < sequence.visible - 1} compact={compact} />
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+        {/* More of the conversation above or below: a fade over the edge line until it is scrolled there. */}
+        {overflowing && edges.above ? <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-linear-to-b from-paper to-transparent" /> : null}
+        {overflowing && edges.below ? <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-paper to-transparent" /> : null}
       </div>
-      {/* More of the conversation below: a fade over the last line until it is scrolled to the end. */}
-      {overflowing && !atEnd ? <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-paper to-transparent" /> : null}
     </div>
   );
 }
