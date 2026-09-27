@@ -48,7 +48,12 @@
     "seed:validate": "tsx scripts/seed/validate.ts",
     "seed:load": "sst shell --stage poc -- tsx scripts/seed/load.ts",
     "scenarios": "tsx scripts/scenarios/run.ts",
-    "smoke:interim": "tsx scripts/smoke/interim.ts"
+    "smoke:interim": "tsx scripts/smoke/interim.ts",
+    "qa:deployed": "playwright test -c packages/web/e2e/deployed/playwright.config.ts",
+    "qa:confirm-signup": "sst shell --stage poc -- tsx scripts/qa/confirm-signup.ts",
+    "qa:edge-probes": "tsx scripts/qa/edge-probes.ts",
+    "qa:deployed-surfaces": "tsx scripts/qa/deployed-surfaces.ts",
+    "qa:logs-pii": "tsx scripts/qa/logs-pii.ts"
   },
   "dependencies": {
     "zod": "4.6.5"
