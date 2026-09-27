@@ -13,7 +13,10 @@
 //
 // The integration URL of the edge ACL (the host of the silent challenge's `challenge.js`) reaches the
 // console's build as a variable (infra/web.ts); the CSP of the bootstrap allows the AWS WAF hosts by
-// wildcard because that URL is born with the ACL, after the bootstrap is applied.
+// wildcard because that URL is born with the ACL, after the bootstrap is applied. AWS WAF issues it only
+// to an ACL with ACFP, ATP or targeted Bot Control (rule 4 of the edge ACL, infra/waf-spec.ts); without
+// it no browser could get the token the Challenge asks for, so an empty URL fails the deploy here,
+// before the console is built, instead of shipping a sign-up nobody can finish.
 //
 // Fences: the CI role manages `wafv2` only on web ACLs named `<app>-*` (both scopes) and associates the
 // pool's ACL only with a pool tagged `sst:app` = this app (infra/bootstrap/ci-role.yaml). No API key
@@ -25,7 +28,7 @@
 //   aws --profile craftech-demos cloudfront get-distribution-config --id <Router distribution> --query DistributionConfig.WebACLId
 
 import { userPool } from "./auth";
-import { webAclSpec, type WebAclKind } from "./waf-spec";
+import { requireIntegrationUrl, webAclSpec, type WebAclKind } from "./waf-spec";
 
 function webAcl(logicalName: string, kind: WebAclKind): aws.wafv2.WebAcl {
   const spec = webAclSpec(kind);
@@ -50,4 +53,4 @@ export const authWebAclAssociation = new aws.wafv2.WebAclAssociation("AuthWebAcl
 });
 
 /** Host of `challenge.js` for the console build (`VITE_WAF_INTEGRATION_URL`). Not a secret. */
-export const wafIntegrationUrl = edgeWebAcl.applicationIntegrationUrl;
+export const wafIntegrationUrl = edgeWebAcl.applicationIntegrationUrl.apply((url) => requireIntegrationUrl(url));

@@ -9,7 +9,7 @@
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { STORY_SCENE_IDS, type StorySceneId } from "@cuadrilla/bff/story/types";
 import { useLandingCopy, useLandingLang } from "../lang";
-import { DESKTOP_QUERY, useInView, useMediaQuery, useReducedMotion } from "../motion";
+import { DESKTOP_QUERY, desktopReveal, useInView, useMediaQuery, useReducedMotion } from "../motion";
 import { SCENE_VISUALS } from "../renders/scenes";
 import { sceneCaption, sceneStart } from "../renders/sources";
 import { SectionHeading } from "./parts";
@@ -145,7 +145,7 @@ function DesktopWalkthrough({ reduced }: { readonly reduced: boolean }) {
                   role={shown ? "group" : undefined}
                   className={`absolute inset-0 flex items-center justify-center transition duration-220 ease-out motion-reduce:transition-none ${shown ? "translate-x-0 opacity-100" : `${side} pointer-events-none opacity-0`}`}
                 >
-                  <Visual run={shown} still={reduced} reduced={reduced} desktop progress={shown ? progress : 0} runKey={plays[scene] ?? 0} />
+                  <Visual run={shown} still={reduced} reduced={reduced} desktop progress={shown ? progress : 0} reveal={shown ? desktopReveal(progress) : 0} runKey={plays[scene] ?? 0} />
                 </div>
               );
             })}
@@ -181,7 +181,7 @@ function SceneCard({ scene, index, reduced }: { readonly scene: StorySceneId; re
       </span>
       <SceneText scene={scene} index={index} active />
       <div role="group" aria-labelledby={`scene-${scene}`} className="mt-5 flex justify-center">
-        <Visual run={centred} still={reduced} reduced={reduced} desktop={false} progress={1} runKey={0} />
+        <Visual run={centred} still={reduced} reduced={reduced} desktop={false} progress={1} reveal={0} runKey={0} />
       </div>
       <Caption text={caption} />
     </li>

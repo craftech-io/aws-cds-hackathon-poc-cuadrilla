@@ -141,6 +141,22 @@ test.describe("commercial landing", () => {
     await expect(page.locator("#real")).toContainText(copy.real.columns[3]?.text ?? "");
   });
 
+  test("[FL-089] every gallery thumbnail shows its whole view inside its frame, nothing cut at the edges", async ({ page }) => {
+    await open(page);
+    const gallery = page.locator("#galeria");
+    await gallery.scrollIntoViewIfNeeded();
+    await expect(gallery.locator("figure")).toHaveCount(6);
+    const overflows = await gallery.evaluate((element) =>
+      [...element.querySelectorAll("figure")].map((figure) => {
+        const frame = figure.querySelector("[inert]")?.parentElement?.getBoundingClientRect();
+        const drawn = figure.querySelector("[inert]")?.getBoundingClientRect();
+        if (!frame || !drawn) return 0;
+        return Math.max(0, frame.left - drawn.left, drawn.right - frame.right);
+      }),
+    );
+    for (const overflow of overflows) expect(overflow).toBeLessThanOrEqual(1);
+  });
+
   test("[FL-089] the gallery opens with the keyboard, walks with the arrows, closes with Escape and gives the focus back", async ({ page }) => {
     const { copy } = context();
     await open(page);

@@ -9,18 +9,26 @@
 //     3 AnonymousIpSignup                       sign-up scope     Count: AnonymousIPList inserts
 //                                                                  `cuadrilla-anon: 1`, HostingProviderIPList
 //                                                                  only counts (corporate VPNs, remote desktops)
-//     4 ChallengeSignup                         sign-up scope, POST   Challenge (token immune 300 s)
-//     5 RatePerIp                               everything        Block over 1,000 per IP in 300 s
+//     4 BotControlSignup                        sign-up scope     Count (the whole group): Bot Control at the
+//                                                                  TARGETED level, machine learning off. It is
+//                                                                  there for the ACL's integration URL: AWS WAF
+//                                                                  issues `ApplicationIntegrationURL` (the host
+//                                                                  of `challenge.js`) only to an ACL that uses
+//                                                                  ACFP, ATP or targeted Bot Control. It only
+//                                                                  labels; rule 5 is what demands the token.
+//     5 ChallengeSignup                         sign-up scope, POST   Challenge (token immune 300 s)
+//     6 RatePerIp                               everything        Block over 1,000 per IP in 300 s
 //   <app>-<stage>-auth   REGIONAL, on the Cognito user pool
 //     1 AWSManagedRulesAmazonIpReputationList
-//     2 SignupUsernameShape: SignUp, ConfirmSignUp and ResendConfirmationCode whose JSON `Username` is
-//       not `gst-<ULID>` → Block. The web only ever sends the ticket's `gst-*` user to these three
-//       operations; an email there would tell a confirmed account apart ("already confirmed") with
-//       nothing but the per-IP rate in the way (the pool's aliases accept the verified email as the
-//       user name). A body AWS WAF cannot parse, or larger than it inspects, is blocked too.
-//     3-5 per-IP rates on `x-amz-target`: SignUp 10, ConfirmSignUp + ResendConfirmationCode +
+//     2-4 per-IP rates on `x-amz-target`: SignUp 10, ConfirmSignUp + ResendConfirmationCode +
 //       ForgotPassword + ConfirmForgotPassword 20, InitiateAuth + RespondToAuthChallenge 100 (per 300 s);
 //       all Block.
+//   No rule of the pool's ACL reads the body's user name: Cognito never hands usernames, passwords,
+//   emails or phone numbers to AWS WAF (Cognito developer guide, "Things to know about AWS WAF web ACLs
+//   and Amazon Cognito"), so a `JsonBody` `/Username` match never sees a value. The `gst-*` user of
+//   `SignUp` is enforced by the pre sign-up trigger's ticket (ADR-0025 §3); what an email as the user
+//   name of `ConfirmSignUp` or `ResendConfirmationCode` can tell is a declared residual risk, bounded by
+//   rule 3 of this ACL and Cognito's own per-user limits (ADR-0025, "Riesgos residuales" (6)).
 //
 // The sign-up scope is ONE value shared by rules 2 to 4: the URI starts with `/api/` AND its path or
 // its query string CONTAINS `signup.`, every comparison after URL_DECODE and LOWERCASE. "Starts with
@@ -35,8 +43,9 @@
 // Header insertion inside a Count override of a managed group is supported by the aws provider
 // 7.33.0 (`ruleActionOverrides[].actionToUse.count.customRequestHandling`) and by the API used here.
 //
-// Cost (ADR-0025 §4): two ACLs (USD 5 each), 10 rules (USD 1 each), requests and Challenge responses
-// at demo volume: about USD 21 a month.
+// Cost (ADR-0025 §4): two ACLs (USD 5 each), 10 rules (USD 1 each), the Bot Control subscription
+// (USD 10; its per-request fee only on the sign-up scope), requests and Challenge responses at demo
+// volume: about USD 30 a month.
 
 const APP = "aws-cds-hackathon-poc-cuadrilla";
 const STAGE = "poc";
@@ -65,22 +74,11 @@ export interface TextTransformation {
   readonly Type: "URL_DECODE" | "LOWERCASE" | "NONE";
 }
 
-/** A JSON body inspected at the given paths: values only; unparseable or oversized bodies never match. */
-export interface JsonBodyField {
-  readonly JsonBody: {
-    readonly MatchPattern: { readonly IncludedPaths: readonly string[] };
-    readonly MatchScope: "VALUE";
-    readonly InvalidFallbackBehavior: "NO_MATCH";
-    readonly OversizeHandling: "NO_MATCH";
-  };
-}
-
 type FieldToMatch =
   | { readonly UriPath: Record<string, never> }
   | { readonly QueryString: Record<string, never> }
   | { readonly Method: Record<string, never> }
-  | { readonly SingleHeader: { readonly Name: string } }
-  | JsonBodyField;
+  | { readonly SingleHeader: { readonly Name: string } };
 
 export interface ByteMatchStatement {
   readonly ByteMatchStatement: {
@@ -91,17 +89,8 @@ export interface ByteMatchStatement {
   };
 }
 
-export interface RegexMatchStatement {
-  readonly RegexMatchStatement: {
-    readonly RegexString: string;
-    readonly FieldToMatch: FieldToMatch;
-    readonly TextTransformations: readonly TextTransformation[];
-  };
-}
-
 export type WafStatement =
   | ByteMatchStatement
-  | RegexMatchStatement
   | { readonly AndStatement: { readonly Statements: readonly WafStatement[] } }
   | { readonly OrStatement: { readonly Statements: readonly WafStatement[] } }
   | { readonly NotStatement: { readonly Statement: WafStatement } };
@@ -146,13 +135,14 @@ export function visibility(kind: WebAclKind, rule?: string): VisibilityConfig {
 }
 
 type RuleAction = { readonly Block: Record<string, never> } | { readonly Challenge: Record<string, never> };
+type OverrideAction = { readonly None: Record<string, never> } | { readonly Count: Record<string, never> };
 
 export interface WafRule {
   readonly Name: string;
   readonly Priority: number;
   readonly Statement: Record<string, unknown>;
   readonly Action?: RuleAction;
-  readonly OverrideAction?: { readonly None: Record<string, never> };
+  readonly OverrideAction?: OverrideAction;
   readonly ChallengeConfig?: { readonly ImmunityTimeProperty: { readonly ImmunityTime: number } };
   readonly VisibilityConfig: VisibilityConfig;
 }
@@ -168,6 +158,13 @@ function rateRule(kind: WebAclKind, name: string, priority: number, limit: numbe
   const statement = { Limit: limit, EvaluationWindowSec: RATE_WINDOW_SECONDS, AggregateKeyType: "IP", ...(scopeDown === undefined ? {} : { ScopeDownStatement: scopeDown }) };
   return { Name: name, Priority: priority, Statement: { RateBasedStatement: statement }, Action: BLOCK, VisibilityConfig: visibility(kind, name) };
 }
+
+/**
+ * The managed group that gives the edge ACL its integration URL. ACFP, ATP and targeted Bot Control are
+ * the only ones that do: ATP inspects sign-ins, not the sign-up, and ACFP reads the password and address
+ * fields of the creation request, which never pass through the Bff (the password goes to Cognito).
+ */
+export const BOT_CONTROL_RULE = "BotControlSignup";
 
 /** Rules of the edge ACL, in priority order. */
 export function edgeRules(): WafRule[] {
@@ -192,14 +189,28 @@ export function edgeRules(): WafRule[] {
       VisibilityConfig: visibility("edge", "AnonymousIpSignup"),
     },
     {
-      Name: "ChallengeSignup",
+      Name: BOT_CONTROL_RULE,
       Priority: 4,
+      Statement: {
+        ManagedRuleGroupStatement: {
+          VendorName: "AWS",
+          Name: "AWSManagedRulesBotControlRuleSet",
+          ScopeDownStatement: SIGNUP_SCOPE,
+          ManagedRuleGroupConfigs: [{ AWSManagedRulesBotControlRuleSet: { InspectionLevel: "TARGETED", EnableMachineLearning: false } }],
+        },
+      },
+      OverrideAction: { Count: {} },
+      VisibilityConfig: visibility("edge", BOT_CONTROL_RULE),
+    },
+    {
+      Name: "ChallengeSignup",
+      Priority: 5,
       Statement: { AndStatement: { Statements: [...SIGNUP_SCOPE_STATEMENTS, POST_ONLY] } },
       Action: { Challenge: {} },
       ChallengeConfig: { ImmunityTimeProperty: { ImmunityTime: CHALLENGE_IMMUNITY_SECONDS } },
       VisibilityConfig: visibility("edge", "ChallengeSignup"),
     },
-    rateRule("edge", "RatePerIp", 5, 1000),
+    rateRule("edge", "RatePerIp", 6, 1000),
   ];
 }
 
@@ -221,30 +232,21 @@ function targetScope(operations: readonly string[]): WafStatement {
   return matches.length === 1 && only !== undefined ? only : { OrStatement: { Statements: matches } };
 }
 
-/** The operations of the own sign-up: the web sends them only the ticket's `gst-*` user. */
-export const SIGNUP_USERNAME_OPERATIONS = ["SignUp", "ConfirmSignUp", "ResendConfirmationCode"] as const;
-/** `gst-<ULID>`, whole (packages/bff/src/leads/model.ts `SIGNUP_USERNAME_PATTERN`). */
-export const SIGNUP_USERNAME_REGEX = "^gst-[0-9A-HJKMNP-TV-Z]{26}$";
-
-const USERNAME_FIELD: JsonBodyField = {
-  JsonBody: { MatchPattern: { IncludedPaths: ["/Username"] }, MatchScope: "VALUE", InvalidFallbackBehavior: "NO_MATCH", OversizeHandling: "NO_MATCH" },
-};
-
-/** Block the three sign-up operations unless the body's `Username` is a `gst-*` user. */
-function signupUsernameShape(priority: number): WafRule {
-  const isSignupUser: WafStatement = { RegexMatchStatement: { RegexString: SIGNUP_USERNAME_REGEX, FieldToMatch: USERNAME_FIELD, TextTransformations: [{ Priority: 0, Type: "NONE" }] } };
-  return {
-    Name: "SignupUsernameShape",
-    Priority: priority,
-    Statement: { AndStatement: { Statements: [targetScope(SIGNUP_USERNAME_OPERATIONS), { NotStatement: { Statement: isSignupUser } }] } },
-    Action: BLOCK,
-    VisibilityConfig: visibility("auth", "SignupUsernameShape"),
-  };
-}
-
 /** Rules of the pool's ACL, in priority order. */
 export function authRules(): WafRule[] {
-  return [ipReputation("auth"), signupUsernameShape(2), ...COGNITO_RATE_RULES.map((rule, index) => rateRule("auth", rule.name, index + 3, rule.limit, targetScope(rule.operations)))];
+  return [ipReputation("auth"), ...COGNITO_RATE_RULES.map((rule, index) => rateRule("auth", rule.name, index + 2, rule.limit, targetScope(rule.operations)))];
+}
+
+/**
+ * The edge ACL's integration URL, or the deploy stops: an ACL that challenges the sign-up without one
+ * leaves every browser without a token (ADR-0025 §4). Only an `https` URL passes.
+ */
+export function requireIntegrationUrl(url: string | undefined | null): string {
+  const value = (url ?? "").trim();
+  if (!/^https:\/\/[^\s/]+\/\S*$/.test(value)) {
+    throw new Error(`The edge web ACL ${webAclName("edge")} has no application integration URL: the sign-up's Challenge could never be solved. It needs targeted Bot Control (rule ${BOT_CONTROL_RULE}).`);
+  }
+  return value;
 }
 
 /** Everything `aws.wafv2.WebAcl` takes for one ACL; `ruleJson` is the API's `Rules`. */
@@ -252,7 +254,7 @@ export function webAclSpec(kind: WebAclKind) {
   return {
     name: webAclName(kind),
     scope: WEB_ACL_SCOPES[kind],
-    description: kind === "edge" ? "Router of the console: IP reputation, per-IP rates and the sign-up challenge." : "Cognito user pool: IP reputation and per-IP rates by operation.",
+    description: kind === "edge" ? "Router of the console: IP reputation, per-IP rates, bot labels and the sign-up challenge." : "Cognito user pool: IP reputation and per-IP rates by operation.",
     defaultAction: { allow: {} },
     rules: kind === "edge" ? edgeRules() : authRules(),
     visibilityConfig: { sampledRequestsEnabled: true, cloudwatchMetricsEnabled: true, metricName: visibility(kind).MetricName },

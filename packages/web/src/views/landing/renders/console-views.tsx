@@ -3,7 +3,7 @@
 // decision log and the simulated clock), built with the console's components (PageHeader, Table, Badge,
 // StatTile, RuleChips, ClockBanner) and the texts of copy/, the story and the seed's manual. Each one is
 // drawn at the width of a desktop console; the gallery scales it down. WP-44 replaces them with captures.
-import type { ReactNode } from "react";
+import { type ReactNode, createContext, useContext } from "react";
 import { Badge } from "../../../components/Badge";
 import { ClockBanner } from "../../../components/ClockBanner";
 import { PageHeader } from "../../../components/PageHeader";
@@ -13,9 +13,19 @@ import { Table } from "../../../components/Table";
 import { firstNameOf, AUDIT_DECISIONS, CLOCK_TEXTS, ORDER_COLUMNS, VIEW_TEXTS, clockOf, manualBlocks, metricAreas, orderLabel, orderTimeline, simTimeText, storyEntry, storyOrders } from "./sources";
 import type { StoryEntry } from "./sources";
 
-/** A console page at desktop width: the paper background and the view's padding. */
+/** How wide a console page draws: a desktop console's column, or the narrower one a gallery thumbnail reflows into. */
+export type ConsolePageWidth = "page" | "thumbnail";
+
+export const CONSOLE_PAGE_WIDTHS: Readonly<Record<ConsolePageWidth, number>> = { page: 960, thumbnail: 600 };
+
+const ConsolePageWidthContext = createContext<ConsolePageWidth>("page");
+
+export const ConsolePageWidthProvider = ConsolePageWidthContext.Provider;
+
+/** A console page: the paper background and the view's padding, at the width of its context. */
 function ConsolePage({ children }: { readonly children: ReactNode }) {
-  return <div className="w-240 bg-paper p-6 text-left">{children}</div>;
+  const width = useContext(ConsolePageWidthContext);
+  return <div className={`${width === "thumbnail" ? "w-150" : "w-240"} bg-paper p-6 text-left`}>{children}</div>;
 }
 
 function GalleryOrders() {

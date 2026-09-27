@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WAF_TOKEN_TIMEOUT_MS, type WafIntegration, WafTokenError, challengeScriptUrl, createWafToken } from "./waf-token";
+import { WAF_TOKEN_TIMEOUT_MS, type WafIntegration, WafTokenError, challengeScriptUrl, createWafToken, isWafChallenge } from "./waf-token";
 
 const URL_OF_ACL = "https://abc123.us-east-1.sdk.awswaf.com/abc123/def456/";
 
@@ -73,5 +73,28 @@ describe("the AWS WAF token of the sign-up [FL-114]", () => {
     await waf.fetch("/api/signup.start");
     expect(plain).toEqual(["/api/signup.start"]);
     expect(challengeScriptUrl("https://x.sdk.awswaf.com/a/b")).toBe("https://x.sdk.awswaf.com/a/b/challenge.js");
+  });
+
+  const challenge = (): Response => new Response("<html></html>", { status: 202, headers: { "x-amzn-waf-action": "challenge", "content-type": "text/html" } });
+
+  it("[FL-114] [SEC-2B-01] without an integration URL, an answer that is still the edge's challenge is BROWSER_CHECK, never a server error", async () => {
+    const waf = createWafToken({ integrationUrl: undefined, loadScript: async () => undefined, integration: () => undefined, fetch: async () => challenge() });
+    await expect(waf.fetch("/api/signup.start", { method: "POST" })).rejects.toMatchObject({ name: "WafTokenError", code: "BROWSER_CHECK" });
+  });
+
+  it("[FL-114] [SEC-2B-01] with the SDK, a request the edge still challenges is BROWSER_CHECK too; the app's own answers pass", async () => {
+    let answer = challenge();
+    const integration: WafIntegration = { getToken: async () => "t", fetch: async () => answer };
+    const waf = createWafToken({ integrationUrl: URL_OF_ACL, loadScript: async () => undefined, integration: () => integration, fetch: async () => new Response("{}") });
+    await expect(waf.fetch("/api/signup.start", { method: "POST" })).rejects.toBeInstanceOf(WafTokenError);
+    answer = new Response("{}", { status: 429 });
+    expect((await waf.fetch("/api/signup.start", { method: "POST" })).status).toBe(429);
+  });
+
+  it("reads AWS WAF's action header in any case, and only that header", () => {
+    expect(isWafChallenge(new Response(null, { status: 202, headers: { "x-amzn-waf-action": "Challenge" } }))).toBe(true);
+    expect(isWafChallenge(new Response(null, { status: 405, headers: { "x-amzn-waf-action": "captcha" } }))).toBe(true);
+    expect(isWafChallenge(new Response(null, { status: 202 }))).toBe(false);
+    expect(isWafChallenge(new Response("{}", { status: 200 }))).toBe(false);
   });
 });

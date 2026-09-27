@@ -2,6 +2,8 @@
 // loop plays, pauses with its visible control (and with hover, focus inside it, leaving the viewport and
 // a hidden tab), stops by itself after two rounds and rests on the final frame; with reduced motion it
 // is a still poster with its text alternative and no control. The voice note never shows its words.
+// The phone of the loop is never empty, and every scene of the walkthrough is complete by the time the
+// visitor has scrolled through it, whatever the dwell; the goals that count up land on their value.
 import { type Page, expect, test } from "@playwright/test";
 import { storyEntry } from "../../bff/src/story/main-story";
 import { LANDING_COPY } from "../src/views/landing/copy";
@@ -13,7 +15,7 @@ const VOICE_NOTE = storyEntry("s1-voice-note");
 function context() {
   const use = test.info().project.use;
   const lang = use.locale?.startsWith("en") ? ("en" as const) : ("es" as const);
-  return { lang, copy: LANDING_COPY[lang], param: lang === "en" ? "en" : "es-MX", reduced: use.reducedMotion === "reduce" };
+  return { lang, copy: LANDING_COPY[lang], param: lang === "en" ? "en" : "es-MX", reduced: use.reducedMotion === "reduce", desktop: (use.viewport?.width ?? 0) >= 1024 };
 }
 
 async function open(page: Page): Promise<void> {
@@ -104,5 +106,54 @@ test.describe("hero loop", () => {
     const summary = page.locator("#hero p.sr-only");
     await expect(summary).toContainText(lang === "en" ? VOICE_NOTE.glossEn : VOICE_NOTE.text);
     expect(await page.locator("#hero ol").innerText()).not.toContain(VOICE_NOTE.text);
+  });
+});
+
+test.describe("the loop and the walkthrough never wait on the visitor", () => {
+  test("[FL-089] the hero's phone shows the voice note from the first paint, before the loop is in view or plays", async ({ page }) => {
+    await routeConsoleApi(page, { brand: NEUTRAL_BRAND });
+    await page.goto(`/?lang=${context().param}`);
+    await expect(page.locator("#hero h1")).toBeVisible();
+    // No scrolling, no waiting: on a phone the loop is still below the fold here.
+    expect(await shownMessages(page).count()).toBeGreaterThanOrEqual(1);
+    await expect(page.locator("#hero ol > li").first()).not.toHaveAttribute("aria-hidden", "true");
+  });
+
+  test("[FL-089] every scene is complete once scrolled into place, at once, fixed texts whole and nothing half typed", async ({ page }) => {
+    const { desktop } = context();
+    await routeConsoleApi(page, { brand: NEUTRAL_BRAND });
+    await page.goto(`/?lang=${context().param}`);
+    await expect(page.locator("#hero h1")).toBeVisible();
+    // Jumps, not the page's smooth scrolling: the fastest a visitor can get there.
+    await page.evaluate(() => document.documentElement.style.setProperty("scroll-behavior", "auto"));
+    for (const scene of ["S1", "S2", "S3", "S4", "S5", "S6"]) {
+      const visual = page.locator(`[role="group"][aria-labelledby="scene-${scene}"]`);
+      // Pinned, the scene's text in the middle of the screen; stacked, the scene's phones scrolled into sight.
+      if (desktop) await page.locator(`#scene-${scene}`).scrollIntoViewIfNeeded();
+      else await visual.evaluate((element) => element.scrollIntoView({ block: "end" }));
+      await page.waitForTimeout(150);
+      const frames = await visual.evaluate((element) =>
+        [...element.querySelectorAll("[data-phone-frame]")]
+          .filter((frame) => !frame.closest('[aria-hidden="true"]'))
+          .map((frame) => {
+            const items = [...frame.querySelectorAll("ol > li")];
+            return { shown: items.filter((item) => item.getAttribute("aria-hidden") !== "true").length, total: items.length, typing: frame.querySelectorAll(".animate-caret").length };
+          }),
+      );
+      expect(frames.length, scene).toBeGreaterThan(0);
+      for (const frame of frames) expect(frame, scene).toEqual({ shown: frame.total, total: frame.total, typing: 0 });
+    }
+  });
+
+  test("[FL-089] the goals that count up land exactly on their value and stay there", async ({ page }) => {
+    const { copy } = context();
+    await routeConsoleApi(page, { brand: NEUTRAL_BRAND });
+    await page.goto(`/?lang=${context().param}`);
+    const impact = page.locator("#impacto");
+    await impact.scrollIntoViewIfNeeded();
+    const finals = copy.impact.items.map((item) => `${item.prefix}${item.value}${item.suffix}`);
+    for (const text of finals) await expect(impact.getByText(text, { exact: true })).toBeVisible();
+    await page.waitForTimeout(1_500);
+    for (const text of finals) await expect(impact.getByText(text, { exact: true })).toBeVisible();
   });
 });

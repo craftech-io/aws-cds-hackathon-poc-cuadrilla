@@ -108,9 +108,16 @@ const TICKET_MARGIN_MS = 30_000;
 
 const START_REASONS: ReadonlySet<string> = new Set(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_DOMAIN"]);
 
+/** A WafTokenError anywhere in the chain: tRPC wraps what its `fetch` threw in a client error's `cause`. */
+function isBrowserCheck(error: unknown, depth = 0): boolean {
+  if (error instanceof WafTokenError) return true;
+  const cause = typeof error === "object" && error !== null ? Reflect.get(error, "cause") : undefined;
+  return depth < 4 && cause !== undefined && isBrowserCheck(cause, depth + 1);
+}
+
 /** The BFF's `reason` of a refused start (tRPC error data), mapped to what the form says. */
 export function startErrorOf(error: unknown): SignupErrorCode {
-  if (error instanceof WafTokenError) return "BROWSER_CHECK";
+  if (isBrowserCheck(error)) return "BROWSER_CHECK";
   const data = typeof error === "object" && error !== null ? Reflect.get(error, "data") : undefined;
   const reason = typeof data === "object" && data !== null ? Reflect.get(data, "reason") : undefined;
   return typeof reason === "string" && START_REASONS.has(reason) ? (reason as SignupErrorCode) : "UNAVAILABLE";

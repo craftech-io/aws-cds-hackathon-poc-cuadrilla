@@ -5,21 +5,28 @@ import { useReducedMotion } from "./motion";
 import { useGallery } from "./gallery";
 import { useLandingCopy, useLandingLang } from "./lang";
 import { type MediaItem, type PictureItem, isPicture } from "./media";
+import { CONSOLE_PAGE_WIDTHS, ConsolePageWidthProvider } from "./renders/console-views";
 import { FitToWidth } from "./renders/FitToWidth";
 import { RENDERS, isRenderId } from "./renders/registry";
 
 /** Width the console views are drawn at before scaling (a desktop console's content column). */
-export const CONSOLE_DESIGN_WIDTH = 960;
+export const CONSOLE_DESIGN_WIDTH = CONSOLE_PAGE_WIDTHS.page;
 
-/** A render of the registry, in its final state, fitted to the width it gets. */
+/**
+ * A render of the registry, in its final state, fitted to the width it gets. As a thumbnail (`crop`) a
+ * console view draws in the narrower thumbnail column, so it reflows into its frame and is scaled whole.
+ */
 export function RenderView({ id, crop = false, minScale }: { readonly id: string; readonly crop?: boolean; readonly minScale?: number }) {
   const reduced = useReducedMotion();
   if (!isRenderId(id)) return null;
   const Render = RENDERS[id];
+  const width = crop ? "thumbnail" : "page";
   return (
-    <FitToWidth designWidth={CONSOLE_DESIGN_WIDTH} crop={crop} minScale={minScale}>
-      <Render run={false} still reduced={reduced} />
-    </FitToWidth>
+    <ConsolePageWidthProvider value={width}>
+      <FitToWidth designWidth={CONSOLE_PAGE_WIDTHS[width]} crop={crop} minScale={minScale}>
+        <Render run={false} still reduced={reduced} />
+      </FitToWidth>
+    </ConsolePageWidthProvider>
   );
 }
 
@@ -44,8 +51,8 @@ export function MediaFigure({ id, item }: MediaFigureProps) {
   const lang = useLandingLang()?.lang ?? "es";
   const gallery = useGallery();
   const alt = item.alt[lang];
-  // A thumbnail crops the top of the view at a legible scale rather than shrinking all of it.
-  const visual = isPicture(item) ? <MediaPicture item={item} alt={gallery ? "" : alt} /> : <RenderView id={id} crop minScale={0.42} />;
+  // A thumbnail fits the whole view into its 4:3 frame; the viewer shows it at a reading size.
+  const visual = isPicture(item) ? <MediaPicture item={item} alt={gallery ? "" : alt} /> : <RenderView id={id} crop />;
   return (
     <figure className="min-w-0">
       <div className="group relative overflow-hidden rounded-card border border-mist bg-paper shadow-card">

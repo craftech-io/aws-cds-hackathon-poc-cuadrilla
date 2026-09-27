@@ -448,7 +448,7 @@ Las capturas (cada página en los dos viewports, es y en, con y sin movimiento r
 | Alerta de seguridad (p95) | < 60 s | `SafetyAlertLatency` |
 | Turnos por orden en el camino feliz | ≤ 12 | `CuadrillaMetrics` de `SC-18` |
 | Costo por conversación (camino feliz, tarifas verificadas) | Umbral del CTO en `IspSettings.costBudgetUsdPerConversation` | `CuadrillaMetrics` de `SC-18`; con tarifas provisionales, `warn` |
-| Costo fijo del anti abuso | ≈ USD 20 por mes | Dos web ACL con 9 reglas y los pedidos del volumen de demo (ADR-0025 §4); se revisa en la factura del mes |
+| Costo fijo del anti abuso | ≈ USD 30 por mes | Dos web ACL con 10 reglas, la suscripción de Bot Control y los pedidos del volumen de demo (ADR-0025 §4); se revisa en la factura del mes |
 | Invitados de alta propia | Sub-techo diario de 600 turnos, 150 validaciones y 1.800 s de transcripción dentro del techo global | `TurnCapHits{scope=GUESTSIGNUP}` y el consumo del techo en métricas (ADR-0025 §3) |
 | Carga liviana | 20 instaladores QA con 3 mensajes cada uno: sin DLQ, orden por instalador preservado, sin turnos duplicados | `scripts/scenarios/load-light.ts` (a pedido) |
 

@@ -7,14 +7,14 @@ import { describe, expect, it } from "vitest";
 import {
   ANONYMOUS_IP_HEADER,
   ANONYMOUS_IP_HEADER_AT_ORIGIN,
+  BOT_CONTROL_RULE,
   COGNITO_RATE_RULES,
   DECODE_AND_LOWERCASE,
-  SIGNUP_USERNAME_OPERATIONS,
-  SIGNUP_USERNAME_REGEX,
   SIGNUP_SCOPE,
   authRules,
   cognitoTarget,
   edgeRules,
+  requireIntegrationUrl,
   webAclName,
   webAclSpec,
   type WafRule,
@@ -36,23 +36,6 @@ interface Request {
   readonly query?: string;
   readonly method?: string;
   readonly headers?: Readonly<Record<string, string>>;
-  readonly body?: string;
-}
-
-/** A RegexMatch over JSON body values at the included paths; a body that does not parse matches nothing (NO_MATCH). */
-function regexOverBody(statement: Extract<WafStatement, { RegexMatchStatement: unknown }>, request: Request): boolean {
-  const { RegexString, FieldToMatch } = statement.RegexMatchStatement;
-  if (!("JsonBody" in FieldToMatch)) throw new Error("only JSON bodies are inspected by regex here");
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(request.body ?? "");
-  } catch {
-    return FieldToMatch.JsonBody.InvalidFallbackBehavior !== "NO_MATCH";
-  }
-  return FieldToMatch.JsonBody.MatchPattern.IncludedPaths.some((path) => {
-    const value = (parsed as Record<string, unknown> | null)?.[path.replace(/^\//, "")];
-    return typeof value === "string" && new RegExp(RegexString).test(value);
-  });
 }
 
 function transform(value: string, transformations: readonly { Type: string }[]): string {
@@ -67,7 +50,6 @@ function evaluate(statement: WafStatement, request: Request): boolean {
   if ("AndStatement" in statement) return statement.AndStatement.Statements.every((inner) => evaluate(inner, request));
   if ("OrStatement" in statement) return statement.OrStatement.Statements.some((inner) => evaluate(inner, request));
   if ("NotStatement" in statement) return !evaluate(statement.NotStatement.Statement, request);
-  if ("RegexMatchStatement" in statement) return regexOverBody(statement, request);
   const { SearchString, FieldToMatch, PositionalConstraint, TextTransformations } = statement.ByteMatchStatement;
   const raw = "UriPath" in FieldToMatch ? request.path : "QueryString" in FieldToMatch ? (request.query ?? "") : "SingleHeader" in FieldToMatch ? (request.headers?.[FieldToMatch.SingleHeader.Name] ?? "") : (request.method ?? "POST");
   const value = transform(raw, TextTransformations);
@@ -108,10 +90,11 @@ describe("sign-up scope of rules 2 to 4 (ADR-0025 §4) [FL-113] [FL-114]", () =>
     for (const [, transformations] of text.matchAll(/"TextTransformations":(\[[^\]]*\])/g)) expect(JSON.parse(transformations ?? "[]")).toEqual(DECODE_AND_LOWERCASE);
   });
 
-  it("is the same value in the three rules", () => {
+  it("is the same value in the four rules", () => {
     const rules = edgeRules();
     expect(rule(rules, "RateSignupPerIp").Statement).toEqual({ RateBasedStatement: { Limit: 10, EvaluationWindowSec: 300, AggregateKeyType: "IP", ScopeDownStatement: SIGNUP_SCOPE } });
     expect(Reflect.get(rule(rules, "AnonymousIpSignup").Statement.ManagedRuleGroupStatement as object, "ScopeDownStatement")).toEqual(SIGNUP_SCOPE);
+    expect(Reflect.get(rule(rules, BOT_CONTROL_RULE).Statement.ManagedRuleGroupStatement as object, "ScopeDownStatement")).toEqual(SIGNUP_SCOPE);
     const challenge = rule(rules, "ChallengeSignup").Statement as { AndStatement: { Statements: WafStatement[] } };
     const scope = SIGNUP_SCOPE as { AndStatement: { Statements: WafStatement[] } };
     expect(challenge.AndStatement.Statements.slice(0, -1)).toEqual(scope.AndStatement.Statements);
@@ -122,13 +105,14 @@ describe("sign-up scope of rules 2 to 4 (ADR-0025 §4) [FL-113] [FL-114]", () =>
 describe("edge ACL (CLOUDFRONT, on the Router) [FL-114]", () => {
   const rules = edgeRules();
 
-  it("has the five rules of ADR-0025 §4, in priority order, with their actions", () => {
+  it("has the six rules of ADR-0025 §4, in priority order, with their actions", () => {
     expect(rules.map((item) => [item.Priority, item.Name])).toEqual([
       [1, "AWSManagedRulesAmazonIpReputationList"],
       [2, "RateSignupPerIp"],
       [3, "AnonymousIpSignup"],
-      [4, "ChallengeSignup"],
-      [5, "RatePerIp"],
+      [4, "BotControlSignup"],
+      [5, "ChallengeSignup"],
+      [6, "RatePerIp"],
     ]);
     expect(rule(rules, "AWSManagedRulesAmazonIpReputationList")).toMatchObject({ Statement: { ManagedRuleGroupStatement: { VendorName: "AWS", Name: "AWSManagedRulesAmazonIpReputationList" } }, OverrideAction: { None: {} } });
     expect(rule(rules, "RateSignupPerIp").Action).toEqual({ Block: {} });
@@ -148,18 +132,38 @@ describe("edge ACL (CLOUDFRONT, on the Router) [FL-114]", () => {
     expect(ANONYMOUS_IP_HEADER).toBe("cuadrilla-anon");
     expect(ANONYMOUS_IP_HEADER_AT_ORIGIN).toBe("x-amzn-waf-cuadrilla-anon");
   });
+  it("[SEC-2B-01] has targeted Bot Control on the sign-up scope, counted only: it gives the ACL its integration URL and blocks nothing", () => {
+    const group = rule(rules, BOT_CONTROL_RULE);
+    expect(group.OverrideAction).toEqual({ Count: {} });
+    expect(group.Action).toBeUndefined();
+    expect(group.Statement.ManagedRuleGroupStatement).toEqual({
+      VendorName: "AWS",
+      Name: "AWSManagedRulesBotControlRuleSet",
+      ScopeDownStatement: SIGNUP_SCOPE,
+      ManagedRuleGroupConfigs: [{ AWSManagedRulesBotControlRuleSet: { InspectionLevel: "TARGETED", EnableMachineLearning: false } }],
+    });
+    expect(Reflect.get(group.Statement.ManagedRuleGroupStatement as object, "RuleActionOverrides")).toBeUndefined();
+    // The group runs before the Challenge, which stays the only rule that demands the token.
+    expect(group.Priority).toBeLessThan(rule(rules, "ChallengeSignup").Priority);
+  });
+
+  it("[SEC-2B-01] an empty or missing integration URL stops the deploy; a real one passes unchanged", () => {
+    const url = "https://abc123.us-east-1.sdk.awswaf.com/abc123/def456/";
+    expect(requireIntegrationUrl(url)).toBe(url);
+    expect(requireIntegrationUrl(` ${url} `)).toBe(url);
+    for (const empty of [undefined, null, "", "   ", "http://abc.sdk.awswaf.com/a/b/", "abc123/def456/"]) expect(() => requireIntegrationUrl(empty), String(empty)).toThrow(/no application integration URL/);
+  });
 });
 
 describe("pool ACL (REGIONAL, on the user pool)", () => {
   const rules = authRules();
 
-  it("has IP reputation, the sign-up user name shape and per-IP rates on x-amz-target, all Block", () => {
+  it("has IP reputation and per-IP rates on x-amz-target, all Block", () => {
     expect(rules.map((item) => [item.Priority, item.Name])).toEqual([
       [1, "AWSManagedRulesAmazonIpReputationList"],
-      [2, "SignupUsernameShape"],
-      [3, "RateSignUp"],
-      [4, "RateCodesAndRecovery"],
-      [5, "RateSignIn"],
+      [2, "RateSignUp"],
+      [3, "RateCodesAndRecovery"],
+      [4, "RateSignIn"],
     ]);
     expect(COGNITO_RATE_RULES.map((item) => [item.name, item.limit, [...item.operations]])).toEqual([
       ["RateSignUp", 10, ["SignUp"]],
@@ -168,42 +172,21 @@ describe("pool ACL (REGIONAL, on the user pool)", () => {
     ]);
     for (const item of rules.slice(1)) expect(item.Action, item.Name).toEqual({ Block: {} });
     const targets = JSON.stringify(rules).match(/"SearchString":"([^"]+)"/g) ?? [];
-    expect(targets).toHaveLength(10);
+    expect(targets).toHaveLength(7);
     expect(JSON.stringify(rules)).toContain(`"SearchString":"${cognitoTarget("SignUp")}","FieldToMatch":{"SingleHeader":{"Name":"x-amz-target"}}`);
     expect(cognitoTarget("SignUp")).toBe("awscognitoidentityproviderservice.signup");
   });
-});
 
-describe("sign-up user name shape of the pool's ACL (ADR-0025 §4) [FL-114]", () => {
-  const shape = rule(authRules(), "SignupUsernameShape");
-  const call = (operation: string, body: unknown): Request => ({
-    path: "/",
-    method: "POST",
-    headers: { "x-amz-target": cognitoTarget(operation) },
-    body: typeof body === "string" ? body : JSON.stringify(body),
-  });
-  const blocks = (request: Request) => evaluate(shape.Statement as WafStatement, request);
-  const GST = "gst-01K60000000000000000000001";
-
-  it("blocks SignUp, ConfirmSignUp and ResendConfirmationCode for any user name that is not gst-<ULID>, and a body it cannot read", () => {
-    expect(SIGNUP_USERNAME_OPERATIONS).toEqual(["SignUp", "ConfirmSignUp", "ResendConfirmationCode"]);
-    expect(shape.Action).toEqual({ Block: {} });
-    for (const operation of SIGNUP_USERNAME_OPERATIONS) {
-      expect(blocks(call(operation, { ClientId: "c", Username: GST })), operation).toBe(false);
-      for (const username of ["someone@company.com", "guest-07", `${GST}x`, ` ${GST}`, "gst-01k60000000000000000000001"]) expect(blocks(call(operation, { ClientId: "c", Username: username })), `${operation} ${username}`).toBe(true);
-      expect(blocks(call(operation, { ClientId: "c" })), `${operation} without Username`).toBe(true);
-      expect(blocks(call(operation, "{not json")), `${operation} unparseable`).toBe(true);
+  it("[SEC-2B-02] never matches on the body: Cognito hands AWS WAF no user name, so such a rule would block every valid gst-* SignUp", () => {
+    const text = JSON.stringify(rules);
+    expect(text).not.toMatch(/JsonBody|"Body"|RegexMatchStatement|Username/);
+    expect(rules.map((item) => item.Name)).not.toContain("SignupUsernameShape");
+    // A valid sign-up call reaches Cognito (and its pre sign-up trigger) with nothing but the rates in the way.
+    const signUp: Request = { path: "/", method: "POST", headers: { "x-amz-target": cognitoTarget("SignUp") } };
+    for (const item of rules.slice(1)) {
+      const scope = Reflect.get(item.Statement.RateBasedStatement as object, "ScopeDownStatement") as WafStatement;
+      expect(evaluate(scope, signUp), item.Name).toBe(item.Name === "RateSignUp");
     }
-  });
-
-  it("leaves the sign-in, the recovery and every other operation alone", () => {
-    for (const operation of ["InitiateAuth", "RespondToAuthChallenge", "ForgotPassword", "ConfirmForgotPassword", "GetUser"]) expect(blocks(call(operation, { Username: "someone@company.com" })), operation).toBe(false);
-  });
-
-  it("inspects the JSON value of /Username only, failing closed on an invalid or oversized body", () => {
-    expect(JSON.stringify(shape.Statement)).toContain(`"RegexString":"${SIGNUP_USERNAME_REGEX.replace(/\\/g, "\\\\")}"`);
-    expect(JSON.stringify(shape.Statement)).toContain('"JsonBody":{"MatchPattern":{"IncludedPaths":["/Username"]},"MatchScope":"VALUE","InvalidFallbackBehavior":"NO_MATCH","OversizeHandling":"NO_MATCH"}');
-    expect(new RegExp(SIGNUP_USERNAME_REGEX).source).toBe(/^gst-[0-9A-HJKMNP-TV-Z]{26}$/.source);
   });
 });
 
@@ -231,6 +214,7 @@ describe("both ACLs", () => {
     expect(wafModule).toMatch(/new aws\.wafv2\.WebAclAssociation\("AuthWebAclAssociation", \{\s+resourceArn: userPool\.arn,\s+webAclArn: authWebAcl\.arn,/);
     expect(read("infra/web.ts")).toContain("args.webAclArn = edgeWebAcl.arn;");
     expect(read("infra/web.ts")).toContain("[WEB_ENV_NAMES.wafIntegrationUrl]: wafIntegrationUrl");
+    expect(wafModule).toContain("export const wafIntegrationUrl = edgeWebAcl.applicationIntegrationUrl.apply((url) => requireIntegrationUrl(url));");
     expect(wafModule).not.toMatch(/APIKey|ApiKey|captcha/i);
   });
 });

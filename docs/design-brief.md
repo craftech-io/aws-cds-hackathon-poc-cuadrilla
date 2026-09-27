@@ -387,7 +387,7 @@ Detalle en ADR-0025 y `docs/architecture-integrations.md` §9.
 | Límites de la app | 5 altas iniciadas por IP y por hora (1 desde una IP anónima), 3 por persona y por hora y 5 por día, 300 por día en el stage; 150 altas confirmadas por día |
 | Mundos | 150 mundos de alta propia activos; TTL de 7 días reales; recreación al volver a entrar |
 | Uso por mundo, con el reloj real | Perfil `SIGNUP` de `docs/seed-spec.md` §4 (turnos 20/h y 60/día, validaciones 20/día, transcripción 300 s/día, emails 10/día, 15 mensajes por hora real por identidad, 15 saltos de escena por hora real); 40 turnos por día por cuenta; sub-techo diario de los invitados por alta dentro del techo global (600 turnos, 150 validaciones, 30 min de transcripción) |
-| Protección contra bots | AWS WAF en el Router (reputación de IP, tasa por IP, Challenge silencioso en el alta, IP anónimas etiquetadas y con límite propio, sin CAPTCHA) y AWS WAF en el user pool (tasa por operación de Cognito); ≈ USD 20 por mes |
+| Protección contra bots | AWS WAF en el Router (reputación de IP, tasa por IP, Challenge silencioso en el alta, IP anónimas etiquetadas y con límite propio, sin CAPTCHA) y AWS WAF en el user pool (tasa por operación de Cognito); ≈ USD 30 por mes (incluye la suscripción de Bot Control que da la URL de integración del Challenge) |
 | Emails de autenticación | Neutrales, es/en, desde el dominio del app, sin texto del visitante; medidos por el configuration set del app, y un corte del alta (`KILL#SIGNUP`) ante rebotes, quejas o ráfagas para proteger la reputación de SES de la cuenta compartida |
 
 ### 7.4 Captación de leads

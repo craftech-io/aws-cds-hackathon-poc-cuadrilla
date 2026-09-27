@@ -132,3 +132,61 @@ export function useCountUp(target: number, run: boolean, reduced: boolean, durat
   }, [target, run, reduced, durationMs]);
   return value;
 }
+
+/**
+ * How far a phone of the stacked walkthrough (< 1024 px) has risen into the viewport, 0 to 1: 0 while
+ * its top is below `start` of the viewport's height, 1 once `span` of its own height has passed that
+ * line. The messages follow the scroll and the phone is complete while its first third comes into
+ * sight, so a card is whole by the time it is read, however fast the visitor goes.
+ */
+export function revealFraction(top: number, height: number, viewport: number, start = 1, span = 0.35): number {
+  if (height <= 0) return 1;
+  return Math.min(1, Math.max(0, (viewport * start - top) / (height * span)));
+}
+
+/** Of a scene's walkthrough, 0 to 1: the pinned visual is complete by the time the visitor is this far into its block. */
+export const DESKTOP_REVEAL_SPAN = 0.3;
+
+export function desktopReveal(progress: number): number {
+  return Math.min(1, Math.max(0, progress / DESKTOP_REVEAL_SPAN));
+}
+
+/** How many messages of each phone, in the scene's order, a reveal fraction puts on screen. */
+export function revealFloors(counts: readonly number[], reveal: number): number[] {
+  let left = Math.ceil(Math.min(1, Math.max(0, reveal)) * counts.reduce((sum, count) => sum + count, 0));
+  return counts.map((count) => {
+    const take = Math.min(count, left);
+    left -= take;
+    return take;
+  });
+}
+
+/** `revealFraction` of the element while `enabled`, following the scroll; it never goes back and stops listening at 1. */
+export function useScrollReveal(ref: RefObject<Element | null>, enabled: boolean): number {
+  const [reveal, setReveal] = useState(0);
+  useEffect(() => {
+    const element = ref.current;
+    if (!enabled || !element) return;
+    let frame = 0;
+    const stop = () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+    const measure = () => {
+      frame = 0;
+      const rect = element.getBoundingClientRect();
+      const value = revealFraction(rect.top, rect.height, window.innerHeight);
+      setReveal((current) => Math.max(current, value));
+      if (value >= 1) stop();
+    };
+    function onScroll() {
+      if (!frame) frame = window.requestAnimationFrame(measure);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    measure();
+    return stop;
+  }, [ref, enabled]);
+  return reveal;
+}

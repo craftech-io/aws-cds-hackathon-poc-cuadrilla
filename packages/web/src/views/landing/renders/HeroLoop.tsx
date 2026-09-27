@@ -15,6 +15,11 @@ const MESSAGES = phoneMessages("inst-rogelio", HERO_LOOP_ENTRIES);
 
 /** Plays this many times, then rests on the final frame. */
 export const HERO_LOOPS = 2;
+/**
+ * The voice note is on screen from the first paint, before the loop is in view or plays and when it is
+ * paused before its first step: the phone is never empty (on a phone the loop starts below the fold).
+ */
+export const HERO_FIRST_FRAME = 1;
 /** Rest on the complete conversation before the next time round (a round lasts 14-18 s). */
 const HOLD_MS = 4_000;
 
@@ -79,7 +84,7 @@ export function HeroLoop({ label, pauseLabel, playLabel, summary }: HeroLoopProp
       <p className="sr-only">{summary}</p>
       <div aria-hidden="true">
         {/* Finished, it rests on its last frame as it played; only reduced motion draws the grown still poster. */}
-        <PhoneFrame owner="inst-rogelio" messages={MESSAGES} run={playing} still={reduced} reduced={reduced} runKey={round} size="hero" onDone={() => setHolding(true)} />
+        <PhoneFrame owner="inst-rogelio" messages={MESSAGES} run={playing} still={reduced} reduced={reduced} runKey={round} size="hero" floor={HERO_FIRST_FRAME} onDone={() => setHolding(true)} />
       </div>
       {reduced ? null : (
         <button

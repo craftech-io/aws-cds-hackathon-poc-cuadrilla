@@ -52,6 +52,8 @@ function projects(): Project[] {
 export default defineConfig({
   testDir: HERE,
   testMatch: "*.spec.ts",
+  // The deployed specs have their own config and run only against the stage (`npm run qa:deployed`).
+  testIgnore: "**/deployed/**",
   outputDir: resolve(WEB_ROOT, "test-results"),
   fullyParallel: true,
   forbidOnly: CI,

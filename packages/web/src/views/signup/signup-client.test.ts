@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CONSENTS_VERSION } from "@cuadrilla/shared/legal/consents";
+import { createWafToken } from "../../lib/waf-token";
 import { createSignupClient } from "./signup-client";
-import type { SignupStartInput } from "./signup-model";
+import { type SignupStartInput, startErrorOf } from "./signup-model";
 
 const INPUT: SignupStartInput = {
   email: "ana.prueba@example.test",
@@ -49,5 +50,16 @@ describe("the sign-up's tRPC client [FL-114]", () => {
       fetch: async () => new Response(JSON.stringify({ result: { data: { ticket: "t", username: "usr-admin", expiresAt: "x" } } }), { status: 200, headers: { "content-type": "application/json" } }),
     });
     await expect(client.start(INPUT)).rejects.toThrow();
+  });
+
+  it("[FL-114] [SEC-2B-01] a start the edge still challenges reads as BROWSER_CHECK through tRPC's error, not UNAVAILABLE", async () => {
+    const challenged = async (): Promise<Response> => new Response("<html></html>", { status: 202, headers: { "x-amzn-waf-action": "challenge", "content-type": "text/html" } });
+    const waf = createWafToken({ integrationUrl: undefined, loadScript: async () => undefined, integration: () => undefined, fetch: challenged });
+    const error: unknown = await createSignupClient(waf).start(INPUT).then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+    expect(error).toBeDefined();
+    expect(startErrorOf(error)).toBe("BROWSER_CHECK");
   });
 });

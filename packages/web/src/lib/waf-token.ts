@@ -7,7 +7,10 @@
 // an extension, the network), the form says so with its own neutral text.
 //
 // Where no web ACL fronts the app (a local server without an integration URL) there is no token to
-// get: the check passes and the plain `fetch` is used; the server side still decides.
+// get: the check passes and the plain `fetch` is used; the server side still decides. A deployed build
+// always has the URL (lib/env.ts requires it, infra/waf.ts fails the deploy without it). Either way the
+// sign-up fails closed: an answer that is still the edge's challenge (`x-amzn-waf-action: challenge`,
+// a 202 with the interstitial) is a browser check that did not pass, never a server error.
 
 /** What the SDK puts on `window.AwsWafIntegration` (AWS WAF application integration, JavaScript). */
 export interface WafIntegration {
@@ -41,6 +44,20 @@ export interface WafToken {
 }
 
 export const WAF_TOKEN_TIMEOUT_MS = 10_000;
+
+/** The header AWS WAF puts on its Challenge and CAPTCHA answers. */
+export const WAF_ACTION_HEADER = "x-amzn-waf-action";
+
+/** The answer is the edge's challenge (or CAPTCHA), not the app's: the request never reached the Bff. */
+export function isWafChallenge(response: Pick<Response, "headers">): boolean {
+  const action = (response.headers.get(WAF_ACTION_HEADER) ?? "").trim().toLowerCase();
+  return action === "challenge" || action === "captcha";
+}
+
+function passedTheEdge(response: Response): Response {
+  if (isWafChallenge(response)) throw new WafTokenError("the edge still challenged the request");
+  return response;
+}
 const POLL_MS = 50;
 
 /** `https://…/<id>/<token>/` → `https://…/<id>/<token>/challenge.js`. */
@@ -93,7 +110,7 @@ export function createWafToken(deps: WafTokenDeps): WafToken {
     ready: () => integration().then(() => undefined),
     fetch: async (input, init) => {
       const sdk = await integration();
-      return sdk === undefined ? deps.fetch(input, init) : sdk.fetch(input, init);
+      return passedTheEdge(sdk === undefined ? await deps.fetch(input, init) : await sdk.fetch(input, init));
     },
   };
 }

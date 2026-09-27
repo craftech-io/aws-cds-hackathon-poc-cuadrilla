@@ -42,12 +42,21 @@ export function readAuthEnv(): AuthEnvResult {
   return { ok: false, missing: [...new Set(missing)] };
 }
 
+const WafIntegrationUrl = z.url({ protocol: /^https$/ });
+
 const SignupEnvSchema = z.object({
   /** The public `GuestSignup` client: `SignUp`, `ConfirmSignUp`, `ResendConfirmationCode` only. */
   signupClientId: z.string().min(1),
-  /** Where the AWS WAF integration SDK lives (`<url>challenge.js`); absent where no WAF fronts the app. */
-  wafIntegrationUrl: z.url({ protocol: /^https$/ }).optional(),
+  /** Where the AWS WAF integration SDK lives (`<url>challenge.js`); absent only where no WAF fronts the app. */
+  wafIntegrationUrl: WafIntegrationUrl.optional(),
 });
+
+/**
+ * A production build is the deployed one, always behind the edge ACL that challenges the sign-up: there
+ * the integration URL is required, so a build without it shows the "not configured" state instead of a
+ * form whose every start the edge would challenge (ADR-0025 §4).
+ */
+const DeployedSignupEnvSchema = SignupEnvSchema.extend({ wafIntegrationUrl: WafIntegrationUrl });
 
 export type SignupEnv = z.infer<typeof SignupEnvSchema>;
 
@@ -60,7 +69,8 @@ function text(value: unknown): string | undefined {
 }
 
 export function readSignupEnv(env: Readonly<Record<string, unknown>> = import.meta.env): SignupEnvResult {
-  const parsed = SignupEnvSchema.safeParse({ signupClientId: text(env.VITE_COGNITO_SIGNUP_CLIENT_ID), wafIntegrationUrl: text(env.VITE_WAF_INTEGRATION_URL) });
+  const schema = env.PROD === true ? DeployedSignupEnvSchema : SignupEnvSchema;
+  const parsed = schema.safeParse({ signupClientId: text(env.VITE_COGNITO_SIGNUP_CLIENT_ID), wafIntegrationUrl: text(env.VITE_WAF_INTEGRATION_URL) });
   if (parsed.success) return { ok: true, env: parsed.data };
   const missing = parsed.error.issues.map((issue) => {
     const key = issue.path[0];

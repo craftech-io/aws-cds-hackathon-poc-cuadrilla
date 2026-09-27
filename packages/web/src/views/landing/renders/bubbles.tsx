@@ -109,6 +109,8 @@ interface BubbleProps {
   readonly read: boolean;
   /** Smaller photos, for the hero's phone where the whole conversation has to fit. */
   readonly compact?: boolean;
+  /** Already past its own motion (scrolled into place, or a later message is on screen): whole text at once. */
+  readonly complete?: boolean;
 }
 
 function Shell({ out, children }: { readonly out: boolean; readonly children: ReactNode }) {
@@ -182,7 +184,7 @@ function DocumentBubble({ message, read }: BubbleProps) {
 
 /** One message of a phone, of any kind. */
 export function Bubble(props: BubbleProps) {
-  const { message, playing, reduced, read } = props;
+  const { message, playing, reduced, read, complete = false } = props;
   const entry = message.entry;
   const out = message.direction === "out";
   if (entry.kind === "VOICE") return <VoiceBubble {...props} />;
@@ -191,7 +193,7 @@ export function Bubble(props: BubbleProps) {
   return (
     <>
       <Shell out={out}>
-        {message.typed ? <TypedText text={entry.text} run={playing} reduced={reduced} /> : <span className="whitespace-pre-line">{entry.text}</span>}
+        {message.typed ? <TypedText text={entry.text} run={playing} reduced={reduced || complete} /> : <span className="whitespace-pre-line">{entry.text}</span>}
         <span className="float-right">
           <Meta time={message.time} out={out} read={read} />
         </span>

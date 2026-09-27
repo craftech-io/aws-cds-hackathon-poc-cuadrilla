@@ -14,7 +14,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Bubble, TypingDots } from "./bubbles";
 import { CONTACT_NAME, type PhoneMessage, type PhoneOwner, firstNameOf } from "./sources";
-import { typingDelay } from "../motion";
+import { typingDelay, useScrollReveal } from "../motion";
 
 /** How long each message holds the stage before the next one, in ms. */
 export function stepDuration(message: PhoneMessage): number {
@@ -35,8 +35,13 @@ export interface Sequence {
   readonly done: boolean;
 }
 
-/** Reveals `messages` one by one while `run` holds; `still` jumps to the end. Restarts when `runKey` changes. */
-export function usePhoneSequence(messages: readonly PhoneMessage[], run: boolean, still: boolean, runKey = 0, onDone?: () => void): Sequence {
+/**
+ * Reveals `messages` one by one while `run` holds; `still` jumps to the end. Restarts when `runKey`
+ * changes. `floor` is how many must be on screen whatever the clock says: the walkthrough raises it as
+ * the visitor scrolls, so a scene never waits on how long someone stays (the timed reveal only runs
+ * ahead of it). Reaching the end, by time or by floor, calls `onDone` once per run.
+ */
+export function usePhoneSequence(messages: readonly PhoneMessage[], run: boolean, still: boolean, runKey = 0, onDone?: () => void, floor = 0): Sequence {
   const [state, setState] = useState<Sequence>(() => (still ? { visible: messages.length, dotsAt: undefined, done: true } : { visible: 0, dotsAt: undefined, done: false }));
   const doneRef = useRef(onDone);
   useEffect(() => {
@@ -51,15 +56,26 @@ export function usePhoneSequence(messages: readonly PhoneMessage[], run: boolean
     setState({ visible: 0, dotsAt: undefined, done: false });
   }, [still, messages, runKey]);
 
+  const target = Math.min(messages.length, Math.max(0, Math.floor(floor)));
+  const visible = still ? messages.length : Math.max(state.visible, target);
+
+  // The end, however it was reached.
+  useEffect(() => {
+    if (still || state.done || visible < messages.length) return;
+    setState({ visible: messages.length, dotsAt: undefined, done: true });
+    doneRef.current?.();
+  }, [still, state.done, visible, messages.length]);
+
   useEffect(() => {
     if (still || !run || state.done) return;
-    const index = state.visible;
-    const message = messages[index];
-    if (!message) {
-      setState({ visible: index, dotsAt: undefined, done: true });
-      doneRef.current?.();
+    // Catch up with the floor first, then go on from there.
+    if (visible > state.visible) {
+      setState({ visible, dotsAt: undefined, done: false });
       return;
     }
+    const index = state.visible;
+    const message = messages[index];
+    if (!message) return;
     const previous = messages[index - 1];
     const before = previous ? stepDuration(previous) : 300;
     const withDots = message.direction === "in" && message.typed;
@@ -69,9 +85,9 @@ export function usePhoneSequence(messages: readonly PhoneMessage[], run: boolean
       dotsShowing ? DOTS_MS : before,
     );
     return () => window.clearTimeout(timer);
-  }, [messages, run, still, state]);
+  }, [messages, run, still, state, visible]);
 
-  return state;
+  return { visible, dotsAt: visible > state.visible ? undefined : state.dotsAt, done: still || state.done || visible >= messages.length };
 }
 
 interface PhoneFrameProps {
@@ -84,6 +100,10 @@ interface PhoneFrameProps {
   readonly runKey?: number;
   readonly onDone?: () => void;
   readonly size?: PhoneSize;
+  /** How many messages are on screen at least, whole (see usePhoneSequence). */
+  readonly floor?: number;
+  /** The frame raises its own floor as it scrolls into view (the stacked walkthrough). */
+  readonly scrollReveal?: boolean;
 }
 
 /**
@@ -112,9 +132,12 @@ function edgesOf(box: HTMLElement): { above: boolean; below: boolean } {
   return { above: box.scrollTop >= 2, below: hidden - box.scrollTop >= 2 };
 }
 
-export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, onDone, size = "solo" }: PhoneFrameProps) {
+export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, onDone, size = "solo", floor: given = 0, scrollReveal = false }: PhoneFrameProps) {
   const compact = size === "hero";
-  const sequence = usePhoneSequence(messages, run, still, runKey, onDone);
+  const frame = useRef<HTMLDivElement>(null);
+  const scrolled = useScrollReveal(frame, scrollReveal && !still);
+  const floor = Math.max(given, Math.ceil(scrolled * messages.length));
+  const sequence = usePhoneSequence(messages, run, still, runKey, onDone, floor);
   const viewport = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLOListElement>(null);
   // Playing, the list slides up to keep the latest message in sight; still, it scrolls or the frame grows.
@@ -156,7 +179,7 @@ export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, o
   }, [overflowing]);
 
   return (
-    <div data-phone-frame={still ? "still" : "playing"} className={`relative flex max-w-full flex-col overflow-hidden rounded-4xl border-8 border-navy-deep bg-paper shadow-float ${grown ?? SIZES[size]}`}>
+    <div ref={frame} data-phone-frame={still ? "still" : "playing"} className={`relative flex max-w-full flex-col overflow-hidden rounded-4xl border-8 border-navy-deep bg-paper shadow-float ${grown ?? SIZES[size]}`}>
       <div className="flex items-center gap-2 bg-navy px-3 py-2 text-white">
         <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan text-xs font-bold text-navy-deep">
           {CONTACT_NAME.charAt(0)}
@@ -190,7 +213,15 @@ export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, o
                       <TypingDots />
                     </span>
                   ) : null}
-                  <Bubble message={message} shown={shown} playing={shown && run && !still} reduced={reduced || still} read={still || sequence.done || index < sequence.visible - 1} compact={compact} />
+                  <Bubble
+                    message={message}
+                    shown={shown}
+                    playing={shown && run && !still}
+                    reduced={reduced || still}
+                    complete={index < floor || index < sequence.visible - 1}
+                    read={still || sequence.done || index < sequence.visible - 1}
+                    compact={compact}
+                  />
                 </li>
               );
             })}

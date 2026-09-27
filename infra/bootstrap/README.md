@@ -79,7 +79,7 @@ What each group of statements is for:
 | `CloudControlTransport` | `awsnative.*` resources go through the Cloud Control API, IAM prefix `cloudformation` |
 | Edge policy | CloudFront functions `<app>-poc-*`, the bootstrap key-value store and the declared cache policy only; reads of the origin request and cache policies of `/api/*` |
 | `WebAclsOfThisApp` (edge policy) | Create, update, delete, tag and associate only the web ACLs `<app>-*` of both scopes (`<app>-poc-edge` on the Router, `<app>-poc-auth` on the user pool). AWS WAF has no tag fence on create, so the fence is the name |
-| `ManagedRuleGroupReads` (edge policy) | Read AWS's managed rule groups the ACLs reference (IP reputation, anonymous IP list) and check capacity. No action on AWS WAF API keys exists anywhere: no CAPTCHA (ADR-0025 §4) |
+| `ManagedRuleGroupReads` (edge policy) | Read AWS's managed rule groups the ACLs reference (IP reputation, anonymous IP list, Bot Control) and check capacity. No action on AWS WAF API keys exists anywhere: no CAPTCHA (ADR-0025 §4) |
 | `WebAclLookupByResource` (edge policy) | `GetWebACLForResource` on `*`: reading back the user pool's association asks for its ACL before knowing it (`webacl/*/*`); read only |
 | `CognitoWebAclAssociation` | `AssociateWebACL` and `GetWebACLForResource` of Cognito on the account's pools: Cognito's check of the association does not see the pool's tags and the pool's ARN has an opaque id, so the fence is the web ACL (`WebAclsOfThisApp`) |
 | `CognitoWebAclDisassociation` | `DisassociateWebACL` of Cognito only on a pool tagged `sst:app` = this app |
