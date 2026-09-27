@@ -38,11 +38,7 @@ export interface LeadTable {
   scanMeta(): Promise<Lead[]>;
 }
 
-export type StartPendingResult =
-  | { readonly outcome: "CREATED"; readonly lead: Lead }
-  | { readonly outcome: "ADDED"; readonly lead: Lead }
-  | { readonly outcome: "EMAIL_TAKEN" }
-  | { readonly outcome: "TOO_MANY_PENDING" };
+export type StartPendingResult = { readonly outcome: "CREATED"; readonly lead: Lead } | { readonly outcome: "ADDED"; readonly lead: Lead } | { readonly outcome: "EMAIL_TAKEN" };
 
 export type ConfirmResult = { readonly outcome: "CONFIRMED"; readonly lead: Lead } | { readonly outcome: "NOT_PENDING" };
 
@@ -50,7 +46,7 @@ export interface LeadStore {
   get(emailHash: string): Promise<Lead | undefined>;
   /** The confirmed lead of a Cognito `sub` (GSI1); `undefined` when none or ambiguous. */
   findBySub(sub: string): Promise<Lead | undefined>;
-  /** `signup.start`: a new pending lead, or one more pending user on the existing one (≤ 3). */
+  /** `signup.start`: a new pending lead, or one more pending user on the existing one (≤ 3, the oldest retired). */
   startPending(input: StartPendingInput): Promise<StartPendingResult>;
   /** Post-confirmation: a pending lead that lists `username` → `CONFIRMED`. */
   confirm(input: ConfirmInput): Promise<ConfirmResult>;
@@ -60,7 +56,7 @@ export interface LeadStore {
   claimNotice(emailHash: string, outcome: NotifyOutcome, at: Date): Promise<boolean>;
   /** A notice that could not be sent: `notifiedAt` out again (the stream retries), `notifyOutcome FAILED`. */
   releaseNotice(emailHash: string, at: Date): Promise<void>;
-  /** Replaces the pending users (the confirmed account's siblings go out of Cognito first). */
+  /** Replaces the pending users and forgets the retired ones (the siblings go out of Cognito first). */
   setPendingUsernames(emailHash: string, usernames: readonly string[], at: Date): Promise<void>;
   /** `leads:unsubscribe`: `CONTACT` not accepted any more, the account untouched. */
   withdrawContact(emailHash: string, record: ConsentRecord, at: Date): Promise<Lead | undefined>;
@@ -119,9 +115,8 @@ export function createLeadStore(table: LeadTable, options: LeadStoreOptions): Le
           const lead = newLead(input, options.newId());
           return { next: lead, result: { outcome: "CREATED", lead } };
         }
-        if (!isPending(current)) return { skip: { outcome: "EMAIL_TAKEN" } };
-        const next = restartedLead(current, input);
-        if (next === undefined) return { skip: { outcome: "TOO_MANY_PENDING" } };
+        const next = isPending(current) ? restartedLead(current, input) : undefined;
+        if (next === undefined) return { skip: { outcome: "EMAIL_TAKEN" } };
         return { next, result: { outcome: "ADDED", lead: next } };
       });
       if (result.outcome === "CREATED" || result.outcome === "ADDED") await event(result.lead, "STARTED", "GUEST", input.at);
@@ -173,7 +168,9 @@ export function createLeadStore(table: LeadTable, options: LeadStoreOptions): Le
       await mutate<void>(emailHash, "updating the pending users", (current) => {
         if (current === undefined) return { skip: undefined };
         const same = current.pendingUsernames.length === usernames.length && current.pendingUsernames.every((name, index) => name === usernames[index]);
-        return same ? { skip: undefined } : { next: { ...current, pendingUsernames: [...usernames], version: current.version + 1, updatedAt: at.toISOString() }, result: undefined };
+        if (same && current.retiredUsernames === undefined) return { skip: undefined };
+        const { retiredUsernames: _retired, ...rest } = current;
+        return { next: { ...rest, pendingUsernames: [...usernames], version: current.version + 1, updatedAt: at.toISOString() }, result: undefined };
       });
     },
 

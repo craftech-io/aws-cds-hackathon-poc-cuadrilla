@@ -10,15 +10,11 @@
 // once and never logged.
 import type { PostConfirmationTriggerEvent } from "aws-lambda";
 import { z } from "zod";
-import { tableClient } from "../connector/index";
 import { type ConfirmationDeps, type ConfirmationOutcome, confirmSignup } from "../guest/confirmation";
-import { lambdaProvisioner } from "../guest/provisioner";
-import { dynamoLeadStore } from "../leads/dynamo-table";
-import { leadEmailHash } from "../leads/keys";
 import { withDeadline } from "../lib/deadline";
 import { type Logger, createLogger } from "../lib/log";
-import { subkey } from "../lib/secrets";
 import { describeError } from "../auth/errors";
+import { linkedGuestFlowDeps } from "./guest-flow-deps";
 
 /** Below the 5 s Cognito gives a trigger. */
 export const POST_CONFIRMATION_DEADLINE_MS = 4_000;
@@ -59,20 +55,7 @@ export function createPostConfirmationHandler(deps: PostConfirmationDeps) {
   };
 }
 
-let defaults: Omit<ConfirmationDeps, "log"> | undefined;
-
-function defaultConfirmation(): Omit<ConfirmationDeps, "log"> {
-  defaults ??= {
-    client: tableClient(),
-    leads: dynamoLeadStore(),
-    emailHash: (email) => leadEmailHash(subkey("email-hash"), email),
-    provisioner: lambdaProvisioner(),
-    now: () => new Date(),
-  };
-  return defaults;
-}
-
 export const handler = createPostConfirmationHandler({
-  confirmation: defaultConfirmation,
+  confirmation: linkedGuestFlowDeps,
   newLogger: () => createLogger({ bindings: { service: "auth-post-confirmation" } }),
 });

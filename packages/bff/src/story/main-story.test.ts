@@ -151,19 +151,22 @@ describe("the story's own texts", () => {
     expect(uncovered.kind === "TEXT" && uncovered.citations.length === 0 && uncovered.buttons.includes("CONSULT_SUPERVISOR")).toBe(true);
   });
 
-  it("the voice note is vn-01 of the voice datasheet, and each photo of the set is the one of the photo datasheet", () => {
+  it("the voice note is vn-01 of the voice datasheet, and each photo is the one of a photo datasheet (the set, or the story's own renders)", () => {
     const notes = readJson<{ notes: Array<{ voiceId: string; text: string; durationSec: number }> }>("scripts/seed/audio/datasheet.json").notes;
     for (const entry of ofKind("VOICE")) {
       const note = notes.find((candidate) => candidate.voiceId === entry.voiceId);
       expect({ text: note?.text, durationSec: note?.durationSec }).toEqual({ text: entry.text, durationSec: entry.durationSec });
     }
-    const photos = readJson<{ photos: Array<{ photoId: string; item: string; workOrderId: string; expectedVerdict: string }> }>("scripts/seed/photos/datasheet.json").photos;
+    type Sheet = { photos: Array<{ photoId: string; group: string; item: string; workOrderId: string | null; expectedVerdict: string; expectedReason: string | null }> };
+    const set = readJson<Sheet>("scripts/seed/photos/datasheet.json").photos;
+    const story = readJson<Sheet>("scripts/seed/photos/datasheet-aux.json").photos.filter((photo) => photo.group === "story");
     for (const entry of ofKind("PHOTO")) {
       expect(entry.reaction).toBe(VERDICT_REACTIONS[entry.verdict]);
       expect(entry.verdict === "REJECT").toBe(entry.reason !== null);
-      if (entry.photoId === null) continue;
-      const sheet = photos.find((candidate) => candidate.photoId === entry.photoId);
-      expect(sheet).toMatchObject({ item: entry.item, workOrderId: `wo-${entry.workOrderNumber}`, expectedVerdict: entry.verdict });
+      // Every photo of the story is a real render: a placeholder would draw an empty box (UX-B2).
+      expect(entry.photoId, entry.id).not.toBeNull();
+      const sheet = [...set, ...story].find((candidate) => candidate.photoId === entry.photoId);
+      expect(sheet, entry.id).toMatchObject({ item: entry.item, workOrderId: `wo-${entry.workOrderNumber}`, expectedVerdict: entry.verdict, expectedReason: entry.reason });
     }
   });
 });

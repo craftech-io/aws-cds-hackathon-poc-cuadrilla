@@ -7,6 +7,7 @@
 //   READY          operator, installers, supervisors and orders of the simulated day, the simulated time
 //   FAILED         the build failed, or a sign-up world ran out its 7 days while the session lived on
 //   CAP_FULL       no room under the cap of active sign-up worlds
+//   PERSON_LIMIT   a third confirmed account of one person: no world, no retry (ADR-0025 §3)
 import { z } from "zod";
 import { type GuestOrigin, GuestOrigin as GuestOriginSchema, GuestWorldStatus, IsoInstant, ToolError, clockIdOfIsp, guestOriginOfIsp } from "@cuadrilla/shared";
 import type { Principal } from "../auth/principal";
@@ -102,6 +103,7 @@ export async function worldStatusOf(ports: WorldStatusPorts, principal: GuestPri
   }
   const dates = { createdAtReal: account.createdAtReal, ...(account.guestOrigin === "SIGNUP" && account.expiresAtReal !== undefined ? { expiresAtReal: account.expiresAtReal } : {}) };
   const refreshSession = account.clockId !== principal.clockId;
+  if (account.status === "PERSON_LIMIT") return { ...base, createdAtReal: account.createdAtReal, status: "PERSON_LIMIT", canRetry: false, refreshSession };
   if (isExpiredAt(account, now)) return { ...base, ...dates, status: "FAILED", canRetry: true, refreshSession };
   const summary = account.status === "READY" ? await summaryOf(ports, account.ispId) : undefined;
   return { ...base, ...dates, status: account.status, canRetry: retryable(account, now), refreshSession, ...(summary === undefined ? {} : { summary }) };

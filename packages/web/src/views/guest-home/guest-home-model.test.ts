@@ -28,13 +28,15 @@ describe("[FL-107] the guest's portada", () => {
     expect(stagesOf(ROUTES, [], (id) => id, "guest-home").available).toEqual([]);
   });
 
-  it("[FL-107] each of the four states has its card; only a failure or a full cap offers the retry, and the full cap also the talk", () => {
+  it("[FL-107] each of the five states has its card; only a failure or a full cap offers the retry, a full cap and the person limit the talk", () => {
     const es = guestHomeCopy.es;
-    expect(cardOf({ ...ready, status: "PROVISIONING", canRetry: false }, es)).toEqual({ title: es.provisioning.title, lead: es.provisioning.lead, retry: false, talk: false });
+    expect(cardOf({ ...ready, status: "PROVISIONING", canRetry: false }, es)).toEqual({ title: es.provisioning.title, lead: es.provisioning.lead, retry: false, talk: null });
     expect(cardOf({ ...ready, status: "PROVISIONING", canRetry: true }, es).retry).toBe(true);
-    expect(cardOf(ready, es)).toEqual({ title: es.ready.title, lead: "", retry: false, talk: false });
-    expect(cardOf({ ...ready, status: "FAILED" }, es)).toMatchObject({ title: "No pudimos preparar tu mundo.", retry: true, talk: false });
-    expect(cardOf({ ...ready, status: "CAP_FULL" }, guestHomeCopy.en)).toMatchObject({ title: "We've hit the limit of test worlds available right now.", retry: true, talk: true });
+    expect(cardOf(ready, es)).toEqual({ title: es.ready.title, lead: "", retry: false, talk: null });
+    expect(cardOf({ ...ready, status: "FAILED" }, es)).toMatchObject({ title: "No pudimos preparar tu mundo.", retry: true, talk: null });
+    expect(cardOf({ ...ready, status: "CAP_FULL" }, guestHomeCopy.en)).toMatchObject({ title: "We've hit the limit of test worlds available right now.", retry: true, talk: guestHomeCopy.en.capFull.talk });
+    // A third account of the same person (ADR-0025 §3): the talk, never a retry that could bring a world.
+    expect(cardOf({ ...ready, status: "PERSON_LIMIT", canRetry: false }, es)).toEqual({ title: es.personLimit.title, lead: es.personLimit.lead, retry: false, talk: es.personLimit.talk });
   });
 
   it("[FL-107] polls every 2 s while the world is being built, and rarely at rest", () => {

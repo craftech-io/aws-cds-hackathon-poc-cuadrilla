@@ -184,6 +184,14 @@ describe("bytes across the set and the auxiliary renders (invariants 21 and 23)"
     expect(aux.photos.filter((p) => setHashes.has(p.sha256))).toEqual([]);
   });
 
+  it("has the main story's own render: the label of wo-24817 with glare over its serial, the same label as ph-label-01", () => {
+    const story = aux.photos.filter((p) => p.group === "story");
+    expect(story.map((p) => p.photoId)).toEqual(["ph-story-01"]);
+    const [glare] = story;
+    expect(glare).toMatchObject({ item: "ONU_LABEL_PHOTO", workOrderId: "wo-24817", expectedVerdict: "REJECT", expectedReason: "GLARE", degradations: [{ kind: "glare", target: "serial" }] });
+    expect(glare?.drawn).toEqual(datasheet.photos.find((p) => p.photoId === "ph-label-01")?.drawn);
+  });
+
   it("has 40 historical renders of wo-24801..24812 and 48 seeding renders with PASS and REJECT looks", () => {
     const hist = aux.photos.filter((p) => p.group === "hist");
     expect(hist.map((p) => p.photoId)).toEqual(Array.from({ length: 40 }, (_, i) => `ph-hist-${String(i + 1).padStart(2, "0")}`));

@@ -4,7 +4,7 @@
 // `{userId, clockId, origin}` and nothing else. Idempotent by (userId, generation):
 //
 //   the account names another generation, or is gone   nothing (a stale request)
-//   the world is READY, or waits in CAP_FULL            nothing
+//   the world is READY, waits in CAP_FULL, or is PERSON_LIMIT   nothing
 //   the world is complete but not marked                READY, without building it again
 //   otherwise                                           the minimal factory builds it → READY
 //
@@ -43,7 +43,7 @@ function failureOf(error: unknown): WorldFailure {
 function skip(account: GuestAccount | undefined, clockId: string, origin: GuestOrigin): GuestWorldsOutcome | undefined {
   if (account === undefined || account.clockId !== clockId || account.guestOrigin !== origin) return "STALE";
   if (account.status === "READY") return "ALREADY_READY";
-  if (account.status === "CAP_FULL") return "NO_SLOT";
+  if (account.status === "CAP_FULL" || account.status === "PERSON_LIMIT") return "NO_SLOT";
   return undefined;
 }
 

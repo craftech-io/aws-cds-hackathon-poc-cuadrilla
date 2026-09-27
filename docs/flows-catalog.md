@@ -773,8 +773,9 @@ Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `
 - Actores: visitante · Canal: web · Disparador: código correcto en el paso de verificación.
 - Pasos: `ConfirmSignUp` → post confirmation (usuario `gst-*`, lead pendiente que lo lista, `sub` sin registro): lead `CONFIRMED` con `sub`, `cognitoUsername`, `userId` y fecha; `Isps/USER#` con `role GUEST` y `guestOrigin SIGNUP`; reserva de mundo; invocación asíncrona de `GuestWorlds`; `LeadStream` borra los demás usuarios pendientes del mismo email. Después, la web ingresa sola por SRP con el email y la contraseña que tuvo en memoria y abre `/app/home` (si falla, `/login` con el email completado). Un código inválido o vencido muestra el error neutral y no cambia nada.
 - Estado esperado: usuario `CONFIRMED`; lead `CONFIRMED` y evento `CONFIRMED`; registro `GUEST`; `GUESTACCOUNT#` en `PROVISIONING`; ningún otro usuario pendiente de ese email en Cognito; ninguna fila `SUPERVISOR`/`OPS` creada por un alta; la contraseña fuera de todo almacenamiento del navegador.
-- Reglas: ADR-0025 §1.
-- Prueba: U `auth-triggers/post-confirmation.test.ts`, `leads/store.test.ts` · UI `signup.spec.ts` · SR `SC-20/3`. Notas: En `SR` la confirmación entra por la costura de QA (`AdminConfirmSignUp`), que dispara el mismo trigger; el código inválido en `UI` con el Cognito falso.
+- Alternativos: el lead toma el formulario, la atribución y los consentimientos del inicio del usuario que confirmó, nunca los de otro inicio del mismo email; si post confirmation falla después de que Cognito confirmó al usuario, el siguiente ingreso (post authentication) termina la confirmación por el mismo camino idempotente; una tercera cuenta confirmada de la misma persona queda en `PERSON_LIMIT`, sin mundo.
+- Reglas: ADR-0025 §1 y §3, ADR-0026.
+- Prueba: U `auth-triggers/post-confirmation.test.ts`, `auth-triggers/post-authentication.test.ts`, `leads/store.test.ts` · UI `signup.spec.ts` · SR `SC-20/3`. Notas: En `SR` la confirmación entra por la costura de QA (`AdminConfirmSignUp`), que dispara el mismo trigger; el código inválido en `UI` con el Cognito falso.
 
 ### FL-106 · Reenvío del código
 - Actores: visitante · Canal: web, email · Disparador: "Reenviar código".

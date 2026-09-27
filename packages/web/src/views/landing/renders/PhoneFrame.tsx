@@ -4,7 +4,11 @@
 //
 // Every message is laid out from the start and revealed in order with opacity and a small translate,
 // so the frame never changes size; when the conversation outgrows the screen, the list slides up with a
-// transform. `still` shows the final state at once (reduced motion, posters, the gallery).
+// transform. `still` shows the final state at once (reduced motion, posters, the gallery), always at
+// its reading size, never shrinking the text (a still frame is how the walkthrough reads without motion,
+// docs/landing-spec.md §4): a scene's phone keeps the height of its stage and its conversation scrolls
+// inside it, like a phone (focusable when it overflows); the hero's poster, a gallery render and a
+// short phone keep their width and grow to the whole conversation.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Bubble, TypingDots } from "./bubbles";
 import { CONTACT_NAME, type PhoneMessage, type PhoneOwner, firstNameOf } from "./sources";
@@ -94,13 +98,24 @@ const SIZES: Readonly<Record<PhoneSize, string>> = {
   still: "aspect-9/19 h-phone",
 };
 
+/** Still, the sizes that grow with the conversation: their width, and a height that follows it. */
+const GROWING: Readonly<Partial<Record<PhoneSize, string>>> = {
+  short: "w-64",
+  hero: "w-hero-phone min-h-80",
+  still: "w-phone min-h-80",
+};
+
 export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, onDone, size = "solo" }: PhoneFrameProps) {
   const compact = size === "hero";
   const sequence = usePhoneSequence(messages, run, still, runKey, onDone);
   const viewport = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLOListElement>(null);
-  // Playing, the list slides up to keep the latest message in sight; still, it shrinks to show them all.
-  const [fit, setFit] = useState({ offset: 0, scale: 1 });
+  // Playing, the list slides up to keep the latest message in sight; still, it scrolls or the frame grows.
+  const [offset, setOffset] = useState(0);
+  const [overflowing, setOverflowing] = useState(false);
+  const [atEnd, setAtEnd] = useState(false);
+  const grown = still ? GROWING[size] : undefined;
+  const scrolls = still && grown === undefined;
 
   useLayoutEffect(() => {
     const box = viewport.current;
@@ -108,13 +123,13 @@ export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, o
     if (!box || !items) return;
     const measure = () => {
       if (still) {
-        const scale = Math.min(1, box.clientHeight / Math.max(1, items.offsetHeight));
-        setFit({ offset: 0, scale });
+        setOffset(0);
+        setOverflowing(scrolls && items.offsetHeight > box.clientHeight + 1);
         return;
       }
       const last = items.children[Math.max(0, sequence.visible - 1)] as HTMLElement | undefined;
       const bottom = last ? last.offsetTop + last.offsetHeight : 0;
-      setFit({ offset: Math.max(0, bottom - box.clientHeight + 12), scale: 1 });
+      setOffset(Math.max(0, bottom - box.clientHeight + 12));
     };
     measure();
     if (typeof ResizeObserver === "undefined") return;
@@ -122,10 +137,10 @@ export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, o
     observer.observe(box);
     observer.observe(items);
     return () => observer.disconnect();
-  }, [sequence.visible, still]);
+  }, [sequence.visible, still, scrolls]);
 
   return (
-    <div className={`flex max-w-full flex-col overflow-hidden rounded-4xl border-8 border-navy-deep bg-paper shadow-float ${SIZES[size]}`}>
+    <div data-phone-frame={still ? "still" : "playing"} className={`relative flex max-w-full flex-col overflow-hidden rounded-4xl border-8 border-navy-deep bg-paper shadow-float ${grown ?? SIZES[size]}`}>
       <div className="flex items-center gap-2 bg-navy px-3 py-2 text-white">
         <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan text-xs font-bold text-navy-deep">
           {CONTACT_NAME.charAt(0)}
@@ -133,11 +148,16 @@ export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, o
         <span className="flex-1 truncate text-sm font-semibold">{CONTACT_NAME}</span>
         <span className="rounded-full bg-navy-soft px-2 py-0.5 text-2xs font-semibold text-cyan-soft">{firstNameOf(owner)}</span>
       </div>
-      <div ref={viewport} className="relative flex-1 overflow-hidden">
+      <div
+        ref={viewport}
+        className={`relative min-h-0 flex-1 ${scrolls ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}
+        {...(overflowing ? { tabIndex: 0, role: "region", "aria-label": `${CONTACT_NAME} · ${firstNameOf(owner)}` } : {})}
+        onScroll={scrolls ? (event) => setAtEnd(event.currentTarget.scrollTop + event.currentTarget.clientHeight >= event.currentTarget.scrollHeight - 2) : undefined}
+      >
         <ol
           ref={list}
           className="flex origin-top flex-col gap-2 p-3 transition-transform duration-300 ease-out motion-reduce:transition-none"
-          style={{ transform: fit.scale < 1 ? `scale(${fit.scale})` : `translateY(${-fit.offset}px)` }}
+          style={offset > 0 ? { transform: `translateY(${-offset}px)` } : undefined}
         >
           {messages.map((message, index) => {
             const shown = index < sequence.visible;
@@ -159,6 +179,8 @@ export function PhoneFrame({ owner, messages, run, still, reduced, runKey = 0, o
           })}
         </ol>
       </div>
+      {/* More of the conversation below: a fade over the last line until it is scrolled to the end. */}
+      {overflowing && !atEnd ? <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-paper to-transparent" /> : null}
     </div>
   );
 }

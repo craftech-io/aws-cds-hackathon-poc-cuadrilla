@@ -9,6 +9,8 @@ import {
   ANONYMOUS_IP_HEADER_AT_ORIGIN,
   COGNITO_RATE_RULES,
   DECODE_AND_LOWERCASE,
+  SIGNUP_USERNAME_OPERATIONS,
+  SIGNUP_USERNAME_REGEX,
   SIGNUP_SCOPE,
   authRules,
   cognitoTarget,
@@ -33,6 +35,24 @@ interface Request {
   readonly path: string;
   readonly query?: string;
   readonly method?: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly body?: string;
+}
+
+/** A RegexMatch over JSON body values at the included paths; a body that does not parse matches nothing (NO_MATCH). */
+function regexOverBody(statement: Extract<WafStatement, { RegexMatchStatement: unknown }>, request: Request): boolean {
+  const { RegexString, FieldToMatch } = statement.RegexMatchStatement;
+  if (!("JsonBody" in FieldToMatch)) throw new Error("only JSON bodies are inspected by regex here");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(request.body ?? "");
+  } catch {
+    return FieldToMatch.JsonBody.InvalidFallbackBehavior !== "NO_MATCH";
+  }
+  return FieldToMatch.JsonBody.MatchPattern.IncludedPaths.some((path) => {
+    const value = (parsed as Record<string, unknown> | null)?.[path.replace(/^\//, "")];
+    return typeof value === "string" && new RegExp(RegexString).test(value);
+  });
 }
 
 function transform(value: string, transformations: readonly { Type: string }[]): string {
@@ -46,8 +66,10 @@ function transform(value: string, transformations: readonly { Type: string }[]):
 function evaluate(statement: WafStatement, request: Request): boolean {
   if ("AndStatement" in statement) return statement.AndStatement.Statements.every((inner) => evaluate(inner, request));
   if ("OrStatement" in statement) return statement.OrStatement.Statements.some((inner) => evaluate(inner, request));
+  if ("NotStatement" in statement) return !evaluate(statement.NotStatement.Statement, request);
+  if ("RegexMatchStatement" in statement) return regexOverBody(statement, request);
   const { SearchString, FieldToMatch, PositionalConstraint, TextTransformations } = statement.ByteMatchStatement;
-  const raw = "UriPath" in FieldToMatch ? request.path : "QueryString" in FieldToMatch ? (request.query ?? "") : (request.method ?? "POST");
+  const raw = "UriPath" in FieldToMatch ? request.path : "QueryString" in FieldToMatch ? (request.query ?? "") : "SingleHeader" in FieldToMatch ? (request.headers?.[FieldToMatch.SingleHeader.Name] ?? "") : (request.method ?? "POST");
   const value = transform(raw, TextTransformations);
   if (PositionalConstraint === "STARTS_WITH") return value.startsWith(SearchString);
   if (PositionalConstraint === "CONTAINS") return value.includes(SearchString);
@@ -131,12 +153,13 @@ describe("edge ACL (CLOUDFRONT, on the Router) [FL-114]", () => {
 describe("pool ACL (REGIONAL, on the user pool)", () => {
   const rules = authRules();
 
-  it("has IP reputation and per-IP rates on x-amz-target, all Block", () => {
+  it("has IP reputation, the sign-up user name shape and per-IP rates on x-amz-target, all Block", () => {
     expect(rules.map((item) => [item.Priority, item.Name])).toEqual([
       [1, "AWSManagedRulesAmazonIpReputationList"],
-      [2, "RateSignUp"],
-      [3, "RateCodesAndRecovery"],
-      [4, "RateSignIn"],
+      [2, "SignupUsernameShape"],
+      [3, "RateSignUp"],
+      [4, "RateCodesAndRecovery"],
+      [5, "RateSignIn"],
     ]);
     expect(COGNITO_RATE_RULES.map((item) => [item.name, item.limit, [...item.operations]])).toEqual([
       ["RateSignUp", 10, ["SignUp"]],
@@ -145,9 +168,42 @@ describe("pool ACL (REGIONAL, on the user pool)", () => {
     ]);
     for (const item of rules.slice(1)) expect(item.Action, item.Name).toEqual({ Block: {} });
     const targets = JSON.stringify(rules).match(/"SearchString":"([^"]+)"/g) ?? [];
-    expect(targets).toHaveLength(7);
+    expect(targets).toHaveLength(10);
     expect(JSON.stringify(rules)).toContain(`"SearchString":"${cognitoTarget("SignUp")}","FieldToMatch":{"SingleHeader":{"Name":"x-amz-target"}}`);
     expect(cognitoTarget("SignUp")).toBe("awscognitoidentityproviderservice.signup");
+  });
+});
+
+describe("sign-up user name shape of the pool's ACL (ADR-0025 §4) [FL-114]", () => {
+  const shape = rule(authRules(), "SignupUsernameShape");
+  const call = (operation: string, body: unknown): Request => ({
+    path: "/",
+    method: "POST",
+    headers: { "x-amz-target": cognitoTarget(operation) },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+  const blocks = (request: Request) => evaluate(shape.Statement as WafStatement, request);
+  const GST = "gst-01K60000000000000000000001";
+
+  it("blocks SignUp, ConfirmSignUp and ResendConfirmationCode for any user name that is not gst-<ULID>, and a body it cannot read", () => {
+    expect(SIGNUP_USERNAME_OPERATIONS).toEqual(["SignUp", "ConfirmSignUp", "ResendConfirmationCode"]);
+    expect(shape.Action).toEqual({ Block: {} });
+    for (const operation of SIGNUP_USERNAME_OPERATIONS) {
+      expect(blocks(call(operation, { ClientId: "c", Username: GST })), operation).toBe(false);
+      for (const username of ["someone@company.com", "guest-07", `${GST}x`, ` ${GST}`, "gst-01k60000000000000000000001"]) expect(blocks(call(operation, { ClientId: "c", Username: username })), `${operation} ${username}`).toBe(true);
+      expect(blocks(call(operation, { ClientId: "c" })), `${operation} without Username`).toBe(true);
+      expect(blocks(call(operation, "{not json")), `${operation} unparseable`).toBe(true);
+    }
+  });
+
+  it("leaves the sign-in, the recovery and every other operation alone", () => {
+    for (const operation of ["InitiateAuth", "RespondToAuthChallenge", "ForgotPassword", "ConfirmForgotPassword", "GetUser"]) expect(blocks(call(operation, { Username: "someone@company.com" })), operation).toBe(false);
+  });
+
+  it("inspects the JSON value of /Username only, failing closed on an invalid or oversized body", () => {
+    expect(JSON.stringify(shape.Statement)).toContain(`"RegexString":"${SIGNUP_USERNAME_REGEX.replace(/\\/g, "\\\\")}"`);
+    expect(JSON.stringify(shape.Statement)).toContain('"JsonBody":{"MatchPattern":{"IncludedPaths":["/Username"]},"MatchScope":"VALUE","InvalidFallbackBehavior":"NO_MATCH","OversizeHandling":"NO_MATCH"}');
+    expect(new RegExp(SIGNUP_USERNAME_REGEX).source).toBe(/^gst-[0-9A-HJKMNP-TV-Z]{26}$/.source);
   });
 });
 

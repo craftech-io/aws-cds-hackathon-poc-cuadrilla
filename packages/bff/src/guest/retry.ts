@@ -7,6 +7,7 @@
 //   PROVISIONING for a minute or more ask `GuestWorlds` again
 //   no account yet (invited, rehearsal) open it and ask for the world
 //   READY, or PROVISIONING just now   nothing
+//   PERSON_LIMIT                      nothing: the person holds its two worlds already (ADR-0025 §3)
 import { ToolError, clockIdOfIsp } from "@cuadrilla/shared";
 import type { Connector } from "../connector/ports";
 import type { TableClient } from "../connector/table-client";
@@ -74,6 +75,7 @@ export async function retryWorld(ports: RetryPorts, principal: GuestPrincipal): 
     await ports.provisioner.request({ userId: principal.userId, clockId, origin });
     return "REQUESTED";
   }
+  if (account.status === "PERSON_LIMIT") return "NOTHING_TO_DO";
   if (account.guestOrigin === "SIGNUP" && (isExpiredAt(account, now) || account.failure === "GENERATION_COLLISION")) return renew(ports, principal, account);
   switch (account.status) {
     case "CAP_FULL":
@@ -85,4 +87,5 @@ export async function retryWorld(ports: RetryPorts, principal: GuestPrincipal): 
     case "READY":
       return "NOTHING_TO_DO";
   }
+  return "NOTHING_TO_DO";
 }

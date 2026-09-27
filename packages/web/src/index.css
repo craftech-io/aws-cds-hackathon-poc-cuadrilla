@@ -185,6 +185,16 @@
   height: min(72vh, 38rem);
 }
 
+/* Widths of a still phone frame that grows with its conversation: the width the same frame has while it
+   plays (its height times 9/19), so the text wraps the same and never shrinks. */
+@utility w-phone {
+  width: calc(min(70vh, 40rem) * 9 / 19);
+}
+
+@utility w-hero-phone {
+  width: calc(min(72vh, 38rem) * 9 / 19);
+}
+
 @layer components {
   /* The first letter of a sentence-case product label (the checklist items of copy/ are written to sit
      inside a sentence, "la foto de la roseta instalada"). */

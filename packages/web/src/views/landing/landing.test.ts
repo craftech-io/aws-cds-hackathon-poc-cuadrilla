@@ -12,7 +12,7 @@ import { findNeutralTerms } from "../../../../../scripts/lint/neutral-terms";
 import { LANDING_COPY } from "./copy";
 import { LandingLangProvider, langFromSearch } from "./lang";
 import { typingDelay } from "./motion";
-import { HeroLoop } from "./renders/HeroLoop";
+import { HERO_LOOP_ENTRIES, HeroLoop } from "./renders/HeroLoop";
 import { RENDERS, SCENE_RENDER_IDS } from "./renders/registry";
 import { SCENE_PHONE_ENTRIES } from "./renders/scenes";
 import { SCENE_CAPTION_ENTRY, isTyped, photoSource, sceneCaption } from "./renders/sources";
@@ -120,13 +120,14 @@ describe("renders: texts from the main story and copy/ only [FL-089]", () => {
     expect(typingDelay(400) * 400).toBeLessThanOrEqual(4000);
   });
 
-  it("shows every photo of the story from a smaller copy of its seed photo", () => {
-    for (const id of SCENE_PHONE_ENTRIES) {
+  it("shows every photo of the walkthrough and of the hero from a smaller copy of its seed photo, never an empty box", () => {
+    for (const id of [...SCENE_PHONE_ENTRIES, ...HERO_LOOP_ENTRIES]) {
       const entry = storyEntry(id);
       if (entry.kind !== "PHOTO") continue;
+      expect(entry.photoId, id).not.toBeNull();
       const src = photoSource(entry);
-      if (entry.photoId === null) expect(src).toBeUndefined();
-      else expect(existsSync(`${PUBLIC_DIR}${src ?? ""}`), src).toBe(true);
+      expect(src, id).toBe(`/landing/renders/photos/${entry.photoId ?? ""}.jpg`);
+      expect(existsSync(`${PUBLIC_DIR}${src ?? ""}`), src).toBe(true);
     }
   });
 

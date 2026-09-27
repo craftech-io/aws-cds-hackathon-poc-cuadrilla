@@ -116,6 +116,7 @@ beforeAll(async () => {
       KeyValueStore: { get: () => ({ arn: out("kvs") }) },
       getResponseHeadersPolicyOutput: () => ({ id: out("headers-policy") }),
       getOriginRequestPolicyOutput: (args: { name: string }) => ({ id: out(args.name === "aws-cds-hackathon-poc-cuadrilla-poc-api" ? "api-policy" : undefined) }),
+      getCachePolicyOutput: (args: { name: string }) => ({ id: out(args.name === "aws-cds-hackathon-poc-cuadrilla-poc-api" ? "api-cache-policy" : undefined) }),
     },
   });
   vi.doMock("./storage-tables", () => ({ ...TABLES, tables: TABLES }));
@@ -210,6 +211,8 @@ describe("triggers of the pool (fixed names, WP-57 and WP-58 handlers) [FL-104] 
       const list = (await deep(fn(name).args.link)) as unknown[];
       expect(list, name).toEqual(expect.arrayContaining([leads, TABLES.Isps, TABLES.Runtime, SENTINELS.CostCaps]));
       expect(list.some((item) => item instanceof Fn && item.logical === "GuestWorlds"), name).toBe(true);
+      // Both hash the confirmed email into the lead's key (the sign-in resumes a failed confirmation).
+      expect(await links(name), name).toContain("SessionTokenKey");
     }
   });
 });
@@ -228,9 +231,9 @@ describe("the edge of the Bff (ADR-0025 §3) [FL-114]", () => {
     expect(origins[0]?.customHeaders).toEqual([{ name: "x-cuadrilla-origin", value: "value-of-OriginVerifyKey" }]);
   });
 
-  it("serves /api/* with the default routing and the bootstrap's policy that forwards CloudFront-Viewer-Address", async () => {
+  it("serves /api/* with the default routing, the bootstrap's policy that forwards CloudFront-Viewer-Address and the cache policy that keeps Authorization on a GET", async () => {
     const { orderedCacheBehaviors, defaultCacheBehavior } = await transformed();
-    expect(orderedCacheBehaviors).toEqual([{ ...DEFAULT, pathPattern: "/api/*", originRequestPolicyId: "api-policy", responseHeadersPolicyId: "headers-policy" }]);
+    expect(orderedCacheBehaviors).toEqual([{ ...DEFAULT, pathPattern: "/api/*", originRequestPolicyId: "api-policy", cachePolicyId: "api-cache-policy", responseHeadersPolicyId: "headers-policy" }]);
     expect(defaultCacheBehavior).toEqual({ ...DEFAULT, responseHeadersPolicyId: "headers-policy" });
   });
 

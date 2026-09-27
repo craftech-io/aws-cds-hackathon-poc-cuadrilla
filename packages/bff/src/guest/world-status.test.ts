@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { resolveBrand } from "../copy/brand";
 import { buildWorld } from "../worlds/factory";
 import { NEUTRAL, SIGNUP_CLOCK, SIGNUP_ISP, SIGNUP_USER } from "../worlds/testing";
-import { createAccountOp, setStatus } from "./account";
+import { createAccountOp, getGuestAccount, setStatus } from "./account";
+import { retryWorld } from "./retry";
 import { guestHarness, type GuestHarness } from "./testing";
 import { type GuestPrincipal, RETRY_PROVISIONING_AFTER_MS, worldStatusOf } from "./world-status";
 
@@ -10,7 +11,7 @@ const SIGNUP: GuestPrincipal = { role: "GUEST", isGuest: true, ispId: SIGNUP_ISP
 const INVITED: GuestPrincipal = { role: "GUEST", isGuest: true, ispId: "isp-guest-07", userId: "usr-guest-07", clockId: "GUEST#isp-guest-07" };
 const DAY_MS = 86_400_000;
 
-async function account(harness: GuestHarness, status: "PROVISIONING" | "READY" | "FAILED" | "CAP_FULL", principal: GuestPrincipal = SIGNUP, origin: "SIGNUP" | "INVITED" = "SIGNUP"): Promise<void> {
+async function account(harness: GuestHarness, status: "PROVISIONING" | "READY" | "FAILED" | "CAP_FULL" | "PERSON_LIMIT", principal: GuestPrincipal = SIGNUP, origin: "SIGNUP" | "INVITED" = "SIGNUP"): Promise<void> {
   await harness.client.transact([createAccountOp({ userId: principal.userId, guestOrigin: origin, ispId: principal.ispId, clockId: principal.clockId, generation: 1, status }, harness.now())], harness.now().toISOString());
 }
 
@@ -61,6 +62,18 @@ describe("[FL-107] the state of a guest's world for its portada", () => {
     expect(await worldStatusOf(ports(fresh), INVITED)).toMatchObject({ status: "PROVISIONING", canRetry: true });
     await buildWorld(fresh.factoryDeps(), { ispId: "isp-guest-07", origin: "INVITED" });
     expect(await worldStatusOf(ports(fresh), INVITED)).toMatchObject({ status: "READY", canDeleteAccount: false });
+  });
+
+  it("[FL-114] PERSON_LIMIT (a third account of one person): no retry, not even past 7 days, and a retry changes nothing", async () => {
+    const harness = guestHarness();
+    await account(harness, "PERSON_LIMIT");
+    expect(await worldStatusOf(ports(harness), SIGNUP)).toMatchObject({ status: "PERSON_LIMIT", canRetry: false, canDeleteAccount: true });
+    harness.advance(7 * DAY_MS);
+    expect(await worldStatusOf(ports(harness), SIGNUP)).toMatchObject({ status: "PERSON_LIMIT", canRetry: false });
+    const before = await getGuestAccount(harness.client, SIGNUP_USER);
+    expect(await retryWorld({ ...ports(harness), provisioner: harness.provisioner }, SIGNUP)).toBe("NOTHING_TO_DO");
+    expect(await getGuestAccount(harness.client, SIGNUP_USER)).toEqual(before);
+    expect(harness.provisioner.requests).toEqual([]);
   });
 
   it("[FL-111] a sign-up world past its 7 days, with the session still alive, asks for a retry; an older session is told to refresh", async () => {

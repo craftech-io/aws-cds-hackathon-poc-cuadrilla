@@ -212,4 +212,33 @@ test.describe("commercial landing", () => {
     await page.locator("#impacto").scrollIntoViewIfNeeded();
     for (const item of copy.impact.items) await expect(page.locator("#impacto").getByText(`${item.prefix}${item.value}${item.suffix}`)).toBeVisible();
   });
+
+  test("[FL-089] with reduced motion every phone message reads at 12 px or more: a still frame scrolls or grows, it never shrinks the text", async ({ page }) => {
+    const { reduced } = context();
+    test.skip(!reduced, "only with reduced motion");
+    await open(page);
+    await page.locator("#recorrido").scrollIntoViewIfNeeded();
+    await expect(page.locator('#recorrido [data-phone-frame="still"]').first()).toBeVisible();
+    const sizes = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('[data-phone-frame="still"] li')]
+        .filter((item) => item.getClientRects().length > 0 && (item.textContent ?? "").trim() !== "")
+        .map((item) => {
+          const list = item.closest("ol") as HTMLElement;
+          // The effective size: the computed font size times whatever scale a transform applies to the list.
+          const transform = getComputedStyle(list).transform;
+          const scale = transform === "none" ? 1 : new DOMMatrixReadOnly(transform).a;
+          const bubble = item.querySelector<HTMLElement>("span") ?? item;
+          return { text: (item.textContent ?? "").slice(0, 40), px: Number.parseFloat(getComputedStyle(bubble).fontSize) * scale };
+        }),
+    );
+    expect(sizes.length).toBeGreaterThan(10);
+    for (const size of sizes) expect(size.px, size.text).toBeGreaterThanOrEqual(12);
+    // A conversation longer than its stage scrolls inside the phone, reachable with the keyboard.
+    const scrollers = page.locator('#recorrido [data-phone-frame="still"] [role="region"]');
+    for (const region of await scrollers.all()) {
+      if (!(await region.isVisible())) continue;
+      await expect(region).toHaveAttribute("tabindex", "0");
+      expect(await region.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    }
+  });
 });

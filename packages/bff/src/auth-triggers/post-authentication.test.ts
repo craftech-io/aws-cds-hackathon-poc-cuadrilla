@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryTableClient } from "../connector/memory/table-client";
 import { getGuestAccount } from "../guest/account";
 import { EMAIL, SUB, authenticationEvent, confirmationEvent, guestHarness, hashOf, pendingLead, type GuestHarness } from "../guest/testing";
-import { signupUserId } from "../leads/testing";
+import { signupUserId, username } from "../leads/testing";
 import { allRows } from "../worlds/testing";
 import { createPostAuthenticationHandler } from "./post-authentication";
 import { createPostConfirmationHandler } from "./post-confirmation";
@@ -24,6 +24,45 @@ async function signupGuest(harness: GuestHarness): Promise<void> {
 async function staffRow(harness: GuestHarness, fields: { readonly ispId: string; readonly userId: string; readonly role: string; readonly sub: string }): Promise<void> {
   await harness.client.put("Isps", { PK: `ISP#${fields.ispId}`, SK: `USER#${fields.userId}`, entity: "ConsoleUser", ...fields, name: "Persona", cognitoSub: fields.sub, cognitoSubKey: `SUB#${fields.sub}`, active: true, ...META });
 }
+
+describe("[FL-105] a confirmation that failed after Cognito confirmed the user is finished by the next sign-in", () => {
+  const signupSignIn = () => authenticationEvent({ userName: username(1), email: EMAIL });
+
+  it("[FL-105] nothing was written (the trigger timed out): the sign-in opens the row, confirms the lead and asks for the world", async () => {
+    const harness = guestHarness();
+    await pendingLead(harness);
+    await signIn(harness, ["abcde"])(signupSignIn());
+    expect(harness.client.dump("Isps").filter((row) => row.entity === "ConsoleUser")).toEqual([expect.objectContaining({ userId: USER_ID, role: "GUEST", guestOrigin: "SIGNUP", cognitoSub: SUB })]);
+    expect(await harness.leads.store.get(hashOf(EMAIL))).toMatchObject({ status: "CONFIRMED", cognitoSub: SUB, userId: USER_ID });
+    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PROVISIONING" });
+    expect(harness.provisioner.requests).toEqual([{ userId: USER_ID, clockId: "GUEST#isp-guest-s261001abcde", origin: "SIGNUP" }]);
+    // A second sign-in finds its row: no second account, no second request of a fresh world.
+    await signIn(harness, ["fghij"])(signupSignIn());
+    expect(harness.client.dump("Isps").filter((row) => row.entity === "ConsoleUser")).toHaveLength(1);
+    expect(harness.provisioner.requests).toHaveLength(1);
+  });
+
+  it("[FL-105] the transaction committed but the lead did not: the sign-in confirms the lead, once", async () => {
+    const harness = guestHarness();
+    await pendingLead(harness);
+    const leadsDown = { ...harness.leads.store, confirm: async () => Promise.reject(new Error("the leads table did not answer")) };
+    await expect(createPostConfirmationHandler({ confirmation: () => ({ ...harness.confirmationDeps(["abcde"]), leads: leadsDown }), newLogger: () => harness.log })(confirmationEvent())).rejects.toThrow();
+    expect((await harness.leads.store.get(hashOf(EMAIL)))?.status).toBeUndefined();
+    await signIn(harness)(signupSignIn());
+    expect(await harness.leads.store.get(hashOf(EMAIL))).toMatchObject({ status: "CONFIRMED", lastLoginAt: harness.now().toISOString() });
+    expect((await harness.leads.store.listEvents(hashOf(EMAIL))).filter((item) => item.kind === "CONFIRMED")).toHaveLength(1);
+  });
+
+  it("[FL-122] a gst-* user without a pending lead that lists it, or an unverified email, gets nothing from its sign-in", async () => {
+    const harness = guestHarness();
+    await pendingLead(harness, { user: 2 });
+    await signIn(harness)(signupSignIn());
+    await signIn(harness)(authenticationEvent({ userName: username(2) }));
+    expect(harness.client.dump("Isps")).toEqual([]);
+    expect(harness.provisioner.requests).toEqual([]);
+    expect((await harness.leads.store.get(hashOf(EMAIL)))?.status).toBeUndefined();
+  });
+});
 
 describe("[FL-108] post authentication of a guest of the own sign-up", () => {
   it("[FL-108] a sign-in with a current world: lastLoginAt and 24 more months of the lead, the world unchanged", async () => {

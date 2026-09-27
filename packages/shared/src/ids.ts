@@ -28,8 +28,9 @@ export const ID_SPEC = {
   case: { prefix: "case", body: ULID_BODY },
   evidence: { prefix: "ev", body: ULID_BODY },
   validation: { prefix: "val", body: ULID_BODY },
-  // The 60 photos of the set, the historical renders of 12/10 and the seeding renders (§10, §10.1).
-  photo: { prefix: "ph", body: `(?:(?:meter|label|rosette|adv|hist)-\\d{2}|seed-(?:${PHOTO_ITEMS})-\\d{2})` },
+  // The 60 photos of the set, the historical renders of 12/10, the seeding renders and the main story's
+  // own renders (§10, §10.1).
+  photo: { prefix: "ph", body: `(?:(?:meter|label|rosette|adv|hist|story)-\\d{2}|seed-(?:${PHOTO_ITEMS})-\\d{2})` },
   voiceNote: { prefix: "vn", body: "\\d{2}" },
   question: { prefix: "q", body: "[AR]-\\d{2}" },
   consoleUser: { prefix: "usr", body: TOKEN },

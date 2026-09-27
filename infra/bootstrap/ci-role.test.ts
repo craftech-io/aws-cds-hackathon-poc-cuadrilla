@@ -384,6 +384,12 @@ describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
     expect(read("infra/bootstrap/ci-role.yaml")).toContain("ApiOriginRequestPolicyId:");
   });
 
+  it("creates the cache policy of /api/* and lets the deploy role only read it (update and delete stay on RouterCachePolicyId)", () => {
+    for (const text of ["Type: AWS::CloudFront::CachePolicy", "ApiCachePolicyId:"]) expect(template).toContain(text);
+    for (const action of ["cloudfront:GetCachePolicy", "cloudfront:ListCachePolicies"]) expect(statement("CloudFrontCreatesAndReads")).toContain(`- ${action}`);
+    expect(statement("DenyCachePoliciesOfOtherProjects")).toContain("cache-policy/${RouterCachePolicyId}");
+  });
+
   it("keeps the Leads table and its stream inside the app's table fence", () => {
     for (const policy of [boundary, deployPolicies]) {
       const named = statementsOf(policy).filter(({ body }) => body.includes("- dynamodb:*"));

@@ -150,7 +150,7 @@ const GLARE_ON_LABEL: CopyRef = { key: "rejectReason", reason: "GLARE", item: "O
 
 const S3: readonly StoryEntry[] = [
   photo(s3("meter-photo", "09:46:00", "inst-rogelio", "cuadrilla"), "POWER_READING_PHOTO", "ph-meter-01", "PASS", null, { es: "Foto de la pantalla del medidor", en: "Photo of the meter's screen" }),
-  photo(s3("label-glare-photo", "09:47:00", "inst-rogelio", "cuadrilla"), "ONU_LABEL_PHOTO", null, "REJECT", "GLARE", {
+  photo(s3("label-glare-photo", "09:47:00", "inst-rogelio", "cuadrilla"), "ONU_LABEL_PHOTO", "ph-story-01", "REJECT", "GLARE", {
     es: "Foto de la etiqueta de la ONU, con reflejo",
     en: "Photo of the ONU label, with glare",
   }),

@@ -2,9 +2,9 @@
 // integrations.md §9.3):
 //
 //   pending → CONFIRMED   the notice to Craftech (leads/notify.ts, at most once) and the other pending
-//                         users out of Cognito (they could never confirm: the email is already the alias
-//                         of the confirmed account), then `pendingUsernames` emptied
-//   pending lead by TTL   each pending user out of Cognito, `LEAD_EXPIRED`
+//                         and retired users out of Cognito (they could never confirm: the email is already
+//                         the alias of the confirmed account), then `pendingUsernames` emptied
+//   pending lead by TTL   each pending and retired user out of Cognito, `LEAD_EXPIRED`
 //   confirmed lead by TTL `GuestAccountDeletion` with the `userId` of the old image (user, row,
 //                         `GUESTACCOUNT#` and current world, not only the user), `LEAD_EXPIRED`
 //   daily sweep           every `gst-*` user still `UNCONFIRMED` 7 days after its creation (Cognito never
@@ -37,10 +37,15 @@ async function deleteUsers(deps: LeadStreamDeps, usernames: readonly string[]): 
   return deleted;
 }
 
+/** Every `gst-*` user of the lead but the confirmed one: the pending ones and those later starts retired. */
+function otherUsers(lead: Lead): string[] {
+  return [...new Set([...lead.pendingUsernames, ...(lead.retiredUsernames ?? [])])].filter((username) => username !== lead.cognitoUsername);
+}
+
 async function onConfirmed(deps: LeadStreamDeps, lead: Lead): Promise<NotifyResult> {
   const emailHash = emailHashOfPartition(lead.PK);
   const result = await notifyConfirmedLead(deps, emailHash);
-  const siblings = lead.pendingUsernames.filter((username) => username !== lead.cognitoUsername);
+  const siblings = otherUsers(lead);
   const deleted = await deleteUsers(deps, siblings);
   await deps.store.setPendingUsernames(emailHash, [], deps.now());
   deps.log.info("lead.confirmed.handled", { leadId: lead.leadId, emailHashPrefix: hashPrefix(emailHash), notice: result, pendingUsersDeleted: deleted });
@@ -48,8 +53,7 @@ async function onConfirmed(deps: LeadStreamDeps, lead: Lead): Promise<NotifyResu
 }
 
 async function onExpired(deps: LeadStreamDeps, lead: Lead): Promise<void> {
-  const pending = lead.pendingUsernames.filter((username) => username !== lead.cognitoUsername);
-  const deleted = await deleteUsers(deps, pending);
+  const deleted = await deleteUsers(deps, otherUsers(lead));
   if (lead.status === "CONFIRMED" && lead.userId !== undefined) {
     await deps.invokeDeletion({ userId: lead.userId, actor: "TTL", abuseHash: lead.abuseHash });
   }

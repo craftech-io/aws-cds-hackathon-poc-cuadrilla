@@ -7,8 +7,10 @@
 //                               expired, the `emailHash` of this email, this very `userName`, and at
 //                               most two uses, always for that user; no `custom:*` attribute; a
 //                               `locale` in {es-MX, en}; the email without a confirmed lead
-//                               (EMAIL_TAKEN); the sign-up not cut and today's starts not over the cap
-//                               (CAP_REACHED), both READ, never incremented (only `signup.start` counts)
+//                               (EMAIL_TAKEN); the person below its two confirmed accounts (RATE_LIMITED:
+//                               another address of the same person may have confirmed since its
+//                               start); the sign-up not cut and today's starts not over the cap
+//                               (CAP_REACHED), all READ, never incremented (only `signup.start` counts)
 //   anything else               refused (an external provider, a migration)
 //
 // It never confirms nor verifies anything (`autoConfirmUser`, `autoVerifyEmail` stay false). A refusal
@@ -30,14 +32,14 @@ import { type Logger, createLogger } from "../lib/log";
 import { subkey } from "../lib/secrets";
 import { killSwitchReader } from "../ops/defaults";
 import { type KillSwitchReader, blockingScope } from "../ops/kill-switch";
-import { SIGNUP_LIMITS, startsToday } from "../signup/limits";
+import { SIGNUP_LIMITS, confirmedAccountsOf, startsToday } from "../signup/limits";
 import { readTicket, spendTicketUse } from "../signup/ticket";
 
 /** Below the 5 s Cognito gives a trigger. */
 export const PRE_SIGN_UP_DEADLINE_MS = 4_000;
 
 /** The codes the browser can read in Cognito's answer (lib/auth/errors.ts of the web). */
-export type PreSignUpRefusal = "TICKET_INVALID" | "EMAIL_TAKEN" | "CAP_REACHED" | "ATTRIBUTE_NOT_ALLOWED" | "LOCALE_NOT_ALLOWED" | "SOURCE_NOT_ALLOWED" | "UNAVAILABLE";
+export type PreSignUpRefusal = "TICKET_INVALID" | "EMAIL_TAKEN" | "RATE_LIMITED" | "CAP_REACHED" | "ATTRIBUTE_NOT_ALLOWED" | "LOCALE_NOT_ALLOWED" | "SOURCE_NOT_ALLOWED" | "UNAVAILABLE";
 
 export class PreSignUpRefused extends Error {
   override readonly name = "PreSignUpRefused";
@@ -91,7 +93,10 @@ async function checkSignUp(deps: PreSignUpDeps, userName: string, attributes: Re
   // The day's starts were reserved by `signup.start`; a day over its cap (the cap lowered, or a start
   // that raced it) takes no more accounts. Read only: nothing here counts.
   if ((await startsToday(deps.runtime, { kind: "PUBLIC" }, now)) > SIGNUP_LIMITS.startsPerDay) throw new PreSignUpRefused("CAP_REACHED");
-  if ((await deps.leads.get(emailHash))?.status === "CONFIRMED") throw new PreSignUpRefused("EMAIL_TAKEN");
+  const lead = await deps.leads.get(emailHash);
+  if (lead?.status === "CONFIRMED") throw new PreSignUpRefused("EMAIL_TAKEN");
+  // `signup.start` read it when it issued the ticket; another address of the person may have confirmed since.
+  if (lead !== undefined && (await confirmedAccountsOf(deps.runtime, lead.abuseHash)) >= SIGNUP_LIMITS.confirmedAccountsPerPerson) throw new PreSignUpRefused("RATE_LIMITED");
   if (!(await spendTicketUse(deps.runtime, read.ticket, now))) throw new PreSignUpRefused("TICKET_INVALID");
   return { kind: "SIGN_UP", emailHash };
 }

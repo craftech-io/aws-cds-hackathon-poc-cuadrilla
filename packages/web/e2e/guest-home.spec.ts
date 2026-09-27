@@ -11,7 +11,7 @@ import { createPool, randomPassword } from "./support/accounts";
 import { type CognitoCall, routeCognito } from "./support/cognito";
 import { quietClock } from "./support/console-api";
 
-type Status = "PROVISIONING" | "READY" | "FAILED" | "CAP_FULL";
+type Status = "PROVISIONING" | "READY" | "FAILED" | "CAP_FULL" | "PERSON_LIMIT";
 
 interface World {
   status: Status;
@@ -165,6 +165,17 @@ test.describe("guest portada", () => {
     await page.getByRole("button", { name: copy.retry }).click();
     await expect.poll(() => api.calls.some((call) => call.path === "guest.retryWorld")).toBe(true);
     await expect(page.getByRole("heading", { name: copy.capFull.title })).toBeVisible();
+  });
+
+  test("[FL-114] PERSON_LIMIT: a third account of the same person has no world and no retry, only Hablemos", async ({ page }) => {
+    const copy = guestHomeCopy[langOf()];
+    await routeApi(page, { world: { status: "PERSON_LIMIT", origin: "SIGNUP", canRetry: false }, afterRetry: "PERSON_LIMIT" });
+    await signInToHome(page);
+    await expect(page.getByRole("heading", { name: copy.personLimit.title })).toBeVisible();
+    await expect(page.getByText(copy.personLimit.lead)).toBeVisible();
+    await expect(page.getByRole("link", { name: copy.personLimit.talk.link })).toHaveAttribute("href", "https://craftech.io/contact/");
+    await expect(page.getByRole("button", { name: copy.retry })).toHaveCount(0);
+    await expectReadableScreen(page);
   });
 
   test("[FL-107] an invited guest's portada has no expiry and no deletion", async ({ page }) => {

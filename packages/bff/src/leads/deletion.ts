@@ -110,9 +110,9 @@ async function byEmail(deps: DeletionDeps, email: string): Promise<Resolution> {
   return { kind: "TARGET", target: { lead, row, account } };
 }
 
-/** Every `gst-*` user of the target: the confirmed one and the pending ones, each once. */
+/** Every `gst-*` user of the target: the confirmed one, the pending and the retired ones, each once. */
 function usernamesOf(target: Target): string[] {
-  const names = [target.row?.cognitoUsername, target.lead?.cognitoUsername, ...(target.lead?.pendingUsernames ?? [])];
+  const names = [target.row?.cognitoUsername, target.lead?.cognitoUsername, ...(target.lead?.pendingUsernames ?? []), ...(target.lead?.retiredUsernames ?? [])];
   return [...new Set(names.filter((name): name is string => name !== undefined && SIGNUP_USERNAME_PATTERN.test(name)))];
 }
 
@@ -123,7 +123,9 @@ async function removeAccount(deps: DeletionDeps, target: Target, abuseHashHint: 
   const abuseHash = target.lead?.abuseHash ?? abuseHashHint;
   for (let attempt = 0; attempt < MAX_REMOVAL_ATTEMPTS; attempt += 1) {
     const account = target.account === undefined ? undefined : await deps.accounts.getGuestAccount(target.account.userId);
-    const current = account === undefined || abuseHash === undefined ? undefined : await deps.accounts.getConfirmedAccounts(abuseHash);
+    // An account over the person's limit never counted (guest/confirmation.ts): nothing to give back.
+    const counted = account !== undefined && account.status !== "PERSON_LIMIT";
+    const current = !counted || abuseHash === undefined ? undefined : await deps.accounts.getConfirmedAccounts(abuseHash);
     try {
       await deps.accounts.removeAccount(
         {

@@ -79,6 +79,21 @@ export function apiOriginRequestPolicyName(app: string, stage: string): string {
   return `${app}-${stage}-api`;
 }
 
+/**
+ * Cache policy the bootstrap creates for `/api/*` (infra/bootstrap/ci-role.yaml, ApiCachePolicy), read
+ * by name like the origin request policy. CloudFront removes `Authorization` from a `GET` or `HEAD`
+ * unless the header is part of the cache key, and the console's `httpBatchLink` sends every query as a
+ * `GET` with `Authorization: Bearer <id token>`: without it every authenticated query answers 401. The
+ * key holds `Authorization` and the query string, TTLs 0/0/1 (the BFF answers `no-store`), so nothing is
+ * kept. Cache and origin request policies have separate names, so both take the same one.
+ */
+export function apiCachePolicyName(app: string, stage: string): string {
+  return `${app}-${stage}-api`;
+}
+
+/** The viewer header the cache policy of `/api/*` must keep on a `GET`. */
+export const API_AUTHORIZATION_HEADER = "Authorization";
+
 // ---- AWS WAF in the browser (ADR-0025 §4) ------------------------------------------------------------
 
 /**

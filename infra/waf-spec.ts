@@ -12,9 +12,15 @@
 //     4 ChallengeSignup                         sign-up scope, POST   Challenge (token immune 300 s)
 //     5 RatePerIp                               everything        Block over 1,000 per IP in 300 s
 //   <app>-<stage>-auth   REGIONAL, on the Cognito user pool
-//     1 AWSManagedRulesAmazonIpReputationList, then per-IP rates on `x-amz-target`: SignUp 10,
-//       ConfirmSignUp + ResendConfirmationCode + ForgotPassword + ConfirmForgotPassword 20,
-//       InitiateAuth + RespondToAuthChallenge 100 (per 300 s); all Block.
+//     1 AWSManagedRulesAmazonIpReputationList
+//     2 SignupUsernameShape: SignUp, ConfirmSignUp and ResendConfirmationCode whose JSON `Username` is
+//       not `gst-<ULID>` → Block. The web only ever sends the ticket's `gst-*` user to these three
+//       operations; an email there would tell a confirmed account apart ("already confirmed") with
+//       nothing but the per-IP rate in the way (the pool's aliases accept the verified email as the
+//       user name). A body AWS WAF cannot parse, or larger than it inspects, is blocked too.
+//     3-5 per-IP rates on `x-amz-target`: SignUp 10, ConfirmSignUp + ResendConfirmationCode +
+//       ForgotPassword + ConfirmForgotPassword 20, InitiateAuth + RespondToAuthChallenge 100 (per 300 s);
+//       all Block.
 //
 // The sign-up scope is ONE value shared by rules 2 to 4: the URI starts with `/api/` AND its path or
 // its query string CONTAINS `signup.`, every comparison after URL_DECODE and LOWERCASE. "Starts with
@@ -29,8 +35,8 @@
 // Header insertion inside a Count override of a managed group is supported by the aws provider
 // 7.33.0 (`ruleActionOverrides[].actionToUse.count.customRequestHandling`) and by the API used here.
 //
-// Cost (ADR-0025 §4): two ACLs (USD 5 each), 9 rules (USD 1 each), requests and Challenge responses
-// at demo volume: about USD 20 a month.
+// Cost (ADR-0025 §4): two ACLs (USD 5 each), 10 rules (USD 1 each), requests and Challenge responses
+// at demo volume: about USD 21 a month.
 
 const APP = "aws-cds-hackathon-poc-cuadrilla";
 const STAGE = "poc";
@@ -59,7 +65,22 @@ export interface TextTransformation {
   readonly Type: "URL_DECODE" | "LOWERCASE" | "NONE";
 }
 
-type FieldToMatch = { readonly UriPath: Record<string, never> } | { readonly QueryString: Record<string, never> } | { readonly Method: Record<string, never> } | { readonly SingleHeader: { readonly Name: string } };
+/** A JSON body inspected at the given paths: values only; unparseable or oversized bodies never match. */
+export interface JsonBodyField {
+  readonly JsonBody: {
+    readonly MatchPattern: { readonly IncludedPaths: readonly string[] };
+    readonly MatchScope: "VALUE";
+    readonly InvalidFallbackBehavior: "NO_MATCH";
+    readonly OversizeHandling: "NO_MATCH";
+  };
+}
+
+type FieldToMatch =
+  | { readonly UriPath: Record<string, never> }
+  | { readonly QueryString: Record<string, never> }
+  | { readonly Method: Record<string, never> }
+  | { readonly SingleHeader: { readonly Name: string } }
+  | JsonBodyField;
 
 export interface ByteMatchStatement {
   readonly ByteMatchStatement: {
@@ -70,10 +91,20 @@ export interface ByteMatchStatement {
   };
 }
 
+export interface RegexMatchStatement {
+  readonly RegexMatchStatement: {
+    readonly RegexString: string;
+    readonly FieldToMatch: FieldToMatch;
+    readonly TextTransformations: readonly TextTransformation[];
+  };
+}
+
 export type WafStatement =
   | ByteMatchStatement
+  | RegexMatchStatement
   | { readonly AndStatement: { readonly Statements: readonly WafStatement[] } }
-  | { readonly OrStatement: { readonly Statements: readonly WafStatement[] } };
+  | { readonly OrStatement: { readonly Statements: readonly WafStatement[] } }
+  | { readonly NotStatement: { readonly Statement: WafStatement } };
 
 /** Every comparison of the sign-up scope sees the decoded, lowercased value. */
 export const DECODE_AND_LOWERCASE: readonly TextTransformation[] = [
@@ -190,9 +221,30 @@ function targetScope(operations: readonly string[]): WafStatement {
   return matches.length === 1 && only !== undefined ? only : { OrStatement: { Statements: matches } };
 }
 
+/** The operations of the own sign-up: the web sends them only the ticket's `gst-*` user. */
+export const SIGNUP_USERNAME_OPERATIONS = ["SignUp", "ConfirmSignUp", "ResendConfirmationCode"] as const;
+/** `gst-<ULID>`, whole (packages/bff/src/leads/model.ts `SIGNUP_USERNAME_PATTERN`). */
+export const SIGNUP_USERNAME_REGEX = "^gst-[0-9A-HJKMNP-TV-Z]{26}$";
+
+const USERNAME_FIELD: JsonBodyField = {
+  JsonBody: { MatchPattern: { IncludedPaths: ["/Username"] }, MatchScope: "VALUE", InvalidFallbackBehavior: "NO_MATCH", OversizeHandling: "NO_MATCH" },
+};
+
+/** Block the three sign-up operations unless the body's `Username` is a `gst-*` user. */
+function signupUsernameShape(priority: number): WafRule {
+  const isSignupUser: WafStatement = { RegexMatchStatement: { RegexString: SIGNUP_USERNAME_REGEX, FieldToMatch: USERNAME_FIELD, TextTransformations: [{ Priority: 0, Type: "NONE" }] } };
+  return {
+    Name: "SignupUsernameShape",
+    Priority: priority,
+    Statement: { AndStatement: { Statements: [targetScope(SIGNUP_USERNAME_OPERATIONS), { NotStatement: { Statement: isSignupUser } }] } },
+    Action: BLOCK,
+    VisibilityConfig: visibility("auth", "SignupUsernameShape"),
+  };
+}
+
 /** Rules of the pool's ACL, in priority order. */
 export function authRules(): WafRule[] {
-  return [ipReputation("auth"), ...COGNITO_RATE_RULES.map((rule, index) => rateRule("auth", rule.name, index + 2, rule.limit, targetScope(rule.operations)))];
+  return [ipReputation("auth"), signupUsernameShape(2), ...COGNITO_RATE_RULES.map((rule, index) => rateRule("auth", rule.name, index + 3, rule.limit, targetScope(rule.operations)))];
 }
 
 /** Everything `aws.wafv2.WebAcl` takes for one ACL; `ruleJson` is the API's `Rules`. */

@@ -13,6 +13,8 @@ import {
   WAF_CSP_SOURCES,
   WAF_SDK_ORIGIN,
   WAF_TOKEN_ORIGIN,
+  API_AUTHORIZATION_HEADER,
+  apiCachePolicyName,
   apiOriginRequestPolicyName,
   LAMBDA_ROUTES,
   LEGAL_PAGES,
@@ -167,6 +169,19 @@ describe("origin of /api/* [FL-114]", () => {
     expect(policy).toContain(`Headers: [${VIEWER_ADDRESS_HEADER}]`);
     expect(policy).toContain("QueryStringBehavior: all");
     expect(web).toContain("aws.cloudfront.getOriginRequestPolicyOutput({ name: apiOriginRequestPolicyName($app.name, $app.stage) })");
+  });
+
+  it("keeps Authorization on a GET query of /api/* with the bootstrap's cache policy, which caches nothing [FL-114]", () => {
+    expect(apiCachePolicyName("aws-cds-hackathon-poc-cuadrilla", "poc")).toBe("aws-cds-hackathon-poc-cuadrilla-poc-api");
+    const policy = template.slice(template.indexOf("  ApiCachePolicy:"), template.indexOf("  # ---- Permissions boundary"));
+    expect(policy).toContain("Type: AWS::CloudFront::CachePolicy");
+    expect(policy).toContain('Name: !Sub "${AppName}-${DeployStage}-api"');
+    expect(policy).toContain("HeaderBehavior: whitelist");
+    expect(policy).toContain(`Headers: [${API_AUTHORIZATION_HEADER}]`);
+    expect(policy).toContain("QueryStringBehavior: all");
+    for (const ttl of ["MinTTL: 0", "DefaultTTL: 0", "MaxTTL: 1"]) expect(policy).toContain(ttl);
+    expect(web).toContain("aws.cloudfront.getCachePolicyOutput({ name: apiCachePolicyName($app.name, $app.stage) })");
+    expect(web).toMatch(/originRequestPolicyId: policyId, cachePolicyId \}/);
   });
 
   it("puts the origin header on the distribution's origins from OriginVerifyKey, never a literal", () => {

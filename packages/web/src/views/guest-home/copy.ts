@@ -1,4 +1,4 @@
-// Texts of the guest's portada (`/app/home`), in Mexican Spanish (tuteo) and English. The four states,
+// Texts of the guest's portada (`/app/home`), in Mexican Spanish (tuteo) and English. The five states,
 // the expiry, the rolling-out block and the deletion are the texts of docs/landing-spec.md §7.6; the
 // labels around them follow the console's voice. Nothing here names the operator: its visible name
 // comes from the world (`resolveBrand`, ADR-0018).
@@ -41,6 +41,11 @@ export const guestHomeCopy = {
       title: "Por ahora llegamos al límite de mundos de prueba disponibles.",
       lead: "Tu cuenta ya está creada; solo falta lugar para tu mundo.",
       talk: { link: "Hablemos", after: " si quieres una demo guiada mientras tanto." },
+    },
+    personLimit: {
+      title: "Ya tienes dos cuentas de prueba con su mundo.",
+      lead: "Esta cuenta quedó creada, pero sin mundo propio: cada persona puede tener hasta dos mundos de prueba. Sigue con una de tus otras cuentas.",
+      talk: { link: "Hablemos", after: " si quieres una demo guiada con más espacio." },
     },
     retry: "Reintentar",
     retrying: "Reintentando…",
@@ -96,6 +101,11 @@ export const guestHomeCopy = {
       title: "We've hit the limit of test worlds available right now.",
       lead: "Your account is already created; we just need room for your world.",
       talk: { link: "Let's talk", after: " if you'd like a guided demo meanwhile." },
+    },
+    personLimit: {
+      title: "You already have two test accounts with their worlds.",
+      lead: "This account is created, but without a world of its own: each person can have up to two test worlds. Carry on with one of your other accounts.",
+      talk: { link: "Let's talk", after: " if you'd like a guided demo with more room." },
     },
     retry: "Retry",
     retrying: "Retrying…",

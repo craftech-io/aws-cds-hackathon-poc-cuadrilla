@@ -53,7 +53,7 @@ describe("LeadStore [FL-115]", () => {
     for (const item of table.allItems()) for (const attribute of Object.keys(item)) expect(allowed.has(attribute), attribute).toBe(true);
   });
 
-  it("[FL-115] another start for a pending email adds its user, keeps the first start and expiry, and takes the last form and consents", async () => {
+  it("[FL-115] another start for a pending email adds its user with its own entry, keeps the first start and expiry, and touches nothing the first start said", async () => {
     await startLead(store, { contact: true, company: "Primera" });
     const second = await startLead(store, { user: 2, contact: false, at: later(2 * HOUR) });
     expect(second.outcome).toBe("ADDED");
@@ -61,22 +61,45 @@ describe("LeadStore [FL-115]", () => {
     expect(lead?.pendingUsernames).toEqual([username(1), username(2)]);
     expect(lead?.signupStartedAt).toBe(T0.toISOString());
     expect(lead?.expiresAt).toBe(epochSeconds(T0) + PENDING_TTL_SECONDS);
-    expect(lead?.company).toBeUndefined();
-    expect(lead?.consents.CONTACT.accepted).toBe(false);
-    expect(lead?.consentHistory.map((record) => [record.id, record.accepted])).toEqual([
-      ["TERMS_PRIVACY", true],
-      ["CONTACT", true],
-      ["TERMS_PRIVACY", true],
-      ["CONTACT", false],
-    ]);
+    expect(lead?.company).toBe("Primera");
+    expect(lead?.consents.CONTACT.accepted).toBe(true);
+    expect(lead?.consentHistory).toHaveLength(2);
+    expect(lead?.pending?.[username(1)]).toMatchObject({ company: "Primera", consents: { CONTACT: { accepted: true } } });
+    expect(lead?.pending?.[username(2)]).toMatchObject({ consents: { CONTACT: { accepted: false } }, at: later(2 * HOUR).toISOString() });
+    expect(lead?.pending?.[username(2)]?.company).toBeUndefined();
   });
 
-  it("[FL-115] a fourth pending user of the same email is refused; a confirmed email is taken", async () => {
-    for (const user of [1, 2, 3]) expect((await startLead(store, { user })).outcome).not.toBe("TOO_MANY_PENDING");
-    expect((await startLead(store, { user: 4 })).outcome).toBe("TOO_MANY_PENDING");
+  it("[FL-114] three starts of a stranger never lock the owner out: a fourth start retires the oldest pending user", async () => {
+    for (const user of [1, 2, 3]) expect((await startLead(store, { user, name: "Desconocido" })).outcome).toMatch(/^(CREATED|ADDED)$/);
+    expect((await startLead(store, { user: 4, name: "Ana Dueña", contact: false })).outcome).toBe("ADDED");
+    const lead = await store.get(hashOf(EMAIL));
+    expect(lead?.pendingUsernames).toEqual([username(2), username(3), username(4)]);
+    expect(lead?.retiredUsernames).toEqual([username(1)]);
+    expect(Object.keys(lead?.pending ?? {}).sort()).toEqual([username(2), username(3), username(4)].sort());
+    // The retired user can no longer confirm the lead; the owner's can.
+    expect((await store.confirm({ emailHash: hashOf(EMAIL), username: username(1), sub: "sub-x", userId: signupUserId(1), at: later(HOUR) })).outcome).toBe("NOT_PENDING");
+    const confirmed = await store.confirm({ emailHash: hashOf(EMAIL), username: username(4), sub: "sub-0004", userId: signupUserId(4), at: later(HOUR) });
+    expect(confirmed.outcome === "CONFIRMED" && confirmed.lead).toMatchObject({ name: "Ana Dueña", consents: { CONTACT: { accepted: false } } });
     const other = "otra.persona@example.com";
     await confirmedLead(store, { email: other, user: 5 });
     expect((await startLead(store, { email: other, user: 6 })).outcome).toBe("EMAIL_TAKEN");
+  });
+
+  it("[FL-115] a start by a third party before the owner confirms never lends its consents nor its form to the owner's confirmation", async () => {
+    await startLead(store, { user: 1, contact: false, name: "Ana Prueba", company: "Fibra Demo" });
+    // Someone else types the same address, accepts the contact and makes up a name.
+    await startLead(store, { user: 2, contact: true, name: "Nombre Inventado", company: "Otra", jobTitle: "Otro", at: later(HOUR) });
+    const result = await store.confirm({ emailHash: hashOf(EMAIL), username: username(1), sub: "sub-0001", userId: signupUserId(1), at: later(2 * HOUR) });
+    expect(result.outcome).toBe("CONFIRMED");
+    const lead = await store.get(hashOf(EMAIL));
+    expect(lead).toMatchObject({ status: "CONFIRMED", name: "Ana Prueba", company: "Fibra Demo", consents: { CONTACT: { accepted: false } } });
+    expect(lead?.jobTitle).toBeUndefined();
+    expect(lead?.consentHistory.map((record) => [record.id, record.accepted, record.at])).toEqual([
+      ["TERMS_PRIVACY", true, T0.toISOString()],
+      ["CONTACT", false, T0.toISOString()],
+    ]);
+    expect(lead?.pending).toBeUndefined();
+    expect(JSON.stringify(lead)).not.toContain("Nombre Inventado");
   });
 
   it("[FL-105] confirmation: only a pending lead that lists the user becomes CONFIRMED, with its sub, user and 24 months", async () => {

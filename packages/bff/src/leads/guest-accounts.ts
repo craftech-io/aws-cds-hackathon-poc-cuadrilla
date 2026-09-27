@@ -6,7 +6,8 @@
 //                                            `cognitoSub`; GSI1 `cognitoSubKey = SUB#<sub>`)
 //   Runtime  GUESTACCOUNT#<userId> · META    the current generation (`clockId`, `guestOrigin`)
 //   Runtime  SIGNUPSUB#<sub> · META          uniqueness of the registry per `sub`
-//   Runtime  SIGNUPKEY#<abuseHash> · META    `confirmedAccounts` of one person (≤ 2)
+//   Runtime  SIGNUPKEY#<abuseHash> · META    `confirmedAccounts` of one person (≤ 2; an account opened in
+//                                            `PERSON_LIMIT` never counted, so its deletion gives nothing back)
 //
 // The removal is one transaction: the row, `SIGNUPSUB#`, `GUESTACCOUNT#` (only while it exists) and the
 // decrement of `SIGNUPKEY#` conditioned on the value read, so a retried deletion never subtracts twice.
@@ -33,6 +34,8 @@ export interface GuestAccount {
   readonly userId: string;
   readonly clockId: string;
   readonly guestOrigin?: string | undefined;
+  /** `PERSON_LIMIT`: the account never counted among the person's confirmed accounts. */
+  readonly status?: string | undefined;
 }
 
 export interface AccountRemoval {
@@ -72,7 +75,7 @@ export function createGuestAccountPorts(client: TableClient): GuestAccountPorts 
     async getGuestAccount(userId) {
       const item = await client.get("Runtime", guestAccountKey(userId));
       const clockId = item === undefined ? undefined : text(item, "clockId");
-      return item === undefined || clockId === undefined ? undefined : { userId, clockId, guestOrigin: text(item, "guestOrigin") };
+      return item === undefined || clockId === undefined ? undefined : { userId, clockId, guestOrigin: text(item, "guestOrigin"), status: text(item, "status") };
     },
 
     async getRegistryUser(ispId, userId) {

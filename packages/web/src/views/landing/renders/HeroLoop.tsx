@@ -78,7 +78,8 @@ export function HeroLoop({ label, pauseLabel, playLabel, summary }: HeroLoopProp
     >
       <p className="sr-only">{summary}</p>
       <div aria-hidden="true">
-        <PhoneFrame owner="inst-rogelio" messages={MESSAGES} run={playing} still={still} reduced={reduced} runKey={round} size="hero" onDone={() => setHolding(true)} />
+        {/* Finished, it rests on its last frame as it played; only reduced motion draws the grown still poster. */}
+        <PhoneFrame owner="inst-rogelio" messages={MESSAGES} run={playing} still={reduced} reduced={reduced} runKey={round} size="hero" onDone={() => setHolding(true)} />
       </div>
       {reduced ? null : (
         <button

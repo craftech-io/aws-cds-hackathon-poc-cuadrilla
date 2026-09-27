@@ -34,10 +34,12 @@
 //     origin request carries it (the S3 origin of the console too, which ignores it); CloudFront
 //     overwrites a viewer's header of the same name. The value lives in the distribution's
 //     configuration (readable with CloudFront read access, a declared residual risk).
-//   - `/api/*` behavior: a copy of the default behavior (same viewer-request routing function, cache
-//     policy and security headers) with the bootstrap's origin request policy, which forwards every
-//     viewer value, the headers AWS WAF inserts and `CloudFront-Viewer-Address`. The console keeps
-//     SST's AllViewerExceptHostHeader.
+//   - `/api/*` behavior: a copy of the default behavior (same viewer-request routing function and
+//     security headers) with the bootstrap's origin request policy, which forwards every viewer value,
+//     the headers AWS WAF inserts and `CloudFront-Viewer-Address`, and the bootstrap's cache policy,
+//     which keeps `Authorization` in the key: CloudFront strips it from a `GET` otherwise, and the
+//     console sends its tRPC queries as `GET`. The console keeps SST's AllViewerExceptHostHeader and
+//     cache policy.
 //
 // Build variables of the console: the pool and its clients (auth.ts) and the edge ACL's integration
 // URL (`challenge.js` of the silent challenge, packages/web/src/lib/waf-token.ts).
@@ -52,7 +54,7 @@ import { consoleHeadersPolicyName, routerKeyValueStoreName } from "./ci-spec";
 import { appDomain, dns } from "./dns";
 import { OriginVerifyKey } from "./secrets";
 import { edgeWebAcl, wafIntegrationUrl } from "./waf";
-import { API_PATH_PATTERN, LEGAL_PAGES, ORIGIN_VERIFY_HEADER, STATIC_FILE_OPTIONS, apiOriginRequestPolicyName, legalUrl } from "./web-spec";
+import { API_PATH_PATTERN, LEGAL_PAGES, ORIGIN_VERIFY_HEADER, STATIC_FILE_OPTIONS, apiCachePolicyName, apiOriginRequestPolicyName, legalUrl } from "./web-spec";
 
 export { API_PATH, LEGAL_PAGES } from "./web-spec";
 
@@ -70,8 +72,9 @@ const bootstrapKvStoreArn = aws.cloudfront.KeyValueStore.get("RouterBootstrapKvS
 // images and audio come only from its own origin and the three browser buckets (infra/ci-spec.ts).
 const consoleHeadersPolicyId = aws.cloudfront.getResponseHeadersPolicyOutput({ name: consoleHeadersPolicyName($app.name, $app.stage) }).id;
 
-// `/api/*`: the origin request policy the bootstrap creates, read by name.
+// `/api/*`: the origin request and cache policies the bootstrap creates, read by name.
 const apiOriginRequestPolicyId = aws.cloudfront.getOriginRequestPolicyOutput({ name: apiOriginRequestPolicyName($app.name, $app.stage) }).id;
+const apiCachePolicyId = aws.cloudfront.getCachePolicyOutput({ name: apiCachePolicyName($app.name, $app.stage) }).id;
 
 function withHeadersPolicy<T extends object>(behavior: $util.Input<T>, policyId: $util.Output<string | undefined>): $util.Output<T> {
   return $util.all([behavior, policyId]).apply(([resolved, id]) => (id ? { ...resolved, responseHeadersPolicyId: id } : resolved) as T);
@@ -80,11 +83,12 @@ function withHeadersPolicy<T extends object>(behavior: $util.Input<T>, policyId:
 type CdnArgs = sst.aws.CdnArgs;
 type OrderedBehavior = NonNullable<$util.Unwrap<CdnArgs["orderedCacheBehaviors"]>>[number];
 
-/** The default behavior of the Router, for `/api/*`, with the origin request policy of the bootstrap. */
+/** The default behavior of the Router, for `/api/*`, with the origin request and cache policies of the bootstrap. */
 function apiBehavior(defaults: CdnArgs["defaultCacheBehavior"]): $util.Output<OrderedBehavior> {
-  return $util.all([defaults, apiOriginRequestPolicyId]).apply(([behavior, policyId]) => {
+  return $util.all([defaults, apiOriginRequestPolicyId, apiCachePolicyId]).apply(([behavior, policyId, cachePolicyId]) => {
     if (!policyId) throw new Error(`The origin request policy ${apiOriginRequestPolicyName($app.name, $app.stage)} does not exist: apply infra/bootstrap/ci-role.yaml.`);
-    return { ...behavior, pathPattern: API_PATH_PATTERN, originRequestPolicyId: policyId } as OrderedBehavior;
+    if (!cachePolicyId) throw new Error(`The cache policy ${apiCachePolicyName($app.name, $app.stage)} does not exist: apply infra/bootstrap/ci-role.yaml.`);
+    return { ...behavior, pathPattern: API_PATH_PATTERN, originRequestPolicyId: policyId, cachePolicyId } as OrderedBehavior;
   });
 }
 

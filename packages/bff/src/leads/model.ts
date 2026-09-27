@@ -68,6 +68,32 @@ export const Utm = z
   .strict();
 export type Utm = z.infer<typeof Utm>;
 
+/**
+ * What one start of a pending lead said (ADR-0026): the form, the attribution and the two consents of the
+ * visitor who asked for that `gst-*` user. Anyone who types an address can start, so a start never
+ * touches what another start said: the confirmation promotes only the entry of the user who proved the
+ * address (post-confirmation), and the rest are dropped with the pending state.
+ */
+export const PendingStart = z
+  .object({
+    email: z.string().min(3).max(320),
+    name: Text80.optional(),
+    company: Text80.optional(),
+    jobTitle: Text80.optional(),
+    locale: LegalLocale,
+    utm: Utm.optional(),
+    referrerOrigin: z.string().max(300).optional(),
+    consents: z.object({ TERMS_PRIVACY: ConsentRecord, CONTACT: ConsentRecord }).strict(),
+    at: Iso,
+  })
+  .strict();
+export type PendingStart = z.infer<typeof PendingStart>;
+
+/** Users a pending lead may confirm, oldest first; a new start past it retires the oldest one. */
+export const MAX_PENDING_USERNAMES = 3;
+/** Retired users kept for the clean-up in Cognito (5 starts a day per person, 7 days of pending life). */
+export const MAX_RETIRED_USERNAMES = 40;
+
 export const Lead = z.object({
   PK: z.string().startsWith(LEAD_PARTITION_PREFIX),
   SK: z.literal(LEAD_META),
@@ -83,10 +109,16 @@ export const Lead = z.object({
   origin: LeadOrigin,
   utm: Utm.optional(),
   referrerOrigin: z.string().max(300).optional(),
+  /** A pending lead: the first start's; a confirmed one: the start of the user who confirmed. */
   consents: z.object({ TERMS_PRIVACY: ConsentRecord, CONTACT: ConsentRecord }).strict(),
   consentHistory: z.array(ConsentRecord),
   abuseHash: EmailHash,
-  pendingUsernames: z.array(SignupUsername).max(3),
+  /** The users that may still confirm the lead, oldest first. */
+  pendingUsernames: z.array(SignupUsername).max(MAX_PENDING_USERNAMES),
+  /** What each pending user's start said, by user; gone once the lead is confirmed. */
+  pending: z.record(SignupUsername, PendingStart).optional(),
+  /** Users retired from `pendingUsernames` by later starts: `LeadStream` removes them from Cognito too. */
+  retiredUsernames: z.array(SignupUsername).max(MAX_RETIRED_USERNAMES).optional(),
   /** Absent while the lead is pending; `CONFIRMED` is written only by post-confirmation. */
   status: z.literal("CONFIRMED").optional(),
   signupStartedAt: Iso,

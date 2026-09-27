@@ -108,6 +108,26 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     expect(harness.provisioner.requests).toEqual([]);
   });
 
+  it("[FL-114] three addresses of one person confirm: two worlds, the third account opens in PERSON_LIMIT without a world nor a count", async () => {
+    const harness = guestHarness();
+    const addresses = ["ana.b+1@gmail.com", "ana.b+2@gmail.com", "anab@gmail.com"];
+    // Three starts before any confirmation: each one saw 0 confirmed accounts at signup.start.
+    for (const [index, email] of addresses.entries()) await pendingLead(harness, { email, user: index + 1 });
+    for (const [index, email] of addresses.entries()) {
+      await handlerOf(harness, [`abcd${"efg"[index] ?? "h"}`])(confirmationEvent({ email, user: index + 1, sub: `sub-000${index + 1}` }));
+    }
+    const statuses = await Promise.all([1, 2, 3].map(async (n) => (await getGuestAccount(harness.client, signupUserId(n)))?.status));
+    expect(statuses).toEqual(["PROVISIONING", "PROVISIONING", "PERSON_LIMIT"]);
+    expect(harness.provisioner.requests.map((request) => request.userId)).toEqual([signupUserId(1), signupUserId(2)]);
+    expect((await getGuestAccount(harness.client, signupUserId(3)))?.slotDay).toBeUndefined();
+    // The Cognito user and the lead stay (ADR-0025 §3); only the world is not given.
+    expect((await harness.leads.store.get(hashOf(addresses[2] ?? "")))?.status).toBe("CONFIRMED");
+    expect(guestRows(harness)).toHaveLength(3);
+    const abuseHash = (await harness.leads.store.get(hashOf(addresses[0] ?? "")))?.abuseHash ?? "";
+    expect(await harness.client.get("Runtime", { PK: `SIGNUPKEY#${abuseHash}`, SK: "META" })).toMatchObject({ confirmedAccounts: 2 });
+    expect(await harness.client.get("Runtime", { PK: worldsDayKey("PUBLIC", "261001"), SK: "META" })).toMatchObject({ count: 2 });
+  });
+
   it("an address of the QA seam takes the slots of the QA scope, never the public ones", async () => {
     const harness = guestHarness();
     await pendingLead(harness, { email: QA_EMAIL });

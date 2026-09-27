@@ -77,7 +77,7 @@ What each group of statements is for:
 | `DenyPublicFunctionUrlsBesidesTheEdge` | A Function URL with `AuthType NONE` only on `Bff`; the mocks, the QA driver and every other function keep `AWS_IAM` |
 | `HarnessUnderlyingRuntime` | The runtime AgentCore creates under the Harness, named `harness_<AgentNamePrefix>*` |
 | `CloudControlTransport` | `awsnative.*` resources go through the Cloud Control API, IAM prefix `cloudformation` |
-| Edge policy | CloudFront functions `<app>-poc-*`, the bootstrap key-value store and the declared cache policy only; reads of the origin request policy of `/api/*` |
+| Edge policy | CloudFront functions `<app>-poc-*`, the bootstrap key-value store and the declared cache policy only; reads of the origin request and cache policies of `/api/*` |
 | `WebAclsOfThisApp` (edge policy) | Create, update, delete, tag and associate only the web ACLs `<app>-*` of both scopes (`<app>-poc-edge` on the Router, `<app>-poc-auth` on the user pool). AWS WAF has no tag fence on create, so the fence is the name |
 | `ManagedRuleGroupReads` (edge policy) | Read AWS's managed rule groups the ACLs reference (IP reputation, anonymous IP list) and check capacity. No action on AWS WAF API keys exists anywhere: no CAPTCHA (ADR-0025 §4) |
 | `CognitoWebAclAssociation` | `AssociateWebACL`, `DisassociateWebACL` and `GetWebACLForResource` of Cognito only on a pool tagged `sst:app` = this app (the pool's ARN has an opaque id) |
@@ -121,8 +121,8 @@ The same command applies every later change. Edit statements, not the `Descripti
 policy: IAM cannot change it in place and the replacement fails with `already exists`.
 
 **Wave 2b (own sign-up, WAF, leads).** The template changed (web ACLs, Cognito association, event
-source mappings, SES event destinations, the CSP with AWS WAF's hosts and the origin request policy
-of `/api/*`): the operator applies it again with the command above **before** the push that deploys
+source mappings, SES event destinations, the CSP with AWS WAF's hosts and the origin request and
+cache policies of `/api/*`; the cache policy keeps `Authorization` on the console's `GET` queries): the operator applies it again with the command above **before** the push that deploys
 the wave, loads the new secrets `OriginVerifyKey` and `LeadConfig` (`infra/secrets.ts`), and checks
 the new statements with `simulate-principal-policy` (below). Before the pool changes, the operator
 records whether the live pool distinguishes case in usernames (it cannot change on an existing pool;

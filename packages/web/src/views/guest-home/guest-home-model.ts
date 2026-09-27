@@ -9,7 +9,7 @@ import type { GuestHomeCopy, GuestHomeLang } from "./copy";
 
 export const GUEST_PROCEDURES = { world: "guest.world", retryWorld: "guest.retryWorld", deleteAccount: "account.deleteGuest" } as const;
 
-export const WorldStatus = z.enum(["PROVISIONING", "READY", "FAILED", "CAP_FULL"]);
+export const WorldStatus = z.enum(["PROVISIONING", "READY", "FAILED", "CAP_FULL", "PERSON_LIMIT"]);
 export type WorldStatus = z.infer<typeof WorldStatus>;
 
 /** What `guest.world` and `guest.retryWorld` answer (packages/bff/src/guest/world-status.ts). */
@@ -90,23 +90,32 @@ export function formatWorldTime(iso: string, weekdays: Readonly<Record<Weekday, 
   return formatSimTime(iso, weekdays);
 }
 
+/** The invitation to talk to Craftech: its link text and what follows it. */
+export interface TalkCopy {
+  readonly link: string;
+  readonly after: string;
+}
+
 /** What the portada puts on screen for a world: its title, lead, and which actions it offers. */
 export interface WorldCard {
   readonly title: string;
   readonly lead: string;
   readonly retry: boolean;
-  readonly talk: boolean;
+  readonly talk: TalkCopy | null;
 }
 
 export function cardOf(world: GuestWorld, copy: GuestHomeCopy): WorldCard {
   switch (world.status) {
     case "PROVISIONING":
-      return { title: copy.provisioning.title, lead: copy.provisioning.lead, retry: world.canRetry, talk: false };
+      return { title: copy.provisioning.title, lead: copy.provisioning.lead, retry: world.canRetry, talk: null };
     case "READY":
-      return { title: copy.ready.title, lead: "", retry: false, talk: false };
+      return { title: copy.ready.title, lead: "", retry: false, talk: null };
     case "FAILED":
-      return { title: copy.failed.title, lead: copy.failed.lead, retry: true, talk: false };
+      return { title: copy.failed.title, lead: copy.failed.lead, retry: true, talk: null };
     case "CAP_FULL":
-      return { title: copy.capFull.title, lead: copy.capFull.lead, retry: true, talk: true };
+      return { title: copy.capFull.title, lead: copy.capFull.lead, retry: true, talk: copy.capFull.talk };
+    case "PERSON_LIMIT":
+      // A third confirmed account of one person (ADR-0025 §3): no world will come, so no retry.
+      return { title: copy.personLimit.title, lead: copy.personLimit.lead, retry: false, talk: copy.personLimit.talk };
   }
 }

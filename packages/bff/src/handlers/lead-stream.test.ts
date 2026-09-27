@@ -94,6 +94,22 @@ describe("LeadStream [FL-118]", () => {
     expect((await h.deps.store.get(hashOf(EMAIL)))?.pendingUsernames).toEqual([]);
   });
 
+  it("[FL-114] users retired by later starts go out of Cognito too, on the confirmation and on the expiry", async () => {
+    for (const user of [1, 2, 3, 4]) await startLead(h.deps.store, { user });
+    const pending = (await h.deps.store.get(hashOf(EMAIL))) as Lead;
+    expect(pending.retiredUsernames).toEqual([username(1)]);
+    await handleLeadStream({ Records: [ttlRemove(pending)] }, h.deps);
+    expect([...h.deleted].sort()).toEqual([1, 2, 3, 4].map(username).sort());
+    h.deleted.length = 0;
+    const result = await h.deps.store.confirm({ emailHash: hashOf(EMAIL), username: username(4), sub: "sub-0004", userId: signupUserId(4), at: T0 });
+    if (result.outcome !== "CONFIRMED") throw new Error("the lead did not confirm");
+    await handleLeadStream({ Records: [modify(pending, result.lead)] }, h.deps);
+    expect([...h.deleted].sort()).toEqual([1, 2, 3].map(username).sort());
+    const after = await h.deps.store.get(hashOf(EMAIL));
+    expect(after?.pendingUsernames).toEqual([]);
+    expect(after?.retiredUsernames).toBeUndefined();
+  });
+
   it("[FL-118] a retried batch does not notify twice, and a change after the confirmation is ignored", async () => {
     await startLead(h.deps.store);
     const before = await h.deps.store.get(hashOf(EMAIL));

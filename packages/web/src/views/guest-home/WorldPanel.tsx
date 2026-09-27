@@ -75,17 +75,19 @@ export function WorldPanel({ world, copy, longWait, retrying, retryNotice, onRet
       ) : null}
       {world.status === "READY" ? <Summary world={world} copy={copy} /> : null}
       {expiry === undefined || world.status !== "READY" ? null : <p className="mt-4 text-sm text-ink">{expiry}</p>}
-      {card.retry ? (
+      {card.retry || card.talk !== null ? (
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Button onClick={onRetry} disabled={retrying}>
-            {retrying ? copy.retrying : copy.retry}
-          </Button>
-          {card.talk ? (
-            <p className="text-sm text-slate">
-              <ContactLink href={copy.contactUrl}>{copy.capFull.talk.link}</ContactLink>
-              {copy.capFull.talk.after}
-            </p>
+          {card.retry ? (
+            <Button onClick={onRetry} disabled={retrying}>
+              {retrying ? copy.retrying : copy.retry}
+            </Button>
           ) : null}
+          {card.talk === null ? null : (
+            <p className="text-sm text-slate">
+              <ContactLink href={copy.contactUrl}>{card.talk.link}</ContactLink>
+              {card.talk.after}
+            </p>
+          )}
         </div>
       ) : null}
       {retryNotice === undefined ? null : (

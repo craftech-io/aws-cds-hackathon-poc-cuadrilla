@@ -133,7 +133,7 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     expect(leadAbuseHash(EMAIL_HASH_KEY, "success+qa-a@simulator.amazonses.com")).not.toBe(leadAbuseHash(EMAIL_HASH_KEY, "success+qa-b@simulator.amazonses.com"));
   });
 
-  it("[FL-113] a fourth unconfirmed user for the same email is RATE_LIMITED; the pending lead keeps its first start", async () => {
+  it("[FL-113] a fourth unconfirmed user for the same email retires the oldest; each start keeps its own consents and the lead its first start", async () => {
     const first = await start();
     h.advance(HOUR);
     const second = await start(signupForm({ contact: true }));
@@ -141,12 +141,16 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     const lead = await h.leads.get(emailHash);
     expect(lead?.pendingUsernames).toEqual([first.username, second.username]);
     expect(lead?.signupStartedAt).toBe(SIGNUP_T0.toISOString());
-    expect(lead?.consents.CONTACT.accepted).toBe(true);
+    expect(lead?.consents).toEqual(lead?.pending?.[first.username]?.consents);
+    expect(lead?.pending?.[second.username]?.consents.CONTACT.accepted).toBe(true);
     h.advance(HOUR);
-    await start();
+    const third = await start();
     h.advance(HOUR);
-    expect(await refusalOf(start())).toMatchObject({ reason: "RATE_LIMITED" });
-    expect((await h.leads.get(emailHash))?.pendingUsernames).toHaveLength(3);
+    const fourth = await start();
+    const after = await h.leads.get(emailHash);
+    expect(after?.pendingUsernames).toEqual([second.username, third.username, fourth.username]);
+    expect(after?.retiredUsernames).toEqual([first.username]);
+    expect(after?.signupStartedAt).toBe(SIGNUP_T0.toISOString());
   });
 
   it("[FL-113] a person with two confirmed accounts gets RATE_LIMITED for a third", async () => {

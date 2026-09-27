@@ -40,7 +40,7 @@ export function guestHarness(start = "2026-10-01T15:00:00.000Z"): GuestHarness {
     lines,
     log,
     confirmationDeps: (suffixes?: string[]): ConfirmationDeps => ({ client: world.client, leads: leads.store, emailHash: hashOf, provisioner, now: world.now, log, ...suffixOf(suffixes) }),
-    signInDeps: (suffixes?: string[]): SignInDeps => ({ client: world.client, leads: leads.store, provisioner, now: world.now, log, ...suffixOf(suffixes) }),
+    signInDeps: (suffixes?: string[]): SignInDeps => ({ client: world.client, leads: leads.store, emailHash: hashOf, provisioner, now: world.now, log, ...suffixOf(suffixes) }),
   });
 }
 
@@ -66,7 +66,7 @@ export function confirmationEvent(overrides: { readonly triggerSource?: string; 
   };
 }
 
-export function authenticationEvent(overrides: { readonly triggerSource?: string; readonly sub?: string; readonly userName?: string } = {}): PostAuthenticationTriggerEvent {
+export function authenticationEvent(overrides: { readonly triggerSource?: string; readonly sub?: string; readonly userName?: string; readonly email?: string } = {}): PostAuthenticationTriggerEvent {
   return {
     version: "1",
     region: "us-east-1",
@@ -74,7 +74,7 @@ export function authenticationEvent(overrides: { readonly triggerSource?: string
     userName: overrides.userName ?? username(1),
     callerContext: { awsSdkVersion: "aws-sdk-js-3", clientId: "console-web-client" },
     triggerSource: (overrides.triggerSource ?? "PostAuthentication_Authentication") as PostAuthenticationTriggerEvent["triggerSource"],
-    request: { userAttributes: { sub: overrides.sub ?? SUB }, newDeviceUsed: false },
+    request: { userAttributes: { sub: overrides.sub ?? SUB, ...(overrides.email === undefined ? {} : { email: overrides.email, email_verified: "true" }) }, newDeviceUsed: false },
     response: {},
   };
 }

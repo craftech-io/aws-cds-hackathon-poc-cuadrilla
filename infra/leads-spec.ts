@@ -103,6 +103,8 @@ export const BFF_LEAD_ATTRIBUTES = [
   "consentHistory",
   "abuseHash",
   "pendingUsernames",
+  "pending",
+  "retiredUsernames",
   "signupStartedAt",
   "expiresAt",
 ] as const;
@@ -191,11 +193,12 @@ export type SignupCapability = keyof typeof SIGNUP_CAPABILITIES;
  * no Cognito API at all. The Lambdas they invoke come with the link of that Function.
  */
 export const SIGNUP_ROLES = {
-  // Reads the lead (EMAIL_TAKEN), spends a use of the ticket and reads the cut and the daily cap
-  // without incrementing anything. Reads go through the shared kill switch reader (GetItem or BatchGetItem).
+  // Reads the lead (EMAIL_TAKEN), spends a use of the ticket and reads the cut, the daily cap and the
+  // person's confirmed accounts without incrementing anything. Reads go through the shared kill switch
+  // reader (GetItem or BatchGetItem).
   AuthPreSignUp: {
     capabilities: ["LEADS_READ"],
-    grants: [runtime(["dynamodb:UpdateItem"], ["SIGNUPTICKET#*"]), runtime(KEY_READS, ["SIGNUP#*", "KILL#*"])],
+    grants: [runtime(["dynamodb:UpdateItem"], ["SIGNUPTICKET#*"]), runtime(KEY_READS, ["SIGNUP#*", "SIGNUPKEY#*", "KILL#*"])],
   },
   // Only the cut of the sign-up: no table, no secret (the auth emails carry the neutral brand).
   AuthCustomMessage: { capabilities: [], grants: [runtime(KEY_READS, ["KILL#*"])] },
@@ -209,13 +212,15 @@ export const SIGNUP_ROLES = {
       invokeGuestWorlds,
     ],
   },
-  // `lastLoginAt` and the retention of the lead; a new generation (old row out, new row in) when it expired.
+  // `lastLoginAt` and the retention of the lead; a new generation (old row out, new row in) when it
+  // expired; and the confirmation of a `gst-*` user whose post confirmation failed after Cognito had
+  // confirmed it (the same rows as AuthPostConfirmation: SIGNUPSUB#, SIGNUPKEY#).
   AuthPostAuthentication: {
     capabilities: ["LEADS_WRITE"],
     grants: [
       queryIspsBySub,
       g(["dynamodb:GetItem", "dynamodb:ConditionCheckItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"], ["{Isps}"], [leadingKeys(GUEST_GENERATIONS)]),
-      runtime(KEY_WRITES, ["GUESTACCOUNT#*", "GUESTWORLDS#*", "SIGNUPOK#*"]),
+      runtime(KEY_WRITES, ["GUESTACCOUNT#*", "GUESTWORLDS#*", "SIGNUPOK#*", "SIGNUPKEY#*", "SIGNUPSUB#*"]),
       invokeGuestWorlds,
     ],
   },

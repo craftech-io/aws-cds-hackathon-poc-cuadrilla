@@ -3,7 +3,7 @@
 # The only infrastructure that must exist BEFORE the first `sst deploy`: the deploy role GitHub
 # Actions assumes through OIDC, the qa-runner role of the scenario runner, the permissions boundary
 # of every role the app creates, the Router key-value store, the console's security headers and the
-# origin request policy of /api/*.
+# origin request and cache policies of /api/*.
 # The demos account is SHARED: every statement is fenced by tag, name, IAM path or ARN.
 # What each statement is for, residual risks, apply and verify: infra/bootstrap/README.md.
 AWSTemplateFormatVersion: "2010-09-09"
@@ -117,6 +117,27 @@ Resources:
           Headers: [CloudFront-Viewer-Address]
         CookiesConfig: { CookieBehavior: all }
         QueryStringsConfig: { QueryStringBehavior: all }
+
+  # CloudFront strips Authorization from a GET or HEAD unless it is part of the cache key, and the
+  # console sends every tRPC query as a GET with its id token. Nothing is kept: the BFF answers
+  # no-store, and MaxTTL 1 is the least CloudFront takes for a policy with a header in its key.
+  ApiCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub "${AppName}-${DeployStage}-api"
+        Comment: /api/* of the Router - Authorization in the key so a GET query keeps its id token; no caching.
+        MinTTL: 0
+        DefaultTTL: 0
+        MaxTTL: 1
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: false
+          EnableAcceptEncodingBrotli: false
+          HeadersConfig:
+            HeaderBehavior: whitelist
+            Headers: [Authorization]
+          CookiesConfig: { CookieBehavior: none }
+          QueryStringsConfig: { QueryStringBehavior: all }
 
   # ---- Permissions boundary: the ceiling of every role the app creates -----------------------
   DeployBoundary:
@@ -1101,3 +1122,6 @@ Outputs:
   ApiOriginRequestPolicyId:
     Description: Origin request policy of /api/* (infra/web.ts finds it by name).
     Value: !Ref ApiOriginRequestPolicy
+  ApiCachePolicyId:
+    Description: Cache policy of /api/* (infra/web.ts finds it by name).
+    Value: !Ref ApiCachePolicy

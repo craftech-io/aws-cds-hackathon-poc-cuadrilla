@@ -89,6 +89,16 @@ describe("pre sign-up trigger [FL-104] [FL-114] [FL-121] [FL-122]", () => {
     expect(await refusalOf(signUpEvent(username, ticket))).toBe("EMAIL_TAKEN");
   });
 
+  it("[FL-114] a person who confirmed two accounts since the start (another address) → RATE_LIMITED, reading only", async () => {
+    const lead = await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, EMAIL));
+    const key = { PK: `SIGNUPKEY#${lead?.abuseHash ?? ""}`, SK: "META" };
+    await h.runtime.put("Runtime", { ...key, entity: "SignupKey", confirmedAccounts: 1 });
+    expect(await refusalOf(signUpEvent(username, ticket))).toBe("ACCEPTED");
+    await h.runtime.update("Runtime", key, { confirmedAccounts: 2 }, SIGNUP_T0.toISOString());
+    expect(await refusalOf(signUpEvent(username, ticket))).toBe("RATE_LIMITED");
+    expect((await h.runtime.get("Runtime", key))?.confirmedAccounts).toBe(2);
+  });
+
   it("[FL-122] a custom:* attribute or a locale outside {es-MX, en} is refused", async () => {
     expect(await refusalOf(signUpEvent(username, ticket, { "custom:ispId": "isp-demo" }))).toBe("ATTRIBUTE_NOT_ALLOWED");
     expect(await refusalOf(signUpEvent(username, ticket, { "custom:role": "SUPERVISOR" }))).toBe("ATTRIBUTE_NOT_ALLOWED");

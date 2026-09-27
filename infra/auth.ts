@@ -62,7 +62,7 @@ const TRIGGER_LINKS = {
   AuthPreSignUp: [Leads, SessionTokenKey],
   AuthCustomMessage: [],
   AuthPostConfirmation: [Leads, SessionTokenKey, CostCaps, guestWorlds],
-  AuthPostAuthentication: [Leads, CostCaps, guestWorlds],
+  AuthPostAuthentication: [Leads, SessionTokenKey, CostCaps, guestWorlds],
 } as const;
 
 type SignupTrigger = keyof typeof TRIGGER_LINKS & SignupFunction;

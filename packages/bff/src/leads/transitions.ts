@@ -4,13 +4,22 @@
 // `signup.start` can put the whole item; `status`, `cognitoSub`, `cognitoUsername`, `userId`,
 // `subKey`, `confirmedAt`, `lastLoginAt`, `notifiedAt` and `notifyOutcome` appear only from the
 // confirmation on, written by the triggers and `LeadStream`.
+//
+// Anyone who types an address can start a sign-up for it, and nothing proves ownership until the code
+// is confirmed. So a start is kept apart, by user, in `pending[<username>]`, and never replaces what
+// another start said: the confirmation promotes the entry of the user who confirmed (its form, its
+// attribution and only its consents). A start past the third pending user retires the oldest one
+// instead of refusing, so three starts of a stranger never lock the owner out for the lead's 7 days.
 import type { LegalLocale } from "@cuadrilla/shared/legal/consents";
 import {
   type ConsentRecord,
   type Lead,
   type LeadOrigin,
   LEAD_META,
+  MAX_PENDING_USERNAMES,
+  MAX_RETIRED_USERNAMES,
   ORIGIN_POC,
+  type PendingStart,
   type Utm,
   confirmedExpiresAt,
   isPending,
@@ -19,8 +28,7 @@ import {
   pendingExpiresAt,
 } from "./model";
 
-/** Users without confirmation per email: a fourth start answers `RATE_LIMITED` (ADR-0025 §3). */
-export const MAX_PENDING_USERNAMES = 3;
+export { MAX_PENDING_USERNAMES };
 
 export interface LeadForm {
   readonly name?: string | undefined;
@@ -55,13 +63,26 @@ export interface ConfirmInput {
   readonly at: Date;
 }
 
-function optionalFields(input: StartPendingInput): Partial<Pick<Lead, "name" | "company" | "jobTitle" | "utm" | "referrerOrigin">> {
+type FormFields = Pick<Lead, "name" | "company" | "jobTitle" | "utm" | "referrerOrigin">;
+
+function optionalFields(input: Partial<FormFields>): Partial<FormFields> {
   return {
     ...(input.name === undefined ? {} : { name: input.name }),
     ...(input.company === undefined ? {} : { company: input.company }),
     ...(input.jobTitle === undefined ? {} : { jobTitle: input.jobTitle }),
     ...(input.utm === undefined || Object.keys(input.utm).length === 0 ? {} : { utm: input.utm }),
     ...(input.referrerOrigin === undefined ? {} : { referrerOrigin: input.referrerOrigin }),
+  };
+}
+
+/** What one start said, kept under its own user. */
+export function pendingStartOf(input: StartPendingInput): PendingStart {
+  return {
+    email: input.email,
+    ...optionalFields(input),
+    locale: input.locale,
+    consents: { TERMS_PRIVACY: input.consents.TERMS_PRIVACY, CONTACT: input.consents.CONTACT },
+    at: input.at.toISOString(),
   };
 }
 
@@ -82,6 +103,7 @@ export function newLead(input: StartPendingInput, leadId: string): Lead {
     consentHistory: [input.consents.TERMS_PRIVACY, input.consents.CONTACT],
     abuseHash: input.abuseHash,
     pendingUsernames: [input.username],
+    pending: { [input.username]: pendingStartOf(input) },
     signupStartedAt: at,
     expiresAt: pendingExpiresAt(input.at),
     version: 1,
@@ -91,37 +113,57 @@ export function newLead(input: StartPendingInput, leadId: string): Lead {
 }
 
 /**
- * Another start for a pending lead: one more pending user (at most 3; `undefined` beyond), the form,
- * the attribution and the consents of the last start (the previous ones stay in `consentHistory`),
- * and the first `signupStartedAt` and `expiresAt` kept: the lead still expires 7 days after its first start.
+ * Another start for a pending lead: one more pending user with its own entry, the oldest pending user
+ * retired when there were already 3 (its Cognito user goes with the others; a confirmation of it finds no
+ * pending lead that lists it), and nothing another start said touched: the lead's own fields stay the
+ * first start's, and the first `signupStartedAt` and `expiresAt` are kept (7 days after the first start).
+ * `undefined` for a lead that is no longer pending.
  */
 export function restartedLead(current: Lead, input: StartPendingInput): Lead | undefined {
-  if (!isPending(current) || current.pendingUsernames.length >= MAX_PENDING_USERNAMES) return undefined;
-  const { name: _name, company: _company, jobTitle: _jobTitle, utm: _utm, referrerOrigin: _referrer, ...kept } = current;
+  if (!isPending(current)) return undefined;
+  const listed = [...current.pendingUsernames, input.username];
+  const retired = listed.slice(0, Math.max(0, listed.length - MAX_PENDING_USERNAMES));
+  const kept = listed.slice(retired.length);
+  const pending = Object.fromEntries(kept.filter((name) => name !== input.username).flatMap((name) => (current.pending?.[name] === undefined ? [] : [[name, current.pending[name]] as const])));
+  const retiredUsernames = [...(current.retiredUsernames ?? []), ...retired].slice(-MAX_RETIRED_USERNAMES);
   return {
-    ...kept,
-    email: input.email,
-    ...optionalFields(input),
-    locale: input.locale,
-    origin: input.origin,
-    consents: { TERMS_PRIVACY: input.consents.TERMS_PRIVACY, CONTACT: input.consents.CONTACT },
-    consentHistory: [...current.consentHistory, input.consents.TERMS_PRIVACY, input.consents.CONTACT],
-    pendingUsernames: [...current.pendingUsernames, input.username],
+    ...current,
+    pendingUsernames: kept,
+    pending: { ...pending, [input.username]: pendingStartOf(input) },
+    ...(retiredUsernames.length === 0 ? {} : { retiredUsernames }),
     version: current.version + 1,
     updatedAt: input.at.toISOString(),
   };
 }
 
+/** The lead without its pending state and, when the confirmed user's start is there, with that start's fields. */
+function promoted(current: Lead, username: string): Omit<Lead, "pending"> {
+  const { pending: _pending, ...lead } = current;
+  const start = current.pending?.[username];
+  // A lead written before the entries existed keeps its own fields.
+  if (start === undefined) return lead;
+  const { name: _name, company: _company, jobTitle: _jobTitle, utm: _utm, referrerOrigin: _referrer, ...rest } = lead;
+  return {
+    ...rest,
+    email: start.email,
+    ...optionalFields(start),
+    locale: start.locale,
+    consents: start.consents,
+    consentHistory: [start.consents.TERMS_PRIVACY, start.consents.CONTACT],
+  };
+}
+
 /**
  * Post-confirmation: only a pending lead whose `pendingUsernames` lists the confirmed user becomes
- * `CONFIRMED` (ADR-0025 §1); its retention becomes 24 months. The other pending users stay listed
- * until `LeadStream` has deleted them from Cognito.
+ * `CONFIRMED` (ADR-0025 §1), with the form, attribution and consents of THAT user's start (what other
+ * starts said is dropped with `pending`); its retention becomes 24 months. The other pending users stay
+ * listed until `LeadStream` has deleted them from Cognito.
  */
 export function confirmedLead(current: Lead, input: ConfirmInput): Lead | undefined {
   if (!isPending(current) || !current.pendingUsernames.includes(input.username)) return undefined;
   const at = input.at.toISOString();
   return {
-    ...current,
+    ...promoted(current, input.username),
     status: "CONFIRMED",
     cognitoSub: input.sub,
     cognitoUsername: input.username,

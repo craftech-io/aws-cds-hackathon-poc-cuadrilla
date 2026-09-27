@@ -149,6 +149,8 @@ describe("the sign-up's Cognito calls (GuestSignup) [FL-104] [FL-105] [FL-106]",
     expect(signupErrorCodeOf(error, "signUp")).toBe("TICKET_INVALID");
     expect(signupErrorCodeOf(new CognitoError("UserLambdaValidationException", "PreSignUp failed with error EMAIL_TAKEN."), "signUp")).toBe("EMAIL_TAKEN");
     expect(signupErrorCodeOf(new CognitoError("UserLambdaValidationException", "CustomMessage failed with error CAP_REACHED."), "resend")).toBe("CAP_REACHED");
+    // Two confirmed accounts of the same person already (ADR-0025 §3), read again by the pre sign-up.
+    expect(signupErrorCodeOf(new CognitoError("UserLambdaValidationException", "PreSignUp failed with error RATE_LIMITED."), "signUp")).toBe("RATE_LIMITED");
     expect(signupErrorCodeOf(new CognitoError("UserLambdaValidationException", "PreSignUp failed with error SOURCE_NOT_ALLOWED."), "signUp")).toBe("UNAVAILABLE");
     expect(signupErrorCodeOf(new CognitoError("InvalidPasswordException", "x"), "signUp")).toBe("WEAK_PASSWORD");
     expect(signupErrorCodeOf(new CognitoError("CodeMismatchException", "x"), "confirm")).toBe("INVALID_CODE");

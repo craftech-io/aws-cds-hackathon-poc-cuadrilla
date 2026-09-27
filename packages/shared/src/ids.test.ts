@@ -141,6 +141,7 @@ describe("photos, ONU, manual and versions", () => {
     expect(set).toHaveLength(60);
     expect(set.every((id) => isId("photo", id) && isSetPhotoId(id))).toBe(true);
     expect(isId("photo", "ph-hist-07") && !isSetPhotoId("ph-hist-07")).toBe(true);
+    expect(isId("photo", "ph-story-01") && !isSetPhotoId("ph-story-01")).toBe(true);
     expect(seedPhotoId("ONU_LABEL_PHOTO", 3)).toBe("ph-seed-ONU_LABEL_PHOTO-03");
     expect(isSetPhotoId(seedPhotoId("ROSETTE_PHOTO", 16))).toBe(false);
     expect(() => seedPhotoId("ONU_ONLINE" as never, 1)).toThrow();

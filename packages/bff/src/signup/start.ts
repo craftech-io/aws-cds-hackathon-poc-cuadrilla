@@ -8,7 +8,8 @@
 //   5. the domain of the email: MX, or A/AAAA, within 1 s                     INVALID (EMAIL_DOMAIN)
 //   6. the visitor's counters, then the stage's day (signup/limits.ts)        RATE_LIMITED | CAP_REACHED
 //   7. two confirmed accounts of the same person                             RATE_LIMITED
-//   8. the lead: new, or one more pending user (≤ 3); a confirmed one         EMAIL_TAKEN | RATE_LIMITED
+//   8. the lead: new, or one more pending user (≤ 3, the oldest retired, each start's form and
+//      consents kept apart under its own user); a confirmed one            EMAIL_TAKEN
 //   9. the ticket that binds the email and the new `gst-<ULID>` user, 10 minutes
 //
 // Emails, IPs and tickets never reach a log: a line carries the first 8 characters of the email's hash
@@ -134,7 +135,6 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
     at: now,
   });
   if (started.outcome === "EMAIL_TAKEN") return refuse("EMAIL_TAKEN", REFUSALS.EMAIL_TAKEN(), emailHash);
-  if (started.outcome === "TOO_MANY_PENDING") return refuse("RATE_LIMITED", REFUSALS.RATE_LIMITED(), emailHash);
 
   const exp = Math.floor((now.getTime() + SIGNUP_TICKET_TTL_MS) / 1000);
   const ticket = issueTicket(p.keys.ticket(), { nonce: p.newUlid(now.getTime()), emailHash, username, exp });

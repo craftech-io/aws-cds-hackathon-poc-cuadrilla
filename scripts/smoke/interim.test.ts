@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { directUrlProblems, edgeInventory, healthVerdict, rootProblems, signupEdgeVerdict, stateInventory } from "./interim";
+import { authForwardingVerdict, directUrlProblems, edgeInventory, healthVerdict, rootProblems, signupEdgeVerdict, stateInventory } from "./interim";
 
 const SECURE = {
   "content-security-policy": "default-src 'self'; script-src 'self'; frame-ancestors 'none'",
@@ -22,6 +22,15 @@ describe("interim smoke", () => {
       "GET / has no X-Content-Type-Options nosniff",
     ]);
     expect(rootProblems(200, { ...SECURE, "x-frame-options": "SAMEORIGIN" })).toEqual(["GET / has no X-Frame-Options DENY"]);
+  });
+
+  it("[FL-114] tells a GET query whose Authorization reached the BFF from one CloudFront stripped", () => {
+    const refusal = (reason: string) => JSON.stringify({ error: { message: "x", code: -32001, data: { code: "UNAUTHORIZED", httpStatus: 401, reason } } });
+    expect(authForwardingVerdict(401, refusal("TOKEN_INVALID"))).toBe("forwarded");
+    expect(authForwardingVerdict(401, `[${refusal("TOKEN_INVALID")}]`)).toBe("forwarded");
+    expect(authForwardingVerdict(401, refusal("TOKEN_MISSING"))).toBe("stripped");
+    expect(authForwardingVerdict(200, "<!doctype html>")).toBe("failed");
+    expect(authForwardingVerdict(403, "")).toBe("failed");
   });
 
   it("tells the BFF health probe from the console's fallback page", () => {

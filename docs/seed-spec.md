@@ -249,7 +249,7 @@ Oráculo del saliente para `R` (`docs/test-plan.md` §4.3 y §5): ningún porcen
 
 Totales: 22 de medidor, 18 de etiqueta, 16 de roseta, 4 adversarias; 21 `PASS` y 39 que deben rechazarse. Los textos que dibujan las plantillas (incluidas las frases adversarias) están en `scripts/seed/photos/texts.ts` y pasan por `lint:forbidden`.
 
-### 10.1 Renders fuera del set: históricos y de siembra
+### 10.1 Renders fuera del set: históricos, de siembra y de la historia
 
 `DUPLICATE_EVIDENCE` compara el `sha256` contra toda evidencia del mundo y su época, incluidas las sembradas. Para que una evidencia sembrada nunca choque con una foto que un paso posterior manda, ninguna evidencia sembrada usa bytes del set salvo pedido explícito:
 
@@ -257,8 +257,9 @@ Totales: 22 de medidor, 18 de etiqueta, 16 de roseta, 4 adversarias; 21 `PASS` y
 |---|---|---|---|
 | Históricos | `ph-hist-<nn>` | Evidencias de las órdenes del 12/10 (§7) | Renders propios del 12/10; distintos de toda foto del set (invariante 21) |
 | De siembra | `ph-seed-<item>-<nn>` (`POWER_READING_PHOTO`, `ONU_LABEL_PHOTO`, `ROSETTE_PHOTO`; `nn` 01-08 con aspecto `PASS` y 09-16 con aspecto `REJECT`, por ítem: 48 archivos) | Evidencias y validaciones de los presets `checklist` de `world.create` (sin `photoId`) y de las escenas de "Saltar a escena"; el preset asigna un `nn` distinto por orden del mundo, así dos órdenes sembradas del mismo mundo tampoco comparten bytes (y un `nn` distinto por intento de `attempts`); si un mundo agota los 8 renders de un ítem y aspecto, `world.create` falla con `PRESET_POOL_EXHAUSTED` | Mismas plantillas de §10 con otra semilla de fondo y otros valores dibujados coherentes con su veredicto; distintos de toda foto del set y de todo `ph-hist` (invariante 23) |
+| De la historia | `ph-story-<nn>` (`ph-story-01`: la etiqueta de la ONU de `wo-24817`, la misma de `ph-label-01`, con reflejo sobre el serial; `REJECT` `GLARE`) | La foto rechazada de la escena 3 de la historia principal (`packages/bff/src/story/main-story.ts`), en el recorrido y el hero de la landing (copia de 480 × 360 en `packages/web/public/landing/renders/photos/`) | Render propio; distinto de toda foto del set y de los demás grupos |
 
-Ninguno de los dos grupos entra en `EV-02` ni en los 60 del set; tienen su propia hoja (`scripts/seed/photos/datasheet-aux.json`) con el mismo formato. La única forma de sembrar una foto del set como evidencia es el `photoId` explícito del preset `checklist`, que usan solo los pasos que declaran `expect: DUPLICATE_EVIDENCE` (`SC-04/12..13`) y `eval.runPhotos` antes de `ph-adv-04`.
+Ninguno de estos grupos entra en `EV-02` ni en los 60 del set; tienen su propia hoja (`scripts/seed/photos/datasheet-aux.json`) con el mismo formato. La única forma de sembrar una foto del set como evidencia es el `photoId` explícito del preset `checklist`, que usan solo los pasos que declaran `expect: DUPLICATE_EVIDENCE` (`SC-04/12..13`) y `eval.runPhotos` antes de `ph-adv-04`.
 
 ## 11. Notas de voz sintéticas (Amazon Polly)
 

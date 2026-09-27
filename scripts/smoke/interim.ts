@@ -12,7 +12,12 @@
 //      and a batch naming it (`POST /api/health.live,signup.start?batch=1`) the challenge or the
 //      app's 400; never a 200 nor RATE_LIMITED. Neither ever reaches `signup.start`: no lead, no
 //      counter, no email.
-//   5. Inventory (`--aws`): the DynamoDB tables and Lambda functions of the app that exist so far,
+//   5. The id token reaches the BFF on a query (SMK/11): a tRPC query is a `GET`, and CloudFront strips
+//      `Authorization` from a `GET` unless the cache policy of `/api/*` keeps it in the key
+//      (infra/bootstrap/ci-role.yaml, ApiCachePolicy). `GET /api/guest.world` with a bearer that is not
+//      a JWT must answer 401 `TOKEN_INVALID` (the BFF saw the header), never `TOKEN_MISSING` (it was
+//      dropped on the way). Only when the BFF is up.
+//   6. Inventory (`--aws`): the DynamoDB tables and Lambda functions of the app that exist so far,
 //      and (SMK/10) the Bff's Function URL called directly answers 403 with no body, and the two web
 //      ACLs are attached (the Router's distribution and the user pool).
 //                          Their names come from this app's own SST state (`sst state export`),
@@ -81,6 +86,29 @@ async function get(url: string, init: RequestInit = {}): Promise<{ status: numbe
     await new Promise((done) => setTimeout(done, RETRY_DELAY_MS));
   }
   throw new Error(`${url} did not answer after ${ATTEMPTS} attempts`, { cause: lastError });
+}
+
+export type AuthForwardingVerdict = "forwarded" | "stripped" | "failed";
+
+/** Bearer of the SMK/11 probe: never a JWT, so the BFF can only refuse it as invalid. */
+export const PROBE_BEARER = "Bearer smoke-probe.not-a-jwt";
+
+/**
+ * What the BFF answered to an authenticated query through the Router: the refusal of a token it read
+ * (`forwarded`), the refusal of a missing one (`stripped`: CloudFront dropped `Authorization`), or
+ * anything else.
+ */
+export function authForwardingVerdict(status: number, body: string): AuthForwardingVerdict {
+  let reason: unknown;
+  try {
+    const parsed = JSON.parse(body) as { error?: { data?: { reason?: unknown } } } | Array<{ error?: { data?: { reason?: unknown } } }>;
+    reason = (Array.isArray(parsed) ? parsed[0] : parsed)?.error?.data?.reason;
+  } catch {
+    return "failed";
+  }
+  if (status !== 401) return "failed";
+  if (reason === "TOKEN_MISSING") return "stripped";
+  return reason === "TOKEN_INVALID" ? "forwarded" : "failed";
 }
 
 export type SignupEdgeVerdict = "challenge" | "rejected" | "failed";
@@ -229,7 +257,13 @@ async function main(): Promise<void> {
   if (verdict === "failed" || (verdict === "not-deployed" && expectApi)) problems.push(`GET /api/health: ${verdict} (${health.status})`);
   const signup = await signupEdge(baseUrl);
   problems.push(...signup.problems);
-  console.log(`smoke:interim: / ${root.status} · /legal/privacy.html ${legal.status} · /api/health ${verdict} · ${signup.line}`);
+  let auth: AuthForwardingVerdict | "skipped" = "skipped";
+  if (verdict === "ok") {
+    const query = await get(`${baseUrl}/api/guest.world`, { headers: { authorization: PROBE_BEARER } });
+    auth = authForwardingVerdict(query.status, query.body);
+    if (auth !== "forwarded") problems.push(`GET /api/guest.world with a bearer answered ${query.status} (${auth}): the Router must forward Authorization on a GET query`);
+  }
+  console.log(`smoke:interim: / ${root.status} · /legal/privacy.html ${legal.status} · /api/health ${verdict} · ${signup.line} · GET query auth ${auth}`);
   if (aws) {
     const found = await inventory();
     console.log(`smoke:interim: ${found.lines.join(" · ")}`);

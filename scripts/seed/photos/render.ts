@@ -1,5 +1,5 @@
-// `npm run seed:photos`: renders the 60 photos of the set, the 40 historical and the 48 seeding
-// renders with Playwright's Chromium, and writes their datasheets, the scripted validator output and
+// `npm run seed:photos`: renders the 60 photos of the set, the 40 historical, the 48 seeding and the
+// main story's renders with Playwright's Chromium, and writes their datasheets, the scripted validator output and
 // the synthetic certificate sample (docs/seed-spec.md §10, §10.1; ADR-0006). The result is committed
 // and checked by sha256 (scripts/seed/__tests__/photos.test.ts). No AWS call.
 //
@@ -13,7 +13,7 @@ import { CERTIFICATE_TEMPLATE_SAMPLE_KEY } from "../../../packages/bff/src/copy/
 import { parseFlags } from "../../channels/cli-args";
 import { ACTA_SAMPLE_FILE, actaSamplePdf } from "./acta-sample";
 import { openRenderer, type PhotoRenderer } from "./browser";
-import { historicalPhotoSpecs, seedPhotoSpecs } from "./catalog-aux";
+import { historicalPhotoSpecs, seedPhotoSpecs, storyPhotoSpecs } from "./catalog-aux";
 import { setPhotoSpecs } from "./catalog-set";
 import { jpegInfo } from "./jpeg";
 import { sha256Hex, stableJson } from "./prng";
@@ -32,9 +32,9 @@ export function photoFile(photoId: string): string {
   return `${PHOTOS_DIR}/out/${photoId}.jpg`;
 }
 
-/** Every spec, validated at the edge, with unique ids: set first, then historical, then seeding. */
+/** Every spec, validated at the edge, with unique ids: set first, then historical, seeding and the story's. */
 export function allPhotoSpecs(): PhotoSpec[] {
-  const specs = [...setPhotoSpecs(), ...historicalPhotoSpecs(), ...seedPhotoSpecs()].map((spec) => PhotoSpec.parse(spec));
+  const specs = [...setPhotoSpecs(), ...historicalPhotoSpecs(), ...seedPhotoSpecs(), ...storyPhotoSpecs()].map((spec) => PhotoSpec.parse(spec));
   const ids = new Set<string>();
   for (const spec of specs) {
     if (ids.has(spec.photoId)) throw new Error(`duplicate photo id ${spec.photoId}`);

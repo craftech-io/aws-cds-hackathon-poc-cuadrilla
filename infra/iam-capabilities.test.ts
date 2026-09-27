@@ -327,12 +327,13 @@ describe("sign-up and leads", () => {
     const runtime = (role: RoleName) => grantsOn(role, "{Runtime}").map((grant) => ({ actions: [...grant.actions].sort(), keys: keysOf(grant) }));
     expect(runtime("AuthPreSignUp")).toEqual([
       { actions: ["dynamodb:UpdateItem"], keys: ["SIGNUPTICKET#*"] },
-      { actions: ["dynamodb:BatchGetItem", "dynamodb:GetItem"], keys: ["SIGNUP#*", "KILL#*"] },
+      { actions: ["dynamodb:BatchGetItem", "dynamodb:GetItem"], keys: ["SIGNUP#*", "SIGNUPKEY#*", "KILL#*"] },
     ]);
     expect(runtime("AuthCustomMessage")).toEqual([{ actions: ["dynamodb:BatchGetItem", "dynamodb:GetItem"], keys: ["KILL#*"] }]);
     expect(expectedGrants("AuthCustomMessage")).toHaveLength(1);
     expect(runtime("AuthPostConfirmation").map((grant) => grant.keys)).toEqual([["GUESTACCOUNT#*", "GUESTWORLDS#*", "SIGNUPOK#*", "SIGNUPKEY#*", "SIGNUPSUB#*"]]);
-    expect(runtime("AuthPostAuthentication").map((grant) => grant.keys)).toEqual([["GUESTACCOUNT#*", "GUESTWORLDS#*", "SIGNUPOK#*"]]);
+    // The sign-in finishes a confirmation that failed after Cognito confirmed the user (ADR-0025 §1).
+    expect(runtime("AuthPostAuthentication").map((grant) => grant.keys)).toEqual([["GUESTACCOUNT#*", "GUESTWORLDS#*", "SIGNUPOK#*", "SIGNUPKEY#*", "SIGNUPSUB#*"]]);
     for (const role of ["AuthPostConfirmation", "AuthPostAuthentication"] as const) expect(keysOf(grantsOn(role, "{Isps}")[0])).toEqual(["ISP#isp-guest-s*"]);
     for (const role of ["AuthPreSignUp", "AuthCustomMessage", "AuthPostConfirmation", "AuthPostAuthentication", "AuthPreToken"] as const) expect(cognito(role), role).toEqual([]);
     for (const role of ["AuthPreSignUp", "AuthCustomMessage", "AuthPostConfirmation", "AuthPostAuthentication"] as const) expect(expectedTables(role), role).toEqual({});

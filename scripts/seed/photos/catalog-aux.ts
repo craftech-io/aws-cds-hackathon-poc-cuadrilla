@@ -7,6 +7,9 @@
 //   ph-hist-37..40   the rejected attempts of 12/10 behind the seeded profiles: two GLARE and one
 //                    BLURRY for Karina, one CROPPED for Rogelio (docs/seed-spec.md §5)
 //   ph-seed-<item>-<nn>  presets and "Saltar a escena": 01-08 look like a PASS, 09-16 like a REJECT
+//   ph-story-<nn>    the main story's own renders that no other group has: 01 is the rejected photo of
+//                    the ONU label of wo-24817, glare over its serial (packages/bff/src/story/main-story.ts,
+//                    the landing's walkthrough and hero)
 import { type OpticalClass, PhotoItem, type RejectReason, seedPhotoId } from "@cuadrilla/shared";
 import { DEMO_ORDERS } from "./catalog-set";
 import { createRng, seedFor } from "./prng";
@@ -51,7 +54,7 @@ function looksRejected(reason: RejectReason, degradations: readonly Degradation[
   return { degradations, expectedVerdict: "REJECT", expectedReason: reason };
 }
 
-function auxPhoto(photoId: string, group: "hist" | "seed", item: PhotoItem, drawn: Drawn, look: AuxLook, context: { serial: string; opticalClass: OpticalClass; rxDbm: number; workOrderId: string | null }, description: string): PhotoSpec {
+function auxPhoto(photoId: string, group: "hist" | "seed" | "story", item: PhotoItem, drawn: Drawn, look: AuxLook, context: { serial: string; opticalClass: OpticalClass; rxDbm: number; workOrderId: string | null }, description: string): PhotoSpec {
   return {
     photoId,
     group,
@@ -160,4 +163,13 @@ export function seedPhotoSpecs(): PhotoSpec[] {
       return auxPhoto(seedPhotoId(item, nn), "seed", item, drawn, look, context, `Seeding render ${nn} of ${item} (${nn <= 8 ? "looks like a PASS" : `looks like a ${look.expectedReason ?? "REJECT"}`}).`);
     }),
   );
+}
+
+/** The main story's rejected label of wo-24817: the same label as ph-label-01, glare over the serial. */
+export function storyPhotoSpecs(): PhotoSpec[] {
+  const order = DEMO_ORDERS["wo-24817"];
+  if (order === undefined) throw new RangeError("unknown demo order wo-24817");
+  const look = looksRejected("GLARE", [{ kind: "glare", target: "serial", opacity: 0.98, spread: 1.5 }]);
+  const context = { serial: order.serial, opticalClass: order.opticalClass, rxDbm: order.rxDbm, workOrderId: "wo-24817" };
+  return [auxPhoto("ph-story-01", "story", "ONU_LABEL_PHOTO", drawnFor("ONU_LABEL_PHOTO", order.serial, order.rxDbm), look, context, "Main story: the ONU label of wo-24817 with glare over its serial, rejected before ph-label-01.")];
 }

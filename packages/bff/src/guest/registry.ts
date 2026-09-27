@@ -5,7 +5,9 @@
 //                                                 cognitoSub; GSI1 SUB#<sub>; no TTL (it moves with the
 //                                                 generation and outlives it)
 //   Runtime  SIGNUPSUB#<sub> · META               one registry per Cognito `sub`, created with the row
-//   Runtime  SIGNUPKEY#<abuseHash> · META          `confirmedAccounts` of one person (signup.start caps it at 2)
+//   Runtime  SIGNUPKEY#<abuseHash> · META          `confirmedAccounts` of one person: 2 at most, read by
+//                                                 signup.start and the pre sign-up, and the increment
+//                                                 itself carries the ceiling
 //
 // A sign-up guest's console user shares the ULID of its Cognito user: `gst-<ULID>` → `usr-g<ULID>`, so a
 // retried confirmation always names the same user.
@@ -16,6 +18,7 @@ import { createRepoContext, entityRow } from "../connector/dynamo/repo";
 import type { Item, TableClient, TransactOp } from "../connector/table-client";
 import { signupKeyKey, signupSubKey, CONFIRMED_ACCOUNTS } from "../leads/guest-accounts";
 import { SIGNUP_USERNAME_PATTERN, SIGNUP_USER_ID_PATTERN } from "../leads/model";
+import { SIGNUP_LIMITS } from "../signup/limits";
 
 /** Visible name of a sign-up guest's console user: a fixed word, never what the visitor typed. */
 export const SIGNUP_GUEST_NAME = "Invitado";
@@ -108,9 +111,20 @@ export async function getSignupSub(client: TableClient, sub: string): Promise<Si
   return { userId: typeof item.userId === "string" ? item.userId : "", username: typeof item.username === "string" ? item.username : "" };
 }
 
-/** One more confirmed account of a person (`GuestAccountDeletion` gives it back). */
+/**
+ * One more confirmed account of a person (`GuestAccountDeletion` gives it back), never past the two of
+ * ADR-0025 §3: a transaction that would pass it fails as a whole (CONFLICT).
+ */
 export function confirmedAccountOp(abuseHash: string, now: Date): TransactOp {
-  return { op: "increment", table: "Runtime", key: signupKeyKey(abuseHash), attribute: CONFIRMED_ACCOUNTS, by: 1, defaults: { entity: "SignupKey", createdAt: now.toISOString() } };
+  return {
+    op: "increment",
+    table: "Runtime",
+    key: signupKeyKey(abuseHash),
+    attribute: CONFIRMED_ACCOUNTS,
+    by: 1,
+    max: SIGNUP_LIMITS.confirmedAccountsPerPerson,
+    defaults: { entity: "SignupKey", createdAt: now.toISOString() },
+  };
 }
 
 /** The clock of a registry row's operator. */

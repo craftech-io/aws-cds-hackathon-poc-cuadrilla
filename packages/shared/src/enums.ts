@@ -200,9 +200,10 @@ export type GuestOrigin = z.infer<typeof GuestOrigin>;
 
 /**
  * State of a guest's world (`Runtime/GUESTACCOUNT#<userId>.status`, ADR-0025 §2-§3): being built, ready,
- * failed (retryable) or without room under the cap of active sign-up worlds (retryable).
+ * failed (retryable), without room under the cap of active sign-up worlds (retryable), or never to have
+ * one: a third confirmed account of a person who already holds the two of ADR-0025 §3 (not retryable).
  */
-export const GuestWorldStatus = z.enum(["PROVISIONING", "READY", "FAILED", "CAP_FULL"]);
+export const GuestWorldStatus = z.enum(["PROVISIONING", "READY", "FAILED", "CAP_FULL", "PERSON_LIMIT"]);
 export type GuestWorldStatus = z.infer<typeof GuestWorldStatus>;
 
 /** People of an operator by role (`People` GSI2 `ispKindKey`, docs/architecture.md §5). */

@@ -64,7 +64,7 @@ export const Degradation = z.discriminatedUnion("kind", [
 ]);
 export type Degradation = z.infer<typeof Degradation>;
 
-export const PhotoGroup = z.enum(["set", "hist", "seed"]);
+export const PhotoGroup = z.enum(["set", "hist", "seed", "story"]);
 export type PhotoGroup = z.infer<typeof PhotoGroup>;
 
 /** A photo to render and its label: what the validator should conclude for the order it is sent to. */

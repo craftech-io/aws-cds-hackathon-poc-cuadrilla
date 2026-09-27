@@ -19,13 +19,23 @@ describe("GuestAccountDeletion [FL-118]", () => {
     const result = await deleteGuestAccount(w.deps, { userId: signupUserId(1) });
     expect(result).toEqual({ outcome: "DELETED", leadId: lead?.leadId, deletedUsers: 2 });
     expect([...w.cognitoCalls].sort()).toEqual([username(1), username(2)].sort());
-    expect(w.destroyed).toEqual([{ userId: signupUserId(1), clockId: GENERATION.clockId, guestOrigin: "SIGNUP" }]);
+    expect(w.destroyed).toEqual([{ userId: signupUserId(1), clockId: GENERATION.clockId, guestOrigin: "SIGNUP", status: "READY" }]);
     expect(await w.store.get(hashOf(EMAIL))).toBeUndefined();
     expect(await w.store.listEvents(hashOf(EMAIL))).toEqual([]);
     expect(w.data.dump("Isps")).toEqual([]);
     expect(await w.data.get("Runtime", guestAccountKey(signupUserId(1)))).toBeUndefined();
     expect(await w.data.get("Runtime", signupSubKey(SUB))).toBeUndefined();
     expect((await w.data.get("Runtime", signupKeyKey(lead?.abuseHash ?? "")))?.[CONFIRMED_ACCOUNTS]).toBe(0);
+  });
+
+  it("[FL-114] an account opened over the person's limit (PERSON_LIMIT) never counted: its deletion gives nothing back", async () => {
+    await signupGuest(w, { user: 1 });
+    const abuseHash = (await w.store.get(hashOf(EMAIL)))?.abuseHash ?? "";
+    await w.data.update("Runtime", guestAccountKey(signupUserId(1)), { status: "PERSON_LIMIT" }, at);
+    await w.data.update("Runtime", signupKeyKey(abuseHash), { [CONFIRMED_ACCOUNTS]: 2 }, at);
+    expect(await deleteGuestAccount(w.deps, { userId: signupUserId(1) })).toMatchObject({ outcome: "DELETED" });
+    expect(await w.data.get("Runtime", guestAccountKey(signupUserId(1)))).toBeUndefined();
+    expect((await w.data.get("Runtime", signupKeyKey(abuseHash)))?.[CONFIRMED_ACCOUNTS]).toBe(2);
   });
 
   it("[FL-118] logs LEAD_DELETED with the leadId, never the email nor its hash, and never calls Cognito with the email", async () => {
