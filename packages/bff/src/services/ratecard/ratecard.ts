@@ -10,7 +10,7 @@ import { z } from "zod";
 import { CalendarDate } from "@cuadrilla/shared";
 
 /** Model of the Harness and of the photo validator (docs/architecture.md §1); token rows are keyed by it. */
-export const DEFAULT_MODEL_ID = "global.anthropic.claude-opus-5";
+export const DEFAULT_MODEL_ID = "global.anthropic.claude-sonnet-5-5";
 /** Embeddings of the Knowledge Base; `Retrieve` embeds each query. */
 export const EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2";
 

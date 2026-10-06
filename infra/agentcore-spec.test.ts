@@ -84,7 +84,7 @@ describe("names (docs/architecture.md §1 and §9)", () => {
 
 describe("Harness (docs/architecture.md §4, ADR-0020)", () => {
   it("uses the documented models, limits and tools", () => {
-    expect(accountSection).toContain(`Harness y validación de fotos: \`${spec.HARNESS_MODEL_ID}\``);
+    expect(accountSection).toContain(`Harness, Memory y validación de fotos: \`${spec.HARNESS_MODEL_ID}\``);
     expect(spec.PHOTO_MODEL_ID).toBe(spec.HARNESS_MODEL_ID);
     expect(components).toContain(`\`${spec.HARNESS_API_FORMAT}\``);
     expect(spec.HARNESS_LIMITS).toEqual({
@@ -276,7 +276,7 @@ describe("runtime log group and content in traces (docs/architecture.md §12)", 
     expect(() => spec.runtimeLogGroupEndpoints("DEFAULT")).toThrow(/DEFAULT/);
     expect(spec.runtimeLogGroupName("harness_x-Ab12", "live")).toBe("/aws/bedrock-agentcore/runtimes/harness_x-Ab12-live");
     expect(() => spec.runtimeLogGroupName("../x", "live")).toThrow();
-    expect(observability).toContain(`Retención ${spec.AGENT_LOG_RETENTION_DAYS} días`);
+    expect(observability).toContain(`Retención de ${spec.AGENT_LOG_RETENTION_DAYS} días en todo grupo`);
   });
 
   it("records that no Harness or endpoint field turns content capture off, so retention is what is fixed", () => {

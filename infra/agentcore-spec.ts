@@ -21,12 +21,15 @@ import { parseStorageRef } from "./storage-keys";
 // ---- Models (ADR-0015, ADR-0020) ----------------------------------------------------------------------
 
 /**
- * Model of the Harness and of the extraction of the three Memory strategies (docs/architecture.md §1). A
- * parameter: changing it takes an EV-01 and an SC-18 run with the new model (ADR-0020).
+ * Model of the Harness and of the extraction of the three Memory strategies (docs/architecture.md §1,
+ * ADR-0028). A parameter: changing it takes an EV-01 and an SC-18 run with the new model (ADR-0020).
  */
-export const HARNESS_MODEL_ID = "global.anthropic.claude-opus-5";
-/** Model of the isolated photo validation (ToolEvidence's `Converse`); changing it takes an EV-02 run (ADR-0015). */
-export const PHOTO_MODEL_ID = "global.anthropic.claude-opus-5";
+export const HARNESS_MODEL_ID = "global.anthropic.claude-sonnet-5-5";
+/**
+ * Model of the isolated photo validation (ToolEvidence's `Converse`); changing it takes an EV-02 run
+ * (ADR-0015). Back to `global.anthropic.claude-opus-5` only if the photo measurement shows a regression (ADR-0028).
+ */
+export const PHOTO_MODEL_ID = "global.anthropic.claude-sonnet-5-5";
 /** G1 rides in the model parameters of the Harness, which needs streaming Converse (docs/architecture.md §9.4). */
 export const HARNESS_API_FORMAT = "converse_stream";
 
