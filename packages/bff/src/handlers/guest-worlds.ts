@@ -43,9 +43,13 @@ function failureOf(error: unknown): WorldFailure {
 /** What the log keeps of a failure: the error's name and, for the store, its code, table and cause; never a row. */
 export function failureDetail(error: unknown): Record<string, string> {
   if (!(error instanceof Error)) return { error: "unknown" };
-  const cause = error.cause instanceof Error ? { cause: error.cause.name } : {};
-  if (error instanceof ConnectorError) return { error: error.name, code: error.code, ...(error.table === undefined ? {} : { table: error.table }), ...cause };
-  return { error: error.name, ...cause };
+  const detail: Record<string, string> = { error: error.name };
+  if (error instanceof ConnectorError) {
+    detail.code = error.code;
+    if (error.table !== undefined) detail.table = error.table;
+  }
+  if (error.cause instanceof Error) detail.cause = error.cause.name;
+  return detail;
 }
 
 function skip(account: GuestAccount | undefined, clockId: string, origin: GuestOrigin): GuestWorldsOutcome | undefined {
