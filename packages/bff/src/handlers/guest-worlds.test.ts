@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ToolError } from "@cuadrilla/shared";
+import { ConnectorError, ToolError } from "@cuadrilla/shared";
 import { createAccountOp, getGuestAccount } from "../guest/account";
 import { guestHarness, type GuestHarness } from "../guest/testing";
 import { buildWorld } from "../worlds/factory";
 import { SIGNUP_CLOCK, SIGNUP_ISP, SIGNUP_USER, allRows } from "../worlds/testing";
-import { type GuestWorldsDeps, handleGuestWorlds } from "./guest-worlds";
+import { type GuestWorldsDeps, failureDetail, handleGuestWorlds } from "./guest-worlds";
 
 const REQUEST = { userId: SIGNUP_USER, clockId: SIGNUP_CLOCK, origin: "SIGNUP" } as const;
 
@@ -80,5 +80,12 @@ describe("[FL-107] GuestWorlds", () => {
     const harness = guestHarness();
     await expect(handleGuestWorlds(depsOf(harness), { ...REQUEST, ispId: "isp-demo" })).rejects.toBeInstanceOf(ToolError);
     await expect(handleGuestWorlds(depsOf(harness), { ...REQUEST, clockId: "GLOBAL#isp-demo#x" })).rejects.toBeInstanceOf(ToolError);
+  });
+
+  it("[FL-105] a failure is logged with the store's code, table and cause, never a row", () => {
+    const cause = Object.assign(new Error("denied"), { name: "AccessDeniedException" });
+    expect(failureDetail(new ConnectorError("UNAVAILABLE", "dynamodb failure on Runtime", "Runtime", { cause }))).toEqual({ error: "ConnectorError", code: "UNAVAILABLE", table: "Runtime", cause: "AccessDeniedException" });
+    expect(failureDetail(new RangeError("x"))).toEqual({ error: "RangeError" });
+    expect(failureDetail("boom")).toEqual({ error: "unknown" });
   });
 });

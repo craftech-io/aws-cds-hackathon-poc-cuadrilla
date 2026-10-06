@@ -11,7 +11,7 @@
 // A failure never throws back to the asynchronous invocation: the account becomes FAILED with its reason
 // (a collision of the generation id asks the next retry for a new generation) and the portada offers
 // "Reintentar". The world is READY within 60 s of the request.
-import { type GuestOrigin, ToolError, ispIdOfClock } from "@cuadrilla/shared";
+import { ConnectorError, type GuestOrigin, ToolError, ispIdOfClock } from "@cuadrilla/shared";
 import { connector, tableClient } from "../connector/index";
 import type { TableClient } from "../connector/table-client";
 import { type GuestAccount, type WorldFailure, getGuestAccount, setStatus } from "../guest/account";
@@ -38,6 +38,14 @@ function failureOf(error: unknown): WorldFailure {
   if (error instanceof GenerationCollisionError) return "GENERATION_COLLISION";
   if (error instanceof TemplateError) return "TEMPLATE_INVALID";
   return "BUILD_FAILED";
+}
+
+/** What the log keeps of a failure: the error's name and, for the store, its code, table and cause; never a row. */
+export function failureDetail(error: unknown): Record<string, string> {
+  if (!(error instanceof Error)) return { error: "unknown" };
+  const cause = error.cause instanceof Error ? { cause: error.cause.name } : {};
+  if (error instanceof ConnectorError) return { error: error.name, code: error.code, ...(error.table === undefined ? {} : { table: error.table }), ...cause };
+  return { error: error.name, ...cause };
 }
 
 function skip(account: GuestAccount | undefined, clockId: string, origin: GuestOrigin): GuestWorldsOutcome | undefined {
@@ -72,7 +80,7 @@ export async function handleGuestWorlds(deps: GuestWorldsDeps, event: unknown): 
   } catch (error) {
     const failure = failureOf(error);
     await setStatus(deps.client, userId, { to: "FAILED", clockId, from: ["PROVISIONING"], failure }, deps.now());
-    deps.log.error("guest.world.failed", { userId, ispId, origin, failure, metric: "GuestWorldFailed", value: 1, error: error instanceof Error ? error.name : "unknown" });
+    deps.log.error("guest.world.failed", { userId, ispId, origin, failure, metric: "GuestWorldFailed", value: 1, ...failureDetail(error) });
     return { outcome: "FAILED" };
   }
 }
