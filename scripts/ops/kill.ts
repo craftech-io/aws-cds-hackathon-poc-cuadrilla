@@ -12,13 +12,18 @@
 //
 //   npm run ops:kill -- --scope SIGNUP --on --reason "bounces of the authentication emails"
 //   npm run ops:kill -- --scope SIGNUP --off
+//   npm run ops:kill -- --status          (reads the four global switches; writes nothing)
+//
+// `CostGuard` turns AGENT on for the cost cut (the global ceiling of turns, the cost per conversation,
+// the project budget at 100 %) and SIGNUP for the sign-up's cut; the operator reads why with --status
+// and turns it off here once the cause is understood.
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ClockId, KillScope } from "@cuadrilla/shared";
 import { auditKillSwitch } from "../../packages/bff/src/handlers/cost-guard";
 import { createLogger } from "../../packages/bff/src/lib/log";
 import { createDynamoRuntimeStore } from "../../packages/bff/src/ops/dynamo-runtime-store";
-import { type KillSwitchAuditEvent, type KillSwitchRecord, type KillSwitchStore, setKillSwitch } from "../../packages/bff/src/ops/kill-switch";
+import { type KillSwitchAuditEvent, KillSwitchRecord, type KillSwitchStore, killSwitchKey, setKillSwitch } from "../../packages/bff/src/ops/kill-switch";
 import { parseFlags } from "../channels/cli-args";
 
 export interface KillRequest {
@@ -28,7 +33,41 @@ export interface KillRequest {
   readonly reason?: string;
 }
 
-export const USAGE = "npm run ops:kill -- --scope <ALL|SIMULATOR|AGENT|SIGNUP> --on|--off [--clock <clockId>] [--reason <text>]";
+export const USAGE = "npm run ops:kill -- --scope <ALL|SIMULATOR|AGENT|SIGNUP> --on|--off [--clock <clockId>] [--reason <text>] | --status";
+
+export type KillCommand = { readonly kind: "status" } | { readonly kind: "set"; readonly request: KillRequest };
+
+/** `--status` alone reads; anything else is a write that parseKillArgs validates. */
+export function parseKillCommand(argv: readonly string[]): KillCommand {
+  if (argv.includes("--status")) {
+    if (argv.length !== 1) throw new RangeError(`--status takes no other argument\n${USAGE}`);
+    return { kind: "status" };
+  }
+  return { kind: "set", request: parseKillArgs(argv) };
+}
+
+export interface KillStatusLine {
+  readonly key: string;
+  /** `absent` when the item does not exist (the switch is off). */
+  readonly state: "on" | "off" | "absent" | "unreadable";
+  readonly setBy?: string;
+  readonly setAtReal?: string;
+  readonly reason?: string;
+}
+
+/** The four global switches as stored; an unparseable item that says "on" still reads as on. */
+export async function readKillStatus(store: KillSwitchStore): Promise<KillStatusLine[]> {
+  const keys = KillScope.options.map((scope) => killSwitchKey(scope));
+  const items = await store.read(keys);
+  return keys.map((key): KillStatusLine => {
+    const raw = items.get(key);
+    if (raw === undefined) return { key, state: "absent" };
+    const parsed = KillSwitchRecord.safeParse(raw);
+    if (!parsed.success) return { key, state: typeof raw === "object" && raw !== null && Reflect.get(raw, "state") === "on" ? "on" : "unreadable" };
+    const { state, setBy, setAtReal, reason } = parsed.data;
+    return { key, state, setBy, setAtReal, ...(reason === undefined ? {} : { reason }) };
+  });
+}
 
 /** The request of the command line; a RangeError for anything ambiguous, so a typo never flips a switch. */
 export function parseKillArgs(argv: readonly string[]): KillRequest {
@@ -74,8 +113,15 @@ export function runKill(request: KillRequest, deps: KillDeps): Promise<KillSwitc
 }
 
 async function main(): Promise<void> {
-  const request = parseKillArgs(process.argv.slice(2));
-  const record = await runKill(request, { store: createDynamoRuntimeStore(), audit: auditKillSwitch });
+  const command = parseKillCommand(process.argv.slice(2));
+  if (command.kind === "status") {
+    for (const line of await readKillStatus(createDynamoRuntimeStore())) {
+      const detail = line.setBy === undefined ? "" : ` (by ${line.setBy} at ${line.setAtReal}${line.reason === undefined ? "" : `: ${line.reason}`})`;
+      console.log(`ops:kill: ${line.key} ${line.state}${detail}`);
+    }
+    return;
+  }
+  const record = await runKill(command.request, { store: createDynamoRuntimeStore(), audit: auditKillSwitch });
   const target = record.clockId === undefined ? `KILL#${record.scope}` : `KILL#AGENT#${record.clockId}`;
   console.log(`ops:kill: ${target} is ${record.state} (audited KILL_SWITCH_SET).`);
 }

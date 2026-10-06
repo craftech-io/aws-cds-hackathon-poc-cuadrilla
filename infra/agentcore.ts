@@ -7,7 +7,11 @@
 //               exclusion rules: `installerTips` (semantic override), `installerPreferences` (userPreference
 //               override) and `workOrderSummary` (summary override), all per installer actor
 //               (`inst-<installerId>-e<worldEpoch>`, passed by the worker on every invocation), run by the
-//               memory role with the extraction model HARNESS_MODEL_ID.
+//               memory role with the extraction model HARNESS_MODEL_ID through the app's inference profile.
+//   Profile     `<app>-<stage>-sonnet-5-5` (infra/agentcore-iam.ts `agentModelProfile()`, ADR-0028): a tagged
+//               copy of the global profile of HARNESS_MODEL_ID; the Harness, Memory and PhotoModel call its ARN.
+//               After a model change the Memory update may fail once on IAM propagation: rerun the CI job
+//               (docs/architecture.md §16), never a local deploy.
 //   Gateway     `aws-cds-hackathon-poc-cuadrilla-poc`, MCP, `AWS_IAM`, called only by the Harness role; the
 //               policy engine of infra/policy.ts in ENFORCE.
 //   Targets     orders, knowledge, evidence, messaging, cases: Lambda + inline schema, created ONE AT A TIME
@@ -15,15 +19,16 @@
 //               ignoreChanges (GATEWAY_SCHEMA_ROLLOUT says how a schema change ships).
 //   Policies    the Cedar statements CED-* of WP-08, attached after the LAST target: the engine validates each
 //               statement against the Gateway's tool schemas.
-//   Harness     HARNESS_MODEL_ID over converse_stream with G1 in the model parameters; maxIterations 10,
+//   Harness     HARNESS_MODEL_ID (the profile's ARN) over converse_stream with G1 in the model parameters; maxIterations 10,
 //               maxTokens 4096, timeout 90 s, sliding window 40; tools = the Gateway only
 //               (`@cuadrilla-tools/*`), so no shell, file or code tools; the static system prompt of
 //               packages/bff/src/agent/system-prompt.ts; public network, idle microVMs stopped after 5
 //               minutes. Created after the policies, so no turn ever runs without the fences. No `effort`:
 //               the Harness does not expose it (HARNESS_EFFORT).
 //   Log group   `/aws/bedrock-agentcore/runtimes/<runtimeId>-live`, 30 days, created after the Harness and
-//               before the endpoint (never the DEFAULT one, which AgentCore creates). Content capture in
-//               traces cannot be turned off: TRACE_CONTENT_CAPTURE of infra/agentcore-spec.ts.
+//               before the endpoint. The DEFAULT one AgentCore creates gets its 30 days as declared manual
+//               configuration (DEFAULT_RUNTIME_LOG_RETENTION of infra/agentcore-spec.ts, docs/architecture.md
+//               §17 item 15). Content capture in traces cannot be turned off: TRACE_CONTENT_CAPTURE.
 //   Endpoint    `live`, pinned to the Harness version of this deploy.
 //
 // What code links:
@@ -41,12 +46,14 @@
 //   aws --profile craftech-demos bedrock-agentcore-control list-gateway-targets --gateway-identifier <id>  → 5 READY
 //   aws --profile craftech-demos bedrock-agentcore-control get-memory --memory-id <id>                     → ACTIVE, 3 strategies
 //   aws --profile craftech-demos logs describe-log-groups --log-group-name-prefix /aws/bedrock-agentcore/runtimes/harness_aws_cds_hackathon_poc_cuadrilla_poc
-//     → <runtimeId>-live with retentionInDays 30 (-DEFAULT: AgentCore's, empty)
+//     → <runtimeId>-live and <runtimeId>-DEFAULT with retentionInDays 30
+//   aws --profile craftech-demos bedrock get-inference-profile --inference-profile-identifier aws-cds-hackathon-poc-cuadrilla-poc-sonnet-5-5
+//     → ACTIVE, models of global.anthropic.claude-sonnet-5-5, tags Project/Stage/ManagedBy/Owner
 
 import { SYSTEM_PROMPT } from "../packages/bff/src/agent/system-prompt";
 import { gatewayToolSchemas } from "./agent-tool-schemas";
 import { gatewayInvokePermissions, toolFunctions } from "./agent-tools";
-import { agentRolePolicy, agentRoles } from "./agentcore-iam";
+import { agentModelProfile, agentRolePolicy, agentRoles } from "./agentcore-iam";
 import {
   AGENT_LOG_RETENTION_DAYS,
   GATEWAY_TOOL_NAME,
@@ -84,10 +91,13 @@ import { tagList, tagMap } from "./tags";
 const pascal = (value: string): string => `${value.charAt(0).toUpperCase()}${value.slice(1).toLowerCase()}`;
 const one = (arn: $util.Input<string>): $util.Output<string[]> => $util.output(arn).apply((value) => [value]);
 const roles = agentRoles();
+/** The app's inference profile (ADR-0028): the model the Harness and the three strategies call. */
+const modelProfile = agentModelProfile();
+const modelRefs = { "{model:PROFILE}": one(modelProfile.arn) };
 
 // ---- Memory ------------------------------------------------------------------------------------------
 
-const memoryRolePolicy = agentRolePolicy("Memory", {});
+const memoryRolePolicy = agentRolePolicy("Memory", modelRefs);
 
 export const memory = new awsnative.bedrockagentcore.Memory(
   "AgentMemory",
@@ -96,7 +106,7 @@ export const memory = new awsnative.bedrockagentcore.Memory(
     description: `Installer tips, preferences and work order summaries of the ${$app.name} agent, stage ${$app.stage}.`,
     eventExpiryDuration: MEMORY_EVENT_EXPIRY_DAYS,
     memoryExecutionRoleArn: roles.Memory.arn,
-    memoryStrategies: memoryStrategyArgs(HARNESS_MODEL_ID),
+    memoryStrategies: modelProfile.arn.apply(memoryStrategyArgs),
     tags: tagMap(),
   },
   // The strategies with overrides run the extraction model with this role from the first event.
@@ -160,6 +170,7 @@ export const gatewayPolicies = attachGatewayPolicies({
 // ---- Harness, its runtime log group and the endpoint --------------------------------------------------
 
 const harnessRolePolicy = agentRolePolicy("Harness", {
+  ...modelRefs,
   "{G1}": one(guardrailArns.g1),
   "{Gateway}": one(gateway.gatewayArn),
   [MEMORY_REF]: one(memory.memoryArn),
@@ -171,7 +182,7 @@ export const harness = new awsnative.bedrockagentcore.Harness(
     harnessName: harnessName($app.name, $app.stage),
     executionRoleArn: roles.Harness.arn,
     // G1 on every model call (infra/guardrail.ts); nothing sends a model, a system prompt or tools from the edge.
-    model: { bedrockModelConfig: harnessBedrockModelConfig(harnessGuardrailConfig) },
+    model: { bedrockModelConfig: harnessBedrockModelConfig(modelProfile.arn, harnessGuardrailConfig) },
     systemPrompt: [{ text: SYSTEM_PROMPT }],
     environment: {
       agentCoreRuntimeEnvironment: {
@@ -244,6 +255,7 @@ export const Harness = new sst.Linkable(HARNESS_LINK, {
     endpointName: HARNESS_ENDPOINT_NAME,
     endpointArn: harnessEndpoint.arn,
     modelId: HARNESS_MODEL_ID,
+    modelProfileArn: modelProfile.arn,
     timeoutSeconds: HARNESS_LIMITS.timeoutSeconds,
     maxIterations: HARNESS_LIMITS.maxIterations,
     maxTokens: HARNESS_LIMITS.maxTokens,

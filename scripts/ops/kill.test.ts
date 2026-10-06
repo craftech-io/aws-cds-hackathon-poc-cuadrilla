@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { KillScope } from "@cuadrilla/shared";
 import type { KillSwitchAuditEvent } from "../../packages/bff/src/ops/kill-switch";
 import { createMemoryRuntimeStore } from "../../packages/bff/src/ops/memory-runtime-store";
-import { parseKillArgs, runKill } from "./kill";
+import { parseKillArgs, parseKillCommand, readKillStatus, runKill } from "./kill";
 
 function deps() {
   const store = createMemoryRuntimeStore();
@@ -43,5 +43,22 @@ describe("npm run ops:kill (ADR-0019, ADR-0025 §4) [FL-112]", () => {
     expect(() => parseKillArgs(["--scope", "SIGNUP"])).toThrow(/pass --on or --off/);
     expect(() => parseKillArgs(["--scope", "SIGNUP", "--on", "--reason", "x".repeat(201)])).toThrow(/1 to 200/);
     expect(() => parseKillArgs(["--scope", "SIGNUP", "--on", "--yes"])).toThrow(/unknown argument/);
+  });
+
+  it("--status reads the four global switches and writes nothing; it takes no other argument", async () => {
+    const { store, run } = deps();
+    expect(parseKillCommand(["--status"])).toEqual({ kind: "status" });
+    expect(() => parseKillCommand(["--status", "--scope", "AGENT"])).toThrow(/takes no other argument/);
+    expect(parseKillCommand(["--scope", "AGENT", "--off"])).toEqual({ kind: "set", request: { scope: "AGENT", on: false } });
+    await run(["--scope", "AGENT", "--on", "--reason", "budget monthly"]);
+    await store.write("KILL#SIMULATOR", { state: "on" } as never);
+    const lines = await readKillStatus(store);
+    expect(lines.map((line) => [line.key, line.state])).toEqual([
+      ["KILL#ALL", "absent"],
+      ["KILL#SIMULATOR", "on"],
+      ["KILL#AGENT", "on"],
+      ["KILL#SIGNUP", "absent"],
+    ]);
+    expect(lines[2]).toMatchObject({ setBy: "OPERATOR", reason: "budget monthly" });
   });
 });

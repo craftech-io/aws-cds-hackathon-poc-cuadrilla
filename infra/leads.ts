@@ -10,7 +10,8 @@
 //                           with explicit confirmation.
 //   LeadStream              the stream with the two filters of LEAD_STREAM_FILTERS (a pending lead turning
 //                           CONFIRMED, a lead removed by TTL), batches split on error, 3 retries, then
-//                           LeadStreamDlq (fixed name, alarm on any message). A daily EventBridge rule
+//                           LeadStreamDlq (fixed name, no alarm: a failed record is an `error` log line of
+//                           LeadStream, ADR-0028, infra/logs-only.test.ts). A daily EventBridge rule
 //                           (LEAD_SWEEP) invokes it with `{kind: "UNCONFIRMED_SWEEP"}`.
 //   GuestAccountDeletion    fixed name `<app>-<stage>-guest-account-deletion`: the operator invokes it by
 //                           name (`npm run leads:delete`), the BFF (`account.deleteGuest`) and LeadStream
@@ -210,19 +211,4 @@ export const leadSweep = new sst.aws.Cron("LeadSweep", {
   function: leadStream.arn,
   schedule: LEAD_SWEEP.schedule,
   event: { ...LEAD_SWEEP.event },
-});
-
-/** Any record that could not be handled (docs/architecture.md §12). */
-export const leadStreamDlqAlarm = new aws.cloudwatch.MetricAlarm("LeadStreamDlqAlarm", {
-  name: `${leadStreamDlqName($app.name, $app.stage)}-messages`,
-  alarmDescription: "LeadStream could not handle a record of the Leads stream (see LeadStreamDlq).",
-  namespace: "AWS/SQS",
-  metricName: "ApproximateNumberOfMessagesVisible",
-  dimensions: { QueueName: leadStreamDlqName($app.name, $app.stage) },
-  statistic: "Maximum",
-  period: 300,
-  evaluationPeriods: 1,
-  threshold: 0,
-  comparisonOperator: "GreaterThanThreshold",
-  treatMissingData: "notBreaching",
 });

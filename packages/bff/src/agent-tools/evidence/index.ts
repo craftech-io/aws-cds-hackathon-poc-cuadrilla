@@ -1,12 +1,18 @@
-// Lambda entry of `ToolEvidence` (target `evidence`, docs/architecture.md §9.2): `packages/bff/src/agent-tools/evidence/index.handler`
-// serves the Gateway and direct invocations through `createToolHandler`, so every fence (`LAM-CALLER`,
-// `LAM-SCOPE`, `LAM-KILL`, `LAM-STRICT`) already holds. Each tool answers `UNAVAILABLE` until WP-30
-// replaces its placeholder with the implementation in `handler.ts` (docs/build-plan.md §4).
-import { notYetAvailable } from "../common/context";
+// Lambda entry of `ToolEvidence` (target `evidence`, docs/architecture.md §9.2): infra/agent-tools.ts
+// points the Function at `packages/bff/src/agent-tools/evidence/index.handler`. Every call goes
+// through `createToolHandler`, so `LAM-CALLER`, `LAM-SCOPE`, `LAM-KILL` and `LAM-STRICT` hold before a
+// tool runs. `createEvidenceTarget` is what the tests and the local flows build the target with,
+// over the in-memory connector and fakes of the photo model, the objects, the orchestrator, the case
+// opener and the outbound pipeline.
 import { createToolHandler } from "../common/handler";
-import { defaultToolRuntime } from "../common/runtime";
-import { EVIDENCE_TOOLS } from "./schema";
+import { getChecklist, updateChecklist } from "./checklist";
+import { type EvidenceToolRuntime, defaultEvidenceRuntime } from "./runtime";
+import { validateInstallPhoto } from "./validate";
 
-export const evidenceTools = createToolHandler({ target: "evidence", deps: defaultToolRuntime, tools: EVIDENCE_TOOLS.map((definition) => notYetAvailable(definition)) });
+export function createEvidenceTarget(deps: () => EvidenceToolRuntime) {
+  return createToolHandler({ target: "evidence", deps, tools: [getChecklist, validateInstallPhoto, updateChecklist] });
+}
+
+export const evidenceTools = createEvidenceTarget(defaultEvidenceRuntime);
 
 export const handler = evidenceTools.handler;

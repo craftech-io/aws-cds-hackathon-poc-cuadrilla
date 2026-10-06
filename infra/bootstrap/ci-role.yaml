@@ -139,7 +139,7 @@ Resources:
           CookiesConfig: { CookieBehavior: none }
           QueryStringsConfig: { QueryStringBehavior: all }
 
-  # ---- Permissions boundary: the ceiling of every role the app creates -----------------------
+  # ---- Permissions boundary: the ceiling of every role the app creates
   DeployBoundary:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -188,6 +188,7 @@ Resources:
             Resource:
               - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
               - !Sub "arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/*"
+              - !Sub "arn:${AWS::Partition}:bedrock:${Region}:${AWS::AccountId}:application-inference-profile/*"
           - Sid: WriteLogs
             Effect: Allow
             Action:
@@ -339,7 +340,7 @@ Resources:
               - sso-directory:*
             Resource: "*"
 
-  # ---- SST home: state, assets, bootstrap marker and passphrase of THIS app ----------------
+  # ---- SST home: state, assets, bootstrap marker and passphrase of THIS app
   DeploySstHomePolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -413,7 +414,7 @@ Resources:
               StringEquals:
                 aws:RequestedRegion: !Ref Region
 
-  # ---- Resources of the app ----------------------------------------------------------------
+  # ---- Resources of the app
   DeployAppResourcesPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -529,9 +530,6 @@ Resources:
               - bedrock-agentcore:UpdateWorkloadIdentity
             Resource:
               - !Sub "arn:${AWS::Partition}:bedrock-agentcore:${Region}:${AWS::AccountId}:workload-identity-directory/default*"
-          # Cedar policies are untaggable children of the engine, and their names are unique across every
-          # engine of the account: only this app's engine (named ${AgentNamePrefix}_${DeployStage} by
-          # infra/policy-rules.ts), the engine ARN itself included, never another app's.
           - Sid: CedarPoliciesOfThisAppsEngine
             Effect: Allow
             Action:
@@ -613,7 +611,7 @@ Resources:
               "Null":
                 aws:ResourceTag/sst:app: "false"
 
-  # ---- Resources of the app fenced by name: the tag is not there yet ------------------------
+  # ---- Resources of the app fenced by name: the tag is not there yet
   DeployNamedResourcesPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -697,9 +695,6 @@ Resources:
             Condition:
               ArnLike:
                 lambda:FunctionArn: !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${AppName}-*"
-          # Cognito's own check of AssociateWebACL (made on behalf of AWS WAF) does not see the pool's
-          # tags, and the pool's id is opaque: the fence is the web ACL, which WebAclsOfThisApp limits
-          # to the app's names. Disassociating stays on a pool tagged as this app.
           - Sid: CognitoWebAclAssociation
             Effect: Allow
             Action:
@@ -721,6 +716,31 @@ Resources:
               - ses:DeleteConfigurationSetEventDestination
               - ses:GetConfigurationSetEventDestinations
             Resource: !Sub "arn:${AWS::Partition}:ses:${Region}:${AWS::AccountId}:configuration-set/${AppName}-email-${DeployStage}"
+          - Sid: AppInferenceProfileCreate
+            Effect: Allow
+            Action:
+              - bedrock:CreateInferenceProfile
+              - bedrock:TagResource
+            Resource:
+              - !Sub "arn:${AWS::Partition}:bedrock:${Region}:${AWS::AccountId}:application-inference-profile/*"
+              - !Sub "arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/*"
+              - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
+            Condition:
+              StringEquals:
+                aws:RequestTag/Project: !Ref AppName
+              ForAllValues:StringEquals:
+                aws:TagKeys: [Project, Stage, ManagedBy, Owner, "sst:app", "sst:stage"]
+          - Sid: AppInferenceProfiles
+            Effect: Allow
+            Action:
+              - bedrock:DeleteInferenceProfile
+              - bedrock:GetInferenceProfile
+              - bedrock:ListTagsForResource
+              - bedrock:UntagResource
+            Resource: !Sub "arn:${AWS::Partition}:bedrock:${Region}:${AWS::AccountId}:application-inference-profile/*"
+            Condition:
+              StringEquals:
+                aws:ResourceTag/Project: !Ref AppName
           - Sid: DenyPublicFunctionUrlsBesidesTheEdge
             Effect: Deny
             Action:
@@ -770,8 +790,6 @@ Resources:
               - wafv2:TagResource
               - wafv2:UntagResource
               - wafv2:UpdateWebACL
-            # Create/UpdateWebACL also authorize every AWS managed rule group the ACL references
-            # (<scope>/managedruleset/<name>/<id>); the web ACL ARN above still fences the ACL.
             Resource:
               - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:global/webacl/${AppName}-*"
               - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:regional/webacl/${AppName}-*"
@@ -785,7 +803,6 @@ Resources:
               - wafv2:ListAvailableManagedRuleGroups
               - wafv2:ListAvailableManagedRuleGroupVersions
             Resource: "*"
-          # Reading back an association asks for the ACL of the pool before knowing it (webacl/*/*).
           - Sid: WebAclLookupByResource
             Effect: Allow
             Action: wafv2:GetWebACLForResource
@@ -843,7 +860,7 @@ Resources:
               - cloudfront:UpdateResponseHeadersPolicy
             Resource: "*"
 
-  # ---- DNS and IAM ---------------------------------------------------------------------------
+  # ---- DNS and IAM
   DeployDnsAndIamPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -1021,7 +1038,7 @@ Resources:
             Action: budgets:*
             NotResource: !Sub "arn:${AWS::Partition}:budgets::${AWS::AccountId}:budget/${AppName}-*"
 
-  # ---- Deploy role: fixed policies, denied any change to itself -----------------------------
+  # ---- Deploy role: fixed policies, denied any change to itself
   DeployRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1060,7 +1077,7 @@ Resources:
         - { Key: ManagedBy, Value: cloudformation-bootstrap }
         - { Key: Owner, Value: craftech }
 
-  # ---- qa-runner: invokes the QA driver of the stage and reads the app's logs (ADR-0005) -----
+  # ---- qa-runner: invokes the QA driver of the stage and reads the app's logs (ADR-0005)
   QaRunnerRole:
     Type: AWS::IAM::Role
     Properties:

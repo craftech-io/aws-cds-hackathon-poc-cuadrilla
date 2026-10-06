@@ -232,7 +232,7 @@ describe("TRANSCRIBE capability through the Transcribe link", () => {
     const { only } = await evaluate();
     const include = (await resolveDeep(only("sst.Linkable").args.include)) as Array<Record<string, unknown>>;
     expect(include.filter((statement) => (statement.actions as string[]).some((action) => action.startsWith("s3:")))).toEqual([
-      { type: "aws.permission", actions: ["s3:GetObject"], resources: [`${MEDIA_ARN}/wa/*`, `${MEDIA_ARN}/sim/*`] },
+      { type: "aws.permission", actions: ["s3:GetObject", "s3:DeleteObject"], resources: [`${MEDIA_ARN}/wa/*`, `${MEDIA_ARN}/sim/*`, `${MEDIA_ARN}/guest/*/sim/*`] },
       { type: "aws.permission", actions: ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"], resources: [`${MEDIA_ARN}/transcripts/*`] },
     ]);
     expect(include).toHaveLength(CAPABILITIES.TRANSCRIBE.grants.length);

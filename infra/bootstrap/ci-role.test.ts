@@ -2,7 +2,6 @@
 // the files as text on purpose (the repository has no YAML parser and needs none): each check is a
 // line someone under pressure would be tempted to write, and must not.
 import { describe, expect, it } from "vitest";
-import { policyEngineName } from "../policy-rules";
 import { allows, block, deployWorkflow, parameterBlock, read, statement, statementsOf, template } from "./template-text";
 
 const TRUSTS = {
@@ -11,7 +10,6 @@ const TRUSTS = {
 };
 
 describe.each(Object.entries(TRUSTS))("trust of the %s role", (_role, trust) => {
-
   it("matches the sub claim exactly, never with a wildcard", () => {
     expect(trust).toContain("StringEquals:");
     expect(trust).not.toMatch(/StringLike|ArnLike/);
@@ -37,7 +35,6 @@ describe.each(Object.entries(TRUSTS))("trust of the %s role", (_role, trust) => 
     expect(trust).toContain("token.actions.githubusercontent.com:repository_owner_id: !Ref GitHubOrgId");
     expect(trust).not.toContain("AWS::NoValue");
   });
-
 });
 
 describe("repository parameters", () => {
@@ -149,43 +146,6 @@ describe("permissions of the deploy role and of the boundary", () => {
     const runtime = block(template, "Sid: HarnessUnderlyingRuntime", "- Sid: AgentCoreUntaggableChildren");
     expect(runtime).toContain("runtime/harness_${AgentNamePrefix}*");
     expect(runtime).not.toMatch(/bedrock-agentcore:\*/);
-  });
-});
-
-describe("Cedar policies (names unique across every engine of the shared account)", () => {
-  const PARAMETERS: Readonly<Record<string, string>> = {
-    "AWS::Partition": "aws",
-    "AWS::AccountId": "776805327629",
-    Region: "us-east-1",
-    AgentNamePrefix: /Default: (\S+)/.exec(parameterBlock("AgentNamePrefix"))?.[1] ?? "",
-    DeployStage: /Default: (\S+)/.exec(parameterBlock("DeployStage"))?.[1] ?? "",
-  };
-  const engineArn = (id: string): string => `arn:aws:bedrock-agentcore:us-east-1:776805327629:policy-engine/${id}`;
-  const OWN_ENGINE = engineArn(`${policyEngineName("aws-cds-hackathon-poc-cuadrilla", "poc")}-a1B2c3D4e5`);
-  const OTHER_ENGINES = [engineArn("other_poc_app_poc-z9Y8x7W6v5"), engineArn("aws_cds_hackathon_poc_other_poc-z9Y8x7W6v5")];
-  const POLICY_ACTION = /bedrock-agentcore:(\*|Create\*|CreatePolicy|DeletePolicy|GetPolicy|UpdatePolicy)$/m;
-  const grants = allows.filter(({ body }) => POLICY_ACTION.test(body));
-  /** The statement's ARN patterns with the template parameters substituted, as regular expressions. */
-  const patterns = (body: string): RegExp[] =>
-    [...body.matchAll(/!Sub "(arn:[^"]+)"/g)].map((match) => {
-      const arn = (match[1] ?? "").replace(/\$\{([^}]+)\}/g, (_all, name: string) => PARAMETERS[name] ?? `\${${name}}`);
-      return new RegExp(`^${arn.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
-    });
-  const granted = (arn: string): boolean => grants.some(({ body }) => patterns(body).some((pattern) => pattern.test(arn)));
-
-  it("grants the policy actions on Resource * only behind the app's tag", () => {
-    expect(grants.length).toBeGreaterThan(0);
-    for (const { sid, body } of grants.filter(({ body }) => body.includes('Resource: "*"'))) expect(body, sid).toMatch(/aws:(Resource|Request)Tag\/sst:app: !Ref AppName/);
-  });
-
-  it("creates, reads, updates and deletes policies of this app's engine, the engine ARN included", () => {
-    expect(statement("CedarPoliciesOfThisAppsEngine")).toContain("policy-engine/${AgentNamePrefix}_${DeployStage}*");
-    for (const arn of [OWN_ENGINE, `${OWN_ENGINE}/policy/cuadrilla_poc_CED_NO_OVERRIDE-q1W2e3R4t5`]) expect(granted(arn), arn).toBe(true);
-  });
-
-  it("never grants them on another app's engine or its policies", () => {
-    expect(template).not.toContain("policy-engine/*");
-    for (const engine of OTHER_ENGINES) for (const arn of [engine, `${engine}/policy/cuadrilla_poc_CED_NO_OVERRIDE-q1W2e3R4t5`]) expect(granted(arn), arn).toBe(false);
   });
 });
 
@@ -396,5 +356,32 @@ describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
       expect(named).toHaveLength(1);
       expect(named[0]?.body).toContain('table/${AppName}-*"');
     }
+  });
+});
+
+describe("the app's inference profile (ADR-0028)", () => {
+  const PROFILE_ARN = '"arn:${AWS::Partition}:bedrock:${Region}:${AWS::AccountId}:application-inference-profile/*"';
+
+  it("creates and tags a profile only when the request tags it as the app, both conditions in one statement", () => {
+    const create = statement("AppInferenceProfileCreate");
+    expect([...create.matchAll(/- (bedrock:\w+)/g)].map((match) => match[1])).toEqual(["bedrock:CreateInferenceProfile", "bedrock:TagResource"]);
+    expect(create).toContain(`- !Sub ${PROFILE_ARN}`);
+    expect(create).toContain("aws:RequestTag/Project: !Ref AppName");
+    expect(create).toContain('aws:TagKeys: [Project, Stage, ManagedBy, Owner, "sst:app", "sst:stage"]');
+    expect(create).not.toContain('Resource: "*"');
+  });
+
+  it("reads, untags and deletes only a profile tagged as the app, by ARN", () => {
+    const profiles = statement("AppInferenceProfiles");
+    expect([...profiles.matchAll(/- (bedrock:\w+)/g)].map((match) => match[1])).toEqual(["bedrock:DeleteInferenceProfile", "bedrock:GetInferenceProfile", "bedrock:ListTagsForResource", "bedrock:UntagResource"]);
+    expect(profiles).toContain(`Resource: !Sub ${PROFILE_ARN}`);
+    expect(profiles).toContain("aws:ResourceTag/Project: !Ref AppName");
+    for (const sid of ["AppInferenceProfileCreate", "AppInferenceProfiles"]) expect(block(template, "  DeployNamedResourcesPolicy:", "  DeployEdgePolicy:")).toContain(`Sid: ${sid}\n`);
+  });
+
+  it("lets app roles invoke through the region's profiles and never create or delete one", () => {
+    expect(block(boundary, "Sid: InvokeModels", "- Sid:")).toContain(`- !Sub ${PROFILE_ARN}`);
+    expect(boundary).not.toMatch(/CreateInferenceProfile|DeleteInferenceProfile|application-inference-profile\/\*"\n\s+Condition/);
+    for (const { sid, body } of allows.filter(({ body }) => /InferenceProfile\n/.test(body))) expect(body, sid).not.toContain('Resource: "*"');
   });
 });

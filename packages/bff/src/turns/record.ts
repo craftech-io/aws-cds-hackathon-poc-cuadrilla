@@ -1,0 +1,110 @@
+// What a turn leaves behind besides its tools' effects (docs/architecture.md §9.1 and §12, ADR-0028):
+//
+//   TurnNote          the final text of the Harness (ADR-0014: an internal note, never sent), with its
+//                     `stopReason` and tokens, or a fixed code when its text must not be kept (a guardrail's
+//                     sentinel, a failed turn)
+//   CuadrillaMetrics  the turn and its tokens on the order's KPI row, its latency, and the first-reply
+//                     latency: real ms from the inbound message to the first outbound of the turn
+//   log fields        `TurnLatency`, `TurnErrors`, `TurnMaxTokens`, `FirstReplyLatency` (logs only, ADR-0028)
+//   answered          whether the installer got something from the turn: a message of the turn, or an
+//                     escalation or a safety report that answers by itself (`ALWAYS_ANSWER`)
+import { ConnectorError, ispKindOfClock } from "@cuadrilla/shared";
+import type { HarnessUsage } from "../agent/harness-client";
+import type { Connector } from "../connector/ports";
+import type { Message } from "../domain/conversations";
+import type { AgentMode } from "../domain/metrics";
+import type { Logger } from "../lib/log";
+import { maskText } from "../lib/mask";
+import type { TurnRequest } from "./deps";
+
+export const TURN_LOG_METRICS = { latency: "TurnLatency", errors: "TurnErrors", maxTokens: "TurnMaxTokens", firstReply: "FirstReplyLatency" } as const;
+
+/** Fixed notes of the turns whose model text is not kept. */
+export const FIXED_NOTES = { guardrail: "GUARDRAIL_BLOCK", failed: "TURN_FAILED" } as const;
+
+/** Tools whose successful call answers the installer by itself (the escalation and the safety handler notify). */
+export const ANSWERING_TOOLS = ["escalate_case", "report_safety_hazard"] as const;
+
+export interface TurnRecordDeps {
+  readonly data: Pick<Connector, "conversations" | "metrics" | "runtime">;
+  readonly agentMode: AgentMode;
+  readonly log: Logger;
+}
+
+export interface NoteInput {
+  readonly request: TurnRequest;
+  readonly turnId: string;
+  readonly text: string;
+  readonly usage?: HarnessUsage;
+  readonly stopReason?: string;
+  readonly latencyMs?: number;
+}
+
+/** Appends the note (masked); a retried event that already wrote it leaves the first one. */
+export async function writeTurnNote(deps: TurnRecordDeps, input: NoteInput): Promise<void> {
+  const { request } = input;
+  const text = maskText(input.text).trim() || FIXED_NOTES.failed;
+  try {
+    await deps.data.conversations.appendTurnNote({
+      turnId: input.turnId,
+      personId: request.installerId,
+      clockId: request.clockId,
+      trigger: request.trigger,
+      note: [...text].slice(0, 4_000).join(""),
+      atSim: request.eventAtSim,
+      agentMode: deps.agentMode,
+      ...(request.workOrderId === undefined ? {} : { workOrderId: request.workOrderId }),
+      ...(input.usage === undefined ? {} : { usage: { inputTokens: input.usage.inputTokens, outputTokens: input.usage.outputTokens } }),
+      ...(input.stopReason === undefined ? {} : { stopReason: input.stopReason.slice(0, 64) }),
+      ...(input.latencyMs === undefined ? {} : { latencyMs: Math.max(0, Math.round(input.latencyMs)) }),
+    });
+  } catch (error) {
+    if (!(error instanceof ConnectorError && error.code === "CONFLICT")) throw error;
+  }
+}
+
+/** The turn, its tokens and its latency on the order's KPI row (`EVAL` in an evaluation world). */
+export async function recordTurnKpi(deps: TurnRecordDeps, request: TurnRequest, usage: HarnessUsage, latencyMs: number, firstReplyLatencyMs?: number): Promise<void> {
+  if (request.workOrderId === undefined) return;
+  const evaluation = ispKindOfClock(request.clockId) === "EVAL";
+  await deps.data.metrics.addToKpi(
+    {
+      ispId: request.ispId,
+      source: evaluation ? "EVAL" : "WORLD",
+      clockId: request.clockId,
+      workOrderId: request.workOrderId,
+      agentMode: deps.agentMode,
+      ...(evaluation ? { runId: request.clockId.slice("eval-".length) } : {}),
+    },
+    {
+      counters: { turns: 1, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+      turnLatencyMs: Math.max(0, Math.round(latencyMs)),
+      ...(firstReplyLatencyMs === undefined ? {} : { firstReplyLatencyMs }),
+    },
+  );
+}
+
+/** The outbound messages of the turn to its installer, oldest first. */
+export async function messagesOfTurn(data: Pick<Connector, "conversations">, request: TurnRequest, turnId: string): Promise<Message[]> {
+  const thread = await data.conversations.listMessages(request.installerId, { fromSim: request.eventAtSim });
+  return thread.filter((message) => message.direction === "OUT" && message.turnId === turnId);
+}
+
+/** A successful escalation or safety report of the turn answers the installer by itself. */
+export async function escalatedInTurn(data: Pick<Connector, "runtime">, turnId: string): Promise<boolean> {
+  const results = await Promise.all(ANSWERING_TOOLS.map((tool) => data.runtime.listTurnResults(turnId, tool)));
+  return results.flat().some((result) => result.output.ok === true);
+}
+
+/** Real ms from the inbound message to the first outbound of the turn; `undefined` when it cannot be measured. */
+export function firstReplyLatency(inbound: Message | undefined, sent: readonly Message[]): number | undefined {
+  const receivedAt = inbound?.sentAtReal === undefined ? Number.NaN : Date.parse(inbound.sentAtReal);
+  const firstAt = Math.min(...sent.map((message) => (message.sentAtReal === undefined ? Number.POSITIVE_INFINITY : Date.parse(message.sentAtReal))));
+  if (!Number.isFinite(receivedAt) || !Number.isFinite(firstAt) || firstAt < receivedAt) return undefined;
+  return Math.round(firstAt - receivedAt);
+}
+
+/** One log line per metric data point; CloudWatch Logs Insights reads them (ADR-0028). */
+export function logTurnMetric(log: Logger, metric: (typeof TURN_LOG_METRICS)[keyof typeof TURN_LOG_METRICS], fields: Readonly<Record<string, unknown>>): void {
+  log.info("metric", { metric, value: 1, ...fields });
+}

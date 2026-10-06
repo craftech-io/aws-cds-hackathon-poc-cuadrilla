@@ -13,14 +13,16 @@
 //   {Media}/transcripts/*   an object prefix of a bucket     {G1} {G2} {G3}  a guardrail
 //   {Memory} {Gateway}      AgentCore of the stage            {KnowledgeBase} the manual's KB
 //   {NetworkMock} …         a Lambda                          {Leads} {UserPool} the leads and the pool
-//   {model:HARNESS}         agentModelArns(HARNESS_MODEL_ID)  {model:PHOTO}  agentModelArns(PHOTO_MODEL_ID)
+//   {model:HARNESS}         agentModelArns(HARNESS_MODEL_ID, …, the app's inference profile)
+//   {model:PHOTO}           agentModelArns(PHOTO_MODEL_ID, …, the profile while PHOTO_MODEL_ID is HARNESS_MODEL_ID)
+//   {model:PROFILE}         the app's inference profile (ADR-0028), for bedrock:GetInferenceProfile
 //   {whatsappPhone}         whatsappPhoneArn(WhatsAppPhoneNumberId); omitted while `not-connected` (P-01)
 //
 // `Resource: "*"` appears only where IAM offers nothing else, each with its justification and a
 // condition (JUSTIFIED_WILDCARDS). No grant carries an SES receipt-rule action (the only active rule
 // set of the account belongs to another app, ADR-0003) nor any WABA association or
 // `PutWhatsAppBusinessAccountEventDestinations` (the operator applies the event destination).
-import { BFF_LEADS_GRANT, GUEST_WORLDS_LEADING_KEYS, SIGNUP_CAPABILITIES, SIGNUP_ROLES, type SignupCapability } from "./leads-spec";
+import { BFF_LEADS_GRANT, GUEST_WORLDS_LEADING_KEYS, QA_SEAM_GRANTS, SIGNUP_CAPABILITIES, SIGNUP_ROLES, type SignupCapability } from "./leads-spec";
 
 export const REGION = "us-east-1";
 export const ACCOUNT_ID = "776805327629";
@@ -42,14 +44,16 @@ export function foundationModelOf(modelId: string): string {
 }
 
 /**
- * Everything `bedrock:InvokeModel` must name to call a model through a global inference profile: the
- * profile in this region, plus its foundation model region-less (global routing) and in every
- * region the profile may route to. A profile alone gives AccessDenied; nothing else is named.
+ * Everything `bedrock:InvokeModel` must name to call a model through the app's inference profile
+ * (ADR-0028), which copies a global one: the app's profile when given, the global profile in this
+ * region, plus its foundation model region-less (global routing) and in every region the profile may
+ * route to. A profile alone gives AccessDenied; nothing else is named, never `*`.
  */
-export function agentModelArns(modelId: string, region: string = REGION, account: string = ACCOUNT_ID): string[] {
+export function agentModelArns(modelId: string, region: string = REGION, account: string = ACCOUNT_ID, appProfileArn?: string): string[] {
   const foundation = foundationModelOf(modelId);
   const models = [`arn:aws:bedrock:::foundation-model/${foundation}`, `arn:aws:bedrock:*::foundation-model/${foundation}`];
-  return foundation === modelId ? models : [`arn:aws:bedrock:${region}:${account}:inference-profile/${modelId}`, ...models];
+  const profiles = foundation === modelId ? [] : [`arn:aws:bedrock:${region}:${account}:inference-profile/${modelId}`];
+  return [...(appProfileArn === undefined ? [] : [appProfileArn]), ...profiles, ...models];
 }
 
 const AWS_PHONE_NUMBER_ID = /^phone-number-id-([0-9a-f]{32})$/;
@@ -163,20 +167,14 @@ export const CAPABILITIES: Readonly<Record<CapabilityName, Capability>> = {
         ],
       },
       { sid: "TranscriptionJobsOfThisApp", actions: ["transcribe:GetTranscriptionJob", "transcribe:DeleteTranscriptionJob"], resources: [arn.transcriptionJobs] },
-      { actions: ["s3:GetObject"], resources: ["{Media}/wa/*", "{Media}/sim/*"] },
+      { actions: ["s3:GetObject", "s3:DeleteObject"], resources: ["{Media}/wa/*", "{Media}/sim/*", "{Media}/guest/*/sim/*"] },
       { actions: ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"], resources: ["{Media}/transcripts/*"] },
     ],
   },
   MEMORY_ADMIN: {
     grants: [
       {
-        actions: [
-          "bedrock-agentcore:ListEvents",
-          "bedrock-agentcore:DeleteEvent",
-          "bedrock-agentcore:ListMemoryRecords",
-          "bedrock-agentcore:DeleteMemoryRecord",
-          "bedrock-agentcore:RetrieveMemoryRecords",
-        ],
+        actions: ["bedrock-agentcore:ListEvents", "bedrock-agentcore:DeleteEvent", "bedrock-agentcore:ListMemoryRecords", "bedrock-agentcore:DeleteMemoryRecord", "bedrock-agentcore:RetrieveMemoryRecords"],
         resources: ["{Memory}"],
       },
     ],
@@ -218,6 +216,8 @@ const g = (actions: readonly string[], resources: readonly string[], conditions?
 const sqsSend = (queue = "{InstallerEvents}"): Grant => g(["sqs:SendMessage"], [queue]);
 const guardrailG1 = g(["bedrock:ApplyGuardrail"], ["{G1}"]);
 const invokeModels = (model: "HARNESS" | "PHOTO", actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]): Grant => g(actions, [`{model:${model}}`]);
+/** AgentCore and Bedrock resolve the app's inference profile before they call through it (ADR-0028). */
+const readModelProfile: Grant = { sid: "ModelProfileRead", ...g(["bedrock:GetInferenceProfile"], ["{model:PROFILE}"]) };
 const metrics = g(["cloudwatch:PutMetricData"], ["*"], [{ test: "StringEquals", variable: "cloudwatch:namespace", values: [METRICS_NAMESPACE] }]);
 
 export const LAMBDA_CAPABILITIES = {
@@ -228,8 +228,8 @@ export const LAMBDA_CAPABILITIES = {
     grants: [g(["bedrock-agentcore:InvokeHarness"], ["{Harness}"]), guardrailG1, sqsSend(), g(["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"], ["{InstallerEvents}"]), g(["lambda:InvokeFunction"], ["{CertificateWriter}"])],
   },
   ToolOrders: {
-    capabilities: ["MOCK_NETWORK"],
-    tables: { WorkOrders: "write", People: "read", Isps: "read", Cases: "read", Runtime: "write", AuditLog: "write" },
+    capabilities: ["MOCK_NETWORK", "PIPELINE"],
+    tables: { WorkOrders: "write", People: "write", Isps: "read", Cases: "write", Runtime: "write", AuditLog: "write" },
   },
   ToolKnowledge: {
     capabilities: [],
@@ -239,10 +239,10 @@ export const LAMBDA_CAPABILITIES = {
   },
   ToolEvidence: {
     capabilities: ["MOCK_NETWORK", "PIPELINE"],
-    tables: { WorkOrders: "write", Reference: "read", Runtime: "write", AuditLog: "write", People: "read", Cases: "read", Isps: "read" },
+    tables: { WorkOrders: "write", Reference: "read", Runtime: "write", AuditLog: "write", People: "write", Cases: "write", Isps: "read" },
     buckets: { Media: "read" },
-    // `Converse` is authorized by bedrock:InvokeModel; PIPELINE only for the VERDICT_REACTION kind (FL-103).
-    grants: [invokeModels("PHOTO", ["bedrock:InvokeModel"]), g(["s3:PutObject"], ["{Evidence}/photos/*"])],
+    // `Converse` is authorized by bedrock:InvokeModel; PIPELINE for the VERDICT_REACTION (FL-103) and the case's ladder.
+    grants: [invokeModels("PHOTO", ["bedrock:InvokeModel"]), readModelProfile, g(["s3:PutObject"], ["{Evidence}/photos/*", "{Evidence}/guest/*/photos/*"])],
   },
   ToolMessaging: {
     capabilities: ["PIPELINE"],
@@ -256,7 +256,7 @@ export const LAMBDA_CAPABILITIES = {
   CertificateWriter: {
     capabilities: [],
     tables: { WorkOrders: "write", People: "read", Isps: "read" },
-    grants: [g(["s3:GetObject"], ["{Evidence}/photos/*"]), g(["s3:PutObject"], ["{Evidence}/certificates/*"]), g(["bedrock:ApplyGuardrail"], ["{G3}"])],
+    grants: [g(["s3:GetObject"], ["{Evidence}/photos/*", "{Evidence}/guest/*/photos/*"]), g(["s3:PutObject"], ["{Evidence}/certificates/*", "{Evidence}/guest/*/certificates/*"]), g(["bedrock:ApplyGuardrail"], ["{G3}"])],
   },
   InboundWhatsApp: {
     capabilities: ["SEND_WHATSAPP"],
@@ -283,18 +283,19 @@ export const LAMBDA_CAPABILITIES = {
   PolicyAudit: {
     capabilities: [],
     tables: { Conversations: "read", AuditLog: "write", WorkOrders: "read", Cases: "read", People: "read", Isps: "read", Reference: "read" },
-    grants: [g(["s3:GetObject"], ["{Evidence}/certificates/*"])],
+    grants: [g(["s3:GetObject"], ["{Evidence}/certificates/*", "{Evidence}/guest/*/certificates/*"])],
   },
   // Cognito pre token generation: the user row by GSI1 `SUB#<sub>` and one audit row per ignored attribute.
   AuthPreToken: { capabilities: [], tables: { Isps: "read", AuditLog: "append" } },
   NetworkMock: { capabilities: [], tables: { Network: "write" } },
   DispatchMock: { capabilities: [], tables: { Dispatch: "write" }, grants: [g(["events:PutEvents"], ["{Feeds}"])] },
   QaDriver: {
-    capabilities: ["MOCK_NETWORK", "MOCK_DISPATCH", "WORLDS"],
+    capabilities: ["MOCK_NETWORK", "MOCK_DISPATCH", "WORLDS", "LEADS_READ"],
     tables: { ...writeAll(APP_TABLES), Reference: "read" },
     buckets: { Evidence: "read", Media: "write" },
     grants: [
       g(["cognito-idp:DescribeUserPoolClient"], ["{Auth}"]),
+      ...QA_SEAM_GRANTS,
       g(["s3:GetObject"], ["{Seed}/brand/*"]),
       sqsSend(),
       g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{PolicyAudit}", "{ToolOrders}", "{ToolKnowledge}", "{ToolEvidence}", "{ToolMessaging}", "{ToolCases}"]),
@@ -318,13 +319,14 @@ export const SERVICE_ROLES = {
     capabilities: [],
     grants: [
       invokeModels("HARNESS"),
+      readModelProfile,
       guardrailG1,
       g(["bedrock-agentcore:InvokeGateway"], ["{Gateway}"]),
       g(["bedrock-agentcore:CreateEvent", "bedrock-agentcore:GetEvent", "bedrock-agentcore:ListEvents", "bedrock-agentcore:RetrieveMemoryRecords"], ["{Memory}"]),
     ],
   },
   // Runs the extraction model of the three Memory strategies with override (sid of the scaffolding).
-  Memory: { capabilities: [], grants: [{ sid: "ExtractionModel", ...invokeModels("HARNESS") }] },
+  Memory: { capabilities: [], grants: [{ sid: "ExtractionModel", ...invokeModels("HARNESS") }, readModelProfile] },
   Gateway: { capabilities: [], grants: [g(["lambda:InvokeFunction"], ["{ToolOrders}", "{ToolKnowledge}", "{ToolEvidence}", "{ToolMessaging}", "{ToolCases}"])] },
   SchedulerInvocation: { capabilities: [], grants: [g(["lambda:InvokeFunction"], ["{ScheduleDispatch}"])] },
 } as const satisfies Record<string, RoleCapabilities>;

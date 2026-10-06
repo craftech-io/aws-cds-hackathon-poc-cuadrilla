@@ -11,15 +11,17 @@ import { TOOL_TARGETS } from "../packages/bff/src/agent-tools/common/definition"
 import { DEFAULT_OPERATOR_NAME } from "../packages/bff/src/copy/brand";
 import { MASK_MARKERS } from "../packages/bff/src/lib/mask";
 import { gatewayToolSchemas } from "./agent-tool-schemas";
-import { AGENT_ROLE_WILDCARD_SIDS, agentCoreTrustPolicy, agentRoleStatements, capabilityStatements, policyDocument, trustSourcePattern, type AgentRole, type AgentStatement } from "./agentcore-iam";
+import { AGENT_ROLE_WILDCARD_SIDS, agentCoreTrustPolicy, agentRoleStatements, capabilityStatements, modelRefArns, policyDocument, trustSourcePattern, type AgentRole, type AgentStatement } from "./agentcore-iam";
 import * as spec from "./agentcore-spec";
-import { block, statementsOf, template } from "./bootstrap/template-text";
+import { boundaryAllows, template } from "./bootstrap/template-text";
 import { CAPABILITIES, LAMBDA_CAPABILITIES, SERVICE_ROLES, agentModelArns, expectedGrants, resolveCapabilities, type Grant, type LambdaName, type RoleName } from "./iam-capabilities";
 import { GATEWAY_TARGETS, GATEWAY_TOOLS, actionId, cedarPolicies, inputSchemasByAction, schemaProblems, type GatewayTarget } from "./policy-rules";
 
 const APP = "aws-cds-hackathon-poc-cuadrilla";
 const STAGE = "poc";
 const PLACE = { account: "776805327629", region: "us-east-1" };
+/** The app's inference profile as Bedrock names it once created (ADR-0028). */
+const PROFILE = "arn:aws:bedrock:us-east-1:776805327629:application-inference-profile/ab12cd34ef56";
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), "utf8");
 
 const architecture = read("docs/architecture.md");
@@ -87,12 +89,8 @@ describe("Harness (docs/architecture.md §4, ADR-0020)", () => {
     expect(accountSection).toContain(`Harness, Memory y validación de fotos: \`${spec.HARNESS_MODEL_ID}\``);
     expect(spec.PHOTO_MODEL_ID).toBe(spec.HARNESS_MODEL_ID);
     expect(components).toContain(`\`${spec.HARNESS_API_FORMAT}\``);
-    expect(spec.HARNESS_LIMITS).toEqual({
-      maxIterations: documented(components, "maxIterations"),
-      maxTokens: documented(components, "maxTokens"),
-      timeoutSeconds: documented(components, "timeoutSeconds"),
-      slidingWindowMessages: documented(components, "sliding_window"),
-    });
+    const limits = { maxIterations: "maxIterations", maxTokens: "maxTokens", timeoutSeconds: "timeoutSeconds", slidingWindowMessages: "sliding_window" } as const;
+    expect(spec.HARNESS_LIMITS).toEqual(Object.fromEntries(Object.entries(limits).map(([key, label]) => [key, documented(components, label)])));
     expect(spec.HARNESS_LIMITS.maxTokens).toBeGreaterThanOrEqual(4096);
     expect(components).toContain(`allowedTools: [${spec.HARNESS_ALLOWED_TOOLS.map((tool) => `"${tool}"`).join(", ")}]`);
   });
@@ -103,22 +101,19 @@ describe("Harness (docs/architecture.md §4, ADR-0020)", () => {
   });
 
   it("keeps the session lifecycle inside the service range and above one turn", () => {
-    for (const value of Object.values(spec.HARNESS_LIFECYCLE)) {
-      expect(value).toBeGreaterThanOrEqual(60);
-      expect(value).toBeLessThanOrEqual(28_800);
-    }
+    for (const value of Object.values(spec.HARNESS_LIFECYCLE)) expect(value >= 60 && value <= 28_800, String(value)).toBe(true);
     expect(spec.HARNESS_LIFECYCLE.idleRuntimeSessionTimeoutSeconds).toBeGreaterThan(spec.HARNESS_LIMITS.timeoutSeconds);
   });
 
-  it("puts G1 in the model parameters of HARNESS_MODEL_ID, over streaming Converse", () => {
+  it("puts G1 in the model parameters of the app's inference profile, over streaming Converse", () => {
     const guardrail = { guardrailConfig: { guardrailIdentifier: "g1", guardrailVersion: "1", trace: "enabled" } };
-    expect(spec.harnessBedrockModelConfig(guardrail)).toEqual({ modelId: spec.HARNESS_MODEL_ID, apiFormat: "converse_stream", additionalParams: guardrail });
+    expect(spec.harnessBedrockModelConfig(PROFILE, guardrail)).toEqual({ modelId: PROFILE, apiFormat: "converse_stream", additionalParams: guardrail });
+    expect(read("infra/agentcore.ts")).toContain("harnessBedrockModelConfig(modelProfile.arn, harnessGuardrailConfig)");
   });
 
   it("records that the Harness exposes no effort, as the pinned provider and the installed SDK declare it", () => {
     const fields = recordedFields(spec.HARNESS_EFFORT.checked);
-    expect(fields).toContain("maxTokens");
-    expect(fields).toContain("additionalParams");
+    expect(fields).toEqual(expect.arrayContaining(["maxTokens", "additionalParams"]));
     expect(fields.filter((field) => /effort|reasoning|thinking/i.test(field))).toEqual([]);
     expect(spec.HARNESS_EFFORT).toMatchObject({ exposed: false, effort: undefined });
   });
@@ -131,7 +126,7 @@ describe("Harness (docs/architecture.md §4, ADR-0020)", () => {
 
 describe("Memory (docs/architecture.md §9.3, docs/design-brief.md §5.4)", () => {
   const rows = [...memorySection.matchAll(/^\| [^|]+ \| `(\w+)` \| `([^`]+)` \|/gm)].map((match) => [match[1], match[2]]);
-  const strategies = spec.memoryStrategyArgs().map((entry) => entry.customMemoryStrategy);
+  const strategies = spec.memoryStrategyArgs(PROFILE).map((entry) => entry.customMemoryStrategy);
   const prompts = strategies.flatMap((strategy) => Object.values(strategy.configuration).flatMap((override: object) => Object.values(override) as Array<{ appendToPrompt: string; modelId: string }>));
 
   it("has exactly the three documented strategies, names, namespaces and event expiry", () => {
@@ -155,10 +150,8 @@ describe("Memory (docs/architecture.md §9.3, docs/design-brief.md §5.4)", () =
     expect(strategies.map((strategy) => strategy.name)).toEqual(Object.keys(spec.MEMORY_STRATEGIES));
     expect(strategies.map((strategy) => Object.keys(strategy.configuration))).toEqual([["semanticOverride"], ["userPreferenceOverride"], ["summaryOverride"]]);
     expect(prompts).toHaveLength(5);
-    for (const prompt of prompts) {
-      expect(prompt.modelId).toBe(spec.HARNESS_MODEL_ID);
-      expect(prompt.appendToPrompt.endsWith(spec.MEMORY_EXCLUSION_INSTRUCTION)).toBe(true);
-    }
+    expect(read("infra/agentcore.ts")).toContain("memoryStrategies: modelProfile.arn.apply(memoryStrategyArgs)");
+    for (const prompt of prompts) expect([prompt.modelId, prompt.appendToPrompt.endsWith(spec.MEMORY_EXCLUSION_INSTRUCTION)]).toEqual([PROFILE, true]);
     for (const strategy of strategies) expect(strategy.namespaceTemplates).toHaveLength(1);
   });
 
@@ -195,7 +188,7 @@ describe("tool Lambdas (docs/architecture.md §9.2, §12 and §14)", () => {
 
   it("carries every grant of every target, and nothing a tool may not hold", () => {
     expect(Object.fromEntries(TOOL_FUNCTIONS.map((fn) => [fn, spec.toolCarriers(fn)]))).toEqual({
-      ToolOrders: ["NetworkMock"],
+      ToolOrders: ["EmailChannel", "Guardrails", "NetworkMock", "Scheduler", "StoragePrefix", "WhatsAppNumber"],
       ToolKnowledge: ["KnowledgeBase"],
       ToolEvidence: ["EmailChannel", "Guardrails", "NetworkMock", "PhotoModel", "Scheduler", "StoragePrefix", "WhatsAppNumber"],
       ToolMessaging: ["EmailChannel", "Guardrails", "Scheduler", "StoragePrefix", "WhatsAppNumber"],
@@ -212,13 +205,16 @@ describe("tool Lambdas (docs/architecture.md §9.2, §12 and §14)", () => {
       for (const [carrier, capability] of Object.entries(capabilityOf)) {
         if (spec.toolCarriers(fn).includes(carrier as spec.ToolCarrier)) expect(byCarrier(fn, carrier as spec.ToolCarrier), `${fn} ${carrier}`).toEqual(CAPABILITIES[capability].grants);
       }
-      for (const grant of byCarrier(fn, "StoragePrefix")) for (const resource of grant.resources) expect(resource).toMatch(/^\{(Media|Evidence)\}\/[a-z]+\/\*$/);
+      for (const grant of byCarrier(fn, "StoragePrefix")) for (const resource of grant.resources) expect(resource).toMatch(/^\{(Media|Evidence)\}\/(?:guest\/\*\/)?[a-z]+\/\*$/);
     }
-    expect(byCarrier("ToolEvidence", "PhotoModel")).toEqual([{ actions: ["bedrock:InvokeModel"], resources: ["{model:PHOTO}"] }]);
+    expect(byCarrier("ToolEvidence", "PhotoModel")).toEqual([
+      { actions: ["bedrock:InvokeModel"], resources: ["{model:PHOTO}"] },
+      { sid: "ModelProfileRead", actions: ["bedrock:GetInferenceProfile"], resources: ["{model:PROFILE}"] },
+    ]);
   });
 
   it("links for their runtime only what their code reads", () => {
-    expect(spec.toolRuntimeLinks("ToolOrders")).toEqual(["SessionTokenKey"]);
+    expect(spec.toolRuntimeLinks("ToolOrders")).toEqual(["SessionTokenKey", "ChannelModes", "SeedOverrides", "BrandConfig", "WhatsAppPhoneNumberId"]);
     expect(spec.toolRuntimeLinks("ToolKnowledge")).toEqual(["SessionTokenKey"]);
     expect(spec.toolRuntimeLinks("ToolMessaging")).toEqual(["SessionTokenKey", "ChannelModes", "SeedOverrides", "BrandConfig", "WhatsAppPhoneNumberId"]);
     expect(spec.toolRuntimeLinks("ToolEvidence")).toEqual(["SessionTokenKey", "ChannelModes", "SeedOverrides", "BrandConfig", "WhatsAppPhoneNumberId", "CostCaps"]);
@@ -281,10 +277,34 @@ describe("runtime log group and content in traces (docs/architecture.md §12)", 
 
   it("records that no Harness or endpoint field turns content capture off, so retention is what is fixed", () => {
     const fields = recordedFields(spec.TRACE_CONTENT_CAPTURE.checked);
-    expect(fields).toContain("executionRoleArn");
-    expect(fields).toContain("targetVersion");
+    expect(fields).toEqual(expect.arrayContaining(["executionRoleArn", "targetVersion"]));
     expect(fields.filter((field) => /observab|capture|telemetry|trac|logging|content/i.test(field))).toEqual([]);
     expect(spec.TRACE_CONTENT_CAPTURE).toMatchObject({ captureCanBeTurnedOff: false, decision: "RETENTION", runtimeLogGroupRetentionDays: spec.AGENT_LOG_RETENTION_DAYS });
+  });
+
+  it("declares the DEFAULT group's 30 days as the manual configuration of §17 item 15: no pinned provider models it (ADR-0028)", () => {
+    const record = spec.DEFAULT_RUNTIME_LOG_RETENTION;
+    const fields = recordedFields(record.checked);
+    expect(fields).toEqual(expect.arrayContaining(["executionRoleArn", "targetVersion", "harnessName", "agentRuntimeName"]));
+    expect(fields.filter((field) => /retention|logGroup|logging|logConfig/i.test(field))).toEqual([]);
+    expect(record).toMatchObject({ modeledByProvider: false, retentionDays: 30, manualConfig: "docs/architecture.md §17 item 15" });
+    const item15 = architecture.split("\n").find((line) => line.startsWith("| 15 |")) ?? "";
+    for (const command of [record.apply, record.verify]) expect(item15).toContain(`\`${command}\``);
+    expect(record.apply).toContain(`<runtimeId>-${spec.RUNTIME_DEFAULT_ENDPOINT} --retention-in-days ${spec.AGENT_LOG_RETENTION_DAYS}`);
+  });
+});
+
+describe("the app's inference profile (ADR-0028)", () => {
+  it("is named after the model as §1 documents it, copies the global profile and is what Harness, Memory and PhotoModel call", () => {
+    const name = spec.appModelProfileName(APP, STAGE);
+    expect([name, name.length <= 64, accountSection.includes(`\`${name}\``)]).toEqual([`${APP}-${STAGE}-sonnet-5-5`, true, true]);
+    for (const text of [name, spec.appModelProfileDescription(APP, STAGE)]) expect(text).toMatch(/^([0-9a-zA-Z:.][ _-]?)+$/);
+    expect(spec.appModelProfileName(APP, STAGE, "global.anthropic.claude-opus-5")).toBe(`${APP}-${STAGE}-opus-5`);
+    expect(spec.globalModelProfileArn(PLACE.region, PLACE.account)).toBe(`arn:aws:bedrock:us-east-1:${PLACE.account}:inference-profile/${spec.HARNESS_MODEL_ID}`);
+    expect(spec.photoInvokeModelId(PROFILE)).toBe(PROFILE);
+    expect(modelRefArns("{model:PHOTO}", PLACE, PROFILE)).toEqual(agentModelArns(spec.HARNESS_MODEL_ID, PLACE.region, PLACE.account, PROFILE));
+    expect(read("infra/agent-tools.ts")).toContain("invokeModelId: profileArn.apply(photoInvokeModelId)");
+    expect(read("infra/agentcore-iam.ts")).toMatch(/new aws\.bedrock\.InferenceProfile\("AgentModelProfile", \{\s+name: appModelProfileName\(\$app\.name, \$app\.stage\),[\s\S]*?copyFrom: /);
   });
 });
 
@@ -295,6 +315,7 @@ describe("IAM of the agent roles (docs/architecture.md §14)", () => {
     "{Gateway}": ["arn:gateway"],
     "{Memory}": ["arn:memory"],
     "{PolicyEngine}": ["arn:engine"],
+    "{model:PROFILE}": [PROFILE],
     ...Object.fromEntries(TOOL_FUNCTIONS.map((fn, index) => [`{${fn}}`, [functionArns[index] ?? ""]])),
   };
   const statements = (role: AgentRole): AgentStatement[] => agentRoleStatements(role, refs, PLACE, APP, STAGE);
@@ -305,11 +326,15 @@ describe("IAM of the agent roles (docs/architecture.md §14)", () => {
       const declared: readonly Grant[] = SERVICE_ROLES[role].grants;
       expect(capabilityStatements(role, refs, PLACE).map((statement) => statement.actions)).toEqual(declared.map((grant) => grant.actions));
     }
-    expect(bySid("Harness", "Model")?.resources).toEqual(agentModelArns(spec.HARNESS_MODEL_ID, PLACE.region, PLACE.account));
+    expect(bySid("Harness", "Model")?.resources).toEqual(agentModelArns(spec.HARNESS_MODEL_ID, PLACE.region, PLACE.account, PROFILE));
+    expect(bySid("Harness", "ModelProfileRead")).toEqual({ sid: "ModelProfileRead", actions: ["bedrock:GetInferenceProfile"], resources: [PROFILE] });
     expect(bySid("Harness", "GuardrailG1")?.resources).toEqual(["arn:g1"]);
     expect(bySid("Harness", "Gateway")?.resources).toEqual(["arn:gateway"]);
     expect(bySid("Harness", "Memory")?.resources).toEqual(["arn:memory"]);
-    expect(statements("Memory")).toEqual([{ sid: "ExtractionModel", actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"], resources: agentModelArns(spec.HARNESS_MODEL_ID, PLACE.region, PLACE.account) }]);
+    expect(statements("Memory")).toEqual([
+      { sid: "ExtractionModel", actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"], resources: agentModelArns(spec.HARNESS_MODEL_ID, PLACE.region, PLACE.account, PROFILE) },
+      { sid: "ModelProfileRead", actions: ["bedrock:GetInferenceProfile"], resources: [PROFILE] },
+    ]);
     expect(() => agentRoleStatements("Harness", {}, PLACE, APP, STAGE)).toThrow(/needs the ARN/);
   });
 
@@ -335,10 +360,7 @@ describe("IAM of the agent roles (docs/architecture.md §14)", () => {
     const trust = JSON.parse(agentCoreTrustPolicy(PLACE, trustSourcePattern("Memory", PLACE, APP, STAGE))) as { Statement: Array<{ Principal: unknown; Condition: unknown }> };
     expect(trust.Statement).toHaveLength(1);
     expect(trust.Statement[0]?.Principal).toEqual({ Service: "bedrock-agentcore.amazonaws.com" });
-    expect(trust.Statement[0]?.Condition).toEqual({
-      StringEquals: { "aws:SourceAccount": PLACE.account },
-      ArnLike: { "aws:SourceArn": `arn:aws:bedrock-agentcore:us-east-1:${PLACE.account}:memory/${spec.memoryName(APP, STAGE)}-*` },
-    });
+    expect(trust.Statement[0]?.Condition).toEqual({ StringEquals: { "aws:SourceAccount": PLACE.account }, ArnLike: { "aws:SourceArn": `arn:aws:bedrock-agentcore:us-east-1:${PLACE.account}:memory/${spec.memoryName(APP, STAGE)}-*` } });
     expect(covers(trustSourcePattern("Memory", PLACE, APP, STAGE), `arn:aws:bedrock-agentcore:us-east-1:${PLACE.account}:memory/${spec.memoryName(APP, STAGE)}-Ab12Cd34Ef`)).toBe(true);
     expect(trustSourcePattern("Gateway", PLACE, APP, STAGE)).toBe(`arn:aws:bedrock-agentcore:us-east-1:${PLACE.account}:gateway/${APP}-${STAGE}-*`);
     const document = JSON.parse(policyDocument(statements("Harness"))) as { Version: string; Statement: Array<{ Effect: string }> };
@@ -347,26 +369,9 @@ describe("IAM of the agent roles (docs/architecture.md §14)", () => {
   });
 
   it("stays inside the permissions boundary of the CI bootstrap, untagged resources by name", () => {
-    const substitute = (text: string): string =>
-      text.replace(/^!Sub /, "").replace(/^"|"$/g, "").replace("${AWS::Partition}", "aws").replace("${Region}", "us-east-1").replace("${AWS::AccountId}", PLACE.account);
-    const list = (body: string, key: string): string[] => {
-      const lines = body.split("\n");
-      const at = lines.findIndex((line) => line.trim().startsWith(`${key}:`));
-      if (at < 0) return [];
-      const inline = lines[at]?.trim().slice(key.length + 1).trim() ?? "";
-      if (inline !== "") return [substitute(inline)];
-      const items: string[] = [];
-      for (const line of lines.slice(at + 1)) {
-        const item = /^\s+- (.+)$/.exec(line)?.[1];
-        if (item === undefined) break;
-        items.push(substitute(item));
-      }
-      return items;
-    };
-    const boundary = statementsOf(block(template, "  DeployBoundary:", "  DeploySstHomePolicy:"))
-      .filter(({ body }) => body.includes("Effect: Allow"))
-      .map(({ sid, body }) => ({ sid, actions: list(body, "Action"), resources: list(body, "Resource"), tagged: body.includes("aws:ResourceTag/sst:app") }));
-    const tagged = new Set(["GuardrailG1", "Gateway", "Memory", "InvokeToolTargets", "PolicyEngineConfiguration", "PolicyEngineAuthorization"]);
+    const boundary = boundaryAllows();
+    // The app's inference profile carries `sst:app` (the provider's default tags): GetInferenceProfile rides TaggedAppResources.
+    const tagged = new Set(["GuardrailG1", "Gateway", "Memory", "InvokeToolTargets", "PolicyEngineConfiguration", "PolicyEngineAuthorization", "ModelProfileRead"]);
     for (const role of ["Harness", "Gateway", "Memory"] as const) {
       for (const statement of statements(role)) {
         for (const action of statement.actions) {

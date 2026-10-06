@@ -69,3 +69,38 @@ export const statement = (sid: string): string => {
 };
 export const allows = statements.filter(({ body }) => body.includes("Effect: Allow"));
 
+
+/** An Allow statement of the boundary with its actions and ARNs (the defaults of this account substituted). */
+export interface BoundaryAllow {
+  readonly sid: string;
+  readonly actions: string[];
+  readonly resources: string[];
+  /** Fenced by `aws:ResourceTag/sst:app`. */
+  readonly tagged: boolean;
+}
+
+const substitute = (text: string): string =>
+  text.replace(/^!Sub /, "").replace(/^"|"$/g, "").replace("${AWS::Partition}", "aws").replace("${Region}", "us-east-1").replace("${AWS::AccountId}", "776805327629");
+
+/** The values of `key:` in a statement body: inline, or the `- item` lines under it. */
+function listOf(body: string, key: string): string[] {
+  const lines = body.split("\n");
+  const at = lines.findIndex((line) => line.trim().startsWith(`${key}:`));
+  if (at < 0) return [];
+  const inline = lines[at]?.trim().slice(key.length + 1).trim() ?? "";
+  if (inline !== "") return [substitute(inline)];
+  const items: string[] = [];
+  for (const line of lines.slice(at + 1)) {
+    const item = /^\s+- (.+)$/.exec(line)?.[1];
+    if (item === undefined) break;
+    items.push(substitute(item));
+  }
+  return items;
+}
+
+/** Every Allow statement of the permissions boundary, the ceiling of the roles the app creates. */
+export function boundaryAllows(): BoundaryAllow[] {
+  return statementsOf(block(template, "  DeployBoundary:", "  DeploySstHomePolicy:"))
+    .filter(({ body }) => body.includes("Effect: Allow"))
+    .map(({ sid, body }) => ({ sid, actions: listOf(body, "Action"), resources: listOf(body, "Resource"), tagged: body.includes("aws:ResourceTag/sst:app") }));
+}

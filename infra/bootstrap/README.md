@@ -76,6 +76,8 @@ What each group of statements is for:
 | `ProjectBudget` / `DenyBudgetsOfOtherProjects` | The monthly budget `<app>-*` of ADR-0019, and no other budget of the account |
 | `DenyPublicFunctionUrlsBesidesTheEdge` | A Function URL with `AuthType NONE` only on `Bff`; the mocks, the QA driver and every other function keep `AWS_IAM` |
 | `HarnessUnderlyingRuntime` | The runtime AgentCore creates under the Harness, named `harness_<AgentNamePrefix>*` |
+| `CedarPoliciesOfThisAppsEngine` | Cedar policies are untaggable children of the engine and their names are unique across every engine of the account: only this app's engine (`<AgentNamePrefix>_<DeployStage>*`, named by `infra/policy-rules.ts`), the engine ARN itself included, never another app's |
+| `AppInferenceProfileCreate` / `AppInferenceProfiles` | The app's inference profile `<app>-poc-sonnet-5-5` (ADR-0028): create and tag on `application-inference-profile/*` (plus the global profile and the foundation model it copies, which the create also authorizes) only when the request tags it `Project` = the app with no key outside the app's tag keys, in one statement so both conditions hold together; get, delete, list tags and untag only on a profile tagged `Project` = the app. Deploy role only (named-resources policy): no role of the app creates or deletes a profile. In the boundary, `InvokeModels` names `application-inference-profile/*` of the region (the Harness, Memory and `ToolEvidence` call through it) and their `bedrock:GetInferenceProfile` rides `TaggedAppResources`: the profile carries `sst:app` from the provider's default tags |
 | `CloudControlTransport` | `awsnative.*` resources go through the Cloud Control API, IAM prefix `cloudformation` |
 | Edge policy | CloudFront functions `<app>-poc-*`, the bootstrap key-value store and the declared cache policy only; reads of the origin request and cache policies of `/api/*` |
 | `WebAclsOfThisApp` (edge policy) | Create, update, delete, tag and associate only the web ACLs `<app>-*` of both scopes (`<app>-poc-edge` on the Router, `<app>-poc-auth` on the user pool). AWS WAF has no tag fence on create, so the fence is the name |
@@ -134,6 +136,17 @@ the email always arrives lowercased, so either value keeps one account per email
 aws --profile craftech-demos cognito-idp describe-user-pool --user-pool-id <id> --query UserPool.UsernameConfiguration
 ```
 
+**Wave 3 (ADR-0028, the app's inference profile).** The template changed (`AppInferenceProfileCreate` and
+`AppInferenceProfiles` in the deploy role, `application-inference-profile/*` in the boundary's `InvokeModels`): the
+operator applies it again with the command above **before** the push that deploys the model change,
+after the read-only pre-checks of `docs/architecture.md` §17 items 5 and 6 (global profile `ACTIVE`,
+tokens-per-minute quota of Sonnet 5.5, and the AWS Marketplace subscription if it is the model's first
+use in the account), and checks the new statements with `simulate-principal-policy` (below). The first
+CI deploy after the model change may fail once on the Memory update (IAM propagation): rerun the job,
+never a local deploy (`docs/architecture.md` §16). After the first deploy that creates the runtime, and
+after every deploy that replaces it, the operator gives the `…-DEFAULT` log group of the runtime its 30
+days (`docs/architecture.md` §17 item 15, `DEFAULT_RUNTIME_LOG_RETENTION` of `infra/agentcore-spec.ts`).
+
 The SST bootstrap of the account and the stage passphrase are created by the operator's first
 `npx sst secret set ... --stage poc` (step 3), never by CI.
 
@@ -179,6 +192,25 @@ aws --profile craftech-demos iam simulate-principal-policy \
   --action-names wafv2:UpdateWebACL wafv2:DeleteWebACL wafv2:CreateAPIKey \
   --resource-arns <arn of a web ACL of another project>
 ```
+
+The wave-3 statements: the deploy role creates an inference profile only with the app's `Project`
+tag, and deletes only a profile tagged as the app:
+
+```bash
+aws --profile craftech-demos iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy \
+  --action-names bedrock:CreateInferenceProfile bedrock:TagResource \
+  --resource-arns arn:aws:bedrock:us-east-1:776805327629:application-inference-profile/x \
+  --context-entries "ContextKeyName=aws:RequestTag/Project,ContextKeyValues=aws-cds-hackathon-poc-cuadrilla,ContextKeyType=string" \
+                    "ContextKeyName=aws:TagKeys,ContextKeyValues=Project,Stage,ContextKeyType=stringList"
+aws --profile craftech-demos iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy \
+  --action-names bedrock:DeleteInferenceProfile \
+  --resource-arns arn:aws:bedrock:us-east-1:776805327629:application-inference-profile/x \
+  --context-entries "ContextKeyName=aws:ResourceTag/Project,ContextKeyValues=another-project,ContextKeyType=string"
+```
+
+The first must be `allowed` and the second `implicitDeny`.
 
 ## Residual risks
 

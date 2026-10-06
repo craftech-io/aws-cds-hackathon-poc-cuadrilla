@@ -133,25 +133,45 @@ describe("TRANSCRIBE", () => {
   });
 });
 
-describe("models", () => {
-  it("names the global inference profile and its foundation model region-less and in every region", () => {
-    expect(agentModelArns("global.anthropic.claude-opus-5", "us-east-1", "776805327629")).toEqual([
+describe("models (ADR-0028)", () => {
+  const PROFILE = "arn:aws:bedrock:us-east-1:776805327629:application-inference-profile/ab12cd34ef56";
+
+  it("names the app's profile, the global profile and its foundation model region-less and in every region", () => {
+    expect(agentModelArns("global.anthropic.claude-sonnet-5-5", "us-east-1", "776805327629", PROFILE)).toEqual([
+      PROFILE,
+      "arn:aws:bedrock:us-east-1:776805327629:inference-profile/global.anthropic.claude-sonnet-5-5",
+      "arn:aws:bedrock:::foundation-model/anthropic.claude-sonnet-5-5",
+      "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-5-5",
+    ]);
+    expect(agentModelArns("global.anthropic.claude-opus-5")).toEqual([
       "arn:aws:bedrock:us-east-1:776805327629:inference-profile/global.anthropic.claude-opus-5",
       "arn:aws:bedrock:::foundation-model/anthropic.claude-opus-5",
       "arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-5",
     ]);
-    for (const arn of agentModelArns("global.anthropic.claude-opus-5")) expect(arn).not.toMatch(/foundation-model\/\*$/);
+    for (const arn of agentModelArns("global.anthropic.claude-sonnet-5-5", "us-east-1", "776805327629", PROFILE)) expect(arn).not.toMatch(/(model|profile)\/\*$|^\*$/);
   });
 
-  it("lets ToolEvidence call its photo model and nothing else of Bedrock runtime", () => {
-    const grants = expectedGrants("ToolEvidence").filter((grant) => grant.actions.some((action) => action.startsWith("bedrock:InvokeModel")));
-    expect(grants).toEqual([{ actions: ["bedrock:InvokeModel"], resources: ["{model:PHOTO}"] }]);
+  it("lets ToolEvidence call its photo model, read the app's profile and nothing else of Bedrock runtime", () => {
+    const grants = expectedGrants("ToolEvidence").filter((grant) => grant.actions.some((action) => action.startsWith("bedrock:")));
+    expect(grants).toEqual([
+      { actions: ["bedrock:InvokeModel"], resources: ["{model:PHOTO}"] },
+      { sid: "ModelProfileRead", actions: ["bedrock:GetInferenceProfile"], resources: ["{model:PROFILE}"] },
+      { actions: ["bedrock:ApplyGuardrail"], resources: ["{G2}", "{G3}"] },
+    ]);
   });
 
-  it("gives the Memory execution role only the extraction model (sid ExtractionModel)", () => {
+  it("gives the Memory execution role only the extraction model (sid ExtractionModel) and the read of the app's profile", () => {
     expect(SERVICE_ROLES.Memory.grants).toEqual([
       { sid: "ExtractionModel", actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"], resources: ["{model:HARNESS}"] },
+      { sid: "ModelProfileRead", actions: ["bedrock:GetInferenceProfile"], resources: ["{model:PROFILE}"] },
     ]);
+  });
+
+  it("reads the app's profile exactly in the roles that call through it: the Harness, Memory and ToolEvidence", () => {
+    const readers = ROLES.filter((role) => expectedGrants(role).some((grant) => grant.actions.includes("bedrock:GetInferenceProfile")));
+    expect(readers.sort()).toEqual(["Harness", "Memory", "ToolEvidence"]);
+    for (const role of readers) for (const grant of expectedGrants(role).filter((entry) => entry.actions.includes("bedrock:GetInferenceProfile"))) expect(grant.resources, role).toEqual(["{model:PROFILE}"]);
+    expect(ROLES.filter((role) => expectedActions(role).some((action) => /^bedrock:(Create|Delete)InferenceProfile$/.test(action)))).toEqual([]);
   });
 });
 
@@ -199,6 +219,16 @@ describe("QaDriver", () => {
     expect(grants.find((grant) => grant.actions.includes("sns:Publish"))?.resources).toEqual(["arn:aws:sns:us-east-1:776805327629:aws-cds-hackathon-poc-cuadrilla-wa-inbound"]);
     const kill = grants.find((grant) => grant.actions.includes("dynamodb:PutItem"));
     expect(kill?.conditions?.[0]?.values).toEqual(["KILL#AGENT#qa-*"]);
+  });
+
+  it("holds the QA seam of ADR-0025 §7 on the stage's pool, the leads read and the two web ACLs, never AdminDeleteUser", () => {
+    const grants = expectedGrants("QaDriver");
+    const on = (resource: string) => grants.filter((grant) => grant.resources.includes(resource)).flatMap((grant) => grant.actions);
+    expect(on("{UserPool}").sort()).toEqual(["cognito-idp:AdminConfirmSignUp", "cognito-idp:AdminGetUser", "cognito-idp:AdminInitiateAuth", "cognito-idp:GetWebACLForResource"]);
+    expect(on("{EdgeWebAcl}")).toEqual(["wafv2:GetWebACL", "wafv2:GetWebACLForResource"]);
+    expect(on("{AuthWebAcl}")).toEqual(["wafv2:GetWebACL", "wafv2:GetWebACLForResource"]);
+    expect(resolveCapabilities(LAMBDA_CAPABILITIES.QaDriver.capabilities)).toContain("LEADS_READ");
+    expect(resolveCapabilities(LAMBDA_CAPABILITIES.QaDriver.capabilities)).not.toContain("LEADS_WRITE");
   });
 });
 
@@ -349,10 +379,10 @@ describe("sign-up and leads", () => {
     expect(expectedGrants("GuestAccountDeletion").find((grant) => grant.actions.includes("s3:ListBucket"))?.conditions).toEqual([{ test: "StringLike", variable: "s3:prefix", values: ["guest/*"] }]);
   });
 
-  it("lets only the Bff, LeadStream (and later the QaDriver) invoke the deletion, and only the triggers and the Bff the world factory", () => {
+  it("lets only the Bff, LeadStream and the QaDriver invoke the deletion, and only the triggers, the Bff and the QaDriver the world factory", () => {
     const invokers = (target: string) => ROLES.filter((role) => grantsOn(role, target).some((grant) => grant.actions.includes("lambda:InvokeFunction"))).sort();
-    expect(invokers("{GuestAccountDeletion}")).toEqual(["Bff", "LeadStream"]);
-    expect(invokers("{GuestWorlds}")).toEqual(["AuthPostAuthentication", "AuthPostConfirmation", "Bff"]);
+    expect(invokers("{GuestAccountDeletion}")).toEqual(["Bff", "LeadStream", "QaDriver"]);
+    expect(invokers("{GuestWorlds}")).toEqual(["AuthPostAuthentication", "AuthPostConfirmation", "Bff", "QaDriver"]);
   });
 
   it("fences the world factory and the deletion to guest worlds in the mocks' tables", () => {

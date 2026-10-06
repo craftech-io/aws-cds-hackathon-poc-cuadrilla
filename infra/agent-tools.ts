@@ -36,12 +36,12 @@
 //     → lambda:InvokeFunction for aws-cds-hackathon-poc-cuadrilla-poc-gateway
 //   aws --profile craftech-demos lambda get-function-concurrency --function-name <ToolEvidence physical name>   → 10
 
-import { PHOTO_MODEL_ID, PHOTO_MODEL_LINK, TOOL_FUNCTIONS, TOOL_LAMBDAS, toolCarriers, toolGrantCarrier, toolHandlerPath, toolRuntimeLinks, type ToolCarrier, type ToolFunctionName, type ToolRuntimeLink } from "./agentcore-spec";
-import { agentPlace, agentRoles } from "./agentcore-iam";
+import { PHOTO_MODEL_ID, PHOTO_MODEL_LINK, TOOL_FUNCTIONS, TOOL_LAMBDAS, photoInvokeModelId, toolCarriers, toolGrantCarrier, toolHandlerPath, toolRuntimeLinks, type ToolCarrier, type ToolFunctionName, type ToolRuntimeLink } from "./agentcore-spec";
+import { agentModelProfile, agentPlace, agentRoles, modelRefArns } from "./agentcore-iam";
 import { ChannelModes } from "./channel-modes";
 import { CostCaps } from "./cost-caps";
 import { GuardrailG2, GuardrailG3 } from "./guardrail";
-import { agentModelArns, expectedGrants } from "./iam-capabilities";
+import { expectedGrants } from "./iam-capabilities";
 import { lateLinks, links, type LinkList } from "./late-links";
 import { EmailChannel } from "./messaging-email";
 import { whatsappPermissions } from "./messaging-whatsapp";
@@ -56,11 +56,26 @@ const grantsCarriedBy = (fn: ToolFunctionName, carrier: ToolCarrier) => expected
 
 // ---- PhotoModel: the photo validation's model (ADR-0015) ---------------------------------------------
 
-/** ToolEvidence: `Resource.PhotoModel.modelId` (PHOTO_MODEL_ID) and exactly its grant on agentModelArns(PHOTO_MODEL_ID). */
+const profileArn = agentModelProfile().arn;
+
+/** One placeholder of a PhotoModel grant: `{model:PHOTO}` (modelRefArns) or `{model:PROFILE}` (the app's profile). */
+function photoModelResources(ref: string): $util.Output<string[]> {
+  return $util.all([agentPlace(), profileArn]).apply(([place, arn]) => {
+    if (ref === "{model:PHOTO}") return modelRefArns(ref, place, arn);
+    if (ref === "{model:PROFILE}") return [arn];
+    throw new Error(`PhotoModel carries no grant on ${ref}.`);
+  });
+}
+
+/**
+ * ToolEvidence: `Resource.PhotoModel.modelId` (PHOTO_MODEL_ID, the key of its rate card rows),
+ * `invokeModelId` (what `Converse` names: the app's inference profile while the photo model is the Harness's,
+ * ADR-0028) and exactly its grants on `{model:PHOTO}` and `{model:PROFILE}`.
+ */
 export const PhotoModel = new sst.Linkable(PHOTO_MODEL_LINK, {
-  properties: { modelId: PHOTO_MODEL_ID },
+  properties: { modelId: PHOTO_MODEL_ID, invokeModelId: profileArn.apply(photoInvokeModelId) },
   include: grantsCarriedBy("ToolEvidence", "PhotoModel").map((grant) =>
-    sst.aws.permission({ actions: [...grant.actions], resources: agentPlace().apply((place) => agentModelArns(PHOTO_MODEL_ID, place.region, place.account)) }),
+    sst.aws.permission({ actions: [...grant.actions], resources: $util.all(grant.resources.map(photoModelResources)).apply((arns) => arns.flat()) }),
   ),
 });
 

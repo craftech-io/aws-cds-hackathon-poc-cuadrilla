@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   type ConversationUsage,
   DEFAULT_MODEL_ID,
+  MODEL_RATES,
   RATE_CARD_KEYS,
+  TokenKind,
   RateCardRow,
   type RateUnit,
   conversationCost,
@@ -18,10 +20,7 @@ function verified(key: string, price: number, unit: RateUnit) {
 }
 
 const RATES = [
-  verified(`bedrock:${DEFAULT_MODEL_ID}:input`, 5, "PER_1M_TOKENS"),
-  verified(`bedrock:${DEFAULT_MODEL_ID}:output`, 25, "PER_1M_TOKENS"),
-  verified(`bedrock:${DEFAULT_MODEL_ID}:cacheRead`, 0.5, "PER_1M_TOKENS"),
-  verified(`bedrock:${DEFAULT_MODEL_ID}:cacheWrite`, 6.25, "PER_1M_TOKENS"),
+  ...TokenKind.options.map((kind) => verified(`bedrock:${DEFAULT_MODEL_ID}:${kind}`, MODEL_RATES.prices[kind], "PER_1M_TOKENS")),
   verified("bedrock:amazon.titan-embed-text-v2", 0.02, "PER_1M_TOKENS"),
   verified("agentcore:gateway", 0.005, "PER_1K_REQUESTS"),
   verified("agentcore:memoryEvents", 0.25, "PER_1K_REQUESTS"),
@@ -71,11 +70,28 @@ describe("rate card rows", () => {
 
   it("[FL-087] a verified row needs price, source and date; a provisional one may lack them (seed invariant 13)", () => {
     expect(RateCardRow.safeParse({ key: "ses:outbound", price: null, unit: "PER_1K_MESSAGES", source: null, asOf: null, provisional: true }).success).toBe(true);
+    // As the seed writes a provisional row: no source and no date at all.
+    expect(RateCardRow.parse({ key: "ses:outbound", price: null, unit: "PER_1K_MESSAGES", provisional: true })).toMatchObject({ source: null, asOf: null });
+    expect(RateCardRow.safeParse({ key: "ses:outbound", price: 0.1, unit: "PER_1K_MESSAGES", asOf: "2026-10-01", provisional: false }).success).toBe(false);
     const missing = RateCardRow.safeParse({ key: "ses:outbound", price: 0.1, unit: "PER_1K_MESSAGES", source: null, asOf: "2026-10-01", provisional: false });
     expect(missing.success).toBe(false);
     expect(RateCardRow.safeParse({ ...verified("ses:outbound", 0.1, "PER_1K_MESSAGES"), key: "SES outbound" }).success).toBe(false);
     expect(hasProvisionalRates(RATES)).toBe(false);
     expect(hasProvisionalRates([...RATES, { key: "ses:outbound", price: null, unit: "PER_1K_MESSAGES", source: null, asOf: null, provisional: true }])).toBe(true);
+  });
+});
+
+describe("rates of the default model (ADR-0028)", () => {
+  it("[FL-087] are Sonnet 5.5 at USD 2 / 10 / 0.2 / 2.5 per million tokens, verified with source and date", () => {
+    expect(DEFAULT_MODEL_ID).toBe("global.anthropic.claude-sonnet-5-5");
+    expect(MODEL_RATES).toMatchObject({ modelId: DEFAULT_MODEL_ID, prices: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 } });
+    expect(SEED_SPEC).toContain(`\`bedrock:${DEFAULT_MODEL_ID}:{input,output,cacheRead,cacheWrite}\` (USD 2 / 10 / 0,2 / 2,5 por millón`);
+    expect(MODEL_RATES.source).toMatch(/^https:\/\/pricing\.us-east-1\.amazonaws\.com\/offers\/v1\.0\/aws\/AmazonBedrockFoundationModels\//);
+    for (const kind of TokenKind.options) {
+      const row = RateCardRow.parse({ key: `bedrock:${DEFAULT_MODEL_ID}:${kind}`, price: MODEL_RATES.prices[kind], unit: "PER_1M_TOKENS", source: MODEL_RATES.source, asOf: MODEL_RATES.asOf, provisional: false });
+      expect(row.provisional).toBe(false);
+    }
+    expect(RATE_CARD_KEYS.filter((key) => key.includes("claude-opus"))).toEqual([]);
   });
 });
 
@@ -85,13 +101,13 @@ describe("conversationCost", () => {
     expect(cost.status).toBe("VERIFIED");
     if (cost.status !== "VERIFIED") return;
     const byKey = new Map(cost.lines.map((line) => [line.key, line.usd]));
-    expect(byKey.get(`bedrock:${DEFAULT_MODEL_ID}:input`)).toBe(2);
-    expect(byKey.get(`bedrock:${DEFAULT_MODEL_ID}:cacheRead`)).toBe(0.5);
+    expect(byKey.get(`bedrock:${DEFAULT_MODEL_ID}:input`)).toBe(0.8);
+    expect(byKey.get(`bedrock:${DEFAULT_MODEL_ID}:cacheRead`)).toBe(0.2);
     expect(byKey.get("transcribe:es-MX:perSecond")).toBe(0.0048);
     expect(byKey.get("agentcore:harness")).toBe(0.009);
     expect(byKey.get("ses:attachmentsGb")).toBe(0.06);
     expect(byKey.get("whatsapp:MX:service")).toBe(0.048);
-    expect(cost.usd).toBe(3.64019);
+    expect(cost.usd).toBe(1.54019);
     expect(cost.whatsappPricedAsLive).toBe(false);
     expect(cost.lines.some((line) => line.key === "polly:neural")).toBe(false);
   });
@@ -118,8 +134,8 @@ describe("conversationCost", () => {
 
   it("compares a verified cost with the operator's threshold", () => {
     const cost = conversationCost(STORY, RATES, { whatsappSimulated: false });
-    expect(exceedsBudget(cost, 3)).toBe(true);
-    expect(exceedsBudget(cost, 5)).toBe(false);
+    expect(exceedsBudget(cost, 1.5)).toBe(true);
+    expect(exceedsBudget(cost, 2)).toBe(false);
     expect(exceedsBudget(cost, undefined)).toBe(false);
     expect(exceedsBudget(conversationCost(STORY, [], { whatsappSimulated: false }), 0)).toBe(false);
   });

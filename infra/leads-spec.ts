@@ -188,6 +188,17 @@ export const SIGNUP_CAPABILITIES = {
 export type SignupCapability = keyof typeof SIGNUP_CAPABILITIES;
 
 /**
+ * The QaDriver's seam of ADR-0025 §7 (`auth.signUp`, `auth.confirmQaSignup`, `auth.qaLogin`, `guest.*`,
+ * `waf.probe`) on the stage's pool, the two web ACLs and the guest Lambdas; never `AdminDeleteUser`
+ * (the clean-up goes through `GuestAccountDeletion`). `leads.get` comes with LEADS_READ.
+ */
+export const QA_SEAM_GRANTS: readonly Grant[] = [
+  g(["cognito-idp:AdminConfirmSignUp", "cognito-idp:AdminInitiateAuth", "cognito-idp:AdminGetUser", "cognito-idp:GetWebACLForResource"], ["{UserPool}"]),
+  g(["lambda:InvokeFunction"], ["{GuestWorlds}", "{GuestAccountDeletion}"]),
+  g(["wafv2:GetWebACL", "wafv2:GetWebACLForResource"], ["{EdgeWebAcl}", "{AuthWebAcl}"]),
+];
+
+/**
  * The Lambdas of the flow. Every `Runtime` access is fenced by the keys of its row; every Cognito
  * action is on the stage's pool (`{UserPool}`) and only where the row names it; the triggers call
  * no Cognito API at all. The Lambdas they invoke come with the link of that Function.

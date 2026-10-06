@@ -14,11 +14,11 @@
 
 import { createHash } from "node:crypto";
 import { MASK_MARKERS } from "../packages/bff/src/lib/mask";
-import { CAPABILITIES, expectedGrants, type CapabilityName, type Grant, type LambdaName } from "./iam-capabilities";
+import { CAPABILITIES, expectedGrants, foundationModelOf, type CapabilityName, type Grant, type LambdaName } from "./iam-capabilities";
 import type { GatewayTarget } from "./policy-rules";
 import { parseStorageRef } from "./storage-keys";
 
-// ---- Models (ADR-0015, ADR-0020) ----------------------------------------------------------------------
+// ---- Models (ADR-0015, ADR-0020, ADR-0028) -------------------------------------------------------------
 
 /**
  * Model of the Harness and of the extraction of the three Memory strategies (docs/architecture.md §1,
@@ -32,6 +32,20 @@ export const HARNESS_MODEL_ID = "global.anthropic.claude-sonnet-5-5";
 export const PHOTO_MODEL_ID = "global.anthropic.claude-sonnet-5-5";
 /** G1 rides in the model parameters of the Harness, which needs streaming Converse (docs/architecture.md §9.4). */
 export const HARNESS_API_FORMAT = "converse_stream";
+
+/**
+ * The app's inference profile (`aws.bedrock.InferenceProfile`, ADR-0028): a copy of the global profile of
+ * HARNESS_MODEL_ID that carries the project's tags (the provider's default tags), so Cost Explorer attributes
+ * the tokens to the app. The Harness, the three Memory strategies and PhotoModel call through its ARN. The
+ * name carries the model: a model change creates the new profile before the old one is deleted.
+ */
+export const appModelProfileName = (app: string, stage: string, modelId: string = HARNESS_MODEL_ID): string => `${app}-${stage}-${foundationModelOf(modelId).replace(/^anthropic\.claude-/, "")}`;
+/** Bedrock takes `([0-9a-zA-Z:.][ _-]?)+` only: no parentheses, commas or slashes. */
+export const appModelProfileDescription = (app: string, stage: string): string => `Agent and photo model of ${app} stage ${stage} for cost attribution`;
+/** `modelSource.copyFrom`: the global profile of HARNESS_MODEL_ID in this region. */
+export const globalModelProfileArn = (region: string, account: string): string => `arn:aws:bedrock:${region}:${account}:inference-profile/${HARNESS_MODEL_ID}`;
+/** What `Converse` of the photo validation names: the app's profile while the photo model is the Harness's (ADR-0028). */
+export const photoInvokeModelId = (appProfileArn: string): string => (PHOTO_MODEL_ID === HARNESS_MODEL_ID ? appProfileArn : PHOTO_MODEL_ID);
 
 // ---- Names ------------------------------------------------------------------------------------------
 
@@ -73,34 +87,26 @@ export const MEMORY_REF = "{Memory}";
 
 // ---- Harness (docs/architecture.md §4, ADR-0020) ----------------------------------------------------------
 
-/**
- * `maxTokens` caps every model call of one invocation and thinking counts in it: 4096, never lower (with 1024
- * turns end in `max_tokens` before `send_whatsapp`). The answer's length is bounded by the system prompt.
- */
+/** `maxTokens` caps every model call of one invocation, thinking included: 4096, never lower (1024 ends turns before `send_whatsapp`). */
 export const HARNESS_LIMITS = { maxIterations: 10, maxTokens: 4_096, timeoutSeconds: 90, slidingWindowMessages: 40 } as const;
 
 /** Session microVMs: a new one reloads the conversation from Memory, so idle ones stop after 5 minutes. */
 export const HARNESS_LIFECYCLE = { idleRuntimeSessionTimeoutSeconds: 300, maxLifetimeSeconds: 3_600 } as const;
 
-/** `model.bedrockModelConfig` of the Harness: the model parameter, streaming Converse and G1 in `additionalParams`. */
-export function harnessBedrockModelConfig<G>(guardrailConfig: G): { modelId: string; apiFormat: typeof HARNESS_API_FORMAT; additionalParams: G } {
-  return { modelId: HARNESS_MODEL_ID, apiFormat: HARNESS_API_FORMAT, additionalParams: guardrailConfig };
+/** `model.bedrockModelConfig` of the Harness: the app's inference profile, streaming Converse and G1 in `additionalParams`. */
+export function harnessBedrockModelConfig<M, G>(modelId: M, guardrailConfig: G): { modelId: M; apiFormat: typeof HARNESS_API_FORMAT; additionalParams: G } {
+  return { modelId, apiFormat: HARNESS_API_FORMAT, additionalParams: guardrailConfig };
 }
 
 /**
- * `effort`, the record ADR-0020 asks WP-26 for. Neither the Harness nor its Bedrock model configuration has
- * an effort field, in the pinned provider or in the control-plane SDK (the test re-reads both). The only way
- * would be `additionalParams`, an opaque pass-through that already carries G1's `guardrailConfig`; an
- * unverified field there could turn every turn into a 400. So no effort is set: the answer's length is
- * bounded by the system prompt ("at most 4 short lines") and `maxTokens` stays at 4096.
+ * `effort`, the record ADR-0020 asks WP-26 for. Neither the Harness nor its model configuration has an effort
+ * field, in the pinned provider or the control-plane SDK (the test re-reads both); only the opaque
+ * `additionalParams`, which carries G1 and where an unverified field could turn every turn into a 400. So
+ * no effort is set: the system prompt bounds the answer ("at most 4 short lines") and `maxTokens` stays 4096.
  */
 export const HARNESS_EFFORT = {
   verifiedOn: "2026-09-26",
-  checked: [
-    ".sst/platform/node_modules/@pulumi/aws-native/bedrockagentcore/harness.d.ts#HarnessArgs",
-    ".sst/platform/node_modules/@pulumi/aws-native/types/input.d.ts#HarnessBedrockModelConfigArgs",
-    "node_modules/@aws-sdk/client-bedrock-agentcore-control/dist-types/models/models_1.d.ts#HarnessBedrockModelConfig",
-  ],
+  checked: [".sst/platform/node_modules/@pulumi/aws-native/bedrockagentcore/harness.d.ts#HarnessArgs", ".sst/platform/node_modules/@pulumi/aws-native/types/input.d.ts#HarnessBedrockModelConfigArgs", "node_modules/@aws-sdk/client-bedrock-agentcore-control/dist-types/models/models_1.d.ts#HarnessBedrockModelConfig"],
   exposed: false,
   effort: undefined,
 } as const;
@@ -193,8 +199,8 @@ function strategyConfiguration(override: MemoryOverride, prompt: PromptOverride)
   return override === "semantic" ? { semanticOverride: both } : { userPreferenceOverride: both };
 }
 
-/** The three custom strategies, each with its focus, the exclusion rules and the extraction model. */
-export function memoryStrategyArgs(modelId: string = HARNESS_MODEL_ID): Array<{ customMemoryStrategy: CustomStrategyArgs }> {
+/** The three custom strategies, each with its focus, the exclusion rules and the extraction model (the app's profile ARN). */
+export function memoryStrategyArgs(modelId: string): Array<{ customMemoryStrategy: CustomStrategyArgs }> {
   return (Object.keys(MEMORY_STRATEGIES) as MemoryStrategyName[]).map((name) => {
     const strategy: MemoryStrategySpec = MEMORY_STRATEGIES[name];
     const prompt: PromptOverride = { appendToPrompt: strategyPrompt(name), modelId };
@@ -265,6 +271,7 @@ const CARRIER_BY_RESOURCE: Readonly<Record<string, ToolCarrier>> = {
   "{whatsappPhone}": "WhatsAppNumber",
   "{KnowledgeBase}": "KnowledgeBase",
   "{model:PHOTO}": "PhotoModel",
+  "{model:PROFILE}": "PhotoModel",
   "{CertificateWriter}": "CertificateWriter",
 };
 
@@ -349,6 +356,21 @@ export function runtimeLogGroupName(agentRuntimeId: string, endpointName: string
   return `${RUNTIME_LOG_GROUP_PREFIX}${agentRuntimeId}-${endpointName}`;
 }
 
+/**
+ * The DEFAULT endpoint's group (ADR-0028): AgentCore creates it with the runtime and no retention, no pinned
+ * provider models it (the test re-reads them) and the IaC can neither create it first nor adopt it: it is the
+ * declared manual configuration of docs/architecture.md §17 item 15, after each deploy that (re)creates the runtime.
+ */
+export const DEFAULT_RUNTIME_LOG_RETENTION = {
+  verifiedOn: "2026-10-06",
+  checked: [".sst/platform/node_modules/@pulumi/aws-native/bedrockagentcore/harness.d.ts#HarnessArgs", ".sst/platform/node_modules/@pulumi/aws-native/bedrockagentcore/harnessEndpoint.d.ts#HarnessEndpointArgs", ".sst/platform/node_modules/@pulumi/aws/bedrock/agentcoreHarness.d.ts#AgentcoreHarnessArgs", ".sst/platform/node_modules/@pulumi/aws/bedrock/agentcoreAgentRuntime.d.ts#AgentcoreAgentRuntimeArgs"],
+  modeledByProvider: false,
+  retentionDays: AGENT_LOG_RETENTION_DAYS,
+  manualConfig: "docs/architecture.md §17 item 15",
+  apply: `aws --profile craftech-demos logs put-retention-policy --log-group-name ${RUNTIME_LOG_GROUP_PREFIX}<runtimeId>-${RUNTIME_DEFAULT_ENDPOINT} --retention-in-days ${AGENT_LOG_RETENTION_DAYS}`,
+  verify: `aws --profile craftech-demos logs describe-log-groups --log-group-name-prefix ${RUNTIME_LOG_GROUP_PREFIX} --query "logGroups[?contains(logGroupName, 'cuadrilla')].[logGroupName,retentionInDays]"`,
+} as const;
+
 /** Endpoints whose log group the IaC creates before the endpoint: `live` only, never DEFAULT. */
 export function runtimeLogGroupEndpoints(endpointName: string = HARNESS_ENDPOINT_NAME): string[] {
   if (endpointName === RUNTIME_DEFAULT_ENDPOINT) throw new Error("The Harness endpoint cannot be DEFAULT: AgentCore owns that log group.");
@@ -366,12 +388,7 @@ export function runtimeLogGroupEndpoints(endpointName: string = HARNESS_ENDPOINT
  */
 export const TRACE_CONTENT_CAPTURE = {
   verifiedOn: "2026-09-26",
-  checked: [
-    ".sst/platform/node_modules/@pulumi/aws-native/bedrockagentcore/harness.d.ts#HarnessArgs",
-    ".sst/platform/node_modules/@pulumi/aws-native/bedrockagentcore/harnessEndpoint.d.ts#HarnessEndpointArgs",
-    "node_modules/@aws-sdk/client-bedrock-agentcore-control/dist-types/models/models_1.d.ts#CreateHarnessRequest",
-    "node_modules/@aws-sdk/client-bedrock-agentcore-control/dist-types/models/models_1.d.ts#CreateHarnessEndpointRequest",
-  ],
+  checked: [".sst/platform/node_modules/@pulumi/aws-native/bedrockagentcore/harness.d.ts#HarnessArgs", ".sst/platform/node_modules/@pulumi/aws-native/bedrockagentcore/harnessEndpoint.d.ts#HarnessEndpointArgs", "node_modules/@aws-sdk/client-bedrock-agentcore-control/dist-types/models/models_1.d.ts#CreateHarnessRequest", "node_modules/@aws-sdk/client-bedrock-agentcore-control/dist-types/models/models_1.d.ts#CreateHarnessEndpointRequest"],
   captureCanBeTurnedOff: false,
   decision: "RETENTION",
   runtimeLogGroupRetentionDays: AGENT_LOG_RETENTION_DAYS,

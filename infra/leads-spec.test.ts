@@ -106,12 +106,13 @@ describe("the Leads table (ADR-0026)", () => {
 });
 
 describe("LeadStream and its dead letters", () => {
-  it("splits a failed batch, retries three times and sends the rest to LeadStreamDlq, which alarms", () => {
+  it("splits a failed batch, retries three times and sends the rest to LeadStreamDlq, with no alarm (ADR-0028)", () => {
     expect(LEAD_STREAM_CONSUMER).toMatchObject({ maximumRetryAttempts: 3, bisectBatchOnFunctionError: true, startingPosition: "LATEST" });
     expect(leadsModule).toContain("destinationConfig: { onFailure: { destinationArn: leadStreamDlq.arn } }");
     expect(leadsModule).toContain("filterCriteria: { filters: LEAD_STREAM_FILTERS.map(");
     expect(leadStreamDlqName()).toBe(`${APP}-${STAGE}-LeadStreamDlq`);
-    expect(leadsModule).toMatch(/new aws\.cloudwatch\.MetricAlarm\("LeadStreamDlqAlarm"[\s\S]*?dimensions: \{ QueueName: leadStreamDlqName\(\$app\.name, \$app\.stage\) \}[\s\S]*?threshold: 0,/);
+    // Logs only (ADR-0028): an alarm with no action costs every month and nobody reads it (infra/logs-only.test.ts).
+    expect(leadsModule).not.toMatch(/cloudwatch\.MetricAlarm|LeadStreamDlqAlarm/);
   });
 
   it("sweeps UNCONFIRMED users once a day", () => {

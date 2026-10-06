@@ -20,6 +20,7 @@ import {
 } from "@cuadrilla/shared";
 import { StepRef } from "../../domain/work-orders";
 import { defineTool } from "../common/definition";
+import { CaseOpened } from "../common/fields";
 
 /** An order as the installer knows it: no ids, no phone, no email; the customer by first name only. */
 const OrderSummary = {
@@ -45,6 +46,8 @@ export const getWorkOrdersTool = defineTool({
     installerFirstName: z.string(),
     dayText: z.string(),
     workOrders: z.array(z.strictObject({ ...OrderSummary, isActive: z.boolean(), openCase: z.boolean() })),
+    /** ADR-0028: the installer's last ten orders in the world, without customer data. */
+    recentWorkOrders: z.array(z.strictObject({ workOrderNumber: WorkOrderNumber, status: WorkOrderStatus, dayText: z.string(), open: z.boolean() })).max(10),
     nowSimText: z.string(),
   }),
 });
@@ -93,6 +96,7 @@ export const getOnuStatusTool = defineTool({
     acceptanceRangeText: z.string().optional(),
     oltPort: z.string().optional(),
     observedAtText: z.string().optional(),
+    caseOpened: CaseOpened.optional(),
   }),
 });
 

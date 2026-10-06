@@ -4,15 +4,20 @@
 // on the first `agentRoles()` call, by infra/agent-tools.ts or infra/agentcore.ts, whichever runs first.
 //
 //   <app>-<stage>-harness  the Harness execution role: exactly SERVICE_ROLES.Harness of
-//                          infra/iam-capabilities.ts (the model through agentModelArns(HARNESS_MODEL_ID), G1,
+//                          infra/iam-capabilities.ts (the model through the app's inference profile,
+//                          agentModelArns(HARNESS_MODEL_ID, …, profile), GetInferenceProfile on it, G1,
 //                          InvokeGateway, the Memory events and retrieval) plus what its runtime needs to run:
 //                          workload identity, its own runtime log groups, X-Ray, the `bedrock-agentcore`
 //                          metrics and the pull of the managed image (the "logs del runtime, X-Ray" of §14).
 //   <app>-<stage>-gateway  lambda:InvokeFunction on the five target Lambdas (SERVICE_ROLES.Gateway) plus the
 //                          three policy engine actions the Gateway needs to evaluate Cedar (without them every
 //                          tool call is denied).
-//   <app>-<stage>-memory   the extraction model of the three strategy overrides, sid `ExtractionModel`
-//                          (SERVICE_ROLES.Memory): a strategy with a prompt override needs a memory role.
+//   <app>-<stage>-memory   the extraction model of the three strategy overrides, sid `ExtractionModel`, and
+//                          `ModelProfileRead` (SERVICE_ROLES.Memory): a strategy with a prompt override
+//                          needs a memory role.
+//
+// The app's inference profile `<app>-<stage>-sonnet-5-5` (ADR-0028, `agentModelProfile()`) is created here
+// too: a tagged copy of the global profile of HARNESS_MODEL_ID that the Harness, Memory and PhotoModel call.
 //
 // Names are fixed because Cedar names the Harness by `assumed-role/<name>` (infra/policy.ts) and
 // `iam get-role-policy` needs them. The path `/<app>/` and the permissions boundary come from the $transform
@@ -29,7 +34,7 @@
 //   aws --profile craftech-demos iam get-role --role-name aws-cds-hackathon-poc-cuadrilla-poc-memory
 //     → Path /aws-cds-hackathon-poc-cuadrilla/, PermissionsBoundary …-ci-boundary, trust with the memory ARN pattern
 
-import { agentRoleName, gatewayName, harnessName, HARNESS_MODEL_ID, memoryName, RUNTIME_LOG_GROUP_PREFIX } from "./agentcore-spec";
+import { agentRoleName, appModelProfileDescription, appModelProfileName, gatewayName, globalModelProfileArn, harnessName, HARNESS_MODEL_ID, memoryName, PHOTO_MODEL_ID, RUNTIME_LOG_GROUP_PREFIX } from "./agentcore-spec";
 import { SERVICE_ROLES, agentModelArns, type Grant } from "./iam-capabilities";
 
 /** Account and region the ARNs are built for (the resources read them from the provider). */
@@ -55,13 +60,14 @@ export const AGENTCORE_PRINCIPAL = "bedrock-agentcore.amazonaws.com";
 export const AGENT_ROLE_WILDCARD_SIDS = ["Traces", "Metrics", "ManagedImagePull", "ManagedImageBearer"] as const;
 
 /**
- * ARNs each placeholder of SERVICE_ROLES stands for (`{G1}`, `{Gateway}`, `{Memory}`, `{ToolOrders}`, …) plus
- * `{PolicyEngine}` for the Gateway's Cedar actions; `{model:HARNESS}` is resolved here.
+ * ARNs each placeholder of SERVICE_ROLES stands for (`{G1}`, `{Gateway}`, `{Memory}`, `{model:PROFILE}`,
+ * `{ToolOrders}`, …) plus `{PolicyEngine}` for the Gateway's Cedar actions; `{model:*}` is resolved here.
  */
 export type AgentRefs = Readonly<Record<string, readonly string[]>>;
 
 const SID_BY_REF: Readonly<Record<string, string>> = {
   "{model:HARNESS}": "Model",
+  "{model:PHOTO}": "Model",
   "{G1}": "GuardrailG1",
   "{Gateway}": "Gateway",
   "{Memory}": "Memory",
@@ -88,8 +94,20 @@ export function agentCoreTrustPolicy(place: AgentPlace, sourceArnPattern: string
   return JSON.stringify({ Version: "2012-10-17", Statement: [{ Effect: "Allow", Principal: { Service: AGENTCORE_PRINCIPAL }, Action: "sts:AssumeRole", Condition: condition }] });
 }
 
+/**
+ * What `{model:HARNESS}` and `{model:PHOTO}` name: the model through the app's inference profile (`{model:PROFILE}`
+ * of `refs`), the photo model without it once PHOTO_MODEL_ID is not HARNESS_MODEL_ID (ADR-0028).
+ */
+export function modelRefArns(ref: "{model:HARNESS}" | "{model:PHOTO}", place: AgentPlace, appProfileArn: string): string[] {
+  if (ref === "{model:PHOTO}" && PHOTO_MODEL_ID !== HARNESS_MODEL_ID) return agentModelArns(PHOTO_MODEL_ID, place.region, place.account);
+  return agentModelArns(HARNESS_MODEL_ID, place.region, place.account, appProfileArn);
+}
+
 function resolveRef(ref: string, refs: AgentRefs, place: AgentPlace): readonly string[] {
-  if (ref === "{model:HARNESS}") return agentModelArns(HARNESS_MODEL_ID, place.region, place.account);
+  if (ref === "{model:HARNESS}" || ref === "{model:PHOTO}") {
+    const [profile] = resolveRef("{model:PROFILE}", refs, place);
+    return modelRefArns(ref, place, profile ?? "");
+  }
   const resolved = refs[ref];
   if (resolved === undefined || resolved.length === 0) throw new Error(`The IAM of the agent needs the ARN of ${ref}.`);
   return resolved;
@@ -160,11 +178,22 @@ const ROLE_DESCRIPTIONS: Readonly<Record<AgentRole, string>> = {
 
 let place: $util.Output<AgentPlace> | undefined;
 let roles: AgentRoles | undefined;
+let profile: aws.bedrock.InferenceProfile | undefined;
 
 /** Account and region of the provider, the scope of every ARN of the agent's policies. */
 export function agentPlace(): $util.Output<AgentPlace> {
   place ??= $util.all([aws.getCallerIdentityOutput({}).accountId, aws.getRegionOutput({}).region]).apply(([account, region]) => ({ account, region }));
   return place;
+}
+
+/** The app's inference profile (ADR-0028), created once; the provider's default tags carry the project's. */
+export function agentModelProfile(): aws.bedrock.InferenceProfile {
+  profile ??= new aws.bedrock.InferenceProfile("AgentModelProfile", {
+    name: appModelProfileName($app.name, $app.stage),
+    description: appModelProfileDescription($app.name, $app.stage),
+    modelSource: { copyFrom: agentPlace().apply((resolved) => globalModelProfileArn(resolved.region, resolved.account)) },
+  });
+  return profile;
 }
 
 /** The three roles, created once; their policies come from `agentRolePolicy`, scoped to what infra/agentcore.ts creates. */

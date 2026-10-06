@@ -1,10 +1,10 @@
-// Stub of the `InstallerWorker` entry (docs/build-plan.md §2: an infra work package that points at a handler
-// that does not exist yet creates it answering UNAVAILABLE; WP-32 replaces it). It reads, stores and
-// logs nothing and never throws, so a message of InstallerEvents.fifo is consumed once and never dead-lettered while nothing produces installer events yet.
-export interface HandlerUnavailable {
-  readonly status: "UNAVAILABLE";
-}
+// Lambda entry of the `InstallerWorker` (infra/workers.ts): consumes `InstallerEvents.fifo`, one event per
+// installer at a time (docs/architecture.md §7). The worker itself is worker/worker.ts; its dependencies
+// are built once per container by worker/production.ts.
+import type { Context, SQSEvent } from "aws-lambda";
+import { productionWorkerDeps } from "../worker/production";
+import { createInstallerWorker } from "../worker/worker";
 
-export async function handler(): Promise<HandlerUnavailable> {
-  return { status: "UNAVAILABLE" };
+export async function handler(event: SQSEvent, context: Context): Promise<void> {
+  await createInstallerWorker(productionWorkerDeps())(event, context);
 }

@@ -1,26 +1,30 @@
-// The minimal cut of the sign-up (ADR-0025 §4, ADR-0019, docs/architecture.md §12 and §14), brought
-// forward from WP-38: the topic `CostAlerts`, `CostGuard` subscribed to it, and the four alarms of the
-// sign-up that publish there. `CostGuard` only turns a kill switch ON, by the closed table of
-// packages/bff/src/handlers/cost-guard.ts (`ALARM_SCOPES`); here every alarm of that table exists:
+// The cut in runtime (ADR-0019, ADR-0025 §4, docs/architecture.md §12 and §14): the topic `CostAlerts`,
+// `CostGuard` subscribed to it, and the four alarms of the sign-up that publish there (WP-56). The cost
+// cut of WP-38 publishes on the same topic from infra/observability.ts: the alarms `TurnCapHitsGlobal`
+// and `CostPerConversation` and the project budget at 100 %. `CostGuard` only turns a kill switch ON,
+// by the closed table of packages/bff/src/handlers/cost-guard.ts (`ALARM_SCOPES`, `BUDGET_SCOPES`):
 //
-//   <app>-<stage>-AuthEmailBounces      Bounce of AWS/SES (kind = AUTH) ≥ 5 in 1 h
-//   <app>-<stage>-AuthEmailBounceRate   Bounce / Send (kind = AUTH) ≥ 3 % in 24 h, with at least 20 sends
-//   <app>-<stage>-AuthEmailComplaints   Complaint (kind = AUTH) ≥ 2 in 24 h
-//   <app>-<stage>-SignupBurst           SignupStarted (CuadrillaAgent, from the Bff's log lines) > 150 in 1 h
+//   <app>-<stage>-AuthEmailBounces      Bounce of AWS/SES (kind = AUTH) ≥ 5 in 1 h                       → KILL#SIGNUP
+//   <app>-<stage>-AuthEmailBounceRate   Bounce / Send (kind = AUTH) ≥ 3 % in 24 h, with at least 20 sends → KILL#SIGNUP
+//   <app>-<stage>-AuthEmailComplaints   Complaint (kind = AUTH) ≥ 2 in 24 h                               → KILL#SIGNUP
+//   <app>-<stage>-SignupBurst           SignupStarted (CuadrillaAgent, from the Bff's log lines) > 150 in 1 h → KILL#SIGNUP
+//   <app>-<stage>-TurnCapHitsGlobal     infra/observability.ts                                            → KILL#AGENT
+//   <app>-<stage>-CostPerConversation   infra/observability.ts                                            → KILL#AGENT
+//   <app>-<stage>-monthly (budget)      infra/observability.ts, 100 % of the actual cost                  → KILL#AGENT
 //
-// all → `KILL#SIGNUP`. The authentication emails are the only ones of the shared account that go to
-// addresses nobody verified: a bot or a typo bounces, and a pause of SES for bounces or complaints
-// would stop the sending of the whole account (the other app's too). Only the operator turns the cut
-// off (`npm run ops:kill -- --scope SIGNUP --off`). WP-38 adds the project budget and the cost alarms.
+// The authentication emails are the only ones of the shared account that go to addresses nobody
+// verified: a bot or a typo bounces, and a pause of SES for bounces or complaints would stop the
+// sending of the whole account (the other app's too). Only the operator turns a cut off
+// (`npm run ops:kill -- --scope SIGNUP|AGENT --off`).
 //
 // Topic: fixed name inside the `sns:<app>-*` fence of the CI role; only CloudWatch alarms and AWS
 // Budgets of this account may publish (`aws:SourceAccount`). CostGuard: reserved concurrency 1,
 // `PutItem` of `Runtime` only on `KILL#*` keys, `AuditLog` for `KILL_SWITCH_SET`.
 //
 // Verify:
-//   aws --profile craftech-demos cloudwatch describe-alarms --alarm-name-prefix aws-cds-hackathon-poc-cuadrilla-poc-   (the four, AlarmActions = CostAlerts)
+//   aws --profile craftech-demos cloudwatch describe-alarms --alarm-name-prefix aws-cds-hackathon-poc-cuadrilla-poc-   (the six, AlarmActions = CostAlerts)
 //   aws --profile craftech-demos sns list-subscriptions-by-topic --topic-arn <CostAlerts>   → CostGuard only
-//   aws --profile craftech-demos dynamodb get-item --table-name <Runtime> --key '{"PK":{"S":"KILL#SIGNUP"},"SK":{"S":"META"}}'   → absent or off
+//   npm run ops:kill -- --status   → KILL#ALL, SIMULATOR, AGENT and SIGNUP absent or off
 
 import { bff } from "./bff";
 import { grantTableLinks, signupPermissions } from "./leads";
