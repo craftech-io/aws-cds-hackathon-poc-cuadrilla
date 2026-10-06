@@ -139,7 +139,8 @@ async function signOut(page: Page): Promise<void> {
   const request = await revoke;
   expect((await request.response())?.status()).toBe(200);
   await expect(page).toHaveURL(/\/login/);
-  const stored = await page.evaluate(() => [...Object.keys(sessionStorage), ...Object.keys(localStorage)].filter((key) => key.includes("token")));
+  // The AWS WAF SDK keeps the refresh time of its own challenge token (`awswaf_*`): not a session.
+  const stored = await page.evaluate(() => [...Object.keys(sessionStorage), ...Object.keys(localStorage)].filter((key) => key.toLowerCase().includes("token") && !key.startsWith("awswaf_")));
   expect(stored).toEqual([]);
   await page.goto(homePath());
   await expect(page).toHaveURL(/\/login\?returnTo=/);
