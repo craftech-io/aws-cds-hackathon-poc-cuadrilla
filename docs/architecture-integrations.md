@@ -42,10 +42,10 @@ El mismo configuration set tiene un segundo destino, de **CloudWatch**, con la d
 | Evento | Efecto |
 |---|---|
 | `Delivery` | `OutboundEmail.status = DELIVERED`; `Certificate.deliveries[destinatario] = DELIVERED`; para `ZONE_CHIEF_ALERT`, marca la hora de entrega (`SafetyAlertLatency`) |
-| `Bounce` `Permanent` | Entrega `BOUNCED`; si es un acta → caso `CERTIFICATE_UNDELIVERED` en la consola; si es una alerta → alarma y aviso en el caso |
+| `Bounce` `Permanent` | Entrega `BOUNCED`; si es un acta → caso `CERTIFICATE_UNDELIVERED` en la consola; si es una alerta → log `error` y aviso en el caso |
 | `Bounce` `Transient`, `DeliveryDelay` | `DELAYED`; `TIMER#CERT_RETRY` único a + 5 min |
 | `Complaint` | `COMPLAINED`; caso `CERTIFICATE_UNDELIVERED` con motivo queja; la dirección queda marcada y no se vuelve a usar |
-| `Reject`, `RenderingFailure` | `FAILED`, alarma |
+| `Reject`, `RenderingFailure` | `FAILED`, log `error` (sin alarma, ADR-0028) |
 
 ## 3. Sin recepción de email
 
@@ -96,7 +96,7 @@ Los dos salen de `aws socialmessaging get-linked-whatsapp-business-account --id 
 
 En este ejemplo `WhatsAppMetaPhoneNumberId = 106540352242922` y `WhatsAppPhoneNumberId = phone-number-id-0123456789abcdef0123456789abcdef`. Los fixtures de `channels/whatsapp/` usan siempre las dos formas; `phone-filter.test.ts` incluye un caso con ids de forma real que falla si el filtro compara contra el id de AWS.
 
-`whatsAppWebhookEntry` es un string JSON que se parsea con zod (`channels/whatsapp/payloads.ts`) solo después del primer filtro de §4.4. Tipos de `messages[]` tratados: `text`, `button` (respuesta a plantilla: `button.payload` = nonce), `interactive` (`button_reply.id` / `list_reply.id` = nonce), `audio` (`voice: true` = nota de voz), `image` (`caption` opcional). El resto (`document`, `video`, `sticker`, `reaction`, `location`, `contacts`) recibe respuesta fija. `statuses[]` (`sent`, `delivered`, `read`, `failed` con `errors[]`) actualizan `Message.status`; su zod admite los dos modelos de precio de Meta: `pricing {billable?, pricing_model: CBP | PMP, category, type?}` y `conversation` **opcional** (desde el 2025-07-01 Meta cobra por mensaje, `PMP`, y los estados pueden no traer `conversation`; desde el 2026-10-01 cobra también los mensajes dentro de la ventana, así que un estado `service` puede traer `billable: true`: `CostPerConversation` lo valoriza con `RATECARD`, ADR-0019). La alarma de categoría distinta de `utility` mira solo los estados de plantillas. Nunca se usa `contacts[].profile.name`.
+`whatsAppWebhookEntry` es un string JSON que se parsea con zod (`channels/whatsapp/payloads.ts`) solo después del primer filtro de §4.4. Tipos de `messages[]` tratados: `text`, `button` (respuesta a plantilla: `button.payload` = nonce), `interactive` (`button_reply.id` / `list_reply.id` = nonce), `audio` (`voice: true` = nota de voz), `image` (`caption` opcional). El resto (`document`, `video`, `sticker`, `reaction`, `location`, `contacts`) recibe respuesta fija. `statuses[]` (`sent`, `delivered`, `read`, `failed` con `errors[]`) actualizan `Message.status`; su zod admite los dos modelos de precio de Meta: `pricing {billable?, pricing_model: CBP | PMP, category, type?}` y `conversation` **opcional** (desde el 2025-07-01 Meta cobra por mensaje, `PMP`, y los estados pueden no traer `conversation`; desde el 2026-10-01 cobra también los mensajes dentro de la ventana, así que un estado `service` puede traer `billable: true`: `CostPerConversation` lo valoriza con `RATECARD`, ADR-0019). El log `error` de categoría distinta de `utility` mira solo los estados de plantillas. Nunca se usa `contacts[].profile.name`.
 
 ### 4.3 Transporte `simulated`
 

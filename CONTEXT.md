@@ -241,7 +241,7 @@ Audio de WhatsApp (Ogg/Opus) que se transcribe con Amazon Transcribe en `es-MX` 
 _Avoid_: audio (suelto), dictado
 
 **Número de la POC** (`WhatsAppPhoneNumberId`, `WhatsAppMetaPhoneNumberId`):
-El número de WhatsApp de Cuadrilla, que EUM Social identifica de dos formas: el **id de AWS** (`phone-number-id-<32 hex>`), que sirve para enviar, bajar y subir media y en IAM, y el **id de Meta** (numérico), que es el que traen los eventos (`metadata.phone_number_id`, `MetaPhoneNumberIds`). Todo evento cuyo id de Meta no sea el nuestro (otra POC que comparta la cuenta de WhatsApp Business o el topic) es un **evento ajeno** y se descarta antes de leer su contenido. Nunca se filtra con el id de AWS.
+El número de WhatsApp de Cuadrilla, que EUM Social identifica de dos formas: el **id de AWS** (`phone-number-id-<32 hex>`), que sirve para enviar, bajar y subir media y en IAM, y el **id de Meta** (numérico), que es el que traen los eventos (`metadata.phone_number_id`, `MetaPhoneNumberIds`). Es un número **nuevo**, con una WABA propia, solo de Cuadrilla; su alta de Meta la hace el CTO al final del build (P-01, ADR-0028). Todo evento cuyo id de Meta no sea el nuestro (otra POC que comparta la cuenta de WhatsApp Business o el topic) es un **evento ajeno** y se descarta antes de leer su contenido. Nunca se filtra con el id de AWS.
 _Avoid_: línea, "el phone number id" (sin decir cuál)
 
 **Política de contacto** (`ContactPolicy`, reglas `CP-*`):
@@ -269,6 +269,26 @@ _Avoid_: bot, asistente virtual, IA
 **Turno del agente** (`Turn`):
 Una invocación del Harness disparada por un evento (`TurnTrigger`: `INSTALLER_MESSAGE`, `ORDERS_REQUESTED`, `CASE_CLOSED`, `WORK_ORDER_CHANGED`, `EVIDENCE_OVERRIDDEN`). Los turnos de un instalador corren de a uno, en orden (cola FIFO por instalador).
 _Avoid_: turno (suelto; ver "Flagged ambiguities"), ejecución, request
+
+**Lectura precargada** (`turns/preload.ts`, `<tool-result>`):
+Lectura que todo turno necesita (la orden en curso, su checklist y, en un mensaje del instalador, sus últimas diez órdenes) que el worker corre en código con el token del turno **antes** de invocar el Harness y pone en el sobre como `<tool-result tool="…">` escapado. Pasa los mismos controles que una tool y respalda a G2 igual; el modelo no la vuelve a pedir (ADR-0028).
+_Avoid_: caché, contexto (suelto), prefetch
+
+**Responder siempre** (`ALWAYS_ANSWER`):
+Regla del system prompt: todo mensaje del instalador recibe en su turno un `REPLY` o un escalamiento; un saludo o un "ok" reciben el estado breve de su orden. Le gana a cualquier conclusión anterior de la conversación o de la memoria (ADR-0028).
+_Avoid_: cortesía, small talk (como categoría aparte)
+
+**Pregunta fija de estado** (`groundingQuery`):
+La pregunta con la que G2 mide la relevancia de una respuesta cuando el mensaje del instalador no pregunta nada (hasta tres palabras y sin "?"): "¿Cómo va mi orden y qué me falta?". No es un texto visible (ADR-0028).
+_Avoid_: pregunta por defecto
+
+**Envío repetido** (`outbound/repeat.ts`, `replayOf`):
+Un `send_whatsapp` igual a otro del mismo turno y canal (mismo texto, o misma plantilla con los mismos parámetros); el pipeline lo contesta con el mensaje ya enviado y no sale nada (ADR-0028).
+_Avoid_: duplicado (es el del evento reentregado), reintento
+
+**Perfil de inferencia de la app** (`<app>-<stage>-sonnet-5-5`):
+Perfil de inferencia de Bedrock con los tags del proyecto que copia el perfil global del modelo; el Harness, Memory y el validador de fotos llaman por su ARN. Su nombre lleva el modelo, así un cambio de modelo crea uno nuevo antes de borrar el viejo (ADR-0028).
+_Avoid_: modelo (cuando se habla del ARN), endpoint
 
 **Techo global y corte** (`CostCaps`, `KILL#`):
 Topes de costo del stage por día real para todos los mundos que no son QA ni evaluación (turnos, validaciones, minutos de transcripción), además de los del mundo y la operadora; y el **corte** de emergencia en runtime (`KILL#ALL`, `SIMULATOR`, `AGENT`) que detiene el gasto sin deploy. La seguridad física nunca se corta (ADR-0019).
@@ -325,8 +345,12 @@ Aceptación explícita, separada y sin tildar por defecto, guardada con fecha, v
 _Avoid_: opt-in (es el de WhatsApp), aceptación (suelta)
 
 **Aviso de lead** (`LeadStream`, `LeadConfig`):
-Email por SES a las casillas `@craftech.io` de la configuración `LeadConfig` por cada lead confirmado, con su propio cerco (solo `@craftech.io`), distinto del cerco de destinatarios de la demo.
+Email por SES a las casillas `@craftech.io` de la configuración `LeadConfig` por cada lead confirmado, con su propio cerco (solo `@craftech.io`), distinto del cerco de destinatarios de la demo. Hoy, la casilla del CTO (ADR-0027), nunca escrita en el repo.
 _Avoid_: notificación (suelta), alerta
+
+**Responsable de los leads** (ADR-0027):
+Quien responde por los datos de los leads ante la Ley 25.326: Craftech, Ciudad Autónoma de Buenos Aires; los derechos se ejercen en sales@craftech.io (o por `https://craftech.io/contact/`). El aviso de privacidad lo nombra sin datos que el CTO no dio.
+_Avoid_: dueño de los datos, contacto de privacidad (suelto)
 
 **Superficie visible** y **guard de superficies neutrales** (`lint:neutral-surfaces`):
 Todo texto que puede leer o escuchar una persona fuera del equipo (landing, alta, consola, legales, emails, PDF, plantillas, textos del seed que ve un usuario, build y el README antes de `## Submission notes`). Ninguna nombra el concurso ni a sus evaluadores; el guard lo verifica en CI (ADR-0023).

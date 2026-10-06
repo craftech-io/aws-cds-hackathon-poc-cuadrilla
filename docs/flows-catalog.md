@@ -40,7 +40,7 @@ Convenciones:
 
 ### FL-004 · Número fuera de la lista de permitidos
 - Actores: desconocido · Canal: WhatsApp · Disparador: cualquier mensaje desde un número no registrado (identidad "número desconocido" del simulador; en vivo, un teléfono sin persona en el mundo vivo ni alta por código).
-- Pasos: 1) `phoneHash` sin match en el mundo. 2) Mundo simulado: primer mensaje del día → `SYSTEM_NOTICE` fijo "Este número es de uso interno de la operadora"; siguientes del mismo día: nada. 3) En vivo: ninguna respuesta, salvo dentro del tope global diario (`UNKNOWN#GLOBAL`, 20) con métrica `UnknownSenderReplies` y alarma al 80 %.
+- Pasos: 1) `phoneHash` sin match en el mundo. 2) Mundo simulado: primer mensaje del día → `SYSTEM_NOTICE` fijo "Este número es de uso interno de la operadora"; siguientes del mismo día: nada. 3) En vivo: ninguna respuesta, salvo dentro del tope global diario (`UNKNOWN#GLOBAL`, 20) con el indicador `UnknownSenderReplies` en el log y un `warn` al 80 % (sin alarma, ADR-0028).
 - Estado esperado: en simulado, exactamente un saliente por número y día simulado; en vivo, ningún saliente por encima del tope; ningún turno ni media descargada; `AuditLog DENY UNKNOWN_SENDER`; el cuerpo entrante no se guarda (solo `phoneHash` y hora).
 - Reglas: `CP-ALLOWLIST`.
 - Prueba: U `channels/whatsapp/inbound.test.ts`, `policy/engine.test.ts` · LF `onboarding.flow.test.ts` · SR `SC-10/4`. Notas: La variante viva, en `U` con fixtures y en `SC-17` (pendiente P-01); los asserts negativos después de `world.settle`.
@@ -190,11 +190,11 @@ Convenciones:
 - Prueba: U `agent-tools/cases/cases.test.ts` · LF `cases.flow.test.ts` · SR `SC-02/10`.
 
 ### FL-025 · Tema ajeno o dato fuera de alcance
-- Actores: instalador, agente · Canal: WhatsApp · Disparador: (a) "¿Quién ganó el partido anoche?"; (b) "¿Qué órdenes tiene Karina hoy?".
-- Pasos: (a) `REPLY` breve que vuelve al trabajo, sin caso; (b) ninguna tool devuelve datos de otro instalador (`LAM-SCOPE`); `REPLY` que dice que solo ve sus órdenes.
-- Estado esperado: ningún caso; ningún saliente con datos de otra persona (nombre, orden, domicilio).
-- Reglas: `LAM-SCOPE`, G2.
-- Prueba: U `agent-tools/orders/orders.test.ts` · LF `diagnosis.flow.test.ts` · SR `SC-02/11`. Notas: Oráculo §4.3 (solo estructura en (a)).
+- Actores: instalador, agente · Canal: WhatsApp · Disparador: (a) "¿Quién ganó el partido anoche?"; (b) "¿Qué órdenes tiene Karina hoy?"; (c) "Hola", "ok" o "gracias" con una orden activa, también un segundo "hola" con el reloj del mundo en pausa (misma hora simulada que el anterior).
+- Pasos: en todo turno, el worker precarga en paralelo, con el token del turno, `get_work_order` y `get_checklist` y, por ser un mensaje del instalador, `get_work_orders` (con `recentWorkOrders`), y los pone en el sobre como `<tool-result>` escapados (ADR-0028). (a) `REPLY` breve que vuelve al trabajo, sin caso; (b) ninguna tool devuelve datos de otro instalador (`LAM-SCOPE`); `REPLY` que dice que solo ve sus órdenes; (c) `REPLY` breve con el estado de su orden (qué falta y lo siguiente), por la regla `ALWAYS_ANSWER`, sin volver a pedir las lecturas precargadas; G2 mide la relevancia contra la pregunta fija de estado (el mensaje tiene hasta tres palabras y no pregunta nada), no contra el saludo.
+- Estado esperado: ningún caso; ningún saliente con datos de otra persona (nombre, orden, domicilio); en (c), exactamente un `REPLY` por mensaje entrante, también en el segundo "hola", y las filas `RESULT#` de las lecturas precargadas; una lectura precargada que falla queda fuera del sobre y el turno sigue.
+- Reglas: `LAM-SCOPE`, G2, ADR-0028.
+- Prueba: U `agent-tools/orders/orders.test.ts`, `turns/preload.test.ts`, `agent/grounding.test.ts` · LF `diagnosis.flow.test.ts` · SR `SC-02/11`. Notas: Oráculo §4.3 (solo estructura en (a) y (c)).
 
 ### FL-026 · Orquestador de red no disponible
 - Actores: agente · Canal: WhatsApp · Disparador: fallas `ERROR_503` del orquestador en el mundo (`network.setFaults`, solo relojes `qa-*`).
@@ -250,9 +250,9 @@ Convenciones:
 ### FL-033 · Respuesta no fundada bloqueada
 - Actores: agente · Canal: WhatsApp · Disparador: plan guionado con una política inventada ("el cambio de roseta cuesta $150").
 - Pasos: pipeline → G2 `GROUNDING_FAIL` o verificación de hechos → la tool devuelve el error → el agente reintenta con los datos o escala.
-- Estado esperado: el texto inventado nunca sale; `AuditLog DENY GROUNDING_FAIL`.
+- Estado esperado: el texto inventado nunca sale; `AuditLog DENY GROUNDING_FAIL`; cada rechazo de G2 deja `outbound.g2_refused` en el log y en `AuditLog` con el motivo, los scores de grounding y relevancia y los umbrales, nunca el texto (ADR-0028).
 - Reglas: G2, `CP-CITATION`.
-- Prueba: U `outbound/pipeline.test.ts`, `outbound/verify.test.ts` · LF `manual.flow.test.ts`. Notas: Excepción §2.1 (requiere que el modelo invente).
+- Prueba: U `outbound/pipeline.test.ts`, `outbound/verify.test.ts`, `outbound/grounding.test.ts` · LF `manual.flow.test.ts`. Notas: Excepción §2.1 (requiere que el modelo invente).
 
 ### FL-034 · Base de conocimiento no disponible
 - Actores: agente · Canal: WhatsApp · Disparador: falla inyectada del cliente de la KB en un mundo `qa-*` (`knowledge.setFaults`).
@@ -380,7 +380,7 @@ Convenciones:
 ### FL-051 · Rebote o queja del email del acta
 - Actores: sistema, supervisor (consola) · Canal: email, consola · Disparador: cliente con `bounce+…@simulator` (Beatriz, 24831) o `complaint+…@simulator`.
 - Pasos: evento `Bounce Permanent` / `Complaint` → entrega `BOUNCED`/`COMPLAINED` → caso `CERTIFICATE_UNDELIVERED` solo en consola (sin WhatsApp).
-- Estado esperado: un caso por orden; ningún reenvío automático a esa dirección; alarma de tasa de rebote sin disparar (simulador).
+- Estado esperado: un caso por orden; ningún reenvío automático a esa dirección; la tasa de rebote del configuration set no sube (simulador).
 - Reglas: `LAD-CONSOLE-ONLY`.
 - Prueba: U `channels/email/events.test.ts` · LF `closing.flow.test.ts` · UI `cases.spec.ts` · SR `SC-05/5..6`.
 
@@ -677,16 +677,16 @@ Convenciones:
 ### FL-092 · WhatsApp vivo: envíos y estados
 - Actores: sistema · Canal: WhatsApp · Disparador: plantilla, texto, interactivo, imagen y documento en modo `live`.
 - Pasos: JSON de Meta validado; `SendWhatsAppMessage` con el id de AWS del número; `PostWhatsAppMessageMedia` para el acta y las fotos del caso; `statuses[]` con `pricing` (`CBP` o `PMP`, `conversation` opcional).
-- Estado esperado: estados `delivered`/`read`; categoría `utility` en plantillas; alarma si no (solo plantillas).
+- Estado esperado: estados `delivered`/`read`; categoría `utility` en plantillas; log `error` si no (solo plantillas).
 - Reglas: `CP-TEMPLATE-APPROVED`.
 - Prueba: U `channels/whatsapp/outbound.test.ts`, `channels/whatsapp/events.test.ts` · SR `SC-17/1` (pendiente P-01), `SC-17/5..6` (pendiente P-01). Notas: Excepción §2.1 hasta P-01 (el escenario devuelve `SKIPPED_PENDING_P01`).
 
-### FL-093 · Entrantes duplicados
-- Actores: sistema · Canal: WhatsApp · Disparador: el mismo `wamid` dos veces (reentrega de SNS o reintento del simulador).
-- Pasos: idempotencia por `wamid` y por `eventId` de la cola. Si el procesamiento falla después de tomar la marca (`FAILED`, reintento de SNS), la marca se devuelve: la reentrega reusa el `Message IN` guardado y encola con el mismo `eventId`.
-- Estado esperado: un `Message IN`, un turno, una transcripción, también cuando el primer intento falló.
-- Reglas: idempotencia doble.
-- Prueba: U `channels/whatsapp/inbound.test.ts`, `worker/idempotency.test.ts` · SR `SC-12/1`.
+### FL-093 · Entrantes duplicados y envío repetido en un turno
+- Actores: sistema, agente · Canal: WhatsApp · Disparador: (a) el mismo `wamid` dos veces (reentrega de SNS o reintento del simulador); (b) en un mismo turno, el agente pide dos veces `send_whatsapp` con el mismo texto, o con la misma plantilla y los mismos parámetros.
+- Pasos: (a) idempotencia por `wamid` y por `eventId` de la cola. Si el procesamiento falla después de tomar la marca (`FAILED`, reintento de SNS), la marca se devuelve: la reentrega reusa el `Message IN` guardado y encola con el mismo `eventId`. (b) El pipeline de salida (`outbound/repeat.ts`, ADR-0028) encuentra el `Message OUT` del mismo turno, canal y contenido y contesta el segundo pedido con ese mensaje (`replayOf`), como a un evento reentregado, sin llamar al transporte.
+- Estado esperado: (a) un `Message IN`, un turno, una transcripción, también cuando el primer intento falló; (b) un solo `Message OUT` y un solo envío del transporte (vivo o simulado), la segunda llamada devuelve `ok` con el `messageId` del primero; un texto distinto en el mismo turno, o el mismo texto en otro turno, sale normalmente.
+- Reglas: idempotencia doble; ADR-0028.
+- Prueba: U `channels/whatsapp/inbound.test.ts`, `worker/idempotency.test.ts`, `outbound/repeat.test.ts` · SR `SC-12/1`. Notas: (b) depende de que el modelo repita un envío: se prueba en `U` con el pipeline y no tiene paso `SR`.
 
 ### FL-094 · Nonce ajeno o vencido
 - Actores: instalador, supervisor · Canal: WhatsApp · Disparador: botón de otra persona o de hace más de 7 días; "Tomar caso" de un supervisor fuera del roster del caso.
@@ -725,7 +725,7 @@ Convenciones:
 
 ### FL-099 · Fallas: turno, validador, Transcribe y evento en la DLQ
 - Actores: sistema · Canal: — · Disparador: (a) `turn.forceFailure`; (b) falla inyectada del validador; (c) falla inyectada de Transcribe; (d) `event.poison`.
-- Pasos: (a) aviso fijo `AGENT_FALLBACK`; (b) `UNSURE` → revisión humana; (c) aviso "no pude procesar el audio"; (d) dos intentos → DLQ → `processError` → alarma.
+- Pasos: (a) aviso fijo `AGENT_FALLBACK`; (b) `UNSURE` → revisión humana; (c) aviso "no pude procesar el audio"; (d) dos intentos → DLQ → `processError` → log `error` (sin alarma, ADR-0028).
 - Estado esperado: ningún mundo queda ocupado; `installer.settle` vuelve; la DLQ solo tiene el evento del escenario, que se borra.
 - Reglas: quiescencia.
 - Prueba: U `worker/worker.test.ts`, `worker/settle.test.ts` · SR `SC-14/1..4`.
@@ -870,9 +870,9 @@ Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `
 
 ### FL-119 · Aviso de privacidad y términos
 - Actores: visitante · Canal: web · Disparador: `/legal/privacy.html`, `/legal/terms.html` y los links del formulario.
-- Pasos: páginas estáticas es-MX con versión en inglés, con los nueve puntos de ADR-0026 ("Política de privacidad y términos"): Craftech responsable con su domicilio; qué se trata (formulario, consentimientos, atribución, fechas, IP en hash por 48 h, cookie de WAF y `sessionStorage`, contenido que el invitado crea en la demo: texto, voz y fotos); encargados y lugares (AWS `us-east-1`, inferencia global del modelo en otras regiones de AWS, Transcribe, la casilla de Craftech del aviso); transferencia internacional (art. 12 de la Ley 25.326) a Estados Unidos (región `us-east-1`) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global, con el consentimiento expreso de la casilla `TERMS_PRIVACY`, cuyo texto nombra la transferencia; finalidades; retención; derechos con sus plazos legales (acceso en 10 días corridos, rectificación y supresión en 5 días hábiles), retiro del consentimiento de contacto sin borrar la cuenta y el aviso sobre la Agencia de Acceso a la Información Pública; el canal de contacto; que los datos de la demo son sintéticos.
-- Estado esperado: 200 con cabeceras; la versión de cada página igual a la `textVersion` de `TERMS_PRIVACY`; los nueve puntos presentes en es y en; el texto de la casilla `TERMS_PRIVACY` (es y en) nombra la transferencia a Estados Unidos y a otras regiones de AWS; ninguna palabra del concurso.
-- Reglas: ADR-0026, ADR-0023.
+- Pasos: páginas estáticas es-MX con versión en inglés, con los nueve puntos de ADR-0026 ("Política de privacidad y términos") con los datos de ADR-0027: Craftech responsable, con domicilio en la Ciudad Autónoma de Buenos Aires, Argentina; qué se trata (formulario, consentimientos, atribución, fechas, IP en hash por 48 h, cookie de WAF y `sessionStorage`, contenido que el invitado crea en la demo: texto, voz y fotos); encargados y lugares (AWS `us-east-1`, inferencia global del modelo en otras regiones de AWS, Transcribe, la casilla de Craftech del aviso); transferencia internacional (art. 12 de la Ley 25.326) a Estados Unidos (región `us-east-1`) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global, con el consentimiento expreso de la casilla `TERMS_PRIVACY`, cuyo texto nombra la transferencia; finalidades; retención; derechos con sus plazos legales (acceso en 10 días corridos, rectificación y supresión en 5 días hábiles), retiro del consentimiento de contacto sin borrar la cuenta y la leyenda de la Agencia de Acceso a la Información Pública; el canal de contacto (sales@craftech.io y, como alternativa, `https://craftech.io/contact/`); que los datos de la demo son sintéticos.
+- Estado esperado: 200 con cabeceras; la versión de cada página igual a la `textVersion` de `TERMS_PRIVACY`; los nueve puntos presentes en es y en; el texto de la casilla `TERMS_PRIVACY` (es y en) nombra la transferencia a Estados Unidos y a otras regiones de AWS; ninguna palabra del concurso; ninguna marca de interino ("a confirmar", "provisorio") ni un CUIT o una calle que ADR-0027 no da.
+- Reglas: ADR-0026, ADR-0027, ADR-0023.
 - Prueba: U `leads/consent.test.ts` · UI `legal.spec.ts` · SMK `SMK/1`.
 
 ### FL-120 · Guard de superficies neutrales
@@ -895,3 +895,4 @@ Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `
 - Estado esperado: ninguna cuenta de alta propia con un rol interno; ningún usuario interno con una segunda fila de registro (que lo dejaría sin acceso) ni un mundo de alta propia; las invitadas conservan su flujo.
 - Reglas: ADR-0025 §1.
 - Prueba: U `auth-triggers/pre-sign-up.test.ts`, `auth-triggers/post-confirmation.test.ts`, `auth-triggers/post-authentication.test.ts` · SR `SC-20/5`. Notas: El pre-token, que solo estampa lo que dice el registro, sigue probado por sus tests de FL-079.
+

@@ -4,16 +4,16 @@ Solo lo que depende de alguien fuera del equipo de agentes (el CTO, Meta, AWS Pa
 
 | # | Pendiente | Dueño | Estado | Qué falta |
 |---|---|---|---|---|
-| P-01 | Conectar WhatsApp: WABA, número, display name, plantillas aprobadas y destino de eventos (fecha objetivo 2026-10-12) | CTO (Meta, número); `devops` ejecuta los scripts; `qa` prueba en vivo | Abierto · opción A (WABA propia) decidida y datos de la plataforma verificados el 2026-09-26 | §1 |
+| P-01 | Conectar WhatsApp: número y WABA **nuevos**, solo de Cuadrilla, display name, plantillas aprobadas y destino de eventos | CTO (cuenta de Meta, número, al final del build); `devops` ejecuta los scripts; `qa` prueba en vivo | Abierto · opción A (WABA propia) decidida y datos de la plataforma verificados el 2026-09-26 · número y WABA nuevos y alta de Meta al final del build, decididos por el CTO el 2026-10-06 (ADR-0028); hasta entonces el canal es simulado y nada más espera por esto | §1 |
 | P-02 | Oportunidad ACE de la submission | CTO | Cerrado el 2026-09-26 por el CTO (oportunidad `O28893592`) | — (§2 registra el resultado) |
 | P-03 | Proyecto en Devpost, instrucciones de prueba privadas y credenciales de las cuentas invitadas `guest-NN` | CTO con el operador | Abierto · el orquestador crea el borrador con la cuenta del CTO (2026-09-26) | §3 |
 | P-04 | Video de 3 minutos | CTO | Abierto | §4 |
 | P-05 | Marca pública, display name de WhatsApp y nombre de la submission | CTO | Cerrado el 2026-09-26 por el CTO (modo `cobrand`; display name "Craftech"; submission "Cuadrilla") | — (§5 registra la decisión y la carga) |
-| P-06 | Domicilio del responsable, vía de contacto de privacidad, validación legal del aviso de privacidad y los términos, y eventual inscripción de la base de leads ante la autoridad de control (Ley 25.326). **Se cierra antes de cualquier promoción pública de la demo** | CTO (legal de Craftech) | Abierto (2026-09-26) | §6 |
+| P-06 | Datos del responsable, vía de contacto de privacidad, destinatario del aviso de lead, validación legal del aviso de privacidad y los términos (con la eventual inscripción de la base ante la autoridad de control, Ley 25.326) y procedimiento de borrado fuera de la tabla | CTO (legal de Craftech) | Abierto · ítems 1, 2 y 4 cerrados el 2026-10-06 por el CTO (ADR-0027: Craftech, Ciudad Autónoma de Buenos Aires, sales@craftech.io; aviso a la casilla del CTO en `LeadConfig`); ítems 3 y 5 abiertos, sin bloquear | §6 |
 
 ## 1. Conectar WhatsApp (P-01)
 
-Fecha objetivo: **WABA, número y plantillas aprobadas antes del 2026-10-12**, para grabar el video y correr `SC-17` con un teléfono real. La verificación del negocio (paso 3) arranca ya, en paralelo con el build: puede llevar hasta 2 semanas. Si no cierra a tiempo, el modo simulado es el respaldo documentado (ADR-0002) y todo material público lo dice. Hasta que se cierre, el stage solo tiene el transporte simulado y la demo usa el simulador de teléfono.
+**Número y WABA nuevos, solo de Cuadrilla** (decisión del CTO del 2026-10-06, ADR-0028): el CTO aporta la cuenta de Meta y hace el alta **al final del build**. Mientras tanto se construye todo de punta a punta (adaptador, transporte vivo, plantillas como código, notas de voz y fotos entrantes, eventos, scripts de los pasos 6 a 8) y el stage solo tiene el transporte simulado: la demo usa el simulador de teléfono. P-01 es un bloqueo externo y nunca frena otro trabajo. Si no cierra antes de grabar el video o de entregar la submission, el modo simulado es el respaldo documentado (ADR-0002) y todo material público lo dice.
 
 ### 1.1 Hechos de la plataforma (verificados contra la documentación de AWS y de Meta el 2026-09-26)
 
@@ -76,7 +76,7 @@ Dueño: CTO con el operador. Verificación: proyecto visible en Devpost; `aws --
 1. Esperar el cierre de WP-50 ("100 % probada").
 2. `devops` reinicia el mundo `GLOBAL#isp-demo` justo antes de grabar (época nueva, memoria vacía, reloj en pausa a las 07:00).
 3. Grabar en inglés con el guion de `docs/design-brief.md` §14, incluido el segmento "what is real / what is simulated" y el aviso de demo sintética del co-branding (P-05): la consola y la landing muestran "Cuadrilla for <socio> · Powered by Craftech"; el teléfono se muestra con el rótulo "simulador" mientras P-01 siga abierto (o el teléfono real si ya cerró). Toda cifra de impacto de negocio va rotulada como meta o supuesto ("goal", "assumption"), nunca como medición; el video puede nombrar el concurso, la app que muestra no.
-4. Publicar en YouTube o Vimeo (público o no listado) y pasar el link a `architect` (se embebe en la landing, arriba del pliegue).
+4. Publicar en YouTube o Vimeo (público o no listado) para el formulario de la submission, y entregar el MP4 y un póster a `typescript-dev`: la landing lo sirve desde el propio sitio (`public/landing/video/`) en su sección de video, antes de la de arquitectura, con `preload="none"`, póster y sin autoplay (ADR-0028, WP-44).
 
 Dueño: CTO.
 
@@ -103,14 +103,12 @@ Desbloquea la marca de la landing (WP-55, WP-44) y la carga de `BrandConfig`; el
 
 ## 6. Privacidad de los leads (P-06)
 
-El alta registra leads reales (ADR-0026). Lo que falta del lado del CTO:
+El alta registra leads reales (ADR-0026). Ítems 1, 2 y 4 cerrados el 2026-10-06 por el CTO (ADR-0027); 3 y 5 siguen con el CTO y no bloquean el build ni la publicación de la demo.
 
-1. **Domicilio del responsable**: el domicilio legal de Craftech que el aviso de privacidad nombra junto al responsable (ADR-0026, punto 1). Sin él, la página no se usa en ninguna promoción pública.
-2. **Vía de contacto de privacidad**: la casilla o el formulario de Craftech donde una persona pide acceso, rectificación, supresión o la baja del contacto. Hasta que se confirme, `/legal/privacy.html` usa `https://craftech.io/contact/` (interino aceptable) y el borrado autoservicio de la consola. Al confirmarse, se carga en `LeadConfig.privacyContact` y en el texto de la página (versión nueva de `TERMS_PRIVACY`).
-3. **Validación legal** del aviso de privacidad y de los términos con los nueve puntos de ADR-0026 (responsable y domicilio; datos tratados, incluidos la IP en hash, la cookie de WAF y el contenido que el invitado crea en la demo; encargados y la inferencia global del modelo; transferencia internacional (art. 12) a Estados Unidos (región `us-east-1`) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global, con el consentimiento expreso de la casilla `TERMS_PRIVACY`, cuyo texto la nombra; finalidades; retención; derechos con sus plazos —acceso en 10 días corridos, rectificación y supresión en 5 días hábiles—, retiro del consentimiento de contacto y el texto sobre la Agencia de Acceso a la Información Pública; canal de contacto) y decisión sobre la **inscripción de la base** en el registro de la autoridad de control si corresponde.
-4. **Destinatarios del aviso de lead**: la casilla `@craftech.io` que recibe los avisos. Carga (operador con `devops`, sin pegar valores en ningún chat): `npx sst secret set LeadConfig '{"notifyRecipients":["<casilla>@craftech.io"]}' --stage poc`, con la casilla del CTO como valor inicial; después `npm run leads:notify-test -- --stage poc` y confirmar que llegó.
+1. **Responsable y domicilio** · Cerrado el 2026-10-06 por el CTO: Craftech, Ciudad Autónoma de Buenos Aires, Argentina (ADR-0027). Sin CUIT ni calle: el CTO no los dio y no se completan.
+2. **Vía de contacto de privacidad** · Cerrado el 2026-10-06 por el CTO: sales@craftech.io, con `https://craftech.io/contact/` como vía alternativa, y el borrado autoservicio de la consola. Está en `LeadConfig.privacyContact` y en el texto de la página (versión nueva de `TERMS_PRIVACY`, ADR-0027 "Consequences").
+3. **Validación legal** del aviso de privacidad y de los términos con los nueve puntos de ADR-0026 (responsable y domicilio; datos tratados, incluidos la IP en hash, la cookie de WAF y el contenido que el invitado crea en la demo; encargados y la inferencia global del modelo; transferencia internacional (art. 12) a Estados Unidos (región `us-east-1`) y, para la inferencia del modelo, a otras regiones de AWS donde Amazon Bedrock procesa la inferencia global, con el consentimiento expreso de la casilla `TERMS_PRIVACY`, cuyo texto la nombra; finalidades; retención; derechos con sus plazos —acceso en 10 días corridos, rectificación y supresión en 5 días hábiles—, retiro del consentimiento de contacto y la leyenda de la Agencia de Acceso a la Información Pública; canal de contacto) y decisión sobre la **inscripción de la base** en el registro de la autoridad de control si corresponde. · Abierto, sin bloquear.
+4. **Destinatario del aviso de lead** · Cerrado el 2026-10-06 por el CTO: su casilla personal `@craftech.io`, ya cargada en `LeadConfig.notifyRecipients` (nunca escrita en el repo). Verificación: `npm run leads:notify-test -- --stage poc` y confirmar que llegó.
+5. **Procedimiento de borrado fuera de la tabla**: quién borra, en la casilla que recibe los avisos, el aviso de un lead borrado o vencido (por su `leadId`) y cómo se destruyen los CSV exportados (a más tardar a los 30 días; ADR-0026). · Abierto, sin bloquear; mientras tanto rige lo que fija ADR-0026.
 
-5. **Procedimiento de borrado fuera de la tabla**: quién borra, en la casilla que recibe los avisos, el aviso de un lead borrado o vencido (por su `leadId`) y cómo se destruyen los CSV exportados (a más tardar a los 30 días; ADR-0026).
-
-Dueño: CTO. Verificación: `npx sst secret list --stage poc` (sin compartir valores); el aviso de prueba recibido; las páginas legales con la versión validada y el domicilio.
-
+Dueño: CTO. Verificación: `npx sst secret list --stage poc` (sin compartir valores); el aviso de prueba recibido; las páginas legales con la versión de ADR-0027.

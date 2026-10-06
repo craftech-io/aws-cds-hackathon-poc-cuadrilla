@@ -59,8 +59,10 @@ Determinista · lee `WorkOrders GSI1`, `People` · invocan: `harness`, `console`
 
 ```json
 {"input": {"type": "object", "properties": {"sessionToken": {"type": "string"}, "day": {"type": "string", "description": "uno de: TODAY | TOMORROW (por defecto TODAY)"}}, "required": ["sessionToken"]},
- "output": {"ok": "boolean", "installerFirstName": "string", "dayText": "string", "workOrders": [{"workOrderNumber": "string", "status": "WorkOrderStatus", "customerFirstName": "string", "addressLine": "string", "neighborhood": "string", "plan": "string", "windowText": "string", "isActive": "boolean", "openCase": "boolean"}], "nowSimText": "string", "error": "Error"}}
+ "output": {"ok": "boolean", "installerFirstName": "string", "dayText": "string", "workOrders": [{"workOrderNumber": "string", "status": "WorkOrderStatus", "customerFirstName": "string", "addressLine": "string", "neighborhood": "string", "plan": "string", "windowText": "string", "isActive": "boolean", "openCase": "boolean"}], "recentWorkOrders": [{"workOrderNumber": "string", "status": "WorkOrderStatus", "dayText": "string", "open": "boolean"}], "nowSimText": "string", "error": "Error"}}
 ```
+
+`recentWorkOrders` (ADR-0028): las últimas diez órdenes del instalador en el mundo, las abiertas primero y después las cerradas más recientes, sin datos del cliente. El worker la precarga en todo mensaje del instalador (`docs/architecture.md` §9.1).
 
 ### `get_work_order`
 Determinista · lee `WorkOrders`, `Cases`, `People` (perfil medido), `Isps` (zona) · invocan: `harness`, `console`. Si llega `workOrderNumber` y es del instalador y del día, la vuelve activa (`set_active_work_order`, auditado); si no, `FORBIDDEN`.

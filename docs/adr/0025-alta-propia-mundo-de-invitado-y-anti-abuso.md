@@ -111,7 +111,7 @@ La revisión de seguridad del diseño (2026-09-26, antes de la ola 2b.1) agregó
   - El pool manda por el configuration set del app (§1). Su destino de eventos de CloudWatch publica las métricas de SES con la dimensión `kind` tomada del tag del mensaje y valor por defecto `AUTH`: los emails de producto y el aviso de lead llevan su `kind` en `EmailTags`, y los de Cognito, que no llevan tags, quedan como `AUTH` (`AuthEmailSends`, `AuthEmailBounces`, `AuthEmailComplaints` = `Send`, `Bounce` y `Complaint` de `AWS/SES` con `kind = AUTH`).
   - Alarmas que publican en el topic `CostAlerts`: `AuthEmailBounces` ≥ 5 en 1 h; `AuthEmailBounces / AuthEmailSends` ≥ 3 % en 24 h con al menos 20 envíos; `AuthEmailComplaints` ≥ 2 en 24 h; `SignupStarted` > 150 en 1 h (ráfaga). `CostGuard` traduce cada una, por su nombre y una tabla cerrada en el código, a `KILL#SIGNUP`.
   - Con `KILL#SIGNUP` (o `KILL#ALL`) encendido, `signup.start` y el pre-sign-up responden `CAP_REACHED` y el trigger de mensaje no manda códigos de alta ni reenvíos; login, recuperación y los mundos existentes siguen. Solo el operador lo apaga: `npm run ops:kill -- --scope SIGNUP --off` (auditado `KILL_SWITCH_SET`).
-  - La validación del dominio (§3) y los límites por persona reducen los rebotes antes de enviar; la alarma de tasa de rebote de la cuenta al 2 % sigue como aviso.
+  - La validación del dominio (§3) y los límites por persona reducen los rebotes antes de enviar; la tasa de rebote de la cuenta se lee con `aws sesv2 get-account` y en los logs: la alarma de solo aviso al 2 % se quitó (ADR-0028, ninguna alarma sin acción); las cuatro de arriba siguen porque encienden el corte.
 
 ### 5. Los invitados operan solo sobre datos sintéticos
 
