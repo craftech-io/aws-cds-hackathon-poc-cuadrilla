@@ -15,7 +15,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { seedBucket } from "./storage";
+import { evidenceBucket, mediaBucket, seedBucket } from "./storage";
 
 /** Where the seed writes the templates (docs/seed-spec.md §3). */
 export const WORLD_TEMPLATES_DIR = "scripts/seed/data/worlds";
@@ -54,7 +54,11 @@ if (!files.includes(`${GUEST_TEMPLATE}.json`)) throw new Error(`${WORLD_TEMPLATE
 
 export const worldTemplates: Readonly<Record<string, UploadedTemplate>> = Object.fromEntries(files.map(upload));
 
-/** `Resource.WorldTemplates.templates.<name>.{key, sha256}`; grants nothing (WORLDS reads `Seed/*`). */
+/**
+ * `Resource.WorldTemplates.templates.<name>.{key, sha256}` and the names of the buckets the world factory
+ * and its destroyer reach only through fenced grants (`Seed/*` of WORLDS, `Media` and `Evidence` under
+ * `guest/`), so those buckets are never linked whole. Grants nothing.
+ */
 export const WorldTemplates = new sst.Linkable("WorldTemplates", {
-  properties: { templates: worldTemplates },
+  properties: { templates: worldTemplates, buckets: { Seed: seedBucket.name, Media: mediaBucket.name, Evidence: evidenceBucket.name } },
 });

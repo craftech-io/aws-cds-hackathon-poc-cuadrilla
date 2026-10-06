@@ -1,29 +1,35 @@
 /// <reference path="../../sst-env.d.ts" />
 // The S3 side of the world factory: the guest template in `Seed/worlds/` (where the IaC uploaded it,
-// with the digest of the `WorldTemplates` link) and the `guest/<seg>/` objects of `Media` and `Evidence`
+// with the digest of the `WorldTemplates` link, which also carries the three bucket names) and the `guest/<seg>/` objects of `Media` and `Evidence`
 // that the destruction of a generation empties. Both with the timeouts of lib/clients.ts.
 import { DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { z } from "zod";
 import { CLIENT_TIMEOUTS, awsClientConfig } from "../lib/clients";
-import { bucketName, readLinked } from "../lib/resource";
+import { readLinked } from "../lib/resource";
 import type { ObjectBucket, ObjectStore } from "./guest-lifecycle";
 import { type TemplateSource, TemplateError } from "./template";
 
 let s3: S3Client | undefined;
 const client = (): S3Client => (s3 ??= new S3Client(awsClientConfig(CLIENT_TIMEOUTS.s3)));
 
-const WorldTemplatesLink = z.object({ templates: z.record(z.string(), z.object({ key: z.string().min(1), sha256: z.string().regex(/^[0-9a-f]{64}$/) })) });
+const BucketName = z.string().min(1);
+const WorldTemplatesLink = z.object({
+  templates: z.record(z.string(), z.object({ key: z.string().min(1), sha256: z.string().regex(/^[0-9a-f]{64}$/) })),
+  // The functions reach these buckets only through fenced grants, so the buckets are not linked: their names ride here.
+  buckets: z.object({ Seed: BucketName, Media: BucketName, Evidence: BucketName }),
+});
+const worldLink = () => readLinked("WorldTemplates", WorldTemplatesLink);
 
 /** The templates the IaC uploaded (`Resource.WorldTemplates`), read from the `Seed` bucket. */
 export function s3TemplateSource(sender: Pick<S3Client, "send"> = client()): TemplateSource {
   return {
     locate(name) {
-      const object = readLinked("WorldTemplates", WorldTemplatesLink).templates[name];
+      const object = worldLink().templates[name];
       if (object === undefined) throw new TemplateError(`template ${name} was not uploaded`);
       return object;
     },
     async read(key) {
-      const output = await sender.send(new GetObjectCommand({ Bucket: bucketName("Seed"), Key: key }));
+      const output = await sender.send(new GetObjectCommand({ Bucket: worldLink().buckets.Seed, Key: key }));
       const text = await output.Body?.transformToString("utf-8");
       if (text === undefined) throw new TemplateError(`template ${key} is empty`);
       return text;
@@ -38,7 +44,7 @@ export function s3ObjectStore(sender: Pick<S3Client, "send"> = client()): Object
   return {
     async deletePrefix(bucket: ObjectBucket, prefix: string) {
       if (!prefix.startsWith("guest/")) throw new RangeError("only guest/ prefixes are deleted here");
-      const name = bucketName(bucket);
+      const name = worldLink().buckets[bucket];
       let deleted = 0;
       let token: string | undefined;
       do {
