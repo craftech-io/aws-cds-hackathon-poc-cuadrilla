@@ -86,7 +86,17 @@ async function startSignup(page: Page, account: Account, options: { readonly con
   const body = (await response.json()) as { result?: { data?: { username?: string } } };
   account.username = body.result?.data?.username;
   expect(account.username ?? "").toMatch(/^gst-[0-9A-HJKMNP-TV-Z]{26}$/);
-  await expect(page.getByRole("heading", { name: copy.confirm.title })).toBeVisible();
+  // After the start the browser calls Cognito's SignUp with the ticket; the pre sign-up may still refuse it.
+  const codeStep = page.getByRole("heading", { name: copy.confirm.title });
+  const refusal = page.getByRole("alert");
+  await expect(codeStep.or(refusal).first()).toBeVisible({ timeout: 20_000 });
+  if (await refusal.isVisible()) {
+    const text = (await refusal.innerText()).trim();
+    await shot(page, "signup-refused-after-start", { fullPage: true });
+    record({ step: "SignUp", ok: false, user: account.username?.slice(0, 8), detail: `the form shows: ${text}` });
+    expect(text, "Cognito's SignUp with the ticket of signup.start").toBe("");
+  }
+  await expect(codeStep).toBeVisible();
   await expect(page.getByText(copy.confirm.lead(account.email))).toBeVisible();
   await expectReadableScreen(page);
   await expectNeutral(page, "/signup code step");

@@ -14,6 +14,7 @@ import { type ConfirmationDeps, type ConfirmationOutcome, confirmSignup } from "
 import { withDeadline } from "../lib/deadline";
 import { type Logger, createLogger } from "../lib/log";
 import { describeError } from "../auth/errors";
+import { canonicalSignupUsername } from "../leads/model";
 import { linkedGuestFlowDeps } from "./guest-flow-deps";
 
 /** Below the 5 s Cognito gives a trigger. */
@@ -43,7 +44,7 @@ export function createPostConfirmationHandler(deps: PostConfirmationDeps) {
     let outcome: ConfirmationOutcome;
     try {
       outcome = await withDeadline("auth.postconfirmation", POST_CONFIRMATION_DEADLINE_MS, () =>
-        confirmSignup({ ...deps.confirmation(), log }, { triggerSource: parsed.data.triggerSource, userName: parsed.data.userName, sub: attributes.sub ?? "", email: attributes.email }),
+        confirmSignup({ ...deps.confirmation(), log }, { triggerSource: parsed.data.triggerSource, userName: canonicalSignupUsername(parsed.data.userName), sub: attributes.sub ?? "", email: attributes.email }),
       );
     } catch (error) {
       // Cognito keeps the user confirmed; a retry of the trigger finds its own rows and finishes.

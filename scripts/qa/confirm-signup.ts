@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import type { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
 import { AdminConfirmSignUpCommand, AdminGetUserCommand, AdminUpdateUserAttributesCommand, UserNotFoundException } from "@aws-sdk/client-cognito-identity-provider";
 import { QA_ADDRESS_PATTERN } from "../../packages/bff/src/leads/keys";
-import { SIGNUP_USERNAME_PATTERN } from "../../packages/bff/src/leads/model";
+import { SIGNUP_USERNAME_PATTERN, canonicalSignupUsername } from "../../packages/bff/src/leads/model";
 import { parseFlags } from "../channels/cli-args";
 import { assertOperatorMachine } from "../leads/operator-only";
 
@@ -42,7 +42,7 @@ export function parseSeamArgs(argv: readonly string[]): SeamRequest {
   let verifyEmail = true;
   parseFlags(argv, {
     "--username": (value) => {
-      username = value();
+      username = canonicalSignupUsername(value());
     },
     "--status": () => {
       statusOnly = true;

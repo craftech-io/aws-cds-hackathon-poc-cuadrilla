@@ -96,7 +96,7 @@ async function countItems(inventory: StageInventory): Promise<{ leads: number; c
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
-/** A fresh ULID-shaped user name, the only shape the pool's web ACL lets reach `SignUp`. */
+/** A fresh `gst-<ULID>` user name, the shape `signup.start` issues. */
 export function probeUsername(now: number = Date.now()): string {
   let time = "";
   let rest = now;
@@ -111,6 +111,17 @@ export function probeUsername(now: number = Date.now()): string {
 
 function probePassword(): string {
   return `Qa!${randomBytes(12).toString("base64url")}9z`;
+}
+
+/**
+ * How Cognito refuses a `SignUp` without a ticket: through `GuestSignup` the pre sign-up answers
+ * (`UserLambdaValidationException`); `ConsoleWeb` may not write `email` (ADR-0025 §1, `writeAttributes =
+ * ["name"]`), so Cognito refuses it before any trigger runs (`NotAuthorizedException`). No user exists
+ * after either.
+ */
+export function signUpRefused(client: string, type: string): boolean {
+  if (type.endsWith("UserLambdaValidationException")) return true;
+  return client === "ConsoleWeb" && type.endsWith("NotAuthorizedException");
 }
 
 export async function directSignUpProbes(inventory: StageInventory, run: string): Promise<Probe[]> {
@@ -139,7 +150,7 @@ export async function directSignUpProbes(inventory: StageInventory, run: string)
         return "";
       }
     })();
-    probes.push({ name: `SignUp straight to Cognito without a ticket (${client})`, ok: answer.status === 400 && type.endsWith("UserLambdaValidationException"), detail: `${answer.status} ${type || "(no type)"}` });
+    probes.push({ name: `SignUp straight to Cognito without a ticket (${client})`, ok: answer.status === 400 && signUpRefused(client, type), detail: `${answer.status} ${type || "(no type)"}` });
   }
   return probes;
 }

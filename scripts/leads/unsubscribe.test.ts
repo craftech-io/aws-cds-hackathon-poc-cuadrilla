@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { CONSENTS_VERSION } from "@cuadrilla/shared/legal/consents";
 import type { MemoryLeadTable } from "../../packages/bff/src/leads/memory-table";
 import type { LeadStore } from "../../packages/bff/src/leads/store";
 import { T0, confirmedLead, hashOf, leadHarness } from "../../packages/bff/src/leads/testing";
@@ -26,7 +27,7 @@ describe("leads:unsubscribe [FL-117]", () => {
     const result = await runUnsubscribe(EMAIL, { store, emailHash: hashOf, now: () => T0 });
     expect(result).toEqual({ outcome: "WITHDRAWN", leadId: before.leadId });
     const lead = await store.get(hashOf(EMAIL));
-    expect(lead?.consentHistory.at(-1)).toEqual({ id: "CONTACT", accepted: false, at: T0.toISOString(), textVersion: "2026-09-26", locale: "es-MX" });
+    expect(lead?.consentHistory.at(-1)).toEqual({ id: "CONTACT", accepted: false, at: T0.toISOString(), textVersion: CONSENTS_VERSION, locale: "es-MX" });
     expect(lead).toMatchObject({ status: "CONFIRMED", cognitoUsername: before.cognitoUsername, userId: before.userId, cognitoSub: before.cognitoSub });
     expect((await store.listEvents(hashOf(EMAIL))).map((event) => event.kind)).toContain("CONTACT_WITHDRAWN");
     expect(table.logs).toEqual([expect.objectContaining({ kind: "CONTACT_WITHDRAWN", leadId: before.leadId, actor: "OPERATOR" })]);

@@ -1,10 +1,12 @@
 // FL-119 on the deployed stage (docs/test-plan.md §6.1, row "Legales"): `/legal/privacy.html` and
 // `/legal/terms.html` answer 200 with the security headers of the Router, carry the version of the
 // TERMS_PRIVACY consent in force, the privacy notice has the nine points of ADR-0026 in the project's
-// language and quotes the box word for word, and neither page uses a word of ADR-0023. A screenshot of
+// language with the controller, mailbox, contact form and legend of ADR-0027 and no interim marker,
+// quotes the box word for word, and neither page uses a word of ADR-0023. A screenshot of
 // each page in the eight projects.
 import { type Page, expect, test } from "@playwright/test";
 import { TERMS_PRIVACY } from "@cuadrilla/shared/legal/consents";
+import { CONTROL_BODY_LEGEND_ES, PRIVACY_CONTROLLER, interimMarkersIn } from "@cuadrilla/shared/legal/controller";
 import { expectReadableScreen } from "../support/a11y";
 import { expectNeutral, noHorizontalScroll, projectContext, shot } from "./support";
 
@@ -33,7 +35,12 @@ test.describe("deployed legal pages @public", () => {
     await expect(article).toHaveAttribute("data-legal-version", TERMS_PRIVACY.textVersion);
     expect(await article.locator("h3[id]").evaluateAll((headings) => headings.map((heading) => heading.id))).toEqual([...PRIVACY_POINTS[lang]]);
     await expect(article.locator('blockquote[data-consent="TERMS_PRIVACY"]')).toHaveText(TERMS_PRIVACY.text[lang === "en" ? "en" : "es-MX"]);
-    await expect(page.locator(`#${PRIVACY_POINTS[lang][7]} + p a`)).toHaveAttribute("href", "https://craftech.io/contact/");
+    const channel = page.locator(`#${PRIVACY_POINTS[lang][7]} + p a`);
+    await expect(channel.nth(0)).toHaveAttribute("href", `mailto:${PRIVACY_CONTROLLER.mailbox}`);
+    await expect(channel.nth(1)).toHaveAttribute("href", PRIVACY_CONTROLLER.contactUrl);
+    const text = await article.innerText();
+    for (const fact of [PRIVACY_CONTROLLER.name, PRIVACY_CONTROLLER.seat[lang === "en" ? "en" : "es-MX"], PRIVACY_CONTROLLER.mailbox, lang === "en" ? "Law No. 25,326" : CONTROL_BODY_LEGEND_ES]) expect(text, fact).toContain(fact);
+    expect(interimMarkersIn(text), "no interim marker (ADR-0027)").toEqual([]);
     await noHorizontalScroll(page);
     await expectReadableScreen(page);
     await expectNeutral(page, "/legal/privacy.html");
@@ -48,6 +55,8 @@ test.describe("deployed legal pages @public", () => {
     const article = page.locator(`article#${lang}`);
     await expect(article).toHaveAttribute("data-legal-version", TERMS_PRIVACY.textVersion);
     await expect(article.locator('a[href="/legal/privacy.html"]').first()).toBeVisible();
+    await expect(article.locator(`a[href="mailto:${PRIVACY_CONTROLLER.mailbox}"]`)).toBeVisible();
+    expect(interimMarkersIn(await article.innerText()), "no interim marker (ADR-0027)").toEqual([]);
     await noHorizontalScroll(page);
     await expectReadableScreen(page);
     await expectNeutral(page, "/legal/terms.html");

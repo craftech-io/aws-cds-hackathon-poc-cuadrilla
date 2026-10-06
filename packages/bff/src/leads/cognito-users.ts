@@ -14,7 +14,7 @@ import {
 import { authConfig } from "../auth/config";
 import { CLIENT_TIMEOUTS, awsClientConfig } from "../lib/clients";
 import { withRetry } from "../lib/retry";
-import { SIGNUP_USERNAME_PATTERN } from "./model";
+import { SIGNUP_USERNAME_PATTERN, canonicalSignupUsername } from "./model";
 
 export interface UnconfirmedUser {
   readonly username: string;
@@ -74,7 +74,7 @@ export function createCognitoUsers(options: CognitoUsersOptions = {}): CognitoUs
           client().send(new ListUsersCommand({ UserPoolId: userPoolId(), Filter: 'cognito:user_status = "UNCONFIRMED"', Limit: LIST_PAGE, ...(token === undefined ? {} : { PaginationToken: token }) })),
         );
         for (const user of output.Users ?? []) {
-          if (user.Username !== undefined && user.UserCreateDate !== undefined) users.push({ username: user.Username, createdAt: user.UserCreateDate });
+          if (user.Username !== undefined && user.UserCreateDate !== undefined) users.push({ username: canonicalSignupUsername(user.Username), createdAt: user.UserCreateDate });
         }
         token = output.PaginationToken;
         if (token === undefined) break;

@@ -6,6 +6,7 @@
 // scroll, touch targets of 44 px in the header and the footer, and no word of ADR-0023.
 import { type Page, expect, test } from "@playwright/test";
 import { TERMS_PRIVACY } from "@cuadrilla/shared/legal/consents";
+import { CONTROL_BODY_LEGEND_ES, PRIVACY_CONTROLLER, interimMarkersIn } from "@cuadrilla/shared/legal/controller";
 import { findNeutralTerms } from "../../../scripts/lint/neutral-terms";
 import { expectReadableScreen } from "./support/a11y";
 
@@ -17,10 +18,10 @@ const PRIVACY_POINTS: Readonly<Record<Language, readonly string[]>> = {
   en: ["en-controller", "en-data", "en-processors", "en-transfer", "en-purposes", "en-retention", "en-rights", "en-contact", "en-synthetic"],
 };
 
-/** What each language's notice must say (ADR-0026 points 1-9). */
+/** What each language's notice must say (ADR-0026 points 1-9, with the controller data of ADR-0027). */
 const PRIVACY_FACTS: Readonly<Record<Language, readonly string[]>> = {
-  es: ["Craftech", "Domicilio legal", "aws-waf-token", "sessionStorage", "48 horas", "voz real", "us-east-1", "inferencia global", "Amazon Transcribe", "artículo 12 de la Ley 25.326", "7 días", "24 meses", "9 días", "30 días", "10 días corridos", "5 días hábiles", "sin borrar tu cuenta", "Agencia de Acceso a la Información Pública", "sintéticos"],
-  en: ["Craftech", "Registered address", "aws-waf-token", "sessionStorage", "48 hours", "real voice", "us-east-1", "global inference", "Amazon Transcribe", "article 12", "7 days", "24 months", "9 days", "30 days", "10 calendar days", "5 business days", "without deleting your account", "Agencia de Acceso a la Información Pública", "synthetic"],
+  es: ["Craftech", PRIVACY_CONTROLLER.seat["es-MX"], PRIVACY_CONTROLLER.mailbox, "Base legal", "lo que ocurra primero", CONTROL_BODY_LEGEND_ES, "aws-waf-token", "sessionStorage", "48 horas", "voz real", "us-east-1", "inferencia global", "Amazon Transcribe", "artículo 12 de la Ley 25.326", "7 días", "24 meses", "9 días", "30 días", "10 días corridos", "5 días hábiles", "sin borrar tu cuenta", "Agencia de Acceso a la Información Pública", "sintéticos"],
+  en: ["Craftech", PRIVACY_CONTROLLER.seat.en, PRIVACY_CONTROLLER.mailbox, "Legal basis", "whichever comes first", "Law No. 25,326", "aws-waf-token", "sessionStorage", "48 hours", "real voice", "us-east-1", "global inference", "Amazon Transcribe", "article 12", "7 days", "24 months", "9 days", "30 days", "10 calendar days", "5 business days", "without deleting your account", "Agencia de Acceso a la Información Pública", "synthetic"],
 };
 
 const LINK_NAME: Readonly<Record<Language, string>> = { es: "Español", en: "English" };
@@ -70,8 +71,12 @@ test.describe("legal pages", () => {
     await expect(article.locator('blockquote[data-consent="TERMS_PRIVACY"]')).toHaveText(BOX_TEXT[lang]);
     const text = await article.innerText();
     for (const fact of PRIVACY_FACTS[lang]) expect(text, fact).toContain(fact);
-    await expect(page.locator(`#${PRIVACY_POINTS[lang][7]} + p a`)).toHaveAttribute("href", "https://craftech.io/contact/");
+    const channel = page.locator(`#${PRIVACY_POINTS[lang][7]} + p a`);
+    await expect(channel).toHaveCount(2);
+    await expect(channel.nth(0)).toHaveAttribute("href", `mailto:${PRIVACY_CONTROLLER.mailbox}`);
+    await expect(channel.nth(1)).toHaveAttribute("href", PRIVACY_CONTROLLER.contactUrl);
     await expect(article.locator('a[href="/legal/terms.html"]')).toBeVisible();
+    expect(interimMarkersIn(text), "no interim marker").toEqual([]);
   });
 
   test("[FL-119] the terms carry the version of TERMS_PRIVACY and link the privacy notice", async ({ page }) => {
@@ -83,6 +88,9 @@ test.describe("legal pages", () => {
     await expect(article).toHaveAttribute("data-legal-version", TERMS_PRIVACY.textVersion);
     await expect(article.locator('a[href="/legal/privacy.html"]').first()).toBeVisible();
     await expect(article).toContainText(lang === "en" ? "Argentine Republic" : "República Argentina");
+    await expect(article).toContainText(PRIVACY_CONTROLLER.seat[lang === "en" ? "en" : "es-MX"]);
+    await expect(article.locator(`a[href="mailto:${PRIVACY_CONTROLLER.mailbox}"]`)).toBeVisible();
+    expect(interimMarkersIn(await article.innerText()), "no interim marker").toEqual([]);
     await expectLayout(page);
   });
 

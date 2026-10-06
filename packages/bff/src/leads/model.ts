@@ -30,6 +30,17 @@ export const EmailHash = z.string().regex(/^[0-9a-f]{64}$/, "expected an HMAC-SH
 /** `gst-<ULID>`: the only Cognito users the own sign-up creates (ADR-0025 §1). */
 export const SIGNUP_USERNAME_PATTERN = /^gst-[0-9A-HJKMNP-TV-Z]{26}$/;
 export const SignupUsername = z.string().regex(SIGNUP_USERNAME_PATTERN, "expected gst-<ULID>");
+const SIGNUP_USERNAME_ANY_CASE = /^gst-[0-9A-HJKMNP-TV-Z]{26}$/i;
+
+/**
+ * The user name as `signup.start` issued it. The pool is case insensitive
+ * (`UsernameConfiguration.CaseSensitive = false`): Cognito hands the triggers and `ListUsers` the name
+ * in lower case, so every name read back from Cognito goes through here before it is compared with a
+ * ticket, a lead or a registry row. Any other name is returned unchanged.
+ */
+export function canonicalSignupUsername(username: string): string {
+  return SIGNUP_USERNAME_ANY_CASE.test(username) ? `gst-${username.slice("gst-".length).toUpperCase()}` : username;
+}
 /** `usr-g<ULID>`: the console user post-confirmation creates for a guest of the own sign-up. */
 export const SIGNUP_USER_ID_PATTERN = /^usr-g[0-9A-HJKMNP-TV-Z]{26}$/;
 export const SignupUserId = z.string().regex(SIGNUP_USER_ID_PATTERN, "expected usr-g<ULID>");

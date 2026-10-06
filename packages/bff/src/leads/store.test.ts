@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { CONSENTS_VERSION } from "@cuadrilla/shared/legal/consents";
 import { BFF_LEAD_ATTRIBUTES } from "../../../../infra/leads-spec";
 import { contactWithdrawal } from "./consent";
 import { MemoryLeadTable } from "./memory-table";
@@ -39,7 +40,7 @@ describe("LeadStore [FL-115]", () => {
       version: 1,
     });
     expect(lead?.status).toBeUndefined();
-    expect(lead?.consents.TERMS_PRIVACY).toEqual({ id: "TERMS_PRIVACY", accepted: true, at: T0.toISOString(), textVersion: "2026-09-26", locale: "es-MX" });
+    expect(lead?.consents.TERMS_PRIVACY).toEqual({ id: "TERMS_PRIVACY", accepted: true, at: T0.toISOString(), textVersion: CONSENTS_VERSION, locale: "es-MX" });
     expect(lead?.consents.CONTACT.accepted).toBe(true);
     expect(lead?.consentHistory).toHaveLength(2);
     expect(lead?.leadId).toMatch(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
@@ -159,7 +160,7 @@ describe("LeadStore [FL-115]", () => {
   it("[FL-115] withdrawing the contact adds a record and leaves the account as it was", async () => {
     const before = await confirmedLead(store);
     const lead = await store.withdrawContact(hashOf(EMAIL), contactWithdrawal("es-MX", later(HOUR)), later(HOUR));
-    expect(lead?.consents.CONTACT).toMatchObject({ accepted: false, textVersion: "2026-09-26" });
+    expect(lead?.consents.CONTACT).toMatchObject({ accepted: false, textVersion: CONSENTS_VERSION });
     expect(lead?.consentHistory.at(-1)).toMatchObject({ id: "CONTACT", accepted: false });
     expect(lead).toMatchObject({ status: "CONFIRMED", cognitoUsername: before.cognitoUsername, userId: before.userId, expiresAt: before.expiresAt });
     expect(table.logs.map((entry) => entry.kind)).toEqual(["CONTACT_WITHDRAWN"]);

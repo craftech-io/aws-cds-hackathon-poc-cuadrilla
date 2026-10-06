@@ -26,6 +26,7 @@ import { tableClient } from "../connector/index";
 import type { TableClient } from "../connector/table-client";
 import { dynamoLeadStore } from "../leads/dynamo-table";
 import { hashPrefix, leadEmailHash, normalizeLeadEmail } from "../leads/keys";
+import { canonicalSignupUsername } from "../leads/model";
 import type { LeadStore } from "../leads/store";
 import { withDeadline } from "../lib/deadline";
 import { type Logger, createLogger } from "../lib/log";
@@ -104,7 +105,7 @@ async function checkSignUp(deps: PreSignUpDeps, userName: string, attributes: Re
 export async function decidePreSignUp(deps: PreSignUpDeps, event: z.infer<typeof PreSignUpEvent>): Promise<PreSignUpDecision> {
   if (!ALLOWED_SOURCES.has(event.triggerSource)) throw new PreSignUpRefused("SOURCE_NOT_ALLOWED");
   if (event.triggerSource === "PreSignUp_AdminCreateUser") return { kind: "ADMIN_CREATE_USER" };
-  return checkSignUp(deps, event.userName, event.request.userAttributes, event.request.clientMetadata ?? {});
+  return checkSignUp(deps, canonicalSignupUsername(event.userName), event.request.userAttributes, event.request.clientMetadata ?? {});
 }
 
 export function createPreSignUpHandler(depsOf: (log: Logger) => PreSignUpDeps, newLogger: () => Logger) {

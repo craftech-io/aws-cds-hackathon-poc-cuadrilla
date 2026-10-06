@@ -41,6 +41,14 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     expect(harness.lines.join("\n")).not.toContain(EMAIL);
   });
 
+  it("[FL-105] Cognito's lower-case user name (case-insensitive pool) still confirms the gst-* user signup.start issued", async () => {
+    const harness = guestHarness();
+    await pendingLead(harness);
+    await handlerOf(harness, ["abcde"])(confirmationEvent({ userName: username(1).toLowerCase() }));
+    expect(guestRows(harness)).toEqual([expect.objectContaining({ SK: `USER#${USER_ID}`, cognitoUsername: username(1) })]);
+    expect(await harness.leads.store.get(hashOf(EMAIL))).toMatchObject({ status: "CONFIRMED", cognitoUsername: username(1), userId: USER_ID });
+  });
+
   it("[FL-105] the same confirmation twice → one row, one account, one lead confirmation", async () => {
     const harness = guestHarness();
     await pendingLead(harness);

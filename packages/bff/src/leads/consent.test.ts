@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CONSENTS, CONTACT, ConsentAnswers, LEGAL_PATHS, TERMS_PRIVACY, consentSegments } from "@cuadrilla/shared/legal/consents";
+import { CONTROL_BODY_LEGEND_ES, PRIVACY_CONTROLLER, interimMarkersIn } from "@cuadrilla/shared/legal/controller";
 import { assertConsents, consentIssues, consentRecords, contactWithdrawal } from "./consent";
 import { answers } from "./testing";
 
@@ -53,7 +54,7 @@ describe("consents of the sign-up [FL-115]", () => {
   it("[FL-115] the form must send both answers, unchecked included, and nothing else", () => {
     expect(ConsentAnswers.safeParse(answers(false)).success).toBe(true);
     expect(ConsentAnswers.safeParse({ TERMS_PRIVACY: answers(true).TERMS_PRIVACY }).success).toBe(false);
-    expect(ConsentAnswers.safeParse({ ...answers(true), MARKETING: { accepted: true, textVersion: "2026-09-26" } }).success).toBe(false);
+    expect(ConsentAnswers.safeParse({ ...answers(true), MARKETING: { accepted: true, textVersion: TERMS_PRIVACY.textVersion } }).success).toBe(false);
   });
 
   it("[FL-115] stores each answer with the server's real time, the version in force and the form's language", () => {
@@ -77,5 +78,38 @@ describe("consents of the sign-up [FL-115]", () => {
     const html = legalPage("privacy");
     expect(html).toContain(`<blockquote data-consent="TERMS_PRIVACY" lang="es-MX">${TERMS_PRIVACY.text["es-MX"]}</blockquote>`);
     expect(html).toContain(`<blockquote data-consent="TERMS_PRIVACY" lang="en">${TERMS_PRIVACY.text.en}</blockquote>`);
+  });
+
+  it("[FL-119] the privacy notice names the controller of ADR-0027, its seat, the mailbox, the contact form and the control-body legend", () => {
+    const html = legalPage("privacy");
+    const mailto = `<a href="mailto:${PRIVACY_CONTROLLER.mailbox}">${PRIVACY_CONTROLLER.mailbox}</a>`;
+    expect(html).toContain(`<strong>${PRIVACY_CONTROLLER.name}</strong>`);
+    expect(html).toContain(PRIVACY_CONTROLLER.seat["es-MX"]);
+    expect(html).toContain(PRIVACY_CONTROLLER.seat.en);
+    expect(html.split(mailto).length - 1, "mailbox in points 1, 7 and 8 of each language").toBe(6);
+    expect(html.split(`href="${PRIVACY_CONTROLLER.contactUrl}"`).length - 1, "contact form in points 7 and 8 of each language").toBe(4);
+    expect(html).toContain(CONTROL_BODY_LEGEND_ES);
+    expect(html).toContain("Law No. 25,326");
+    expect(html).toContain("lo que ocurra primero");
+    expect(html).toContain("whichever comes first");
+    expect(html).toContain("<strong>Base legal</strong>: tu consentimiento.");
+    expect(html).toContain("<strong>Legal basis</strong>: your consent.");
+  });
+
+  it("[FL-119] the terms name the controller and the same two channels to delete an account", () => {
+    const html = legalPage("terms");
+    expect(html).toContain(`Craftech, con domicilio en la ${PRIVACY_CONTROLLER.seat["es-MX"]}`);
+    expect(html).toContain(`Craftech, based in the ${PRIVACY_CONTROLLER.seat.en}`);
+    expect(html.split(`href="mailto:${PRIVACY_CONTROLLER.mailbox}"`).length - 1).toBe(2);
+  });
+
+  it("[FL-119] no legal page carries an interim marker, an invented tax id or a street address", () => {
+    for (const page of ["privacy", "terms"] as const) {
+      const html = legalPage(page);
+      expect(interimMarkersIn(html), page).toEqual([]);
+      expect(html, page).not.toMatch(/CUIT|\b\d{2}-\d{8}-\d\b|\bcalle\b|\bpiso\b|\bstreet\b/i);
+    }
+    expect(interimMarkersIn("Domicilio legal: en confirmación")).not.toEqual([]);
+    expect(interimMarkersIn("Registered address: being confirmed")).not.toEqual([]);
   });
 });

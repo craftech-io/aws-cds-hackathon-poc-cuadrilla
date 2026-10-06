@@ -17,6 +17,7 @@ import { type SignInDeps, type SignInOutcome, onSignIn } from "../guest/sign-in"
 import { withDeadline } from "../lib/deadline";
 import { type Logger, createLogger } from "../lib/log";
 import { describeError } from "../auth/errors";
+import { canonicalSignupUsername } from "../leads/model";
 import { linkedGuestFlowDeps } from "./guest-flow-deps";
 
 export const POST_AUTHENTICATION_DEADLINE_MS = 4_000;
@@ -52,7 +53,7 @@ export function createPostAuthenticationHandler(deps: PostAuthenticationDeps) {
       const outcome: SignInOutcome = await withDeadline("auth.postauthentication", POST_AUTHENTICATION_DEADLINE_MS, () =>
         onSignIn(
           { ...deps.signIn(), log },
-          { triggerSource: parsed.data.triggerSource, sub: attributes.sub ?? "", userName: parsed.data.userName, email: attributes.email_verified === "true" ? attributes.email : undefined },
+          { triggerSource: parsed.data.triggerSource, sub: attributes.sub ?? "", userName: parsed.data.userName === undefined ? undefined : canonicalSignupUsername(parsed.data.userName), email: attributes.email_verified === "true" ? attributes.email : undefined },
         ),
       );
       log.info("auth.postauthentication.done", { kind: outcome.kind, ...describeOutcome(outcome) });

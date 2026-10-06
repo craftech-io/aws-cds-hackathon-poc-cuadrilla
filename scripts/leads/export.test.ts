@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { CONSENTS_VERSION } from "@cuadrilla/shared/legal/consents";
 import { contactWithdrawal } from "../../packages/bff/src/leads/consent";
 import type { LeadStore } from "../../packages/bff/src/leads/store";
 import { T0, confirmedLead, hashOf, leadHarness, signupUserId, startLead } from "../../packages/bff/src/leads/testing";
@@ -41,13 +42,13 @@ describe("leads:export [FL-117]", () => {
     ]);
     expect(rows()).toHaveLength(2);
     expect(rows()[1]).toContain("contactable@example.com");
-    expect(rows()[1]).toContain(",yes,2026-09-26,2026-09-26,cuadrilla,linkedin,,fibra-2026,,,https://example.org,");
+    expect(rows()[1]).toContain(`,yes,${CONSENTS_VERSION},${CONSENTS_VERSION},cuadrilla,linkedin,,fibra-2026,,,https://example.org,`);
   });
 
   it("[FL-117] --all adds the confirmed leads that may not be contacted, with contactConsent = no; never pending leads", async () => {
     expect(await runExport(parseExportArgs(["--out", OUTSIDE, "--all"]), deps())).toBe(2);
     const noContact = rows().find((row) => row.includes("no-contacto@example.com"));
-    expect(noContact).toContain(",no,2026-09-26,");
+    expect(noContact).toContain(`,no,${CONSENTS_VERSION},`);
     expect(written?.content).not.toContain("pendiente@example.com");
     expect(written?.content).not.toContain("simulator.amazonses.com");
   });

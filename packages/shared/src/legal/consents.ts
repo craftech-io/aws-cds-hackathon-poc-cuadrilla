@@ -41,7 +41,7 @@ export interface ConsentDefinition {
 }
 
 /** Version in force of both consents and of the legal pages. */
-export const CONSENTS_VERSION = "2026-09-26";
+export const CONSENTS_VERSION = "2026-10-06";
 
 export const TERMS_PRIVACY: ConsentDefinition = {
   id: "TERMS_PRIVACY",

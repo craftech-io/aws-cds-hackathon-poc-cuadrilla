@@ -10,6 +10,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { FilterLogEventsCommand, ResourceNotFoundException } from "@aws-sdk/client-cloudwatch-logs";
+import type { LambdaClient } from "@aws-sdk/client-lambda";
+import { GetFunctionConfigurationCommand } from "@aws-sdk/client-lambda";
 import { parseFlags } from "../channels/cli-args";
 import { loadInventory } from "./inventory";
 
@@ -20,7 +22,8 @@ export function literalPattern(term: string): string {
   return `"${term.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
-export async function countMatches(logs: Pick<CloudWatchLogsClient, "send">, logGroupName: string, term: string, startTime: number): Promise<number> {
+/** Matches of a term in one log group; `undefined` when the group does not exist (never read as zero). */
+export async function countMatches(logs: Pick<CloudWatchLogsClient, "send">, logGroupName: string, term: string, startTime: number): Promise<number | undefined> {
   let total = 0;
   let nextToken: string | undefined;
   try {
@@ -30,10 +33,19 @@ export async function countMatches(logs: Pick<CloudWatchLogsClient, "send">, log
       nextToken = page.nextToken;
     } while (nextToken !== undefined && total < 1_000);
   } catch (error) {
-    if (error instanceof ResourceNotFoundException || (error as { name?: string }).name === "ResourceNotFoundException") return 0;
+    if (error instanceof ResourceNotFoundException || (error as { name?: string }).name === "ResourceNotFoundException") return undefined;
     throw error;
   }
   return total;
+}
+
+/**
+ * The log group a function writes to: its `LoggingConfig.LogGroup` (SST names it apart from the
+ * function, so `/aws/lambda/<function>` is not it), read with `GetFunctionConfiguration`.
+ */
+export async function logGroupOf(lambda: Pick<LambdaClient, "send">, functionName: string): Promise<string> {
+  const config = await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: functionName }));
+  return config.LoggingConfig?.LogGroup ?? `/aws/lambda/${functionName}`;
 }
 
 async function main(): Promise<void> {
@@ -51,19 +63,33 @@ async function main(): Promise<void> {
     },
   });
   const { CloudWatchLogsClient: Client } = await import("@aws-sdk/client-cloudwatch-logs");
+  const { LambdaClient: Lambda } = await import("@aws-sdk/client-lambda");
   const logs = new Client({ region: "us-east-1", maxAttempts: 3 });
+  const lambda = new Lambda({ region: "us-east-1", maxAttempts: 3 });
   const inventory = await loadInventory();
   const startTime = Date.now() - sinceMinutes * 60_000;
   let hits = 0;
+  let searched = 0;
+  const missing: string[] = [];
   for (const fn of inventory.functions) {
+    const group = await logGroupOf(lambda, fn);
+    let exists = true;
     for (const term of terms) {
-      const count = await countMatches(logs, `/aws/lambda/${fn}`, term, startTime);
-      if (count > 0) console.error(`  /aws/lambda/${fn}: ${count} event(s) with term #${terms.indexOf(term) + 1}`);
+      const count = await countMatches(logs, group, term, startTime);
+      if (count === undefined) {
+        exists = false;
+        break;
+      }
+      if (count > 0) console.error(`  ${group}: ${count} event(s) with term #${terms.indexOf(term) + 1}`);
       hits += count;
     }
+    if (exists) searched += 1;
+    else missing.push(fn);
   }
-  console.log(`qa:logs-pii: ${inventory.functions.length} log group(s) × ${terms.length} term(s) over the last ${sinceMinutes} min: ${hits} event(s).`);
-  if (hits > 0) process.exit(1);
+  // A function that never ran has no group yet: listed, so a wrong group name can never pass as "0 events".
+  for (const fn of missing) console.log(`  no log group yet: ${fn}`);
+  console.log(`qa:logs-pii: ${searched} of ${inventory.functions.length} log group(s) × ${terms.length} term(s) over the last ${sinceMinutes} min: ${hits} event(s).`);
+  if (hits > 0 || searched === 0) process.exit(1);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

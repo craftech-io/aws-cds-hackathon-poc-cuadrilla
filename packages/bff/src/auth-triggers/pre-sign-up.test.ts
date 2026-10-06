@@ -66,6 +66,11 @@ describe("pre sign-up trigger [FL-104] [FL-114] [FL-121] [FL-122]", () => {
     expect(lines.join("\n")).not.toContain(EMAIL);
   });
 
+  it("[FL-104] the user name in lower case, as the case-insensitive pool hands it to the trigger, matches the ticket", async () => {
+    expect(username).toMatch(/^gst-[0-9A-Z]{26}$/);
+    expect(await refusalOf(signUpEvent(username.toLowerCase(), ticket))).toBe("ACCEPTED");
+  });
+
   it("[FL-114] a second use for the same user passes; a third one is TICKET_INVALID", async () => {
     expect(await refusalOf(signUpEvent(username, ticket))).toBe("ACCEPTED");
     expect(await refusalOf(signUpEvent(username, ticket))).toBe("ACCEPTED");
