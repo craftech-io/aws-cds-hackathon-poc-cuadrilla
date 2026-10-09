@@ -92,7 +92,7 @@ Determinista (el orquestador es externo) · `NetworkMock` por SigV4 con `X-World
 ## Target `knowledge` (`ToolKnowledge`)
 
 ### `search_procedures`
-Determinista (la recuperación es de Bedrock) · `bedrock-agent-runtime:Retrieve` sobre la Knowledge Base · invocan: `harness`, `console` (visor) · sin efectos salvo `TURN#`.
+Determinista (la recuperación es de Bedrock) · `bedrock-agent-runtime:Retrieve` sobre la Knowledge Base · invocan: `harness`, `console` (visor), `qa` (`kb.probe`, solo en mundos `qa-*` y `eval-*`) · sin efectos salvo `TURN#`.
 
 ```json
 {"input": {"type": "object", "properties": {"sessionToken": {"type": "string"}, "query": {"type": "string", "description": "máx. 300 caracteres, en español"}, "category": {"type": "string", "description": "opcional; uno de: GEN | SEG | INS | MED | DIAG | EVI | COM | ESC | CAL"}}, "required": ["sessionToken", "query"]},

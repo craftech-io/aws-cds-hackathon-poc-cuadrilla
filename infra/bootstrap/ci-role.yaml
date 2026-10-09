@@ -279,18 +279,18 @@ Resources:
             Resource: !Sub "arn:${AWS::Partition}:transcribe:${Region}:${AWS::AccountId}:vocabulary/cuadrilla-poc-*"
           - Sid: WebAclReadsOfThisApp
             Effect: Allow
-            Action:
-              - wafv2:GetWebACL
-              - wafv2:GetWebACLForResource
+            Action: wafv2:GetWebACL
             Resource:
               - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:global/webacl/${AppName}-*"
               - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:regional/webacl/${AppName}-*"
-          # WAF evaluates GetWebACLForResource on this ARN pattern; the pool asked about is fenced by
-          # cognito-idp:GetWebACLForResource on the app's tagged pool.
-          - Sid: WebAclLookupForThePool
+          - Sid: PoolWebAclLookup
             Effect: Allow
-            Action: wafv2:GetWebACLForResource
-            Resource: !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:regional/webacl/*/*"
+            Action:
+              - wafv2:GetWebACLForResource
+              - cognito-idp:GetWebACLForResource
+            Resource:
+              - !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:regional/webacl/*/*"
+              - !Sub "arn:${AWS::Partition}:cognito-idp:${Region}:${AWS::AccountId}:userpool/*"
           - Sid: InvokeAccountDeletionByName
             Effect: Allow
             Action: lambda:InvokeFunction

@@ -14,7 +14,7 @@ export const searchProceduresTool = defineTool({
   name: "search_procedures",
   description:
     "Searches the operator's procedures manual and returns the passages that answer, each with its section id, title and score, plus the citation format to use. coverage NONE means the manual does not cover it: say so and offer to escalate; never answer a policy or procedure from memory. coverage UNAVAILABLE means the manual could not be read now.",
-  principals: ["HARNESS", "CONSOLE"],
+  principals: ["HARNESS", "CONSOLE", "QA"],
   args: z.strictObject({
     query: boundedText(300, "What to look up, in Spanish, in the installer's words or the manual's"),
     category: ManualCategory.optional().describe("Manual category to narrow the search to"),

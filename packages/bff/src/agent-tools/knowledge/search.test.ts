@@ -130,6 +130,13 @@ describe("search_procedures fences and catalog", () => {
     expect(await target().invoke("search_procedures", { caller: { kind: "WORKER", ispId: ISP, clockId: CLOCK }, query: "luz PON" })).toMatchObject({ ok: false, error: { code: "FORBIDDEN" } });
   });
 
+  it("answers the QaDriver's kb.probe in a QA world and refuses QA anywhere else", async () => {
+    answer = found(chunk("DIAG-02", 0.7));
+    const qa = (clockId: string, ispId: string) => target().invoke("search_procedures", { caller: { kind: "QA", ispId, clockId, eventId: "qa-ev-kb-probe" }, query: "luz PON" });
+    expect(await qa("qa-812-1-sc-00", "isp-qa-812-1-sc-00")).toMatchObject({ ok: true, coverage: "FOUND", passages: [{ sectionId: "DIAG-02" }] });
+    expect(await qa(CLOCK, ISP)).toMatchObject({ ok: false, error: { code: "FORBIDDEN" } });
+  });
+
   it("reads versions up to the first gap and names the manual as citations do", async () => {
     const present = new Set(["v001", "v002", "v004"]);
     expect(await newestVersion(async (version) => present.has(version))).toBe("v002");

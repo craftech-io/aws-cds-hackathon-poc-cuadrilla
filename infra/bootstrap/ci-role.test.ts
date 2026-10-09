@@ -301,8 +301,8 @@ describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
     for (const action of ["CreateWebACL", "UpdateWebACL", "DeleteWebACL", "GetWebACL", "AssociateWebACL", "DisassociateWebACL", "TagResource"]) expect(acls).toContain(`- wafv2:${action}\n`);
     expect(acls).not.toContain('Resource: "*"');
     // The one `webacl/*/*` is the boundary's lookup of the pool's ACL (WAF evaluates it on that pattern).
-    const lookup = block(boundary, "Sid: WebAclLookupForThePool", "- Sid:");
-    expect(lookup).not.toMatch(/- wafv2:/);
+    const lookup = block(boundary, "Sid: PoolWebAclLookup", "- Sid:");
+    expect(lookup).not.toMatch(/wafv2:(?!GetWebACLForResource)\w+/);
     expect(template.replace(lookup, "")).not.toMatch(/wafv2:\*|webacl\/\*/);
     for (const { sid, body } of allows.filter(({ body }) => /- wafv2:(Create|Update|Delete|Associate|Disassociate|Tag|Untag)/.test(body))) for (const arn of WEB_ACLS) expect(body, sid).toContain(arn);
   });
@@ -335,9 +335,13 @@ describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
 
   it("lets app roles read only the app's web ACLs and invoke the account deletion by its name", () => {
     const reads = block(boundary, "Sid: WebAclReadsOfThisApp", "- Sid:");
-    expect([...reads.matchAll(/- (wafv2:\w+)/g)].map((match) => match[1])).toEqual(["wafv2:GetWebACL", "wafv2:GetWebACLForResource"]);
+    expect(reads).toMatch(/Action: wafv2:GetWebACL\n/);
     for (const arn of WEB_ACLS) expect(reads).toContain(arn);
-    expect(block(boundary, "Sid: WebAclLookupForThePool", "- Sid:")).toMatch(/Action: wafv2:GetWebACLForResource\n\s+Resource: !Sub "arn:\$\{AWS::Partition\}:wafv2:\$\{Region\}:\$\{AWS::AccountId\}:regional\/webacl\/\*\/\*"/);
+    // WAF authorizes the pool's lookup on `regional/webacl/*/*` and on the pool without its tags
+    // (TaggedAppResources never matches it); the QaDriver's own policy names the app's pool.
+    const lookup = block(boundary, "Sid: PoolWebAclLookup", "- Sid:");
+    expect([...lookup.matchAll(/- ([a-z0-9-]+:\w+)$/gm)].map((match) => match[1])).toEqual(["wafv2:GetWebACLForResource", "cognito-idp:GetWebACLForResource"]);
+    for (const arn of ['wafv2:${Region}:${AWS::AccountId}:regional/webacl/*/*"', 'cognito-idp:${Region}:${AWS::AccountId}:userpool/*"']) expect(lookup).toContain(arn);
     expect(block(boundary, "Sid: InvokeAccountDeletionByName", "- Sid:")).toContain("function:${AppName}-${DeployStage}-guest-account-deletion");
   });
 
