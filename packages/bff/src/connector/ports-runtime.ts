@@ -194,7 +194,7 @@ export interface WorldRuntimePort {
    * "ALTA <code>" from a real phone: consumes the one-use code and creates `PHONELEASE#<phoneHash>`
    * with `attribute_not_exists` (a phone bound to another world is a CONFLICT), in one transaction.
    */
-  bindPhoneLease(code: string, phoneHash: string): Promise<PhoneLease>;
+  bindPhoneLease(code: string, phoneHash: string, bound?: Pick<PhoneLease, "phone" | "lastInboundAtReal">): Promise<PhoneLease>;
   /** The lease while it has not expired. */
   getPhoneLease(phoneHash: string): Promise<PhoneLease | undefined>;
   touchPhoneLease(phoneHash: string, lastInboundAtReal: string): Promise<PhoneLease>;

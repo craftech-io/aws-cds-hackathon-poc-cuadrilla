@@ -5,7 +5,7 @@
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from "react";
 import type { GalleryItem } from "./gallery";
 import { useLandingCopy, useLandingLang } from "./lang";
-import { MediaPicture, RenderView } from "./MediaFigure";
+import { MediaPicture } from "./MediaFigure";
 
 interface LightboxProps {
   readonly items: readonly GalleryItem[];
@@ -72,7 +72,7 @@ export function Lightbox({ items, index, onIndex, onClose }: LightboxProps) {
       {current ? (
         <div className="relative flex h-dvh w-dvw flex-col items-center justify-center gap-3 px-3 py-16 sm:px-20">
           <div onClick={stop} onPointerDown={onPointerDown} onPointerUp={onPointerUp} className="min-h-0 w-full max-w-240 touch-pan-y overflow-auto rounded-card bg-white shadow-float">
-            {current.item.status === "render" ? <RenderView id={current.id} minScale={0.6} /> : <MediaPicture item={current.item} alt={alt ?? ""} eager />}
+            <MediaPicture item={current.item} alt={alt ?? ""} eager />
           </div>
           <p onClick={stop} className="max-w-3xl text-center text-sm text-white">
             {alt} <span className="ml-2 text-mist">{landingCopy.zoom.counter((index ?? 0) + 1, items.length)}</span>

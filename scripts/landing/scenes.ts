@@ -3,18 +3,26 @@
 // and the framing come from captures.json; every scene ends with the view settled: nothing loading,
 // nothing busy, the fonts in and the network quiet.
 //
+// A view of the console (a `guest-scene` capture) opens on its heading, picks the scene's person in the
+// simulator's "Escribir como" and opens their phone on its last message; the world was already loaded
+// in its moment (console-world.ts), so no turn of the agent runs here.
+//
 // The signup talks to Cognito from the browser; in a capture that call is answered here, in memory,
 // with the shapes of Cognito's JSON API (only what the scene reaches: `SignUp`). The visitor's password
 // is made for the run and lives only in this process's memory.
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Page, Route } from "@playwright/test";
+import { STORY_PEOPLE } from "../../packages/bff/src/story/main-story";
 import { dataCopy } from "../../packages/web/src/copy/console-data";
 import { copy as consoleCopy } from "../../packages/web/src/copy/console";
+import { simulatorCopy } from "../../packages/web/src/views/simulator/copy";
+import type { CaptureSpec, FramedVisual, StoryPersonId, Visual } from "./captures";
 import { type ConsoleWorld, TEST_POOL, VISITOR } from "./console-world";
 
 export interface SceneContext {
   readonly page: Page;
   readonly world: ConsoleWorld;
+  readonly spec: CaptureSpec;
 }
 
 export interface Scene {
@@ -86,7 +94,72 @@ async function fillSignup(page: Page): Promise<void> {
   await page.getByRole("checkbox", { name: TERMS_CONSENT }).check();
 }
 
+// ---- The console's moments (guest-scene) -------------------------------------------------------------
+
+/** The simulator's phone of a person: the frame the view labels with whose phone it is. */
+export function phoneSelector(person: StoryPersonId): string {
+  return `section[aria-label^=${JSON.stringify(simulatorCopy.identity.phoneOf(STORY_PEOPLE[person].firstName))}]`;
+}
+
+/** The visual of a capture with the phone turned into the crop of its own frame. */
+export function framed(visual: Visual, person: StoryPersonId | null): FramedVisual {
+  if (visual.kind !== "phone") return visual;
+  if (person === null) throw new Error("a phone capture names whose phone it is");
+  return { kind: "crop", selector: phoneSelector(person), margin: 10 };
+}
+
+/** The simulator writing as `person`: the identity picked in "Escribir como", their phone on screen. */
+async function showPhoneOf(page: Page, person: StoryPersonId): Promise<void> {
+  const select = page.getByLabel(simulatorCopy.identity.label);
+  await select.waitFor({ timeout: SETTLE_TIMEOUT_MS });
+  const firstName = STORY_PEOPLE[person].firstName;
+  const value = await select.locator("option").filter({ hasText: firstName }).first().getAttribute("value");
+  if (value === null) throw new Error(`the simulator offers no identity ${firstName}`);
+  await select.selectOption(value);
+  await page.locator(phoneSelector(person)).waitFor({ timeout: SETTLE_TIMEOUT_MS });
+}
+
+/** A view of the console at the scene's moment: its heading, the scene's phone when it shows one, everything settled. */
+export async function stageConsole(page: Page, person: StoryPersonId | null, press?: string): Promise<void> {
+  await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: SETTLE_TIMEOUT_MS });
+  if (person !== null) await showPhoneOf(page, person);
+  if (press !== undefined) await page.getByRole("button", { name: press, exact: true }).click({ timeout: SETTLE_TIMEOUT_MS });
+  await settle(page);
+  // A conversation opens on its last message, as WhatsApp does, once every photo has its height.
+  await page.evaluate(`document.querySelectorAll('[role="log"]').forEach((log) => { log.scrollTop = log.scrollHeight; })`);
+  await page.waitForTimeout(100);
+}
+
+const consoleView: Scene = {
+  async stage({ page, spec }) {
+    await stageConsole(page, spec.scene?.as ?? null, spec.press);
+  },
+};
+
+/** Captures of the console's moments: they all open their view and wait, the scene did the rest. */
+const CONSOLE_CAPTURES = [
+  "hero-loop",
+  "s1-voice-diagnosis",
+  "s2-policy-cite",
+  "s3-photo-reject",
+  "s3-photo-pass",
+  "s4-checklist-complete",
+  "s4-certificate-pdf",
+  "s4-outbox",
+  "s5-escalation-template",
+  "s5-escalation-take",
+  "s6-safety-hazard",
+  "s6-safety-alerts",
+  "gallery-orders",
+  "gallery-order-detail",
+  "gallery-manual",
+  "gallery-metrics",
+  "gallery-audit",
+  "gallery-clock",
+] as const;
+
 export const SCENES: Readonly<Record<string, Scene>> = {
+  ...Object.fromEntries(CONSOLE_CAPTURES.map((id) => [id, consoleView])),
   landing: {
     async stage({ page }) {
       await page.getByRole("main").first().waitFor();

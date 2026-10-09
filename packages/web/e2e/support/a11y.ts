@@ -25,7 +25,9 @@ async function inspect(page: Page): Promise<Findings> {
       }
       return (element.textContent ?? "").trim().length > 0;
     };
-    const controls = [...document.querySelectorAll("a[href], button, input:not([type=hidden]), select, textarea, img, [role=button]")].filter(visible);
+    // What is hidden from assistive technology (a decorative frame, a thumbnail under its zoom button) needs no name.
+    const exposed = (element: Element) => element.closest('[aria-hidden="true"]') === null;
+    const controls = [...document.querySelectorAll("a[href], button, input:not([type=hidden]), select, textarea, img, [role=button]")].filter((element) => visible(element) && exposed(element));
     return {
       lang: document.documentElement.lang,
       headings: [...document.querySelectorAll("h1")].filter(visible).length,

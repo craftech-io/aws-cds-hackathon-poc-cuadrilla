@@ -80,9 +80,17 @@ export async function answerUnknownSender(sender: SenderIdentity, world: WorldTi
 
 export type BindReply = "BOUND" | "CODE_INVALID" | "LEASE_CONFLICT";
 
+/** The "ALTA <código>" message: its code, its id and Meta's instant (ISO), which opens the phone's window. */
+export interface AltaMessage {
+  readonly code: string;
+  readonly wamid: string;
+  readonly atReal: string;
+}
+
 /** FL-101: "ALTA <código>" from a real phone. */
-export async function bindFromLivePhone(sender: SenderIdentity, world: WorldTime | undefined, code: string, wamid: string, deps: GateDeps & { readonly leases: LeaseDeps }): Promise<BindReply> {
-  const outcome = await bindPhoneLease({ code, phoneHash: sender.phoneHash }, deps.leases);
+export async function bindFromLivePhone(sender: SenderIdentity, world: WorldTime | undefined, alta: AltaMessage, deps: GateDeps & { readonly leases: LeaseDeps }): Promise<BindReply> {
+  const { code, wamid } = alta;
+  const outcome = await bindPhoneLease({ code, phoneHash: sender.phoneHash, phone: sender.phone, lastInboundAtReal: alta.atReal }, deps.leases);
   if (!outcome.ok) {
     const [notice, text] = outcome.reason === "CODE_INVALID" ? (["joinCodeInvalid", esMX.joinCodeInvalid] as const) : (["leaseInUse", esMX.leaseInUse] as const);
     await replyToUnknown(sender, world, wamid, notice, text, deps);

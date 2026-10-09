@@ -6,7 +6,7 @@ import { groupSecret, otpauthUri } from "../../lib/auth/credentials";
 import type { MfaSetup } from "../../lib/auth/flow";
 import { useLoginCopy } from "./auth-lang";
 import { CodeField, LinkButton, StepHeading, SubmitButton } from "./form-parts";
-import { QrCode } from "./QrCode";
+import { QrCode } from "../../components/QrCode";
 import type { StepProps } from "./steps";
 
 export function MfaSetupStep({ busy, dispatch, inDrawer, setup }: StepProps & { readonly setup: MfaSetup }) {

@@ -1,24 +1,28 @@
 // The hero (docs/landing-spec.md §1.3): what it is, for whom and that it works, with the three calls to
-// action and the product loop. From 1024 px two columns (text 55, loop 45); below, the text and the
-// primary call to action come first, above the fold at 360×640, and the loop follows at 320 px or more.
+// action and the product loop (the captured frames of the installer's phone). From 1024 px two columns
+// (text 55, loop 45); below, the text and the primary call to action come first, above the fold at
+// 360×640, and the loop follows at 320 px or more.
 // The note under the calls to action says the demo is synthetic: the operator is "fictitious" in the
 // neutral mode, or the co-branding disclaimer of the stage is shown (ADR-0018).
 import { enGloss } from "@cuadrilla/bff/copy/en-gloss";
 import { esMX } from "@cuadrilla/bff/copy/es-MX";
 import { useDemoBrand } from "../../../context/BrandContext";
+import { HeroFrames, heroFrames } from "../captured";
 import { useLandingCopy, useLandingLang } from "../lang";
-import { HeroLoop } from "../renders/HeroLoop";
-import { storyEntry } from "../renders/sources";
+import type { MediaState } from "../media";
+import { storyEntry } from "../story";
 import { CtaGroup, FiberStrand } from "./parts";
 
 const VOICE_NOTE = storyEntry("s1-voice-note");
 
-export function Hero() {
+export function Hero({ media }: { readonly media: MediaState }) {
   const copy = useLandingCopy();
   const lang = useLandingLang()?.lang ?? "es";
   const brand = useDemoBrand(lang);
   const notice = brand.mode === "cobrand" ? brand.disclaimer : lang === "en" ? enGloss.fictitiousOperatorNotice : esMX.fictitiousOperatorNotice;
   const voiceText = lang === "en" ? VOICE_NOTE.glossEn : VOICE_NOTE.text;
+  const loop = { label: copy.hero.loop.label, pauseLabel: copy.hero.loop.pause, playLabel: copy.hero.loop.play, summary: copy.hero.loop.summary(voiceText) };
+  const frames = heroFrames(media);
   return (
     <section id="hero" aria-labelledby="hero-title" className="scroll-mt-16 relative overflow-hidden bg-navy text-white">
       <FiberStrand className="bottom-10 left-1 top-10 lg:hidden" />
@@ -38,7 +42,7 @@ export function Hero() {
           </p>
         </div>
         <div className="flex min-w-0 justify-center lg:col-span-9">
-          <HeroLoop label={copy.hero.loop.label} pauseLabel={copy.hero.loop.pause} playLabel={copy.hero.loop.play} summary={copy.hero.loop.summary(voiceText)} />
+          {frames ? <HeroFrames frames={frames} {...loop} /> : null}
         </div>
       </div>
     </section>

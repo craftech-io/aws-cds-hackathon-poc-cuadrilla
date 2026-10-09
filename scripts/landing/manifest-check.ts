@@ -3,8 +3,8 @@
 // (scripts/landing/captures.json) and the files under packages/web/public:
 //
 //   - the manifest reads with the page's own schema (views/landing/media.ts)
-//   - every `render` names the capture that replaces it: routes, viewports, the state of the world and
-//     the work package that takes it
+//   - no entry is a `render`: every visual is a capture of the real console (or a dated placeholder),
+//     and every entry names its capture: routes, viewports, the state of the world and the work package
 //   - every `placeholder` has its replacement date
 //   - every file of a `capture` (the picture and each source of its srcsets) is under public/, is in
 //     the ledger, and has the hash the ledger recorded; the entry's `sha256` is its picture's
@@ -38,10 +38,11 @@ function rawEntries(manifest: unknown): Array<[string, RawEntry]> {
   return Object.entries(media as Record<string, unknown>).filter((entry): entry is [string, RawEntry] => entry[1] !== null && typeof entry[1] === "object");
 }
 
-/** What the schema would say, by entry and in words: a placeholder without its date, a render without its replacement. */
+/** What the schema would say, by entry and in words: a render, a placeholder without its date, an entry without its replacement. */
 function entryShapeProblems(manifest: unknown): string[] {
   const problems: string[] = [];
   for (const [id, entry] of rawEntries(manifest)) {
+    if (entry.status === "render") problems.push(`${id}: a render; every visual is a capture of the real console or a dated placeholder`);
     if (entry.status === "placeholder" && typeof entry.replaceBy !== "string") problems.push(`${id}: a placeholder without its replacement date (replaceBy)`);
     const replacement = entry.replacement as { routes?: unknown; viewports?: unknown; worldState?: unknown; by?: unknown } | undefined;
     const complete = replacement !== undefined && Array.isArray(replacement.routes) && replacement.routes.length > 0 && Array.isArray(replacement.viewports) && replacement.viewports.length > 0 && typeof replacement.worldState === "string" && replacement.worldState.trim() !== "" && typeof replacement.by === "string";

@@ -67,13 +67,14 @@ describe("landing:check [FL-089]", () => {
     expect(checkManifest({ manifest: manifestWith({ "signup-form": captureEntry }), captures: ledger(), fileHash: onDisk(hashes) })).toEqual([]);
   });
 
-  it("[FL-089] refuses a render without the capture that replaces it, or without its work package", () => {
+  it("[FL-089] refuses a render, and an entry without the capture that replaces it or without its work package", () => {
     const { by: _by, ...withoutPackage } = REPLACEMENT;
     const problems = checkManifest({
       manifest: manifestWith({ "signup-form": { status: "render", alt: ALT }, "signup-code": { status: "render", alt: ALT, replacement: withoutPackage } }),
       captures: ledger(),
       fileHash: onDisk(hashes),
     });
+    expect(problems).toContain("signup-form: a render; every visual is a capture of the real console or a dated placeholder");
     expect(problems).toContain("signup-form: no complete replacement (routes, viewports, world state and the work package that captures it)");
     expect(problems).toContain("signup-code: no complete replacement (routes, viewports, world state and the work package that captures it)");
   });

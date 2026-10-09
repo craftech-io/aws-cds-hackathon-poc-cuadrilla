@@ -55,8 +55,10 @@ export interface WhatsAppRecipient {
 /** The transport a WhatsApp message to this recipient takes (ADR-0002, point 3). */
 export function whatsAppRouteOf(recipient: WhatsAppRecipient): WhatsAppRoute {
   const worldMode = WhatsAppMode.parse(recipient.worldMode);
-  if (isSyntheticPhone(recipient.phone)) return { transport: "simulated", source: "SYNTHETIC_PHONE" };
+  // A lease of this world binds a phone proved real (the code came from it): it wins over the person's
+  // synthetic phone, and the send goes to the bound phone (outbound/context.ts).
   if (recipient.lease !== undefined && recipient.lease.clockId === recipient.clockId) return { transport: "live", source: "PHONE_LEASE" };
+  if (isSyntheticPhone(recipient.phone)) return { transport: "simulated", source: "SYNTHETIC_PHONE" };
   // A real phone in a simulated world without a lease of that world: nothing may reach it live.
   if (worldMode !== "live") return { transport: "simulated", source: "SIMULATED_WORLD" };
   // In the live world only the phones the operator registered are real; any other number stays simulated.

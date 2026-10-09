@@ -1,6 +1,6 @@
 // Texts of the public landing in English, from docs/landing-spec.md §1, with the same keys as the
 // Spanish ones (landing.test.ts). The phones of the walkthrough stay in Mexican Spanish, as the product
-// talks to the installer; their only English caption is the gloss of the main story (renders/sources.ts).
+// talks to the installer; their only English caption is the gloss of the main story (story.ts).
 import type { LandingCopy } from "./copy-es";
 
 export const en: LandingCopy = {
@@ -163,6 +163,13 @@ export const en: LandingCopy = {
       { kind: "cap", value: 60, prefix: "< ", suffix: " s", text: "from a reported hazard to the zone lead's alert", source: "safety-alert target" },
     ],
     pilot: "In a pilot we would measure 30-day repeat visits and minutes per installation against your baseline.",
+  },
+  video: {
+    title: "One installation in three minutes",
+    lead: "The installer on WhatsApp, the supervisor who takes a case and the operator's console, in one walkthrough.",
+    label: "Cuadrilla video: one installation from start to finish",
+    note: "The video downloads only when you play it.",
+    fallback: "Download the video (MP4)",
   },
   integration: {
     title: "How it fits in",

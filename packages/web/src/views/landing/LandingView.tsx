@@ -1,8 +1,8 @@
 // `/`: the commercial landing of Cuadrilla (docs/landing-spec.md §1): header, hero, the problem, the
 // walkthrough of one installation, what it does for each role, the rules it guarantees, the impact goals,
-// how it fits in, what is real and what is simulated, the gallery, the final call to action and the
-// footer — twelve blocks, in Mexican Spanish or English. The brand line is the stage's (`brand.get`,
-// ADR-0018). The visuals are renders built with the product's components and texts until the console
+// the product video (once it is delivered), how it fits in, what is real and what is simulated, the
+// gallery, the final call to action and the footer — twelve blocks, in Mexican Spanish or English. The
+// brand line is the stage's (`brand.get`, ADR-0018). The visuals are renders built with the product's components and texts until the console
 // exists; each one is in public/landing/manifest.json with the real capture that replaces it.
 import { VIEWS } from "../../lib/view-registry";
 import { useRouter } from "../../lib/router";
@@ -14,6 +14,7 @@ import { Actors, Problem, Trust } from "./sections/content";
 import { Header } from "./sections/Header";
 import { Hero } from "./sections/Hero";
 import { Impact, Integration, RealAndSimulated } from "./sections/proof";
+import { VideoSection } from "./sections/Video";
 import { Walkthrough } from "./sections/Walkthrough";
 import type { MediaState } from "./media";
 
@@ -26,12 +27,13 @@ function Page({ media }: { readonly media: MediaState }) {
       </a>
       <Header />
       <main id="main">
-        <Hero />
+        <Hero media={media} />
         <Problem />
-        <Walkthrough />
+        <Walkthrough media={media} />
         <Actors />
         <Trust />
         <Impact />
+        <VideoSection media={media} />
         <Integration />
         <RealAndSimulated viewNames={VIEWS.names} />
         <GallerySection media={media} />

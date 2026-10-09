@@ -1,13 +1,12 @@
 // Media of the landing, described by public/landing/manifest.json (docs/landing-spec.md §6.3): one entry
 // per visual, keyed by its id, with what it is today and the real capture that replaces it.
 //
-//   render       drawn live by the landing with the product's components and texts (renders/)
 //   capture      a capture of the real console by the capture pipeline (scripts/landing/), with its file
 //   placeholder  a provisional picture, always labelled "capture pending" and with its replacement date
 //
 // Every entry names its replacement: the console route(s), the viewports, the state of the world and the
-// work package that captures it. The manifest is read once per visit and parsed with zod; if it cannot
-// be read, the renders still draw (they need no file) and the captures are left out.
+// work package that captured it. The manifest is read once per visit and parsed with zod; if it cannot
+// be read, the visuals are left out and the texts stand alone.
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { fetchWithRetry } from "../../lib/http";
@@ -49,17 +48,28 @@ const Picture = {
   sources: z.array(z.object({ type: z.enum(["image/avif", "image/webp"]), srcset: Text })).default([]),
 };
 
-export const RenderItem = z.object({ ...Common, status: z.literal("render") });
 export const CaptureItem = z.object({ ...Common, ...Picture, status: z.literal("capture"), sha256: z.string().regex(/^[0-9a-f]{64}$/).optional() });
 export const PlaceholderItem = z.object({ ...Common, ...Picture, status: z.literal("placeholder"), replaceBy: z.iso.date() });
 
-export const MediaItem = z.discriminatedUnion("status", [RenderItem, CaptureItem, PlaceholderItem]);
+export const MediaItem = z.discriminatedUnion("status", [CaptureItem, PlaceholderItem]);
 export type MediaItem = z.infer<typeof MediaItem>;
-export type PictureItem = Extract<MediaItem, { status: "capture" | "placeholder" }>;
+
+/**
+ * The product video (ADR-0028), served by the site itself from public/landing/video/: the MP4 and its
+ * poster, both required; `null` until they are delivered, and the landing then leaves its section out.
+ */
+export const LandingVideo = z
+  .object({
+    src: z.string().regex(/^\/landing\/video\/[a-z0-9._-]+\.mp4$/),
+    poster: z.string().regex(/^\/landing\/video\/[a-z0-9._-]+\.(?:avif|webp|jpg|png)$/),
+    caption: z.object({ es: Text, en: Text }).optional(),
+  })
+  .strict();
+export type LandingVideo = z.infer<typeof LandingVideo>;
 
 export const LandingManifest = z.object({
   version: z.literal(2),
-  video: z.object({ src: File, poster: File.optional(), caption: z.object({ es: Text, en: Text }).optional() }).nullable(),
+  video: LandingVideo.nullable(),
   media: z.record(z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), MediaItem),
 });
 export type LandingManifest = z.infer<typeof LandingManifest>;
@@ -98,8 +108,4 @@ export function useLandingMedia(): MediaState {
 
 export function mediaOf(state: MediaState, id: string): MediaItem | undefined {
   return state.status === "ready" ? state.manifest.media[id] : undefined;
-}
-
-export function isPicture(item: MediaItem): item is PictureItem {
-  return item.status !== "render";
 }

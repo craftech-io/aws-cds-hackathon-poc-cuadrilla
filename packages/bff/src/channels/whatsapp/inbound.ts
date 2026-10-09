@@ -37,7 +37,7 @@ import { type MediaDeps, type InboundContent, contentOf, fetchInboundMedia } fro
 import { type NonceResolution, auditNonceDenial, resolveNonce } from "./nonces";
 import { type PhoneFilterDeps, type ScreenResult, recordForeign, screenRecord } from "./phone-filter";
 import { type ChannelActions, type EventQueue, type MetricSink, type NoticeSender, type WorldTime, type WorldTimeReader, inboundEventId } from "./ports";
-import { type InboundMessage as InboundMessageType, SnsEvent } from "./payloads";
+import { type InboundMessage as InboundMessageType, SnsEvent, metaTimestampToIso } from "./payloads";
 import { routeSupervisorMessage } from "./routing";
 
 export interface InboundDeps {
@@ -266,7 +266,7 @@ async function processClaimed(origin: "LIVE" | "SIMULATED", sender: SenderIdenti
   const gate = { connector, notices: deps.notices, metrics: deps.metrics, ...(deps.realClock === undefined ? {} : { realClock: deps.realClock }) };
   if (origin === "LIVE" && keyword?.kind === "ALTA_CODE") {
     const leaseDeps = { worlds: connector.worlds, people: connector.people, audit: connector.audit };
-    return (await bindFromLivePhone(sender, world, keyword.code, raw.id, { ...gate, leases: leaseDeps })) === "BOUND" ? "LEASE_BOUND" : "LEASE_REFUSED";
+    return (await bindFromLivePhone(sender, world, { code: keyword.code, wamid: raw.id, atReal: metaTimestampToIso(raw.timestamp) }, { ...gate, leases: leaseDeps })) === "BOUND" ? "LEASE_BOUND" : "LEASE_REFUSED";
   }
   const person = allowlistedPerson(sender);
   if (person === undefined || world === undefined || sender.clockId === undefined) {

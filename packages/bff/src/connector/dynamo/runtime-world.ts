@@ -129,12 +129,12 @@ export function worldRuntimeRepo(ctx: RepoContext): WorldRuntimePort {
     createJoinCode: (code) => createEntity(ctx, JoinCode, "JoinCode", code, { ttlSeconds: RUNTIME_TTL_SECONDS.joinCode, condition: { ifNotExistsOrExpiredAt: nowEpoch(ctx) } }),
     getJoinCode: async (code) => valid(await getEntity(ctx, JoinCode, "JoinCode", { code })),
 
-    async bindPhoneLease(code, phoneHash) {
+    async bindPhoneLease(code, phoneHash, bound = {}) {
       const joinCode = valid(await getEntity(ctx, JoinCode, "JoinCode", { code }));
       if (joinCode === undefined) throw new ConnectorError("NOT_FOUND", "join code not found or expired", TABLE);
       if (joinCode.usedAtReal !== undefined) throw new ConnectorError("CONFLICT", "join code already used", TABLE);
       const at = nowIso(ctx);
-      const lease = entityRow(ctx, PhoneLease, "PhoneLease", { phoneHash, clockId: joinCode.clockId, personId: joinCode.personId, joinCode: code, boundAtReal: at }, { ttlSeconds: RUNTIME_TTL_SECONDS.phoneLease });
+      const lease = entityRow(ctx, PhoneLease, "PhoneLease", { phoneHash, ...bound, clockId: joinCode.clockId, personId: joinCode.personId, joinCode: code, boundAtReal: at }, { ttlSeconds: RUNTIME_TTL_SECONDS.phoneLease });
       await client.transact(
         [
           { op: "update", table: TABLE, key: joinCodeKey(code), patch: { usedAtReal: at, usedByPhoneHash: phoneHash }, condition: { ifVersion: joinCode.version, absent: ["usedAtReal"] } },

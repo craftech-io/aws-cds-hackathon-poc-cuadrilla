@@ -7,23 +7,16 @@
 //   attachment   a photo the installer sent: only its candidate id and size, never the image (ADR-0015)
 //
 // agent/envelope.ts renders it; turns/invoke.ts gathers it.
-import { createHash } from "node:crypto";
 import type { AttachmentLine, EnvelopeEvent, FactLine } from "../agent/envelope";
 import { normalizeUntrusted } from "../channels/normalizer";
 import type { Connector } from "../connector/ports";
 import type { Case } from "../domain/cases";
 import type { Message } from "../domain/conversations";
 import type { WorkOrder } from "../domain/work-orders";
+import { candidateIdOf } from "../evidence/candidate";
 import { MASK_MARKERS, type PrefilterBlock, prefilterBlock } from "../lib/mask";
 import { MEXICO_CITY_TIME_ZONE, toZonedIso } from "../services/business-hours/zoned-time";
 import type { TurnInbound, TurnRequest } from "./deps";
-
-/** `candidateId` of `validate_install_photo`: the message id when the tool's pattern takes it, else a digest of it. */
-const CANDIDATE_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
-
-export function candidateIdOf(messageId: string): string {
-  return CANDIDATE_ID.test(messageId) ? messageId : `cand-${createHash("sha256").update(messageId, "utf8").digest("hex").slice(0, 40)}`;
-}
 
 const zonedSim = (iso: string): string => toZonedIso(new Date(iso), MEXICO_CITY_TIME_ZONE);
 

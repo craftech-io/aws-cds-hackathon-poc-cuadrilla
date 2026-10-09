@@ -1,17 +1,18 @@
 // The heart of the landing (docs/landing-spec.md §1.5, §1.6, §4): six scenes of one installation.
 //
 // From 1024 px the narrative scrolls on the left and the visual stays pinned on the right; the scene
-// whose block crosses the middle of the viewport is the active one, its visual cross-fades in (M5), its
-// phones play, the progress bar follows the visitor's scroll (M7) and the fibre pulse moves to its
+// whose block crosses the middle of the viewport is the active one, its captures of the real console
+// cross-fade in (M5), the progress bar follows the visitor's scroll (M7) and the fibre pulse moves to its
 // marker (M10). Never scroll-jacking: the page scrolls at its normal speed. Below 1024 px every scene is
-// a card with its own visual (at most 70 % of the screen's height), no snap and no carousel; a card plays
-// when it reaches the middle 40 % of the screen. With reduced motion every visual is in its final state.
+// a card with its own captures (at most 70 % of the screen's height), no snap and no carousel. With
+// reduced motion nothing moves.
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { STORY_SCENE_IDS, type StorySceneId } from "@cuadrilla/bff/story/types";
+import { ScenePictures, capturesOf } from "../captured";
 import { useLandingCopy, useLandingLang } from "../lang";
-import { DESKTOP_QUERY, desktopReveal, useInView, useMediaQuery, useReducedMotion } from "../motion";
-import { SCENE_VISUALS } from "../renders/scenes";
-import { sceneCaption, sceneStart } from "../renders/sources";
+import type { MediaState } from "../media";
+import { DESKTOP_QUERY, useMediaQuery, useReducedMotion } from "../motion";
+import { SCENE_ENTRY_IDS, sceneCaption, sceneStart } from "../story";
 import { SectionHeading } from "./parts";
 
 const TOTAL = STORY_SCENE_IDS.length;
@@ -59,6 +60,13 @@ function SceneText({ scene, index, active }: { readonly scene: StorySceneId; rea
   );
 }
 
+/** A scene's visual: its captures of the real console, once the manifest is read. */
+function SceneVisual({ scene, media, desktop }: { readonly scene: StorySceneId; readonly media: MediaState; readonly desktop: boolean }) {
+  const lang = useLandingLang()?.lang ?? "es";
+  const pictures = capturesOf(media, SCENE_ENTRY_IDS[scene]);
+  return pictures ? <ScenePictures pictures={pictures} lang={lang} desktop={desktop} /> : null;
+}
+
 // ---- Desktop: pinned visual, narrative scrolling -------------------------------------------------------
 
 function useActiveScene(blocks: RefObject<(HTMLElement | null)[]>): { readonly active: number; readonly progress: number } {
@@ -92,7 +100,7 @@ function useActiveScene(blocks: RefObject<(HTMLElement | null)[]>): { readonly a
   return state;
 }
 
-function DesktopWalkthrough({ reduced }: { readonly reduced: boolean }) {
+function DesktopWalkthrough({ reduced, media }: { readonly reduced: boolean; readonly media: MediaState }) {
   const copy = useLandingCopy().walkthrough;
   const lang = useLandingLang()?.lang ?? "es";
   const blocks = useRef<(HTMLElement | null)[]>([]);
@@ -133,7 +141,6 @@ function DesktopWalkthrough({ reduced }: { readonly reduced: boolean }) {
         <div className="sticky top-24 flex flex-col items-center">
           <div className="relative flex h-phone w-full items-center justify-center">
             {STORY_SCENE_IDS.map((scene, index) => {
-              const Visual = SCENE_VISUALS[scene];
               const shown = index === active;
               const side = index < active ? "-translate-x-4" : "translate-x-4";
               return (
@@ -145,7 +152,7 @@ function DesktopWalkthrough({ reduced }: { readonly reduced: boolean }) {
                   role={shown ? "group" : undefined}
                   className={`absolute inset-0 flex items-center justify-center transition duration-220 ease-out motion-reduce:transition-none ${shown ? "translate-x-0 opacity-100" : `${side} pointer-events-none opacity-0`}`}
                 >
-                  <Visual run={shown} still={reduced} reduced={reduced} desktop progress={shown ? progress : 0} reveal={shown ? desktopReveal(progress) : 0} runKey={plays[scene] ?? 0} />
+                  <SceneVisual scene={scene} media={media} desktop />
                 </div>
               );
             })}
@@ -167,13 +174,10 @@ function DesktopWalkthrough({ reduced }: { readonly reduced: boolean }) {
 
 // ---- Mobile and tablet: stacked cards -----------------------------------------------------------------
 
-function SceneCard({ scene, index, reduced }: { readonly scene: StorySceneId; readonly index: number; readonly reduced: boolean }) {
-  const card = useRef<HTMLLIElement>(null);
-  const centred = useInView(card, { rootMargin: "-30% 0px -30% 0px", threshold: 0, once: true });
+function SceneCard({ scene, index, media }: { readonly scene: StorySceneId; readonly index: number; readonly media: MediaState }) {
   const { caption } = useSceneText(scene);
-  const Visual = SCENE_VISUALS[scene];
   return (
-    <li ref={card} aria-labelledby={`scene-${scene}`} className="rounded-card border border-mist bg-white p-5 shadow-card sm:p-6">
+    <li aria-labelledby={`scene-${scene}`} className="rounded-card border border-mist bg-white p-5 shadow-card sm:p-6">
       <span aria-hidden="true" className="mb-3 flex gap-1.5">
         {STORY_SCENE_IDS.map((dot, at) => (
           <span key={dot} className={`h-2 w-2 rounded-full ${at === index ? "bg-cyan-deep" : "bg-mist"}`} />
@@ -181,14 +185,14 @@ function SceneCard({ scene, index, reduced }: { readonly scene: StorySceneId; re
       </span>
       <SceneText scene={scene} index={index} active />
       <div role="group" aria-labelledby={`scene-${scene}`} className="mt-5 flex justify-center">
-        <Visual run={centred} still={reduced} reduced={reduced} desktop={false} progress={1} reveal={0} runKey={0} />
+        <SceneVisual scene={scene} media={media} desktop={false} />
       </div>
       <Caption text={caption} />
     </li>
   );
 }
 
-export function Walkthrough() {
+export function Walkthrough({ media }: { readonly media: MediaState }) {
   const copy = useLandingCopy().walkthrough;
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const reduced = useReducedMotion();
@@ -197,11 +201,11 @@ export function Walkthrough() {
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-8 lg:py-24">
         <SectionHeading id="recorrido-title" title={copy.title} lead={copy.lead} />
         {desktop ? (
-          <DesktopWalkthrough reduced={reduced} />
+          <DesktopWalkthrough reduced={reduced} media={media} />
         ) : (
           <ol className="mt-10 space-y-6">
             {STORY_SCENE_IDS.map((scene, index) => (
-              <SceneCard key={scene} scene={scene} index={index} reduced={reduced} />
+              <SceneCard key={scene} scene={scene} index={index} media={media} />
             ))}
           </ol>
         )}

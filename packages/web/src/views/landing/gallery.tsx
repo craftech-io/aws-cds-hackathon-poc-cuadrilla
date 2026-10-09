@@ -4,7 +4,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { Lightbox } from "./Lightbox";
 import type { MediaItem, MediaState } from "./media";
-import { GALLERY_IDS } from "./renders/registry";
+import { GALLERY_IDS } from "./story";
 
 export interface GalleryItem {
   readonly id: string;

@@ -1,11 +1,18 @@
 // A failed BFF call as the supervisor reads it: the refusal of the BFF `reason` when there is
 // one, the generic text of its kind otherwise, the way out (confirm with the password in place;
-// sign in again; retry) and the correlation id to quote. The English server message never becomes
-// the headline.
+// sign in again; retry) and a short reference to quote (the first block of the correlation id).
+// The English server message never becomes the headline.
 import { useSession } from "../context/SessionContext";
 import { dataCopy } from "../copy/console-data";
 import type { ApiError } from "../lib/api-error";
 import { Button } from "./Button";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The reference a person can read out: the first block of a UUID (enough to find the request in the logs). */
+export function referenceOf(correlationId: string): string {
+  return UUID.test(correlationId) ? correlationId.slice(0, 8).toUpperCase() : correlationId;
+}
 
 export function describeApiError(error: ApiError): string {
   const byReason = error.reason !== null ? dataCopy.byReason[error.reason] : undefined;
@@ -50,7 +57,10 @@ export function ApiErrorNotice({ error, onRetry, details }: ApiErrorNoticeProps)
         ) : null}
         {error.correlationId ? (
           <span className="text-xs text-slate">
-            {dataCopy.reference}: <code className="font-mono">{error.correlationId}</code>
+            {dataCopy.reference}:{" "}
+            <code className="font-mono" title={error.correlationId}>
+              {referenceOf(error.correlationId)}
+            </code>
           </span>
         ) : null}
       </div>

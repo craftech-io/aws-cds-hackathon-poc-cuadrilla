@@ -7,7 +7,7 @@
 // nonces the channel checks again when the tap comes back (bound to phone, object and action).
 import { z } from "zod";
 import { type PhotoItem, ToolError } from "@cuadrilla/shared";
-import voiceSheet from "../../../../scripts/seed/audio/datasheet.json";
+import voiceSheet from "../../../../scripts/seed/audio/datasheet.json" with { type: "json" };
 import { MetaMessage } from "../channels/whatsapp/meta-messages";
 import { displayOf, mediaIdOf } from "../channels/whatsapp/render";
 import type { Message } from "../domain/conversations";

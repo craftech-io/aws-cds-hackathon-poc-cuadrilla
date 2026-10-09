@@ -1,15 +1,16 @@
 // The landing's media manifest (FL-089, docs/landing-spec.md §6.3): it lists every entry of the spec's
-// table, each `render` names the real capture that replaces it (routes, viewports, state of the world)
-// and the work package that takes it, no replacement points to a view outside docs/design-brief.md §6
-// (or the public pages of §7 for the signup), a placeholder always has its replacement date, every
-// render of the landing has its component and every file of a capture exists. The counts come from the
-// manifest, never written here.
+// table, every entry is a capture of the real console (never a render) that names its capture (routes,
+// viewports, state of the world) and the work package that took it, no capture points to a view outside
+// docs/design-brief.md §6 (or the public pages of §7 for the signup), a placeholder always has its
+// replacement date, the walkthrough and the gallery show entries of the manifest and every file of a
+// capture exists. The counts come from the manifest, never written here.
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { findNeutralTerms } from "../../../../../scripts/lint/neutral-terms";
-import { LandingManifest, isPicture } from "./media";
-import { EXTERNAL_RENDERS, RENDERS, SCENE_RENDER_IDS, isRenderId } from "./renders/registry";
+import { LandingManifest } from "./media";
+import { CapturesFile } from "../../../../../scripts/landing/captures";
+import { GALLERY_IDS, SCENE_ENTRY_IDS, SIGNUP_ENTRY_IDS } from "./story";
 
 const ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 const PUBLIC_DIR = fileURLToPath(new URL("../../../public", import.meta.url));
@@ -57,21 +58,21 @@ describe("landing manifest [FL-089]", () => {
     expect(Object.keys(manifest.media).sort()).toEqual([...SPEC_IDS].sort());
   });
 
-  it("names, for every render, the capture that replaces it and its work package", () => {
+  it("names, for every entry, the capture that replaces it and its work package", () => {
     for (const [id, item] of entries) {
       expect(item.replacement.routes.length, id).toBeGreaterThan(0);
       expect(item.replacement.viewports.length, id).toBeGreaterThan(0);
       expect(item.replacement.worldState.length, id).toBeGreaterThan(0);
-      expect(item.replacement.by, id).toBe((EXTERNAL_RENDERS as readonly string[]).includes(id) ? "WP-63" : "WP-44");
+      expect(item.replacement.by, id).toBe((SIGNUP_ENTRY_IDS as readonly string[]).includes(id) ? "WP-63" : "WP-44");
     }
-    const console = entries.filter(([id]) => !(EXTERNAL_RENDERS as readonly string[]).includes(id));
-    expect(console.length).toBe(entries.length - EXTERNAL_RENDERS.length);
+    const console = entries.filter(([id]) => !(SIGNUP_ENTRY_IDS as readonly string[]).includes(id));
+    expect(console.length).toBe(entries.length - SIGNUP_ENTRY_IDS.length);
   });
 
   it("points only to views of docs/design-brief.md §6 (and §7 for the signup)", () => {
     expect(CONSOLE_ROUTES).toContain("/app/simulator");
     for (const [id, item] of entries) {
-      const allowed = (EXTERNAL_RENDERS as readonly string[]).includes(id) ? PUBLIC_ROUTES : CONSOLE_ROUTES;
+      const allowed = (SIGNUP_ENTRY_IDS as readonly string[]).includes(id) ? PUBLIC_ROUTES : CONSOLE_ROUTES;
       for (const route of item.replacement.routes) expect(isRouteOf(allowed, route), `${id}: ${route}`).toBe(true);
     }
   });
@@ -84,20 +85,34 @@ describe("landing manifest [FL-089]", () => {
     expect(LandingManifest.safeParse(withDate).success).toBe(true);
   });
 
-  it("draws every render of the landing with its component, and the walkthrough shows each scene entry", () => {
-    for (const [id, item] of entries) {
-      if (item.status !== "render" || (EXTERNAL_RENDERS as readonly string[]).includes(id)) continue;
-      expect(isRenderId(id), id).toBe(true);
-    }
-    for (const id of Object.keys(RENDERS)) expect(manifest.media[id], id).toBeDefined();
-    const sceneIds = Object.values(SCENE_RENDER_IDS).flat();
+  it("has no render left: every entry is a capture, and the walkthrough and the gallery show entries of the manifest", () => {
+    for (const [id, item] of entries) expect(item.status, id).toBe("capture");
+    const sceneIds = Object.values(SCENE_ENTRY_IDS).flat();
     expect(new Set(sceneIds).size).toBe(sceneIds.length);
-    for (const id of sceneIds) expect(manifest.media[id]?.status, id).toBeDefined();
+    for (const id of [...sceneIds, ...GALLERY_IDS, ...SIGNUP_ENTRY_IDS]) expect(manifest.media[id], id).toBeDefined();
   });
 
   it("names only files that exist under public/landing", () => {
-    for (const [id, item] of entries) if (isPicture(item)) expect(existsSync(`${PUBLIC_DIR}${item.file}`), `${id}: ${item.file}`).toBe(true);
-    if (manifest.video) expect(existsSync(`${PUBLIC_DIR}${manifest.video.src}`)).toBe(true);
+    for (const [id, item] of entries) expect(existsSync(`${PUBLIC_DIR}${item.file}`), `${id}: ${item.file}`).toBe(true);
+    if (manifest.video) {
+      expect(existsSync(`${PUBLIC_DIR}${manifest.video.src}`)).toBe(true);
+      expect(existsSync(`${PUBLIC_DIR}${manifest.video.poster}`)).toBe(true);
+    }
+  });
+
+  it("takes every console entry with a capture of the ledger, on the routes and viewport the manifest names", () => {
+    const captures = CapturesFile.parse(JSON.parse(readFileSync(`${ROOT}scripts/landing/captures.json`, "utf8")));
+    // `{order:24817}`, `{case:24818}` and a manual section stand for the route's named segment.
+    const pattern = (route: string) => route.replace(/\{order:\d{5}\}/, ":workOrderId").replace(/\{case:\d{5}\}/, ":caseId").replace(/^\/app\/manual\/[A-Z]+-\d{2}$/, "/app/manual/:sectionId");
+    for (const [id, item] of entries) {
+      if ((SIGNUP_ENTRY_IDS as readonly string[]).includes(id)) continue;
+      const spec = Object.values(captures.captures).find((capture) => capture.manifest?.id === id);
+      expect(spec, id).toBeDefined();
+      if (spec === undefined) continue;
+      const routes = [spec.route, ...(spec.beside ? [spec.beside.route] : [])].map(pattern);
+      for (const route of routes) expect(item.replacement.routes, `${id}: ${route}`).toContain(route);
+      expect(item.replacement.viewports, id).toContain(spec.manifest?.viewport);
+    }
   });
 
   it("describes every visual in both languages without naming the contest", () => {

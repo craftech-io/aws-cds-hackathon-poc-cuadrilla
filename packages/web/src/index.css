@@ -50,11 +50,11 @@
   --breakpoint-wide: 90rem;
 
   --radius-card: 0.75rem;
-  /* Chat bubbles of the landing's phone frame: rounder than a card, like a real message. */
+  /* Chat bubbles of the phone simulator: rounder than a card, like a real message. */
   --radius-bubble: 1.125rem;
 
   --shadow-card: 0 1px 2px rgb(10 12 15 / 0.06), 0 4px 12px rgb(10 12 15 / 0.06);
-  /* The pinned visual of the walkthrough and the active phone frame. */
+  /* Floating surfaces: the viewer of the landing, the video and the phone simulator. */
   --shadow-float: 0 12px 32px rgb(10 12 15 / 0.24), 0 2px 8px rgb(10 12 15 / 0.12);
 
   /* Fluid type of the landing: a legible minimum at 360 px and a ceiling at 1440 px and wider. */
@@ -64,20 +64,15 @@
   --text-h2--line-height: 1.15;
   --text-lead: clamp(1rem, 0.93rem + 0.3vw, 1.125rem);
   --text-lead--line-height: 1.6;
-  /* Timestamps and file types inside a chat bubble. */
+  /* Timestamps and file types inside a chat bubble of the simulator. */
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
 
-  /* The reaction on a photo bubble lands with a slight overshoot (M4). */
-  --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1);
-
   /* Motion of the landing (docs/landing-spec.md §3). Only transform and opacity, and every one of
-     them finite: the fibre pulse (M10) runs twice, a PON dot (M11) blinks for at most 5 s, the voice
-     note's waveform (M3) plays once. */
+     them finite but the simulator's "typing…" dots, shown only while a reply is on its way: the fibre
+     pulse (M10) runs twice and a PON dot (M11) blinks for at most 5 s. */
   --animate-fiber-pulse: fiber-pulse 2.4s ease-in-out 2 forwards;
   --animate-pon-blink: pon-blink 1s steps(2, jump-none) 5 forwards;
-  --animate-wave: wave 0.8s ease-in-out 4 alternate;
-  --animate-caret: caret 1s steps(2, jump-none) infinite;
   --animate-typing-dot: typing-dot 1.2s ease-in-out infinite;
 
   @keyframes fiber-pulse {
@@ -101,24 +96,6 @@
     }
     to {
       opacity: 1;
-    }
-  }
-
-  @keyframes wave {
-    from {
-      transform: scaleY(0.3);
-    }
-    to {
-      transform: scaleY(1);
-    }
-  }
-
-  @keyframes caret {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0;
     }
   }
 
@@ -162,18 +139,13 @@
 }
 
 /* Heights of the landing's visuals: a scene's visual never takes more than 70 % of a small screen's
-   height (docs/landing-spec.md §4.2), and the pinned phone of the desktop walkthrough fits the viewport. */
+   height (docs/landing-spec.md §4.2), and the pinned visual of the desktop walkthrough fits the viewport. */
 @utility max-h-scene {
   max-height: 70svh;
 }
 
 @utility h-phone {
   height: min(70vh, 40rem);
-}
-
-/* Two phones side by side in the pinned column of the desktop walkthrough (55 % of the page). */
-@utility h-phone-pair {
-  height: min(60vh, 32rem, calc((55vw - 4rem) * 1.05));
 }
 
 /* Each scene of the desktop walkthrough gets more than a screen of scroll to be read comfortably. */
@@ -185,12 +157,7 @@
   height: min(72vh, 38rem);
 }
 
-/* Widths of a still phone frame that grows with its conversation: the width the same frame has while it
-   plays (its height times 9/19), so the text wraps the same and never shrinks. */
-@utility w-phone {
-  width: calc(min(70vh, 40rem) * 9 / 19);
-}
-
+/* Width of the hero's captured phone: its height times 9/19. */
 @utility w-hero-phone {
   width: calc(min(72vh, 38rem) * 9 / 19);
 }

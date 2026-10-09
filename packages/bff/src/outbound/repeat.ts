@@ -3,9 +3,11 @@
 // same template with the same parameters) would write the installer twice. The second request is
 // answered from the first message, as a redelivered event is (`replayOf`), and nothing goes out
 // again. Same turn, same channel, same recipient and the same content key; another text, another
-// turn or another template goes out normally.
+// turn or another template goes out normally. A deferred send that fires keeps its turn and is never
+// answered from its own `DEFERRED` message.
 import { sha256Hex } from "../lib/crypto";
 import type { Message } from "../domain/conversations";
+import { FIRED_SUFFIX } from "./defer";
 import type { WhatsAppSendRequest } from "./types";
 
 /** `refs` field of an outbound message that keeps its content key. */
@@ -35,6 +37,7 @@ export function repeatedInTurn(request: WhatsAppSendRequest, history: readonly M
       message.channel === "WHATSAPP" &&
       message.personId === request.personId &&
       message.turnId === request.turnId &&
+      `${message.messageId}${FIRED_SUFFIX}` !== request.messageId &&
       REPLAYABLE.has(message.status) &&
       message.refs?.[CONTENT_KEY_REF] === key,
   );

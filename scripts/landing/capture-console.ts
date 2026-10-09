@@ -35,6 +35,7 @@ import {
   CapturesFile,
   DEVICE_SCALE,
   type FrameRules,
+  type FramedVisual,
   VIEWPORT_SIZE,
   capturedEntry,
   formatJson,
@@ -50,8 +51,8 @@ import {
 import { type ConsoleWorld, TEST_POOL, createConsoleWorld } from "./console-world";
 import { startConsoleServer } from "./console-server";
 import { encodeVariant, pixelsOf } from "./encode";
-import { renderVisual } from "./render-visuals";
-import { COGNITO_ORIGIN, SCENES, answerCognito, plantSession } from "./scenes";
+import { composeCard, renderVisual } from "./render-visuals";
+import { COGNITO_ORIGIN, SCENES, answerCognito, framed, plantSession, stageConsole } from "./scenes";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const WEB = join(ROOT, "packages/web");
@@ -154,24 +155,38 @@ async function takePicture(browser: Browser, origin: string, world: ConsoleWorld
     const scene = SCENES[id];
     if (!scene) throw new Error(`${id}: no scene in scenes.ts`);
     await plantSession(page, world);
+    const route = await world.route(spec.route);
     const fresh = (): ApiAnswers => ({ failures: [], busy: false, cobrand: false, reads: [] });
     let answers = fresh();
     page.on("response", (response) => watchAnswer(origin, response, answers));
     // The world is quiet when no answer of the scene was WORLD_BUSY; a busy world gets another try.
     for (let attempt = 1; ; attempt += 1) {
-      await page.goto(`${origin}${spec.route}?lang=${spec.locale}`);
-      await scene.stage({ page, world });
+      await page.goto(`${origin}${route}?lang=${spec.locale}`);
+      await scene.stage({ page, world, spec });
       await Promise.all(answers.reads);
       if (!answers.busy) break;
       if (attempt === QUIET_ATTEMPTS) throw new Error(`${id} ${viewport}: the world stayed busy`);
       answers = fresh();
       await page.waitForTimeout(QUIET_WAIT_MS);
     }
-    const problems = [...frameProblems(await page.locator("body").innerText(), rules), ...answers.failures];
-    if (escaped.size > 0) problems.push(`requests left localhost for ${[...escaped].join(", ")}`);
-    if (answers.cobrand) problems.push("the brand was not the neutral one");
-    if (problems.length > 0) throw new Error(`${id} ${viewport}: ${problems.join("; ")}`);
-    return await renderVisual(browser, page, spec.visual, CSS_FILE);
+    const check = async (): Promise<void> => {
+      const problems = [...frameProblems(await page.locator("body").innerText(), rules), ...answers.failures];
+      if (escaped.size > 0) problems.push(`requests left localhost for ${[...escaped].join(", ")}`);
+      if (answers.cobrand) problems.push("the brand was not the neutral one");
+      if (problems.length > 0) throw new Error(`${id} ${viewport}: ${problems.join("; ")}`);
+    };
+    await check();
+    const visual = framed(spec.visual, spec.scene?.as ?? null);
+    if (spec.beside === undefined) return await renderVisual(browser, page, visual, CSS_FILE);
+    // A pair: both views as they are on screen, then one card with the two side by side.
+    const raw = (shot: FramedVisual): FramedVisual => (shot.kind === "card" ? { ...shot, kind: "crop" } : shot);
+    const first = await renderVisual(browser, page, raw(visual), CSS_FILE);
+    await page.goto(`${origin}${await world.route(spec.beside.route)}?lang=${spec.locale}`);
+    await stageConsole(page, spec.beside.as);
+    await Promise.all(answers.reads);
+    await check();
+    const second = await renderVisual(browser, page, raw(framed(spec.beside.visual, spec.beside.as)), CSS_FILE);
+    return await composeCard(browser, [first, second], CSS_FILE);
   } finally {
     await context.close();
   }
@@ -205,9 +220,9 @@ async function main(): Promise<void> {
   const server = await startConsoleServer({
     webDir: WEB,
     pool: TEST_POOL,
-    deps: () => {
+    handler: () => {
       if (!world) throw new Error("no capture world yet");
-      return world.deps;
+      return world.handle;
     },
   });
   const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome", args: DETERMINISTIC_CHROME });
@@ -217,8 +232,10 @@ async function main(): Promise<void> {
   try {
     for (const [id, spec] of wanted) {
       for (const viewport of spec.viewports.filter((candidate) => !opts.viewports || opts.viewports.includes(candidate))) {
-        world = await createConsoleWorld(spec.world);
-        const png = await takePicture(browser, server.origin, world, id, spec, viewport, frameRules(world, opts.out === undefined));
+        world = await createConsoleWorld(spec, server.origin);
+        const png = await takePicture(browser, server.origin, world, id, spec, viewport, frameRules(world, opts.out === undefined)).catch((error: unknown) => {
+          throw new Error(`${id} ${viewport}: ${error instanceof Error ? error.message : String(error)}`);
+        });
         const pixels = await pixelsOf(png);
         const variants = variantsOf(id, viewport, pixels);
         const key = pictureKey(id, viewport);

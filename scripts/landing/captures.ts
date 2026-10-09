@@ -37,23 +37,59 @@ const PublicFile = z.string().regex(/^\/landing\/captures\/[a-z0-9._-]+\.(?:avif
 const Procedure = z.string().regex(/^[a-z][A-Za-z]*(?:\.[a-z][A-Za-z]*)+$/);
 
 /** The state of the world a capture opens on (scripts/landing/console-world.ts). */
-export const WorldState = z.enum(["visitor", "guest-ready"]);
+export const WorldState = z.enum(["visitor", "guest-ready", "guest-scene"]);
 export type WorldState = z.infer<typeof WorldState>;
+
+/** People of the main story, by the id the `guest` template clones (story/types.ts `StoryPerson`). */
+export const StoryPersonId = z.enum(["inst-rogelio", "sup-adriana", "sup-hector", "zc-marisol"]);
+export type StoryPersonId = z.infer<typeof StoryPersonId>;
+
+/**
+ * The moment of the main story a `guest-scene` capture shows: the world loaded in a scene of the `guest`
+ * template ("Saltar a escena", WP-39), its conversations holding the story up to one entry
+ * (story/main-story.ts; `null` adds nothing to what the scene seeds), and the person whose phone the
+ * simulator shows (`null` off the simulator).
+ */
+export const SceneSetup = z
+  .object({
+    jump: Slug,
+    through: Slug.nullable(),
+    as: StoryPersonId.nullable(),
+  })
+  .strict();
+export type SceneSetup = z.infer<typeof SceneSetup>;
+
+/** A route of the console, with `{order:24817}` or `{case:24818}` for the ids of the capture world. */
+const CaptureRoute = z.string().regex(/^\/(?:[A-Za-z0-9/._-]|\{(?:order|case):\d{5}\})*$/);
 
 /**
  * How the screenshot becomes the picture (scripts/landing/render-visuals.ts): the whole viewport, the
- * box of one element, or that box set on a card of the landing's theme.
+ * box of one element, or that box set on a card of the landing's theme; `phone` is the simulator's
+ * phone of the scene's person, cropped with its own frame.
  */
 export const Visual = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("full") }).strict(),
+  z.object({ kind: z.literal("phone") }).strict(),
   z.object({ kind: z.enum(["crop", "card"]), selector: z.string().min(1), margin: z.int().min(0).max(64).default(24) }).strict(),
 ]);
 export type Visual = z.infer<typeof Visual>;
 
+/** A visual whose element is known: the simulator's phone is turned into the crop of its own frame first (scenes.ts `framed`). */
+export type FramedVisual = Exclude<Visual, { kind: "phone" }>;
+
+/** A second view of the same moment drawn beside the first one (a phone and the console's view of it). */
+export const BesideShot = z.object({ route: CaptureRoute, as: StoryPersonId.nullable(), visual: Visual }).strict();
+export type BesideShot = z.infer<typeof BesideShot>;
+
 export const CaptureSpec = z
   .object({
-    route: z.string().regex(/^\/[A-Za-z0-9/._-]*$/),
+    route: CaptureRoute,
     world: WorldState,
+    scene: SceneSetup.optional(),
+    /** A button of the view a person presses before the frame (a tab of the metrics), by its visible name. */
+    press: z.string().trim().min(1).optional(),
+    /** A second view of the same world beside the first one, on one card. */
+    beside: BesideShot.optional(),
     locale: z.enum(["es-MX", "en"]),
     viewports: z.array(CaptureViewport).min(1),
     visual: Visual,
@@ -64,7 +100,11 @@ export const CaptureSpec = z
     moment: z.string().trim().min(1),
   })
   .strict()
-  .refine((spec) => spec.manifest === null || spec.viewports.includes(spec.manifest.viewport), { message: "the manifest viewport is not one of the capture's viewports" });
+  .refine((spec) => spec.manifest === null || spec.viewports.includes(spec.manifest.viewport), { message: "the manifest viewport is not one of the capture's viewports" })
+  .refine((spec) => (spec.world === "guest-scene") === (spec.scene !== undefined), { message: "a guest-scene capture, and only it, names its scene" })
+  .refine((spec) => spec.world === "guest-scene" || !/\{/.test(spec.route), { message: "only a guest-scene capture names ids of its world in the route" })
+  .refine((spec) => spec.world === "guest-scene" || (spec.visual.kind !== "phone" && spec.beside === undefined), { message: "only a guest-scene capture shows a phone or a view beside another" })
+  .refine((spec) => spec.visual.kind !== "phone" || (spec.scene?.as ?? null) !== null, { message: "a phone capture names whose phone it is (scene.as)" });
 export type CaptureSpec = z.infer<typeof CaptureSpec>;
 
 /** One picture of the ledger: its pixels and every file written from them. */

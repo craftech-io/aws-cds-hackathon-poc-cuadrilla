@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { openCase } from "../connector/testing";
+import { candidateIdOf } from "../evidence/candidate";
 import { CLOCK, ISP, ROGELIO, TURN_AT_SIM, WO, type WorkerKit, inboundEvent, inboundMessage, seedWorld, workerKit } from "./testing";
 
 let kit: WorkerKit;
@@ -83,7 +84,7 @@ describe("worker: INBOUND_MESSAGE", () => {
     const message = await inboundMessage(kit, { content: "IMAGE", text: "la roseta", media: { kind: "IMAGE", s3Key: "sim/abc-e3/up-2", mime: "image/jpeg", bytes: 512_000 } });
     await kit.run(inboundEvent(message));
     const envelope = kit.rec.harness[0]?.envelope ?? "";
-    expect(envelope).toContain(`<attachment kind="IMAGE" candidateId="${message.messageId}" bytes="512000"/>`);
+    expect(envelope).toContain(`<attachment kind="IMAGE" candidateId="${candidateIdOf(message.messageId)}" bytes="512000"/>`);
     expect(envelope).toMatch(/kind="IMAGE_CAPTION" truncated="false">la roseta</);
     expect(envelope).not.toContain("s3Key");
   });

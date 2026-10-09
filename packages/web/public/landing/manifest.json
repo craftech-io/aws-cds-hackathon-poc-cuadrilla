@@ -3,11 +3,19 @@
   "video": null,
   "media": {
     "hero-loop": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "Un teléfono con WhatsApp: la nota de voz del instalador, la respuesta que cita el manual, una foto rechazada con 🔁, la siguiente aceptada con ✅ y el acta en PDF.",
         "en": "A phone with WhatsApp: the installer's voice note, the reply citing the manual, a photo rejected with 🔁, the next one accepted with ✅ and the certificate as a PDF."
       },
+      "file": "/landing/captures/hero-loop-1440x900-468w.webp",
+      "width": 468,
+      "height": 731,
+      "sources": [
+        { "type": "image/avif", "srcset": "/landing/captures/hero-loop-1440x900-468w.avif 468w, /landing/captures/hero-loop-1440x900-936w.avif 936w" },
+        { "type": "image/webp", "srcset": "/landing/captures/hero-loop-1440x900-468w.webp 468w, /landing/captures/hero-loop-1440x900-936w.webp 936w" }
+      ],
+      "sha256": "11c026c958c5e19ac48505a7021015fad343b9a021bd8ec58a3834efd208b507",
       "replacement": {
         "routes": ["/app/simulator"],
         "viewports": ["1440x900", "390x844"],
@@ -16,27 +24,63 @@
       }
     },
     "s1-voice-diagnosis": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "El teléfono de Rogelio: su nota de voz sobre la luz PON y la respuesta que cita el manual, sección DIAG-02, como texto.",
         "en": "Rogelio's phone: his voice note about the PON light and the reply citing the manual, section DIAG-02, as plain text."
       },
+      "file": "/landing/captures/s1-voice-diagnosis-1440x900-468w.webp",
+      "width": 468,
+      "height": 687,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/s1-voice-diagnosis-1440x900-468w.avif 468w, /landing/captures/s1-voice-diagnosis-1440x900-936w.avif 936w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/s1-voice-diagnosis-1440x900-468w.webp 468w, /landing/captures/s1-voice-diagnosis-1440x900-936w.webp 936w"
+        }
+      ],
+      "sha256": "340b4f85c9801c2603cbc6ca10c83dd92c3eb529ac129dd94caa23bba342e669",
       "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"En sitio 09:20\"", "by": "WP-44" }
     },
     "s2-policy-cite": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "Una pregunta de política respondida con la sección COM-04 citada, y otra que el manual no cubre, con la oferta de consultar a la supervisora.",
         "en": "A policy question answered citing section COM-04, and another the manual doesn't cover, with the offer to check with the supervisor."
       },
+      "file": "/landing/captures/s2-policy-cite-1440x900-468w.webp",
+      "width": 468,
+      "height": 687,
+      "sources": [
+        { "type": "image/avif", "srcset": "/landing/captures/s2-policy-cite-1440x900-468w.avif 468w, /landing/captures/s2-policy-cite-1440x900-936w.avif 936w" },
+        { "type": "image/webp", "srcset": "/landing/captures/s2-policy-cite-1440x900-468w.webp 468w, /landing/captures/s2-policy-cite-1440x900-936w.webp 936w" }
+      ],
+      "sha256": "cdcf41d8e1804f64255be2a9d2828aeb3351e0bc218c9e772d55f74e8a1e1fa3",
       "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"Pregunta de política\"", "by": "WP-44" }
     },
     "s3-photo-reject": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "La foto de la etiqueta con reflejo recibe la reacción 🔁 y un mensaje con el motivo; al lado, la revisión de evidencia de la consola.",
         "en": "The label photo with glare gets the 🔁 reaction and a message with the reason; next to it, the console's evidence review."
       },
+      "file": "/landing/captures/s3-photo-reject-1440x900-2062w.webp",
+      "width": 2062,
+      "height": 1030,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/s3-photo-reject-1440x900-2062w.avif 2062w, /landing/captures/s3-photo-reject-1440x900-4124w.avif 4124w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/s3-photo-reject-1440x900-2062w.webp 2062w, /landing/captures/s3-photo-reject-1440x900-4124w.webp 4124w"
+        }
+      ],
+      "sha256": "5a0dc578764caba469a1f08a177d9a7c3dd76148a2e6ab2ce67d23be32ec31fc",
       "replacement": {
         "routes": ["/app/simulator", "/app/evidence"],
         "viewports": ["1440x900", "390x844"],
@@ -45,16 +89,38 @@
       }
     },
     "s3-photo-pass": {
-      "status": "render",
+      "status": "capture",
       "alt": { "es": "La segunda foto de la etiqueta, aceptada con ✅.", "en": "The second label photo, accepted with ✅." },
+      "file": "/landing/captures/s3-photo-pass-1440x900-468w.webp",
+      "width": 468,
+      "height": 687,
+      "sources": [
+        { "type": "image/avif", "srcset": "/landing/captures/s3-photo-pass-1440x900-468w.avif 468w, /landing/captures/s3-photo-pass-1440x900-936w.avif 936w" },
+        { "type": "image/webp", "srcset": "/landing/captures/s3-photo-pass-1440x900-468w.webp 468w, /landing/captures/s3-photo-pass-1440x900-936w.webp 936w" }
+      ],
+      "sha256": "a312f44cd11e3f21b125226199f665ef736472c144216ebc0bfaad85212cfb70",
       "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Escena \"Evidencia\", segundo envío", "by": "WP-44" }
     },
     "s4-checklist-complete": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "El checklist de la orden 24817 completo, cinco de cinco validados, sin botón de cierre en la consola.",
         "en": "The checklist of order 24817 complete, five of five validated, with no close button in the console."
       },
+      "file": "/landing/captures/s4-checklist-complete-1440x900-1234w.webp",
+      "width": 1234,
+      "height": 580,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/s4-checklist-complete-1440x900-1234w.avif 1234w, /landing/captures/s4-checklist-complete-1440x900-2468w.avif 2468w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/s4-checklist-complete-1440x900-1234w.webp 1234w, /landing/captures/s4-checklist-complete-1440x900-2468w.webp 2468w"
+        }
+      ],
+      "sha256": "e85c62a443ad1638544bc6e1141690d3cafa8aca796e6f0116c1cf8eb10505df",
       "replacement": {
         "routes": ["/app/orders/:workOrderId"],
         "viewports": ["1440x900", "390x844"],
@@ -63,27 +129,63 @@
       }
     },
     "s4-certificate-pdf": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "Rogelio toca Cerrar instalación y recibe el acta en PDF por WhatsApp.",
         "en": "Rogelio taps Close installation and gets the certificate as a PDF on WhatsApp."
       },
+      "file": "/landing/captures/s4-certificate-pdf-1440x900-468w.webp",
+      "width": 468,
+      "height": 731,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/s4-certificate-pdf-1440x900-468w.avif 468w, /landing/captures/s4-certificate-pdf-1440x900-936w.avif 936w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/s4-certificate-pdf-1440x900-468w.webp 468w, /landing/captures/s4-certificate-pdf-1440x900-936w.webp 936w"
+        }
+      ],
+      "sha256": "11c026c958c5e19ac48505a7021015fad343b9a021bd8ec58a3834efd208b507",
       "replacement": { "routes": ["/app/simulator"], "viewports": ["1440x900", "390x844"], "worldState": "Después de \"Cerrar instalación\"", "by": "WP-44" }
     },
     "s4-outbox": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "El buzón de salida con los dos emails del acta, al cliente y a operaciones, entregados.",
         "en": "The outbox with the certificate's two emails, to the customer and to operations, delivered."
       },
+      "file": "/landing/captures/s4-outbox-1440x900-1440w.webp",
+      "width": 1440,
+      "height": 900,
+      "sources": [
+        { "type": "image/avif", "srcset": "/landing/captures/s4-outbox-1440x900-1440w.avif 1440w, /landing/captures/s4-outbox-1440x900-2880w.avif 2880w" },
+        { "type": "image/webp", "srcset": "/landing/captures/s4-outbox-1440x900-1440w.webp 1440w, /landing/captures/s4-outbox-1440x900-2880w.webp 2880w" }
+      ],
+      "sha256": "fe538e68d9b3a560043708e40a4df7c7c1d8c1fc4179e0f3cd19e047cfe1516f",
       "replacement": { "routes": ["/app/outbox"], "viewports": ["1440x900", "390x844"], "worldState": "Después del cierre", "by": "WP-44" }
     },
     "s5-escalation-template": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "El teléfono de Adriana con la plantilla del caso escalado y los botones Tomar caso y No puedo.",
         "en": "Adriana's phone with the escalated-case template and the Take case and Can't buttons."
       },
+      "file": "/landing/captures/s5-escalation-template-1440x900-468w.webp",
+      "width": 468,
+      "height": 731,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/s5-escalation-template-1440x900-468w.avif 468w, /landing/captures/s5-escalation-template-1440x900-936w.avif 936w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/s5-escalation-template-1440x900-468w.webp 468w, /landing/captures/s5-escalation-template-1440x900-936w.webp 936w"
+        }
+      ],
+      "sha256": "ea13b897934b763ebe24a72785e35f95e83c49a0dee596ba4fca3a445e6e0b2f",
       "replacement": {
         "routes": ["/app/simulator"],
         "viewports": ["1440x900", "390x844"],
@@ -92,11 +194,25 @@
       }
     },
     "s5-escalation-take": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "Héctor toma el caso, recibe el resumen y su instrucción le llega a Rogelio con su nombre delante.",
         "en": "Héctor takes the case, gets the summary, and his instruction reaches Rogelio with his name in front."
       },
+      "file": "/landing/captures/s5-escalation-take-1440x900-1090w.webp",
+      "width": 1090,
+      "height": 861,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/s5-escalation-take-1440x900-1090w.avif 1090w, /landing/captures/s5-escalation-take-1440x900-2180w.avif 2180w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/s5-escalation-take-1440x900-1090w.webp 1090w, /landing/captures/s5-escalation-take-1440x900-2180w.webp 2180w"
+        }
+      ],
+      "sha256": "bd978911b520799e46f4ce91b4cfc4bc49a94fd4ba3184cfca048e7dab74398d",
       "replacement": {
         "routes": ["/app/cases/:caseId", "/app/simulator"],
         "viewports": ["1440x900", "390x844"],
@@ -105,11 +221,25 @@
       }
     },
     "s6-safety-hazard": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "Rogelio reporta un cable chispeando y recibe al instante la instrucción de seguridad fija del manual.",
         "en": "Rogelio reports a sparking cable and instantly gets the manual's fixed safety instruction."
       },
+      "file": "/landing/captures/s6-safety-hazard-1440x900-468w.webp",
+      "width": 468,
+      "height": 687,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/s6-safety-hazard-1440x900-468w.avif 468w, /landing/captures/s6-safety-hazard-1440x900-936w.avif 936w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/s6-safety-hazard-1440x900-468w.webp 468w, /landing/captures/s6-safety-hazard-1440x900-936w.webp 936w"
+        }
+      ],
+      "sha256": "8b0e47dafdd33ff3e787a43534bf9b6cf8a989dd4c10c60f5e13f9d6c6b50b7b",
       "replacement": {
         "routes": ["/app/simulator"],
         "viewports": ["1440x900", "390x844"],
@@ -118,11 +248,25 @@
       }
     },
     "s6-safety-alerts": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "La alerta de seguridad en el teléfono de Adriana y el email a la jefa de zona en el buzón de salida, segundos después del reporte.",
         "en": "The safety alert on Adriana's phone and the email to the zone lead in the outbox, seconds after the report."
       },
+      "file": "/landing/captures/s6-safety-alerts-1440x900-2062w.webp",
+      "width": 2062,
+      "height": 1030,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/s6-safety-alerts-1440x900-2062w.avif 2062w, /landing/captures/s6-safety-alerts-1440x900-4124w.avif 4124w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/s6-safety-alerts-1440x900-2062w.webp 2062w, /landing/captures/s6-safety-alerts-1440x900-4124w.webp 4124w"
+        }
+      ],
+      "sha256": "ed9dfac6a18f1733128730de4bea87c7fdfcf13a647967175afe3c629f5aaf4a",
       "replacement": {
         "routes": ["/app/simulator", "/app/outbox"],
         "viewports": ["1440x900", "390x844"],
@@ -131,48 +275,132 @@
       }
     },
     "gallery-orders": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "Las órdenes del día en la consola, con su instalador, su cliente y su estado.",
         "en": "The day's work orders in the console, with their installer, customer and status."
       },
+      "file": "/landing/captures/gallery-orders-1440x900-1440w.webp",
+      "width": 1440,
+      "height": 900,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/gallery-orders-1440x900-1440w.avif 1440w, /landing/captures/gallery-orders-1440x900-2880w.avif 2880w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/gallery-orders-1440x900-1440w.webp 1440w, /landing/captures/gallery-orders-1440x900-2880w.webp 2880w"
+        }
+      ],
+      "sha256": "933d7f61512a3c305a5117e79b2053992fe556ab549ef475d769bd1ff6a91326",
       "replacement": { "routes": ["/app/orders"], "viewports": ["1440x900", "390x844"], "worldState": "Mundo de la plantilla, fin del día", "by": "WP-44" }
     },
     "gallery-order-detail": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "La línea de tiempo de la orden 24817: mensajes, la transcripción de la nota de voz, las fotos con su veredicto y el acta.",
         "en": "The timeline of order 24817: messages, the voice note's transcription, the photos with their verdict and the certificate."
       },
+      "file": "/landing/captures/gallery-order-detail-1440x900-1234w.webp",
+      "width": 1234,
+      "height": 2812,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/gallery-order-detail-1440x900-1234w.avif 1234w, /landing/captures/gallery-order-detail-1440x900-2468w.avif 2468w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/gallery-order-detail-1440x900-1234w.webp 1234w, /landing/captures/gallery-order-detail-1440x900-2468w.webp 2468w"
+        }
+      ],
+      "sha256": "e71ba8edef63939d177d7673f0e978f3e1fa9ced63cf20b93620a137e45564e3",
       "replacement": { "routes": ["/app/orders/:workOrderId"], "viewports": ["1440x900"], "worldState": "Orden 24817 cerrada", "by": "WP-44" }
     },
     "gallery-manual": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "El manual de la operadora abierto en la sección DIAG-02, la que cita la respuesta.",
         "en": "The operator's manual open at section DIAG-02, the one the reply cites."
       },
+      "file": "/landing/captures/gallery-manual-1440x900-1440w.webp",
+      "width": 1440,
+      "height": 900,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/gallery-manual-1440x900-1440w.avif 1440w, /landing/captures/gallery-manual-1440x900-2880w.avif 2880w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/gallery-manual-1440x900-1440w.webp 1440w, /landing/captures/gallery-manual-1440x900-2880w.webp 2880w"
+        }
+      ],
+      "sha256": "7effceae9ae2ffb0dcc8ae3fcda2c79c6645d6cd9688adc9e5378e5d47f3af80",
       "replacement": { "routes": ["/app/manual/:sectionId"], "viewports": ["1440x900"], "worldState": "Sección DIAG-02", "by": "WP-44" }
     },
     "gallery-metrics": {
-      "status": "render",
+      "status": "capture",
       "alt": { "es": "La vista de métricas de la consola, con las áreas que mide.", "en": "The console's metrics view, with the areas it measures." },
+      "file": "/landing/captures/gallery-metrics-1440x900-1440w.webp",
+      "width": 1440,
+      "height": 900,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/gallery-metrics-1440x900-1440w.avif 1440w, /landing/captures/gallery-metrics-1440x900-2880w.avif 2880w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/gallery-metrics-1440x900-1440w.webp 1440w, /landing/captures/gallery-metrics-1440x900-2880w.webp 2880w"
+        }
+      ],
+      "sha256": "be8c3a9319266c991358ab14fc3737727a68350f8bec2b01b602bac15d87c931",
       "replacement": { "routes": ["/app/metrics"], "viewports": ["1440x900"], "worldState": "Pestaña \"Medición del manual\" con N y meta", "by": "WP-44" }
     },
     "gallery-audit": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "La bitácora: cada mensaje que salió con las reglas de la política de contacto que lo permitieron.",
         "en": "The decision log: every message sent with the contact-policy rules that allowed it."
       },
+      "file": "/landing/captures/gallery-audit-1440x900-1440w.webp",
+      "width": 1440,
+      "height": 900,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/gallery-audit-1440x900-1440w.avif 1440w, /landing/captures/gallery-audit-1440x900-2880w.avif 2880w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/gallery-audit-1440x900-1440w.webp 1440w, /landing/captures/gallery-audit-1440x900-2880w.webp 2880w"
+        }
+      ],
+      "sha256": "db0e0be97afde309cb5591141f98b632c8a2902b44742b88284a896e565eb3b4",
       "replacement": { "routes": ["/app/audit"], "viewports": ["1440x900"], "worldState": "Fin del día de la historia", "by": "WP-44" }
     },
     "gallery-clock": {
-      "status": "render",
+      "status": "capture",
       "alt": {
         "es": "La barra de hora simulada del mundo, en pausa, con Avanzar al próximo evento.",
         "en": "The world's simulated-time bar, paused, with Advance to the next event."
       },
+      "file": "/landing/captures/gallery-clock-1440x900-1440w.webp",
+      "width": 1440,
+      "height": 900,
+      "sources": [
+        {
+          "type": "image/avif",
+          "srcset": "/landing/captures/gallery-clock-1440x900-1440w.avif 1440w, /landing/captures/gallery-clock-1440x900-2880w.avif 2880w"
+        },
+        {
+          "type": "image/webp",
+          "srcset": "/landing/captures/gallery-clock-1440x900-1440w.webp 1440w, /landing/captures/gallery-clock-1440x900-2880w.webp 2880w"
+        }
+      ],
+      "sha256": "17761c3aee2bf90c16d313c3f55bb84943be85cf91e295c94dbd1d988e0faf6f",
       "replacement": { "routes": ["/app/clock"], "viewports": ["1440x900"], "worldState": "Escena \"En sitio 09:20\"", "by": "WP-44" }
     },
     "signup-form": {

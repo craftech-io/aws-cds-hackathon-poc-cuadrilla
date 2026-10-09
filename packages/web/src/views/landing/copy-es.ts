@@ -1,7 +1,7 @@
 // Texts of the public landing in Mexican Spanish (tú), from docs/landing-spec.md §1, its only source.
-// The texts inside the phones and console crops of the renders are not here: they come from the main
-// story and from copy/ (renders/sources.ts). Nothing here names the operator: the brand line and the
-// synthetic-demo notice come from the stage's brand configuration at runtime (ADR-0018).
+// What the captures of the console show is not here: the product itself writes it. Nothing here names
+// the operator: the brand line and the synthetic-demo notice come from the stage's brand configuration
+// at runtime (ADR-0018).
 
 export type SceneKey = "S1" | "S2" | "S3" | "S4" | "S5" | "S6";
 
@@ -169,6 +169,13 @@ export const es = {
       { kind: "cap" as const, value: 60, prefix: "< ", suffix: " s", text: "desde un riesgo reportado hasta el aviso al jefe de zona", source: "objetivo de la alerta de seguridad" },
     ],
     pilot: "En un piloto mediríamos revisitas a 30 días y minutos por instalación contra tu línea de base.",
+  },
+  video: {
+    title: "Una instalación en tres minutos",
+    lead: "El instalador en WhatsApp, el supervisor que toma un caso y la consola de la operadora, en un solo recorrido.",
+    label: "Video de Cuadrilla: una instalación de principio a fin",
+    note: "El video se descarga solo cuando lo reproduces.",
+    fallback: "Descargar el video (MP4)",
   },
   integration: {
     title: "Cómo se integra",

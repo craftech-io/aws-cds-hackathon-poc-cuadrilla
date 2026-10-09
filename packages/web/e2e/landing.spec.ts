@@ -3,7 +3,10 @@
 // to action (with the language kept on the way to the signup and the login), no horizontal scroll from
 // 360 to 1440 px, the primary call to action on the first screen at 360×640, the walkthrough (pinned on
 // a desktop, stacked on a phone), the impact labelled as goals, the gallery with zoom and the focus back,
-// the language switch and the brand of the stage in the neutral and co-branding modes.
+// the language switch (never wider than a 360 px screen), the product video once it is delivered (and
+// nothing downloaded before play) and the brand of the stage in the neutral and co-branding modes.
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { type Page, expect, test } from "@playwright/test";
 import { enGloss } from "../../bff/src/copy/en-gloss";
 import { esMX } from "../../bff/src/copy/es-MX";
@@ -19,6 +22,8 @@ const COBRAND = {
   logos: { onLight: null, onDark: null },
   disclaimer: { es: "Demo sintética: el manual, las políticas y los datos son inventados.", en: "Synthetic demo: the manual, the policies and the data are made up." },
 };
+
+const MANIFEST_FILE = fileURLToPath(new URL("../public/landing/manifest.json", import.meta.url));
 
 const BLOCKS = ["#top", "#hero", "#problema", "#recorrido", "#actores", "#confianza", "#impacto", "#integracion", "#real", "#galeria", "#empezar", "#footer"];
 
@@ -96,6 +101,59 @@ test.describe("commercial landing", () => {
     expect((primary?.y ?? 0) + (primary?.height ?? 0)).toBeLessThanOrEqual(640);
   });
 
+  test("[FL-089] the language switch never overflows at 360 px, in Spanish and in English", async ({ page }) => {
+    await routeConsoleApi(page, { brand: COBRAND });
+    await page.setViewportSize({ width: 360, height: 640 });
+    for (const param of ["es-MX", "en"] as const) {
+      const lang = param === "en" ? "en" : "es";
+      await page.goto(`/?lang=${param}`);
+      await expect(page.locator("#hero h1")).toBeVisible();
+      await noHorizontalScroll(page);
+      const toggle = page.getByRole("banner").getByRole("button", { name: LANDING_COPY[lang].lang.short, exact: true });
+      await expect(toggle).toBeVisible();
+      // Every control of the header ends inside the screen.
+      const rightmost = await page.evaluate(() => Math.max(...[...document.querySelectorAll("header a, header button")].map((element) => element.getBoundingClientRect().right)));
+      expect(rightmost, "the header's controls end inside the screen").toBeLessThanOrEqual(360);
+      // After switching, the other label takes the same place without pushing the page wider.
+      await toggle.click();
+      await expect(page.locator("html")).toHaveAttribute("lang", LANDING_COPY[lang === "es" ? "en" : "es"].htmlLang);
+      await noHorizontalScroll(page);
+    }
+  });
+
+  test("[FL-089] the video section waits for the delivered video and then downloads nothing until play", async ({ page }) => {
+    const { copy } = context();
+    await open(page);
+    await expect(page.locator("#galeria figure").first()).toBeAttached();
+    await expect(page.locator("#video"), "no section while the manifest has no video").toHaveCount(0);
+
+    const manifest = JSON.parse(readFileSync(MANIFEST_FILE, "utf8")) as Record<string, unknown>;
+    const video = { src: "/landing/video/cuadrilla-demo.mp4", poster: "/landing/video/cuadrilla-demo-poster.webp" };
+    await page.route("**/landing/manifest.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...manifest, video }) }));
+    const asked: string[] = [];
+    await page.route("**/landing/video/**", (route) => {
+      asked.push(new URL(route.request().url()).pathname);
+      return route.fulfill({ status: 404, body: "" });
+    });
+    await open(page);
+    const section = page.locator("#video");
+    await expect(section.getByRole("heading", { level: 2, name: copy.video.title })).toBeVisible();
+    // It sits right before "how it fits in".
+    expect(await section.evaluate((element) => element.nextElementSibling?.id)).toBe("integracion");
+    const player = section.locator("video");
+    await expect(player).toHaveAttribute("controls", "");
+    await expect(player).toHaveAttribute("preload", "none");
+    await expect(player).toHaveAttribute("playsinline", "");
+    await expect(player).toHaveAttribute("poster", video.poster);
+    await expect(player).not.toHaveAttribute("autoplay", /.*/);
+    await expect(player.locator("source")).toHaveAttribute("src", video.src);
+    await expect(section.getByRole("link", { name: copy.video.fallback })).toHaveAttribute("href", video.src);
+    await section.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    expect(asked.filter((path) => path.endsWith(".mp4")), "no byte of the video before play").toEqual([]);
+    await noHorizontalScroll(page);
+  });
+
   test("[FL-089] the walkthrough shows the six scenes in order, pinned on a desktop and stacked on a phone", async ({ page }) => {
     const { copy, desktop } = context();
     await open(page);
@@ -118,8 +176,9 @@ test.describe("commercial landing", () => {
       const cards = page.locator("#recorrido li[aria-labelledby^='scene-']");
       await expect(cards).toHaveCount(6);
       const viewport = page.viewportSize()?.height ?? 844;
-      for (const phone of await page.locator("#recorrido .rounded-4xl").all()) {
-        const box = await phone.boundingBox();
+      await expect(page.locator("#recorrido [data-scene-captures] img").first()).toBeAttached();
+      for (const picture of await page.locator("#recorrido [data-scene-captures] img").all()) {
+        const box = await picture.boundingBox();
         expect(box?.height ?? 0).toBeLessThanOrEqual(viewport * 0.7 + 1);
       }
       const snap = await page.evaluate(() => getComputedStyle(document.documentElement).scrollSnapType);
@@ -215,7 +274,7 @@ test.describe("commercial landing", () => {
     else await expect(page.getByRole("banner")).toContainText(COBRAND.displayName);
   });
 
-  test("[FL-089] with reduced motion every block is visible at once and the hero shows its still poster", async ({ page }) => {
+  test("[FL-089] with reduced motion every block is visible at once and the hero shows its final frame", async ({ page }) => {
     const { reduced, copy } = context();
     test.skip(!reduced, "only with reduced motion");
     await open(page);
@@ -229,77 +288,25 @@ test.describe("commercial landing", () => {
     for (const item of copy.impact.items) await expect(page.locator("#impacto").getByText(`${item.prefix}${item.value}${item.suffix}`)).toBeVisible();
   });
 
-  test("[FL-089] with reduced motion every phone message reads at 12 px or more: a still frame scrolls or grows, it never shrinks the text", async ({ page }) => {
-    const { reduced } = context();
-    test.skip(!reduced, "only with reduced motion");
+  test("[FL-089] the walkthrough shows each scene as captures of the real console, described, inside the screen; the wheel over one scrolls the page", async ({ page }) => {
+    const { lang } = context();
+    const manifest = JSON.parse(readFileSync(MANIFEST_FILE, "utf8")) as { media: Record<string, { alt: Record<string, string> }> };
+    const alts = new Set(Object.values(manifest.media).map((item) => item.alt[lang]));
     await open(page);
     await page.locator("#recorrido").scrollIntoViewIfNeeded();
-    await expect(page.locator('#recorrido [data-phone-frame="still"]').first()).toBeVisible();
-    const sizes = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>('[data-phone-frame="still"] li')]
-        .filter((item) => item.getClientRects().length > 0 && (item.textContent ?? "").trim() !== "")
-        .map((item) => {
-          const list = item.closest("ol") as HTMLElement;
-          // The effective size: the computed font size times whatever scale a transform applies to the list.
-          const transform = getComputedStyle(list).transform;
-          const scale = transform === "none" ? 1 : new DOMMatrixReadOnly(transform).a;
-          const bubble = item.querySelector<HTMLElement>("span") ?? item;
-          return { text: (item.textContent ?? "").slice(0, 40), px: Number.parseFloat(getComputedStyle(bubble).fontSize) * scale };
-        }),
-    );
-    expect(sizes.length).toBeGreaterThan(10);
-    for (const size of sizes) expect(size.px, size.text).toBeGreaterThanOrEqual(12);
-    // A conversation longer than its stage scrolls inside the phone, reachable with the keyboard.
-    const scrollers = page.locator('#recorrido [data-phone-frame="still"] [role="region"]');
-    for (const region of await scrollers.all()) {
-      if (!(await region.isVisible())) continue;
-      await expect(region).toHaveAttribute("tabindex", "0");
-      expect(await region.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
-      // It opens on its last message, the final state the motion version ends on.
-      expect(await region.evaluate((element) => element.scrollTop + element.clientHeight >= element.scrollHeight - 2)).toBe(true);
+    const pictures = page.locator("#recorrido [data-scene-captures] img").filter({ visible: true });
+    await expect(pictures.first()).toBeVisible();
+    const width = page.viewportSize()?.width ?? 0;
+    for (const picture of await pictures.all()) {
+      expect(alts.has((await picture.getAttribute("alt")) ?? "")).toBe(true);
+      const box = await picture.boundingBox();
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width + 1);
     }
-  });
-
-  test("[FL-089] with reduced motion the wheel over a still phone keeps scrolling the page", async ({ page }) => {
-    const { reduced } = context();
-    test.skip(!reduced, "only with reduced motion");
-    await open(page);
-    await page.locator("#recorrido").scrollIntoViewIfNeeded();
-    const phones = page.locator('#recorrido [data-phone-frame="still"]').filter({ visible: true });
-    await expect(phones.first()).toBeVisible();
-    // A phone whose conversation fits never becomes a scroll container that could hold the page.
-    const trapped = await phones.evaluateAll(
-      (frames) =>
-        frames.filter((frame) => {
-          const viewport = frame.querySelector("ol")?.parentElement;
-          if (!viewport) return false;
-          const style = getComputedStyle(viewport);
-          const scrollable = style.overflowY === "auto" || style.overflowY === "scroll";
-          return style.overscrollBehaviorY !== "auto" || (scrollable && viewport.scrollHeight <= viewport.clientHeight + 1);
-        }).length,
-    );
-    expect(trapped).toBe(0);
-    // At 1024×768 the first scene's conversation overflows its phone: the wheel scrolls it, then the page.
-    const sizes = context().desktop ? [page.viewportSize(), { width: 1024, height: 768 }] : [page.viewportSize()];
-    for (const size of sizes) {
-      if (size !== null) await page.setViewportSize(size);
-      await page.locator("#recorrido").scrollIntoViewIfNeeded();
-      await phones.first().scrollIntoViewIfNeeded();
-      // The phone the pointer really lands on (the pinned column stacks every scene's phone).
-      const point = await phones.evaluateAll((frames) => {
-        for (const frame of frames) {
-          const rect = frame.getBoundingClientRect();
-          const x = rect.left + rect.width / 2;
-          const y = Math.min(rect.top + rect.height / 2, window.innerHeight - 20);
-          if (y > 0 && frame.contains(document.elementFromPoint(x, y))) return { x, y };
-        }
-        return null;
-      });
-      if (point === null) throw new Error("no still phone under the pointer");
-      await page.mouse.move(point.x, point.y);
-      const before = await page.evaluate(() => window.scrollY);
-      for (let tick = 0; tick < 6; tick += 1) await page.mouse.wheel(0, 150);
-      await expect.poll(() => page.evaluate(() => window.scrollY), `the page scrolls at ${size?.width ?? 0} px`).toBeGreaterThan(before + 300);
-    }
+    await pictures.first().scrollIntoViewIfNeeded();
+    const box = await pictures.first().boundingBox();
+    await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, Math.min((box?.y ?? 0) + (box?.height ?? 0) / 2, (page.viewportSize()?.height ?? 0) - 20));
+    const before = await page.evaluate(() => window.scrollY);
+    for (let tick = 0; tick < 6; tick += 1) await page.mouse.wheel(0, 150);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before + 300);
   });
 });

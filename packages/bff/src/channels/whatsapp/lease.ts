@@ -72,6 +72,10 @@ export interface BindLeaseInput {
   /** Normalized code from "ALTA <código>" (copy/keywords.ts). */
   readonly code: string;
   readonly phoneHash: string;
+  /** The sender's normalized E.164: the lease's live address. */
+  readonly phone?: string;
+  /** Meta's `timestamp` of the "ALTA" message: it opens the phone's 24-hour window. */
+  readonly lastInboundAtReal?: string;
 }
 
 async function denyConflict(deps: LeaseDeps, clockId: string | undefined, detail: string): Promise<BindOutcome> {
@@ -91,7 +95,10 @@ export async function bindPhoneLease(input: BindLeaseInput, deps: LeaseDeps): Pr
   if (existing !== undefined) return denyConflict(deps, existing.clockId, "PHONE_ALREADY_BOUND");
   let lease: PhoneLease;
   try {
-    lease = await deps.worlds.bindPhoneLease(input.code, input.phoneHash);
+    lease = await deps.worlds.bindPhoneLease(input.code, input.phoneHash, {
+      ...(input.phone === undefined ? {} : { phone: input.phone }),
+      ...(input.lastInboundAtReal === undefined ? {} : { lastInboundAtReal: input.lastInboundAtReal }),
+    });
   } catch (error) {
     if (!(error instanceof ConnectorError)) throw error;
     if (error.code === "NOT_FOUND" || /join code/.test(error.message)) return { ok: false, reason: "CODE_INVALID" };

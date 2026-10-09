@@ -1,6 +1,6 @@
 // Texts of the public landing in Mexican Spanish and English with a switch (docs/landing-spec.md §1 and
-// §8): both languages carry the same keys (landing.test.ts). The texts drawn inside the renders (the
-// phones and console crops) are never here: renders/sources.ts takes them from the main story and copy/.
+// §8): both languages carry the same keys (landing.test.ts). What the captures of the console show is
+// never here: the product writes it, and story.ts reads the main story for the scenes' captions.
 import { en } from "./copy-en";
 import { type LandingCopy, es } from "./copy-es";
 

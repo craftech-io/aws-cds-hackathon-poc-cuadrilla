@@ -25,6 +25,7 @@ import type { TableClient } from "../connector/table-client";
 import type { Person } from "../domain/people";
 import type { WorkOrder } from "../domain/work-orders";
 import type { NonceDeps } from "../channels/whatsapp/nonces";
+import { storedPayload } from "../channels/whatsapp/transport";
 import { sha256Hex, ulid } from "../lib/crypto";
 import { renderWhatsApp } from "../outbound/render/whatsapp";
 import { WhatsAppSendRequest } from "../outbound/types";
@@ -155,7 +156,8 @@ async function seedOffer(deps: PresetDeps, target: PresetTarget, offer: OfferPre
     transport: "simulated",
     providerMessageId: `wamid.SIM.${sha256Hex(`${order.clockId}/${messageId}`).slice(0, 32)}`,
     sentAtSim: target.atSim,
-    refs: { seeded: true, offer: offer.action },
+    // The Cloud API JSON a delivered send keeps (transport.ts `recordSent`): the simulator draws its buttons from it.
+    refs: { seeded: true, offer: offer.action, whatsapp: storedPayload(rendered.payload) },
     seeded: true,
   });
   const ids = Array.isArray(rendered.interactive?.buttons) ? (rendered.interactive.buttons as Array<{ id?: unknown }>).flatMap((button) => (typeof button.id === "string" ? [button.id] : [])) : [];

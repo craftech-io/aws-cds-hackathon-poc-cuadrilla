@@ -1,9 +1,9 @@
 // The motion of the landing (FL-089, docs/landing-spec.md §3 and §9.1, WCAG 2.2.2): the hero's product
-// loop plays, pauses with its visible control (and with hover, focus inside it, leaving the viewport and
-// a hidden tab), stops by itself after two rounds and rests on the final frame; with reduced motion it
-// is a still poster with its text alternative and no control. The voice note never shows its words.
-// The phone of the loop is never empty, and every scene of the walkthrough is complete by the time the
-// visitor has scrolled through it, whatever the dwell; the goals that count up land on their value.
+// loop over the captured frames of the installer's phone plays, pauses with its visible control (and with
+// hover, focus inside it, leaving the viewport and a hidden tab), stops by itself after two rounds and
+// rests on the final frame; with reduced motion it is the final frame with its text alternative and no
+// control. The voice note's words are only in that text alternative. Every scene of the walkthrough shows
+// its captures, loaded, by the time the visitor reaches it; the goals that count up land on their value.
 import { type Page, expect, test } from "@playwright/test";
 import { storyEntry } from "../../bff/src/story/main-story";
 import { LANDING_COPY } from "../src/views/landing/copy";
@@ -26,13 +26,15 @@ async function open(page: Page): Promise<void> {
 }
 
 const loop = (page: Page) => page.locator("#hero [data-playing]");
-/** Messages of the loop's phone already on screen. */
-const shownMessages = (page: Page) => page.locator("#hero ol > li:not([aria-hidden='true'])");
+/** The `src` of the frame of the loop on screen (the one at full opacity). */
+const shownFrame = (page: Page) => loop(page).locator("div.opacity-100 img").first().getAttribute("src");
+const FINAL_FRAME = /\/landing\/captures\/hero-loop-/;
 
 test.describe("hero loop", () => {
   test("[FL-089] plays, and its visible control pauses and plays it", async ({ page }) => {
     const { copy, reduced } = context();
     test.skip(reduced, "the loop only plays without reduced motion");
+    await page.clock.install();
     await open(page);
     await page.mouse.move(1, 1);
     await expect(loop(page)).toHaveAttribute("data-playing", "true");
@@ -44,9 +46,9 @@ test.describe("hero loop", () => {
     await page.mouse.move(1, 1);
     await page.getByRole("button", { name: copy.hero.loop.play }).blur();
     await expect(loop(page)).toHaveAttribute("data-playing", "false");
-    const before = await shownMessages(page).count();
-    await page.waitForTimeout(2_500);
-    expect(await shownMessages(page).count()).toBe(before);
+    const before = await shownFrame(page);
+    await page.clock.runFor(8_000);
+    expect(await shownFrame(page)).toBe(before);
     await page.getByRole("button", { name: copy.hero.loop.play }).click();
     await page.mouse.move(1, 1);
     await page.getByRole("button", { name: copy.hero.loop.pause }).blur();
@@ -78,8 +80,8 @@ test.describe("hero loop", () => {
     await expect(loop(page)).toHaveAttribute("data-playing", "false");
   });
 
-  test("[FL-089] stops by itself after two rounds and rests on the final frame, voice note without its words", async ({ page }) => {
-    const { copy, reduced } = context();
+  test("[FL-089] stops by itself after two rounds and rests on the final frame; the voice note's words are only its summary", async ({ page }) => {
+    const { copy, reduced, lang } = context();
     test.skip(reduced, "the loop only plays without reduced motion");
     await page.clock.install();
     await open(page);
@@ -88,38 +90,38 @@ test.describe("hero loop", () => {
     for (let step = 0; step < 16; step += 1) await page.clock.runFor(4_000);
     await expect(loop(page)).toHaveAttribute("data-still", "true");
     await expect(loop(page)).toHaveAttribute("data-playing", "false");
-    await expect(shownMessages(page)).toHaveCount(6);
+    expect(await shownFrame(page)).toMatch(FINAL_FRAME);
     await expect(page.getByRole("button", { name: copy.hero.loop.play })).toBeVisible();
-    const phoneText = await page.locator("#hero ol").innerText();
-    expect(phoneText).not.toContain(VOICE_NOTE.text);
+    await expect(page.locator("#hero p.sr-only")).toContainText(lang === "en" ? VOICE_NOTE.glossEn : VOICE_NOTE.text);
+    for (const alt of await loop(page).locator("img").evaluateAll((images) => images.map((image) => image.getAttribute("alt")))) expect(alt).toBe("");
   });
 
-  test("[FL-089] with reduced motion: a still poster of the final frame, its summary and no control", async ({ page }) => {
+  test("[FL-089] with reduced motion: the final frame, its summary and no control", async ({ page }) => {
     const { copy, reduced, lang } = context();
     test.skip(!reduced, "only with reduced motion");
     await open(page);
     await expect(loop(page)).toHaveAttribute("data-still", "true");
     await expect(loop(page)).toHaveAttribute("data-playing", "false");
-    await expect(shownMessages(page)).toHaveCount(6);
+    await expect(loop(page).locator("img")).toHaveCount(1);
+    expect(await shownFrame(page)).toMatch(FINAL_FRAME);
     await expect(page.getByRole("button", { name: copy.hero.loop.pause })).toHaveCount(0);
     await expect(page.getByRole("button", { name: copy.hero.loop.play })).toHaveCount(0);
-    const summary = page.locator("#hero p.sr-only");
-    await expect(summary).toContainText(lang === "en" ? VOICE_NOTE.glossEn : VOICE_NOTE.text);
-    expect(await page.locator("#hero ol").innerText()).not.toContain(VOICE_NOTE.text);
+    await expect(page.locator("#hero p.sr-only")).toContainText(lang === "en" ? VOICE_NOTE.glossEn : VOICE_NOTE.text);
   });
 });
 
 test.describe("the loop and the walkthrough never wait on the visitor", () => {
-  test("[FL-089] the hero's phone shows the voice note from the first paint, before the loop is in view or plays", async ({ page }) => {
+  test("[FL-089] the hero's first frame is requested at once, before the loop is in view or plays", async ({ page }) => {
     await routeConsoleApi(page, { brand: NEUTRAL_BRAND });
     await page.goto(`/?lang=${context().param}`);
     await expect(page.locator("#hero h1")).toBeVisible();
     // No scrolling, no waiting: on a phone the loop is still below the fold here.
-    expect(await shownMessages(page).count()).toBeGreaterThanOrEqual(1);
-    await expect(page.locator("#hero ol > li").first()).not.toHaveAttribute("aria-hidden", "true");
+    const first = loop(page).locator("img").first();
+    await expect(first).toHaveAttribute("loading", "eager");
+    await expect.poll(() => first.evaluate((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)).toBe(true);
   });
 
-  test("[FL-089] every scene is complete once scrolled into place, at once, fixed texts whole and nothing half typed", async ({ page }) => {
+  test("[FL-089] every scene shows its captures, loaded, once scrolled into place", async ({ page }) => {
     const { desktop } = context();
     await routeConsoleApi(page, { brand: NEUTRAL_BRAND });
     await page.goto(`/?lang=${context().param}`);
@@ -128,20 +130,13 @@ test.describe("the loop and the walkthrough never wait on the visitor", () => {
     await page.evaluate(() => document.documentElement.style.setProperty("scroll-behavior", "auto"));
     for (const scene of ["S1", "S2", "S3", "S4", "S5", "S6"]) {
       const visual = page.locator(`[role="group"][aria-labelledby="scene-${scene}"]`);
-      // Pinned, the scene's text in the middle of the screen; stacked, the scene's phones scrolled into sight.
       if (desktop) await page.locator(`#scene-${scene}`).scrollIntoViewIfNeeded();
       else await visual.evaluate((element) => element.scrollIntoView({ block: "end" }));
-      await page.waitForTimeout(150);
-      const frames = await visual.evaluate((element) =>
-        [...element.querySelectorAll("[data-phone-frame]")]
-          .filter((frame) => !frame.closest('[aria-hidden="true"]'))
-          .map((frame) => {
-            const items = [...frame.querySelectorAll("ol > li")];
-            return { shown: items.filter((item) => item.getAttribute("aria-hidden") !== "true").length, total: items.length, typing: frame.querySelectorAll(".animate-caret").length };
-          }),
-      );
-      expect(frames.length, scene).toBeGreaterThan(0);
-      for (const frame of frames) expect(frame, scene).toEqual({ shown: frame.total, total: frame.total, typing: 0 });
+      const images = visual.locator("[data-scene-captures] img");
+      await expect(images.first(), scene).toBeVisible();
+      await expect
+        .poll(() => images.evaluateAll((all) => all.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)), { message: scene })
+        .toBe(true);
     }
   });
 

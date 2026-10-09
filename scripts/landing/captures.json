@@ -1,5 +1,5 @@
 {
-  "_readme": "Captures of the product for the landing (docs/landing-spec.md §6.2), taken by scripts/landing/capture-console.ts from the real console and its BFF served on localhost over a synthetic world (scripts/landing/console-world.ts), always with the neutral brand. Each capture names its route, the state of its world, the language, the viewports, how the picture is framed, the manifest entry it replaces (if any), what it needs to exist in the tree first, and the moment it shows; the steps to reach that moment live in scripts/landing/scenes.ts. `images` is the ledger the pipeline writes: per capture and viewport, the hash of the picture's pixels and of every file written under packages/web/public, so a run that moves no pixel writes no file. Synthetic data only, no real person, never taken in CI, with credentials or against a deployed stage.",
+  "_readme": "Captures of the product for the landing (docs/landing-spec.md §6.2), taken by scripts/landing/capture-console.ts from the real console and its BFF served on localhost over a synthetic world (scripts/landing/console-world.ts), always with the neutral brand. Each capture names its route, the state of its world, the language, the viewports, how the picture is framed, the manifest entry it replaces (if any), what it needs to exist in the tree first, and the moment it shows; a `guest-scene` capture also names the scene of the guest template its world jumps to, the last entry of the main story its conversations hold (story-thread.ts, story-evidence.ts, story-mail.ts) and whose phone the simulator shows, and may press a button of the view or put a second view beside the first. The steps to reach each moment live in scripts/landing/scenes.ts. `images` is the ledger the pipeline writes: per capture and viewport, the hash of the picture's pixels and of every file written under packages/web/public, so a run that moves no pixel writes no file. Synthetic data only, no real person, never taken in CI, with credentials or against a deployed stage.",
   "captures": {
     "landing": {
       "route": "/",
@@ -40,9 +40,310 @@
       "manifest": null,
       "requires": { "views": ["guest-home"], "procedures": ["guest.world"] },
       "moment": "The guest's home once the signup world is READY: the seeded installer and operator, the expiry date and what can already be used"
+    },
+    "hero-loop": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "checklist-completo", "through": "s4-certificate", "as": "inst-rogelio" },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "hero-loop", "viewport": "1440x900" },
+      "requires": { "views": ["simulator"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene"] },
+      "moment": "Rogelio's phone after the certificate: the voice note, the cited reply, the rejected photo with its reason, the accepted ones and the PDF"
+    },
+    "s1-voice-diagnosis": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "paso-de-diagnostico", "through": "s1-diagnosis-reply", "as": "inst-rogelio" },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "s1-voice-diagnosis", "viewport": "1440x900" },
+      "requires": { "views": ["simulator"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene"] },
+      "moment": "Rogelio's phone at 09:21: his voice note about the PON light and the reply that cites DIAG-02"
+    },
+    "s2-policy-cite": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "onu-en-linea", "through": "s2-uncovered-reply", "as": "inst-rogelio" },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "s2-policy-cite", "viewport": "1440x900" },
+      "requires": { "views": ["simulator"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene"] },
+      "moment": "Rogelio's phone at 09:39: the policy answer citing COM-04 and the question the manual does not cover, with the offer to ask the supervisor"
+    },
+    "s3-photo-reject": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "evidencia", "through": "s3-glare-reason", "as": "inst-rogelio" },
+      "beside": { "route": "/app/evidence", "as": null, "visual": { "kind": "full" } },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "s3-photo-reject", "viewport": "1440x900" },
+      "requires": { "views": ["simulator", "evidence"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene", "evidence.queue"] },
+      "moment": "Rogelio's phone at 09:47: the label photo with glare, its 🔁 and the reason to take it again"
+    },
+    "s3-photo-pass": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "evidencia", "through": "s3-label-photo", "as": "inst-rogelio" },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "s3-photo-pass", "viewport": "1440x900" },
+      "requires": { "views": ["simulator"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene"] },
+      "moment": "Rogelio's phone at 09:48: the second label photo accepted with ✅"
+    },
+    "s4-checklist-complete": {
+      "route": "/app/orders/{order:24817}",
+      "world": "guest-scene",
+      "scene": { "jump": "checklist-completo", "through": "s3-close-offer", "as": null },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "card", "selector": "#orden-checklist", "margin": 0 },
+      "manifest": { "id": "s4-checklist-complete", "viewport": "1440x900" },
+      "requires": { "views": ["order-detail"], "procedures": ["orders.get", "orders.timeline", "clock.jumpToScene"] },
+      "moment": "Order 24817 at 10:00: the checklist five of five validated, and no close button in the console"
+    },
+    "s4-certificate-pdf": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "checklist-completo", "through": "s4-certificate", "as": "inst-rogelio" },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "s4-certificate-pdf", "viewport": "1440x900" },
+      "requires": { "views": ["simulator"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene"] },
+      "moment": "Rogelio's phone at 10:05: Cerrar instalación tapped and the certificate as a PDF"
+    },
+    "s4-outbox": {
+      "route": "/app/outbox",
+      "world": "guest-scene",
+      "scene": { "jump": "checklist-completo", "through": "s4-certificate", "as": null },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "full" },
+      "manifest": { "id": "s4-outbox", "viewport": "1440x900" },
+      "requires": { "views": ["outbox"], "procedures": ["outbox.list", "clock.jumpToScene"] },
+      "moment": "The outbox at 10:05: the certificate's two emails, to the customer and to operations, delivered"
+    },
+    "s5-escalation-template": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "caso-con-supervisora", "through": "s5-case-escalated", "as": "sup-adriana" },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "s5-escalation-template", "viewport": "1440x900" },
+      "requires": { "views": ["simulator"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene"] },
+      "moment": "Adriana's phone at 11:50: the caso_escalado template with Tomar caso and No puedo"
+    },
+    "s5-escalation-take": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "caso-con-respaldo", "through": "s5-hector-relay", "as": "sup-hector" },
+      "beside": { "route": "/app/simulator", "as": "inst-rogelio", "visual": { "kind": "phone" } },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "s5-escalation-take", "viewport": "1440x900" },
+      "requires": { "views": ["simulator"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene"] },
+      "moment": "Héctor's phone at 12:04 (the case reassigned, taken, the brief and his instruction) beside Rogelio's, where the instruction arrives with his name"
+    },
+    "s6-safety-hazard": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "tercera-visita-1510", "through": "s6-safety-case-opened", "as": "inst-rogelio" },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "s6-safety-hazard", "viewport": "1440x900" },
+      "requires": { "views": ["simulator"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene"] },
+      "moment": "Rogelio's phone at 15:10: the hazard he reports and the manual's fixed safety instruction at once"
+    },
+    "s6-safety-alerts": {
+      "route": "/app/simulator",
+      "world": "guest-scene",
+      "scene": { "jump": "tercera-visita-1510", "through": "s6-zone-chief-email", "as": "sup-adriana" },
+      "beside": { "route": "/app/outbox", "as": null, "visual": { "kind": "full" } },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "phone" },
+      "manifest": { "id": "s6-safety-alerts", "viewport": "1440x900" },
+      "requires": { "views": ["simulator", "outbox"], "procedures": ["simulator.identities", "simulator.thread", "clock.jumpToScene", "outbox.list"] },
+      "moment": "Adriana's phone with the safety alert beside the outbox with the zone chief's email, both at 15:10"
+    },
+    "gallery-orders": {
+      "route": "/app/orders",
+      "world": "guest-scene",
+      "scene": { "jump": "tercera-visita-1510", "through": "s6-zone-chief-email", "as": null },
+      "locale": "es-MX",
+      "viewports": ["1440x900", "390x844"],
+      "visual": { "kind": "full" },
+      "manifest": { "id": "gallery-orders", "viewport": "1440x900" },
+      "requires": { "views": ["orders"], "procedures": ["orders.list", "clock.jumpToScene"] },
+      "moment": "The day's work orders at 15:10, with their installer, customer and status"
+    },
+    "gallery-order-detail": {
+      "route": "/app/orders/{order:24817}",
+      "world": "guest-scene",
+      "scene": { "jump": "checklist-completo", "through": "s4-certificate", "as": null },
+      "locale": "es-MX",
+      "viewports": ["1440x900"],
+      "visual": { "kind": "card", "selector": "#orden-linea-de-tiempo", "margin": 0 },
+      "manifest": { "id": "gallery-order-detail", "viewport": "1440x900" },
+      "requires": { "views": ["order-detail"], "procedures": ["orders.get", "orders.timeline", "clock.jumpToScene"] },
+      "moment": "The timeline of order 24817 once closed: messages, the voice note's transcription, the photos with their verdict and the certificate"
+    },
+    "gallery-manual": {
+      "route": "/app/manual/DIAG-02",
+      "world": "guest-scene",
+      "scene": { "jump": "en-sitio-0920", "through": null, "as": null },
+      "locale": "es-MX",
+      "viewports": ["1440x900"],
+      "visual": { "kind": "full" },
+      "manifest": { "id": "gallery-manual", "viewport": "1440x900" },
+      "requires": { "views": ["manual"], "procedures": ["manual.section", "clock.jumpToScene"] },
+      "moment": "The manual open at section DIAG-02"
+    },
+    "gallery-metrics": {
+      "route": "/app/metrics",
+      "world": "guest-scene",
+      "scene": { "jump": "tercera-visita-1510", "through": null, "as": null },
+      "press": "Medición del manual",
+      "locale": "es-MX",
+      "viewports": ["1440x900"],
+      "visual": { "kind": "full" },
+      "manifest": { "id": "gallery-metrics", "viewport": "1440x900" },
+      "requires": { "views": ["metrics"], "procedures": ["metrics.summary", "clock.jumpToScene"] },
+      "moment": "The metrics view on its tab Medición del manual, with N and the goal of each figure"
+    },
+    "gallery-audit": {
+      "route": "/app/audit",
+      "world": "guest-scene",
+      "scene": { "jump": "tercera-visita-1510", "through": "s6-zone-chief-email", "as": null },
+      "locale": "es-MX",
+      "viewports": ["1440x900"],
+      "visual": { "kind": "full" },
+      "manifest": { "id": "gallery-audit", "viewport": "1440x900" },
+      "requires": { "views": ["audit"], "procedures": ["audit.list", "clock.jumpToScene"] },
+      "moment": "The decision log at the end of the story: every message sent with the rules that allowed it"
+    },
+    "gallery-clock": {
+      "route": "/app/clock",
+      "world": "guest-scene",
+      "scene": { "jump": "en-sitio-0920", "through": null, "as": null },
+      "locale": "es-MX",
+      "viewports": ["1440x900"],
+      "visual": { "kind": "full" },
+      "manifest": { "id": "gallery-clock", "viewport": "1440x900" },
+      "requires": { "views": ["clock"], "procedures": ["clock.get", "clock.jumpToScene"] },
+      "moment": "The world's simulated time paused at 09:20, with Avanzar al próximo evento"
     }
   },
   "images": {
+    "gallery-audit/1440x900": {
+      "pixels": "35e807fe08be27a45794760fb38442dcf69707a280d3cec7e3a36bc9ce14563e",
+      "width": 2880,
+      "height": 1800,
+      "files": {
+        "/landing/captures/gallery-audit-1440x900-1440w.avif": "51f5fa78278d75dce775fcdb02a51659c8471fddbf6dbe459728106660770360",
+        "/landing/captures/gallery-audit-1440x900-2880w.avif": "9cb94639568ba7f733f4fb3123617897f9fbaa275536e7ad1bad740167c4778b",
+        "/landing/captures/gallery-audit-1440x900-1440w.webp": "db0e0be97afde309cb5591141f98b632c8a2902b44742b88284a896e565eb3b4",
+        "/landing/captures/gallery-audit-1440x900-2880w.webp": "71a9c0a0ccacb0a311410b75b2a316179c3850f298704f9f91f27a1ea6de7ace"
+      }
+    },
+    "gallery-clock/1440x900": {
+      "pixels": "10dfcd70b7050bdc05cae5c2c94b73988cbe316a87a811ea317d7fa23408de8d",
+      "width": 2880,
+      "height": 1800,
+      "files": {
+        "/landing/captures/gallery-clock-1440x900-1440w.avif": "5128fbaac1d7bc185f90115fbac0a4227ac70f650054705e2b8f12801a1e02d1",
+        "/landing/captures/gallery-clock-1440x900-2880w.avif": "f84540fba1f1ef4bc35c32be53f22764ce2fd72ef2172387c921ba9d8b042458",
+        "/landing/captures/gallery-clock-1440x900-1440w.webp": "17761c3aee2bf90c16d313c3f55bb84943be85cf91e295c94dbd1d988e0faf6f",
+        "/landing/captures/gallery-clock-1440x900-2880w.webp": "2433072b7f01be3ff3fa3a042568468cb325173c19efcbfa70b1e5ee6ea75347"
+      }
+    },
+    "gallery-manual/1440x900": {
+      "pixels": "31727093ff404fd5b9695d56e58b413682fe7f78796ed5c35b07e163b9d62757",
+      "width": 2880,
+      "height": 1800,
+      "files": {
+        "/landing/captures/gallery-manual-1440x900-1440w.avif": "223f6f2c60e975e72303df5d1126988c2ba74d6a7c59c0298159acacfa6421ad",
+        "/landing/captures/gallery-manual-1440x900-2880w.avif": "dc427c0051b0a79d8711db62b219f08274f8bff3cfa2e54f6b37fa8abf51c85e",
+        "/landing/captures/gallery-manual-1440x900-1440w.webp": "7effceae9ae2ffb0dcc8ae3fcda2c79c6645d6cd9688adc9e5378e5d47f3af80",
+        "/landing/captures/gallery-manual-1440x900-2880w.webp": "9936292ba423058d9d279f713f48f36920087c442e4371c8988b217824b35ed6"
+      }
+    },
+    "gallery-metrics/1440x900": {
+      "pixels": "2b2f021dc58b3e6ea3932e60bad0f84ee4e3d34232a49b8db4c1a61cc13d95b2",
+      "width": 2880,
+      "height": 1800,
+      "files": {
+        "/landing/captures/gallery-metrics-1440x900-1440w.avif": "6cabba258f42d6a397169e20f0106df5facd7d01449d56d67850ff84e592e01a",
+        "/landing/captures/gallery-metrics-1440x900-2880w.avif": "f81dcf2704e40b1377072ce69100a4aeba4c1bc0739ea758712587c8c99844a8",
+        "/landing/captures/gallery-metrics-1440x900-1440w.webp": "be8c3a9319266c991358ab14fc3737727a68350f8bec2b01b602bac15d87c931",
+        "/landing/captures/gallery-metrics-1440x900-2880w.webp": "1de0ae0088bb132cff850f273335d1cc4c4e9ac4530b4676c9873189ffe86470"
+      }
+    },
+    "gallery-order-detail/1440x900": {
+      "pixels": "54c6a6adde68c5a8eeb9bccd0ab13d30cd1d0cd5a948f885e94adc80cbee4dbd",
+      "width": 2468,
+      "height": 5624,
+      "files": {
+        "/landing/captures/gallery-order-detail-1440x900-1234w.avif": "78b502fc2afa6e39fe89ec0d86c672c995b0ceb9c4af8938a5223a925230f7f8",
+        "/landing/captures/gallery-order-detail-1440x900-2468w.avif": "46b1f5d1cc6a1ffc1b4d93214f260f86739f1f72446b517e92c5a4cb4ecbf521",
+        "/landing/captures/gallery-order-detail-1440x900-1234w.webp": "e71ba8edef63939d177d7673f0e978f3e1fa9ced63cf20b93620a137e45564e3",
+        "/landing/captures/gallery-order-detail-1440x900-2468w.webp": "d4fee87f3fadbece82846959cd427868f0cf396e154fb284d258d510e9260f22"
+      }
+    },
+    "gallery-orders/1440x900": {
+      "pixels": "a7183d263e6b75822c7515c0b4a7aceea095d88301b850534a5899dfd2a56d98",
+      "width": 2880,
+      "height": 1800,
+      "files": {
+        "/landing/captures/gallery-orders-1440x900-1440w.avif": "ed0fb709bf7affb7bb48debfc656300d08ac4b28e9e73d33d6c6c2b59dd486db",
+        "/landing/captures/gallery-orders-1440x900-2880w.avif": "c826af5397e2a8372ee7e28d2398f59fbf8b01c8d49cd8df1b90dd460a0da0d9",
+        "/landing/captures/gallery-orders-1440x900-1440w.webp": "933d7f61512a3c305a5117e79b2053992fe556ab549ef475d769bd1ff6a91326",
+        "/landing/captures/gallery-orders-1440x900-2880w.webp": "aff9523715075ece381912cd48c0b8c21ce4399689232111d05c297fc52106b5"
+      }
+    },
+    "gallery-orders/390x844": {
+      "pixels": "776948555a17ecf91b965101671c2b2367b1b3759f4c7288b27c4eb526165070",
+      "width": 780,
+      "height": 1688,
+      "files": {
+        "/landing/captures/gallery-orders-390x844-390w.avif": "24a8b06664fc327249c57fa2e09c3416408db80848efac104550d7127c045f60",
+        "/landing/captures/gallery-orders-390x844-780w.avif": "8e43ec335ca70ce967c94043039ac40e23bfbf35966b7efc5c78469753041841",
+        "/landing/captures/gallery-orders-390x844-390w.webp": "3f89841c972e5cd0c0782c14642eeefed80a655294314a6c455a558b6f2c47e5",
+        "/landing/captures/gallery-orders-390x844-780w.webp": "c5e0ab17d807f4264c163b079376043c9003f571c610f57af258bab205ff55ac"
+      }
+    },
+    "hero-loop/1440x900": {
+      "pixels": "80a766822bf50aa30e9c5519e4b53c026dbe9e2a1a938495ac39014a3261ba17",
+      "width": 936,
+      "height": 1462,
+      "files": {
+        "/landing/captures/hero-loop-1440x900-468w.avif": "1a85dabdcea31433c79eec2260f0a37f27f228024a16b855803a29560f16bf8c",
+        "/landing/captures/hero-loop-1440x900-936w.avif": "5aa743f7b5e71a558964630ec894f32e4b0d514fd4b8b0b48f4b70ca45e70bf5",
+        "/landing/captures/hero-loop-1440x900-468w.webp": "11c026c958c5e19ac48505a7021015fad343b9a021bd8ec58a3834efd208b507",
+        "/landing/captures/hero-loop-1440x900-936w.webp": "e0ee0324d7b366abdf71b68e510add1db54df95d1727482846b33621b6d7e7bc"
+      }
+    },
+    "hero-loop/390x844": {
+      "pixels": "dbd01a65c85f4d4d2502ff45efc4e52c18d5721448f46f2fde50e03febff23f6",
+      "width": 724,
+      "height": 1462,
+      "files": {
+        "/landing/captures/hero-loop-390x844-362w.avif": "a0879c9a9bd9e6fa9a7621c00bc3c4e7592884625d08bc81a6eef30318c2d1a9",
+        "/landing/captures/hero-loop-390x844-724w.avif": "c0f53c48082dc47f369b164c7517f2482bdfe1f55ded8404a7f0ed65f8395f73",
+        "/landing/captures/hero-loop-390x844-362w.webp": "d7cf8621c78a3558b5ad776eac5440d9212fa6216bf9782e6a5d50b3f84c71fa",
+        "/landing/captures/hero-loop-390x844-724w.webp": "7e72f7c4cdc87d2a50fd257a00bc9bb39aefb42ddadcf34d748c53009b176a96"
+      }
+    },
     "landing/1440x900": {
       "pixels": "e405ab2c043f3317b9294a7d05bc1e0a5b8c38446fb114b293552f3b23fadde8",
       "width": 2880,
@@ -63,6 +364,248 @@
         "/landing/captures/landing-390x844-780w.avif": "d88ecafad010c2508586507ba76a4312b0ac585989175bacda34158114675ea4",
         "/landing/captures/landing-390x844-390w.webp": "9b8fcce6a6fb224aaab8e6f2b82d00786699468e4a91c86e9698b72b39520304",
         "/landing/captures/landing-390x844-780w.webp": "b0475d78c76d014e52e91297521254f58272051dd6c5424290efe54d8344e548"
+      }
+    },
+    "s1-voice-diagnosis/1440x900": {
+      "pixels": "0dc2227c3d34d3901a0e2f3e6e4e19dffa541af9e8c6c8c1932f6d3b739f7c43",
+      "width": 936,
+      "height": 1374,
+      "files": {
+        "/landing/captures/s1-voice-diagnosis-1440x900-468w.avif": "ad7631b5a45ed7052da23fd80bd5830c672b99b7c2a5691545809805787c8a85",
+        "/landing/captures/s1-voice-diagnosis-1440x900-936w.avif": "feedf51ddf5f571045695e0f56cafaf95eb33cf5e4e2aee337b568dfe50a74ed",
+        "/landing/captures/s1-voice-diagnosis-1440x900-468w.webp": "340b4f85c9801c2603cbc6ca10c83dd92c3eb529ac129dd94caa23bba342e669",
+        "/landing/captures/s1-voice-diagnosis-1440x900-936w.webp": "3320e68c23ec9800e7e0d5f20197621a76abb834449cf2034ac0c33202f3d9d9"
+      }
+    },
+    "s1-voice-diagnosis/390x844": {
+      "pixels": "565b4e7a4eaeae1c34361839ebcecbfe763e9dba58d60ebbf02233fedc739f01",
+      "width": 724,
+      "height": 1374,
+      "files": {
+        "/landing/captures/s1-voice-diagnosis-390x844-362w.avif": "e22969a0ff8c0a9fafa9faa311e8048ea1ccd423705a4376dd4bb1f5d01c8567",
+        "/landing/captures/s1-voice-diagnosis-390x844-724w.avif": "dc82fece19c442cab65700f1f253be692462fc13c2d05f733fad8664d0c3e765",
+        "/landing/captures/s1-voice-diagnosis-390x844-362w.webp": "627049544ddf54b1d9e92906d01bb4bdb6dd573f92ebc163c6248a02b0ec8f0b",
+        "/landing/captures/s1-voice-diagnosis-390x844-724w.webp": "3d71649625fbf233ae63eaa9c287dacb2517399bb32a56c46e9606fe07501c06"
+      }
+    },
+    "s2-policy-cite/1440x900": {
+      "pixels": "921292285710ff401309cb4b8017bd4d31e4be5a647cdf578dc4bb6b5a9a1656",
+      "width": 936,
+      "height": 1374,
+      "files": {
+        "/landing/captures/s2-policy-cite-1440x900-468w.avif": "cc2fcd9ae529b41cbacae574488baa588a9120a91e3a894dbb8dbe615c56284f",
+        "/landing/captures/s2-policy-cite-1440x900-936w.avif": "12c961878bd84040f5da31ed8226bf83a68b33b4fb69fdd8a54e7e4e0607d29c",
+        "/landing/captures/s2-policy-cite-1440x900-468w.webp": "cdcf41d8e1804f64255be2a9d2828aeb3351e0bc218c9e772d55f74e8a1e1fa3",
+        "/landing/captures/s2-policy-cite-1440x900-936w.webp": "17a8356a7d4df97f2ae7ae8dde2a50a7e0c28020e2b6859fbd3e81ba3d1e7173"
+      }
+    },
+    "s2-policy-cite/390x844": {
+      "pixels": "633a71d5a0344fbd47aeb5fb8b231aa5c73d4574ff09f70677c0a4f41a2fd4e4",
+      "width": 724,
+      "height": 1374,
+      "files": {
+        "/landing/captures/s2-policy-cite-390x844-362w.avif": "577aae6fb9d6ebaf555ce836e1f1703fb02a2f522084625b7d19a29bb0c193d1",
+        "/landing/captures/s2-policy-cite-390x844-724w.avif": "8b2967fe0f81bd3d10aec31044e53796b3409ef402a93f45e2974a7df0ecc988",
+        "/landing/captures/s2-policy-cite-390x844-362w.webp": "f79a4a4fe50e5a881ef49a7374ce7a46fa144e8446bd2514a1735a71ea83185f",
+        "/landing/captures/s2-policy-cite-390x844-724w.webp": "0b51d4f510f92ff3f5daea2b4d0bf27c655fff285f4701faf6ff87fa3e454b76"
+      }
+    },
+    "s3-photo-pass/1440x900": {
+      "pixels": "54edd2c8faf7cbbb2874da0e1803ad9d77f0b347b9e4c1ed38d061578cc6a885",
+      "width": 936,
+      "height": 1374,
+      "files": {
+        "/landing/captures/s3-photo-pass-1440x900-468w.avif": "b03f47d885530d8f4e5296cf4446fe3982872bf49c8afcf9b71e01fd031ba2bb",
+        "/landing/captures/s3-photo-pass-1440x900-936w.avif": "c3227d351a2df7c5e8aa87656a6d0709956f897f4bedc48fe5c74c18ca7a3d4d",
+        "/landing/captures/s3-photo-pass-1440x900-468w.webp": "a312f44cd11e3f21b125226199f665ef736472c144216ebc0bfaad85212cfb70",
+        "/landing/captures/s3-photo-pass-1440x900-936w.webp": "629f1b24ef4af9ac791573dec0f2e7b64d57c45e85acc4e078f2d558df0fc712"
+      }
+    },
+    "s3-photo-pass/390x844": {
+      "pixels": "bb9a4ec3c76adc757beea0179445f9dd585ac6b9efdb22345120a7abc0c64ba4",
+      "width": 724,
+      "height": 1374,
+      "files": {
+        "/landing/captures/s3-photo-pass-390x844-362w.avif": "217f47ad546557dd1797a58c2f2acf3cba2a4ea3a1a9d18c6c937dbb30e317db",
+        "/landing/captures/s3-photo-pass-390x844-724w.avif": "b4f0a385e8fa497f7f0ac1d69de5efbee704ff46887f306632118ba7f096c938",
+        "/landing/captures/s3-photo-pass-390x844-362w.webp": "b77d817e6123f70fd6bdd426def8c454462cf1b9c019e7003c7c325509005b29",
+        "/landing/captures/s3-photo-pass-390x844-724w.webp": "1c82840a34ad1b02e2d81969546b94ae2bfdb5858f7a202f9c1ec7c529ab5877"
+      }
+    },
+    "s3-photo-reject/1440x900": {
+      "pixels": "2fe27d1c51332f0e55397f0730adb103ead8cbd69f17b1af1fede192914ea4d1",
+      "width": 4124,
+      "height": 2060,
+      "files": {
+        "/landing/captures/s3-photo-reject-1440x900-2062w.avif": "9655932a75438b8f61858ce86de4ab9380e874c7e9d67801c424f7b3ed586d2d",
+        "/landing/captures/s3-photo-reject-1440x900-4124w.avif": "fb3108244be6fb623cb32b7d62f160402e59684157258730cd8cb587bcfbc3bb",
+        "/landing/captures/s3-photo-reject-1440x900-2062w.webp": "5a0dc578764caba469a1f08a177d9a7c3dd76148a2e6ab2ce67d23be32ec31fc",
+        "/landing/captures/s3-photo-reject-1440x900-4124w.webp": "b938a049d988f94668e35f554f5d029c33fd3534578c26225eec36519cd71d2a"
+      }
+    },
+    "s3-photo-reject/390x844": {
+      "pixels": "887e6937b3081ddf35118b543568a3d55fb63ccb84fa6c54881632d985d829b6",
+      "width": 1812,
+      "height": 1948,
+      "files": {
+        "/landing/captures/s3-photo-reject-390x844-906w.avif": "3d3d9789b41e5e21a6ec05fbe93c1a51ba32138fa44101ad10c467f36ea14632",
+        "/landing/captures/s3-photo-reject-390x844-1812w.avif": "0d107e429f64389011e2dbb389af4f9189607950ebe3aa19eff71431c72fee5e",
+        "/landing/captures/s3-photo-reject-390x844-906w.webp": "e2301c0d1460ff71ea93a31f225d08c3149ee9ff314c789afa5d0fca79269838",
+        "/landing/captures/s3-photo-reject-390x844-1812w.webp": "e50524bc1f864b08d0dd1577897edb25ab8c403d4416f876f68248482fca84f4"
+      }
+    },
+    "s4-certificate-pdf/1440x900": {
+      "pixels": "80a766822bf50aa30e9c5519e4b53c026dbe9e2a1a938495ac39014a3261ba17",
+      "width": 936,
+      "height": 1462,
+      "files": {
+        "/landing/captures/s4-certificate-pdf-1440x900-468w.avif": "1a85dabdcea31433c79eec2260f0a37f27f228024a16b855803a29560f16bf8c",
+        "/landing/captures/s4-certificate-pdf-1440x900-936w.avif": "5aa743f7b5e71a558964630ec894f32e4b0d514fd4b8b0b48f4b70ca45e70bf5",
+        "/landing/captures/s4-certificate-pdf-1440x900-468w.webp": "11c026c958c5e19ac48505a7021015fad343b9a021bd8ec58a3834efd208b507",
+        "/landing/captures/s4-certificate-pdf-1440x900-936w.webp": "e0ee0324d7b366abdf71b68e510add1db54df95d1727482846b33621b6d7e7bc"
+      }
+    },
+    "s4-certificate-pdf/390x844": {
+      "pixels": "dbd01a65c85f4d4d2502ff45efc4e52c18d5721448f46f2fde50e03febff23f6",
+      "width": 724,
+      "height": 1462,
+      "files": {
+        "/landing/captures/s4-certificate-pdf-390x844-362w.avif": "a0879c9a9bd9e6fa9a7621c00bc3c4e7592884625d08bc81a6eef30318c2d1a9",
+        "/landing/captures/s4-certificate-pdf-390x844-724w.avif": "c0f53c48082dc47f369b164c7517f2482bdfe1f55ded8404a7f0ed65f8395f73",
+        "/landing/captures/s4-certificate-pdf-390x844-362w.webp": "d7cf8621c78a3558b5ad776eac5440d9212fa6216bf9782e6a5d50b3f84c71fa",
+        "/landing/captures/s4-certificate-pdf-390x844-724w.webp": "7e72f7c4cdc87d2a50fd257a00bc9bb39aefb42ddadcf34d748c53009b176a96"
+      }
+    },
+    "s4-checklist-complete/1440x900": {
+      "pixels": "8a65bd6fa30c555fe2bf584d84bbd703224d6a648e6dd93e42e8168a66b60981",
+      "width": 2468,
+      "height": 1160,
+      "files": {
+        "/landing/captures/s4-checklist-complete-1440x900-1234w.avif": "a8aa2c659159568c9539a1528ff82bdb483aa2fe215bcc4c4de090c64c055311",
+        "/landing/captures/s4-checklist-complete-1440x900-2468w.avif": "066bb23ce1f1d25e173ba7587246980c1e8d756629d0fa04668e70a68ddef6cd",
+        "/landing/captures/s4-checklist-complete-1440x900-1234w.webp": "e85c62a443ad1638544bc6e1141690d3cafa8aca796e6f0116c1cf8eb10505df",
+        "/landing/captures/s4-checklist-complete-1440x900-2468w.webp": "a4812956fe940b3aa070a6ce00fc766ecc00efd655df3a74c9ef6af3276b43b5"
+      }
+    },
+    "s4-checklist-complete/390x844": {
+      "pixels": "65c94cf41210048a3f6ed845c6b5b27e5804b2404657058f53e6fd6298a822fe",
+      "width": 848,
+      "height": 1240,
+      "files": {
+        "/landing/captures/s4-checklist-complete-390x844-424w.avif": "738422ff9eab01cc05e30bc4e707fbf9af04cc3cb239444566cd7802b1ef6ea3",
+        "/landing/captures/s4-checklist-complete-390x844-848w.avif": "cd8beaf65fb246d72069188fdffcd5767eb3aa7af880db99a1502149e0540277",
+        "/landing/captures/s4-checklist-complete-390x844-424w.webp": "d8a2918830ef3e22a9bc4c88691d163d44a74d95364b88d94cebd36ac5a37081",
+        "/landing/captures/s4-checklist-complete-390x844-848w.webp": "728378957c283eb0c1fc560647f32beb5cc8b11d80c9d3a2d716142a33b6890c"
+      }
+    },
+    "s4-outbox/1440x900": {
+      "pixels": "cf599a747c774311a38f314681471e1cb7261c6198600b1cb82e20995e1523f5",
+      "width": 2880,
+      "height": 1800,
+      "files": {
+        "/landing/captures/s4-outbox-1440x900-1440w.avif": "f6b55f6e3c1658bce1735f0e610b279a91db1e31e106669723a276a6b212eb14",
+        "/landing/captures/s4-outbox-1440x900-2880w.avif": "189bc2ee7a6e5d0a776e92c817b1bb415a4a11ba94957205b37748828fa3bc03",
+        "/landing/captures/s4-outbox-1440x900-1440w.webp": "fe538e68d9b3a560043708e40a4df7c7c1d8c1fc4179e0f3cd19e047cfe1516f",
+        "/landing/captures/s4-outbox-1440x900-2880w.webp": "5fb3665085cfbf4bd83367dcda103ef49e574c0a7796ea424b2fd4b2a52f437c"
+      }
+    },
+    "s4-outbox/390x844": {
+      "pixels": "69b460518aa212f4d68c41a734f24188fc77373c8619f9d2a51b7a96bfd855d1",
+      "width": 780,
+      "height": 1688,
+      "files": {
+        "/landing/captures/s4-outbox-390x844-390w.avif": "49956d0d214d1597d109ad23ebffdde426333d7ece18061a2f6b02d7bcf36292",
+        "/landing/captures/s4-outbox-390x844-780w.avif": "2dcd91d55ec846be701b8626af92e0299a7ee9944b9b0d0efff7eac546778e9c",
+        "/landing/captures/s4-outbox-390x844-390w.webp": "05d3def22cf8c237a0a5bc7d1c81e7c2114d061dab994693e1d003611de543a8",
+        "/landing/captures/s4-outbox-390x844-780w.webp": "84b706deb171dd010448953b6b00f0e25dc79b0bfba7537acb6f4ac5aec31325"
+      }
+    },
+    "s5-escalation-take/1440x900": {
+      "pixels": "56fdc247c44462648b84721a06cf4140770643fdb60c44dc6c48824a079581d4",
+      "width": 2180,
+      "height": 1722,
+      "files": {
+        "/landing/captures/s5-escalation-take-1440x900-1090w.avif": "ced5374e293a174349c94c44e0eb9126f652b2f2ee51ab4deee85e14a800cd2d",
+        "/landing/captures/s5-escalation-take-1440x900-2180w.avif": "056f1391d480385b3a7c924f5b072458584839da129754ea88b5627e82b0a359",
+        "/landing/captures/s5-escalation-take-1440x900-1090w.webp": "bd978911b520799e46f4ce91b4cfc4bc49a94fd4ba3184cfca048e7dab74398d",
+        "/landing/captures/s5-escalation-take-1440x900-2180w.webp": "a3092fbb6be5e4ff8a81443326efbf381969d821149f366f647a9d0e36f36094"
+      }
+    },
+    "s5-escalation-take/390x844": {
+      "pixels": "a7fc2fb4b14c61fe4c0dcdcceec22f19a935866b52079ff1f7c6cfa8c0318e5e",
+      "width": 1756,
+      "height": 1722,
+      "files": {
+        "/landing/captures/s5-escalation-take-390x844-878w.avif": "c21121a904ae01c2f8ba7d36f62240e56cc02f03b94611bbf38d8807a0799a54",
+        "/landing/captures/s5-escalation-take-390x844-1756w.avif": "6b43adc8d1e08eec3f18bc83fcf14b08bc74a712dcd414b75caa7e9777d773b0",
+        "/landing/captures/s5-escalation-take-390x844-878w.webp": "1b6c6ad11bea6d95ce6a6e80907796e6d00ead29399135d313d77135e6641b76",
+        "/landing/captures/s5-escalation-take-390x844-1756w.webp": "78a9660bccc8c660b2deceaa425458b85205efc895e616c0b61b799f2dd81889"
+      }
+    },
+    "s5-escalation-template/1440x900": {
+      "pixels": "a43edccb4ad9ef15f3698e41a11d1919cffb72e87f85971441e74f1bc4bc532b",
+      "width": 936,
+      "height": 1462,
+      "files": {
+        "/landing/captures/s5-escalation-template-1440x900-468w.avif": "f6a2c163b952124066fa6c2fe0092c27fb2139019bfe9409b1ff980812af0b1c",
+        "/landing/captures/s5-escalation-template-1440x900-936w.avif": "a66977803c024c947d0f79b00d317d4a11501c6881639b1a68cba821d3c20114",
+        "/landing/captures/s5-escalation-template-1440x900-468w.webp": "ea13b897934b763ebe24a72785e35f95e83c49a0dee596ba4fca3a445e6e0b2f",
+        "/landing/captures/s5-escalation-template-1440x900-936w.webp": "7bff320be8ba50829c825e4bd634911e811be2f3e015c6444440bd1d56ad7eda"
+      }
+    },
+    "s5-escalation-template/390x844": {
+      "pixels": "6737b2ab1f33c5c376bb1ef2f68344cc1af4278aa921dc1bf5798ebf89c41355",
+      "width": 724,
+      "height": 1462,
+      "files": {
+        "/landing/captures/s5-escalation-template-390x844-362w.avif": "e26477dfc8a7e86f22f3f46360bd4d7f16cd63c4405cba74dd1a4dc9aabab4db",
+        "/landing/captures/s5-escalation-template-390x844-724w.avif": "95590b9343dc5f4d082b04d74893ee80ecd3e2880dc81bceb5fbabfc11d42e7c",
+        "/landing/captures/s5-escalation-template-390x844-362w.webp": "478d7af6352480a7758e283dde4586ffa8a43bce25a0677d20309f2cfef106d7",
+        "/landing/captures/s5-escalation-template-390x844-724w.webp": "9b675e42cd9ca211e6f854013d1ffef18aac811665dd02c20658576c339c44ec"
+      }
+    },
+    "s6-safety-alerts/1440x900": {
+      "pixels": "205e62f3f1a94d6a2f83413755a97388ade435d042c6b7f0c84bc572267d8d0d",
+      "width": 4124,
+      "height": 2060,
+      "files": {
+        "/landing/captures/s6-safety-alerts-1440x900-2062w.avif": "30e52fe6cf4409c55502032baa700de9d0fcfa822dd2b05d5e4995063406d808",
+        "/landing/captures/s6-safety-alerts-1440x900-4124w.avif": "ad075c665255c3add0ae5d51e7b05e75ed1eaa741b5df5e83d8a34ff773b4d07",
+        "/landing/captures/s6-safety-alerts-1440x900-2062w.webp": "ed9dfac6a18f1733128730de4bea87c7fdfcf13a647967175afe3c629f5aaf4a",
+        "/landing/captures/s6-safety-alerts-1440x900-4124w.webp": "30a4947d23f7f41d2c9d968af07337e00d82b65aeab99dd2af8a7c71c434555d"
+      }
+    },
+    "s6-safety-alerts/390x844": {
+      "pixels": "2939a8f2e50e3a0f4bff91b0c5e7c2fa2b7499526b27a9a59f3e4a05ca1581d6",
+      "width": 1812,
+      "height": 1948,
+      "files": {
+        "/landing/captures/s6-safety-alerts-390x844-906w.avif": "a35f8ebf4f0a49fa77530cc07730bf84dfaf4d5eeb618f17d9e1e89cf16ed773",
+        "/landing/captures/s6-safety-alerts-390x844-1812w.avif": "66865cdd917b4b1622b3e2c2a156992dbb61f3ab97fc6d0361571db1b794eda8",
+        "/landing/captures/s6-safety-alerts-390x844-906w.webp": "48194bb25fd7dc1159a512128f9a62697172f83832fdc56b391c25a41fb906af",
+        "/landing/captures/s6-safety-alerts-390x844-1812w.webp": "0f2683084e95e7e338d1db0eb8d834fe4f29240b42e18507f07d2bb64943a6fa"
+      }
+    },
+    "s6-safety-hazard/1440x900": {
+      "pixels": "5be22aa5c2131a07befb7f4a675eca1d32a4ecb06d7156ecd927e7f331e1b0c3",
+      "width": 936,
+      "height": 1374,
+      "files": {
+        "/landing/captures/s6-safety-hazard-1440x900-468w.avif": "19c7ff05101a705078e552854e5870d3a5ff1fdec44c0b0ed0ba786208fd729f",
+        "/landing/captures/s6-safety-hazard-1440x900-936w.avif": "725babf5a974ff7d8ba03dc4251b54102b9f0770afba9e5901c7a61a0cea8dfc",
+        "/landing/captures/s6-safety-hazard-1440x900-468w.webp": "8b0e47dafdd33ff3e787a43534bf9b6cf8a989dd4c10c60f5e13f9d6c6b50b7b",
+        "/landing/captures/s6-safety-hazard-1440x900-936w.webp": "fd920f5d3f37cf0a027fd940b1e5e6f60bcddb92c800ca420ff9b34a704ba411"
+      }
+    },
+    "s6-safety-hazard/390x844": {
+      "pixels": "3c2863c1307e1e18f680e0a2ba31835af6a30ed33fe3d117e20af2dd355ef3bc",
+      "width": 724,
+      "height": 1374,
+      "files": {
+        "/landing/captures/s6-safety-hazard-390x844-362w.avif": "91d0df6ad848bb559377362c747ed82e2a60607b691e09b2162a7e3c70791ab9",
+        "/landing/captures/s6-safety-hazard-390x844-724w.avif": "c34d7f4eb2bc7c385430f33b8c037c95bafcfc16db31813d1867844a889bda3b",
+        "/landing/captures/s6-safety-hazard-390x844-362w.webp": "86c324334604a3935ef99d199f2390130ef307f1625a02ba528ae1147d0a8f88",
+        "/landing/captures/s6-safety-hazard-390x844-724w.webp": "58d3b612f1453c9d9eda41eb5b3b1870be794624d3d5a69312669f6c0e999ac5"
       }
     },
     "signup-code/1440x900": {

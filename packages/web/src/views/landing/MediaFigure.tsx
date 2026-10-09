@@ -1,42 +1,35 @@
-// One visual of the landing's gallery, from the manifest: a render of a console view drawn live and
-// scaled into its thumbnail, or a capture as a <picture> (AVIF/WebP, lazy, sized up front). A
-// placeholder says so ("capture pending"). The thumbnail is a button that opens the viewer.
-import { useReducedMotion } from "./motion";
+// One visual of the landing's gallery, from the manifest: a capture of the real console as a <picture>
+// (AVIF/WebP, lazy, sized up front). A placeholder says so ("capture pending"). The thumbnail is a
+// button that opens the viewer.
 import { useGallery } from "./gallery";
 import { useLandingCopy, useLandingLang } from "./lang";
-import { type MediaItem, type PictureItem, isPicture } from "./media";
-import { CONSOLE_PAGE_WIDTHS, ConsolePageWidthProvider } from "./renders/console-views";
-import { FitToWidth } from "./renders/FitToWidth";
-import { RENDERS, isRenderId } from "./renders/registry";
+import type { MediaItem } from "./media";
 
-/** Width the console views are drawn at before scaling (a desktop console's content column). */
-export const CONSOLE_DESIGN_WIDTH = CONSOLE_PAGE_WIDTHS.page;
-
-/**
- * A render of the registry, in its final state, fitted to the width it gets. As a thumbnail (`crop`) a
- * console view draws in the narrower thumbnail column, so it reflows into its frame and is scaled whole.
- */
-export function RenderView({ id, crop = false, minScale }: { readonly id: string; readonly crop?: boolean; readonly minScale?: number }) {
-  const reduced = useReducedMotion();
-  if (!isRenderId(id)) return null;
-  const Render = RENDERS[id];
-  const width = crop ? "thumbnail" : "page";
-  return (
-    <ConsolePageWidthProvider value={width}>
-      <FitToWidth designWidth={CONSOLE_PAGE_WIDTHS[width]} crop={crop} minScale={minScale}>
-        <Render run={false} still reduced={reduced} />
-      </FitToWidth>
-    </ConsolePageWidthProvider>
-  );
+interface MediaPictureProps {
+  readonly item: MediaItem;
+  readonly alt: string;
+  /** Above the fold: loaded at once and first (the hero's frame); the rest wait for the viewport. */
+  readonly eager?: boolean;
+  /** Size of the image in its slot; by default it takes the slot's width. */
+  readonly className?: string;
 }
 
-export function MediaPicture({ item, alt, eager = false }: { readonly item: PictureItem; readonly alt: string; readonly eager?: boolean }) {
+export function MediaPicture({ item, alt, eager = false, className = "block h-auto w-full" }: MediaPictureProps) {
   return (
     <picture>
       {item.sources.map((source) => (
         <source key={source.type} type={source.type} srcSet={source.srcset} />
       ))}
-      <img src={item.file} alt={alt} width={item.width} height={item.height} loading={eager ? "eager" : "lazy"} decoding="async" className="block h-auto w-full" />
+      <img
+        src={item.file}
+        alt={alt}
+        width={item.width}
+        height={item.height}
+        loading={eager ? "eager" : "lazy"}
+        fetchPriority={eager ? "high" : "auto"}
+        decoding="async"
+        className={className}
+      />
     </picture>
   );
 }
@@ -51,14 +44,16 @@ export function MediaFigure({ id, item }: MediaFigureProps) {
   const lang = useLandingLang()?.lang ?? "es";
   const gallery = useGallery();
   const alt = item.alt[lang];
-  // A thumbnail fits the whole view into its 4:3 frame; the viewer shows it at a reading size.
-  const visual = isPicture(item) ? <MediaPicture item={item} alt={gallery ? "" : alt} /> : <RenderView id={id} crop />;
+  const visual = <MediaPicture item={item} alt={gallery ? "" : alt} />;
   return (
     <figure className="min-w-0">
       <div className="group relative overflow-hidden rounded-card border border-mist bg-paper shadow-card">
-        <div className="transition-transform duration-150 group-active:scale-98 motion-reduce:transition-none">{visual}</div>
+        {/* Under the zoom button the thumbnail is decorative: the button carries its description. */}
+        <div aria-hidden={gallery ? true : undefined} className="transition-transform duration-150 group-active:scale-98 motion-reduce:transition-none">
+          {visual}
+        </div>
         {gallery ? (
-          // Over the visual, not around it: a render may draw the console's own buttons, and a button never nests in another.
+          // Over the visual, not around it: the zoom button covers the whole thumbnail.
           <button
             type="button"
             onClick={(event) => gallery.open(id, event.currentTarget)}

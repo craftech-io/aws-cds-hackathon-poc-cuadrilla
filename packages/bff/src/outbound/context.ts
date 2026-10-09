@@ -79,8 +79,10 @@ export async function loadWhatsAppContext(deps: OutboundDeps, request: WhatsAppS
   if (settings === undefined || settings.clockId !== person.clockId) return noRecipient("the recipient's world has no settings");
   if (person.phone === undefined) return noRecipient("the recipient has no registered phone");
   const leases = await connector.worlds.listPhoneLeases(person.clockId);
-  const lease = leases.find((candidate) => candidate.personId === person.personId);
+  // Only a lease that kept its phone can be reached: the person's own phone is synthetic.
+  const lease = leases.find((candidate) => candidate.personId === person.personId && candidate.phone !== undefined);
   const route = whatsAppRouteOf({ clockId: person.clockId, phone: person.phone, worldMode: settings.whatsappMode, lease, registeredRealPhones: deps.registeredRealPhones() });
+  const recipient = route.source === "PHONE_LEASE" && lease?.phone !== undefined ? { ...person, phone: lease.phone, phoneHash: lease.phoneHash } : person;
   const policyRoute = policyRouteOf(route);
   const at = await nowAt(deps, request.eventAtSim);
   const fromSim = new Date(Date.parse(at.sim) - THREAD_LOOKBACK_MS).toISOString();
@@ -98,7 +100,7 @@ export async function loadWhatsAppContext(deps: OutboundDeps, request: WhatsAppS
     resultsOf(deps, request.turnId),
     connector.conversations.listMessages(person.personId, { fromSim, descending: true, limit: HISTORY_LIMIT }),
   ]);
-  return { channel: "WHATSAPP", ispId: person.ispId, clockId: person.clockId, at, records, results, person, settings, route, policyRoute, history };
+  return { channel: "WHATSAPP", ispId: person.ispId, clockId: person.clockId, at, records, results, person: recipient, settings, route, policyRoute, history };
 }
 
 async function emailAddressOf(deps: OutboundDeps, request: EmailSendOutbound, workOrder: WorkOrder): Promise<string | undefined> {

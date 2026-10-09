@@ -53,6 +53,7 @@ describe("whatsAppRouteOf", () => {
     const guest = { clockId: "GUEST#isp-guest-07", phone: REAL, worldMode: "simulated" as const, registeredRealPhones: new Set<string>() };
     expect(whatsAppRouteOf({ ...guest, lease: { clockId: "GUEST#isp-guest-07" } })).toEqual({ transport: "live", source: "PHONE_LEASE" });
     expect(whatsAppRouteOf({ ...guest, lease: { clockId: "GUEST#isp-guest-03" } })).toEqual({ transport: "simulated", source: "SIMULATED_WORLD" });
+    expect(whatsAppRouteOf({ ...guest, phone: GUEST_BLOCK, lease: { clockId: "GUEST#isp-guest-07" } })).toEqual({ transport: "live", source: "PHONE_LEASE" });
   });
 
   it("never reaches a real phone live from a simulated world without a lease", () => {

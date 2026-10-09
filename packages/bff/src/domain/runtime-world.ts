@@ -4,7 +4,7 @@
 // single live world, tombstones of reset epochs, probes and the fault switches of QA worlds.
 import { z } from "zod";
 import { ClockId, ConsoleUserId, IsoInstant, PersonId, WorkOrderId } from "@cuadrilla/shared";
-import { Actor, HexHash, JsonObject, S3Key, StringSet, defineEntity } from "./common";
+import { Actor, E164, HexHash, JsonObject, S3Key, StringSet, defineEntity } from "./common";
 
 /** A failed event on its last attempt: kept so a DLQ event never leaves the world busy (§7). */
 export const ProcessError = z.object({ eventId: z.string().min(1).max(256), message: z.string().max(500), atReal: IsoInstant });
@@ -55,6 +55,8 @@ export type Lease = z.infer<typeof Lease>;
 /** A real phone bound to a person of a guest world by a join code (48 h; unique per phone). */
 export const PhoneLease = defineEntity("PhoneLease", {
   phoneHash: HexHash,
+  /** The bound phone (normalized E.164): where the person's messages go live while the lease lasts. */
+  phone: E164.optional(),
   clockId: ClockId,
   personId: PersonId,
   joinCode: z.string().min(1).max(32).optional(),
