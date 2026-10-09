@@ -1,22 +1,31 @@
 // SC-20 · the own sign-up, the guest's world and the lead (docs/test-plan.md §4.5; FL-104 … FL-118, FL-121,
-// FL-122), through the QA seam of ADR-0025 §7: every address is `success+qa-<runId>-<n>@simulator.amazonses.com`,
-// `signup.start` runs inside the `QaDriver` with the run's counters (`…#qa-<runId>[-<scope>]#…`, never over
-// public HTTP), the confirmation and the sign-in are administrative and only for users whose address IN
-// COGNITO is a QA one, and the cleanup deletes every account through `GuestAccountDeletion`. No password ever
-// leaves the driver; the tests' leads are QA leads (their notice is suppressed).
+// FL-122). Every `signup.start` goes through the PUBLIC path, `POST /api/signup.start` through the Router,
+// the edge's web ACL (its silent Challenge, solved by the page's AWS WAF SDK in a headless Chromium,
+// lib/public-signup.ts) and the Bff, with the real limits and no exception: the `QaDriver` never writes a
+// lead nor a counter of the sign-up. Every address is `success+qa-<runId>-<n>@simulator.amazonses.com`
+// (the mailbox simulator; `origin QA` by the server's own rule, so the notice to Craftech is suppressed and
+// the account's world counts in the run's own room). Only what IAM and the code can fence to QA goes
+// through the QA seam of ADR-0025 §7: the confirmation and the sign-in, administrative and only for users
+// whose address IN COGNITO is a QA one; `guest.forceExpire` only for an account of a QA run's room;
+// `guest.capsOverride` only on that room's limits; the cleanup through `GuestAccountDeletion`. No password
+// ever leaves the driver.
+//
+// The run's starts spend the runner's per-IP room of the clock hour (5): steps 1, 2, 4 and 7 take four, so
+// step 8 proves the limit with the fifth and the sixth. Run it from a runner without other sign-ups in that
+// hour (a scenarios job of its own); a second run in the same hour from the same IP is refused at step 1.
 import { createHash } from "node:crypto";
 import { authRules, edgeRules } from "../../infra/waf-spec";
-import { type ScenarioContext, ensure } from "./lib/context";
+import { type ScenarioContext, AssertionFailed, ensure } from "./lib/context";
+import { edgeConfig } from "./lib/edge";
 import { WAITS } from "./lib/eventually";
+import { type PublicSignup, type StartAnswer, type StartForm, type Started, openPublicSignup } from "./lib/public-signup";
 import { defineScenario } from "./lib/steps";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const QA_LIMITS = { activeWorlds: 150, signupsPerDay: 150 } as const;
-
-interface Started {
-  readonly username: string;
-  readonly ticket: string;
-}
+/** Starts per IP and clock hour (packages/bff/src/signup/limits.ts `perIpPerHour`). */
+const PER_IP_PER_HOUR = 5;
+const HOUR_MS = 3_600_000;
 
 interface LeadView {
   readonly found: boolean;
@@ -55,10 +64,31 @@ function track(ctx: ScenarioContext, username: string): void {
   if (!users.includes(username)) ctx.state.users = [...users, username];
 }
 
-async function start(ctx: ScenarioContext, n: number | string, extra: Record<string, unknown> = {}): Promise<Started> {
-  const started = (await ctx.qa("signup.start", { email: qaEmail(ctx.runId, n), contactAccepted: true, utm: { source: "qa", campaign: "sc20" }, ...extra })) as Started;
-  track(ctx, started.username);
-  return started;
+/** The scenario's browser on `/signup`, opened once per run (closed by the cleanup). */
+async function publicPath(ctx: ScenarioContext): Promise<PublicSignup> {
+  const open = ctx.state.publicSignup as Promise<PublicSignup> | undefined;
+  if (open !== undefined) return open;
+  const opening = openPublicSignup(edgeConfig().baseUrl);
+  ctx.state.publicSignup = opening;
+  return opening;
+}
+
+/** One public start; an accepted one is tracked for the cleanup and counted in its clock hour. */
+async function attemptStart(ctx: ScenarioContext, n: number | string, extra: Omit<StartForm, "email"> = {}): Promise<StartAnswer> {
+  const answer = await (await publicPath(ctx)).start({ email: qaEmail(ctx.runId, n), ...extra });
+  if (answer.ok) {
+    track(ctx, answer.result.username);
+    const hour = Math.floor(ctx.now() / HOUR_MS);
+    const hours = (ctx.state.startsByHour as Record<number, number> | undefined) ?? {};
+    ctx.state.startsByHour = { ...hours, [hour]: (hours[hour] ?? 0) + 1 };
+  }
+  return answer;
+}
+
+async function start(ctx: ScenarioContext, n: number | string, extra: Omit<StartForm, "email"> = {}): Promise<Started> {
+  const answer = await attemptStart(ctx, n, { contactAccepted: true, utm: { utm_source: "qa", utm_campaign: "sc20" }, ...extra });
+  if (!answer.ok) throw new AssertionFailed(`the public signup.start answered ${answer.status} ${answer.code}${answer.reason === undefined ? "" : `/${answer.reason}`}`);
+  return answer.result;
 }
 
 /** start → signUp → confirm: a confirmed account of the run. */
@@ -89,13 +119,15 @@ export default defineScenario({
   suites: ["full"],
   alone: true,
   cleanup: async (ctx) => {
+    const browser = ctx.state.publicSignup as Promise<PublicSignup> | undefined;
+    await browser?.then((open) => open.close()).catch(() => undefined);
     await ctx.qa("guest.capsOverride", QA_LIMITS);
     for (const username of (ctx.state.users as string[] | undefined) ?? []) await ctx.qa("auth.cleanupQaSignup", { username });
   },
   steps: [
     {
       id: "1",
-      title: "signup.start through the appRouter (the run's counters) with both consents and UTM → a PENDING lead, origin QA, the user pending and a ticket",
+      title: "Public signup.start (Router, WAF token, Bff) with both consents and UTM → a PENDING lead, origin QA, the user pending and a ticket",
       kind: "det",
       flows: ["FL-104", "FL-115"],
       after: "preset",
@@ -151,14 +183,14 @@ export default defineScenario({
     },
     {
       id: "4",
-      title: "signup.start with the same email → EMAIL_TAKEN and no new lead",
+      title: "Public signup.start with the same email → EMAIL_TAKEN and no new lead",
       kind: "det",
       flows: ["FL-121"],
       after: "3",
       async run(ctx) {
         const before = (await ctx.qa("leads.get", { email: qaEmail(ctx.runId, 1) })) as LeadView;
-        const again = await ctx.attempt("signup.start", { email: qaEmail(ctx.runId, 1), contactAccepted: true });
-        ctx.check(!again.ok && again.error.reason === "EMAIL_TAKEN", `the second start answered ${again.ok ? "ok" : again.error.reason ?? again.error.code}`);
+        const again = await attemptStart(ctx, 1, { contactAccepted: true });
+        ctx.check(!again.ok && again.reason === "EMAIL_TAKEN", `the second start answered ${again.ok ? "ok" : again.reason ?? again.code}`);
         const after = (await ctx.qa("leads.get", { email: qaEmail(ctx.runId, 1) })) as LeadView;
         ctx.check(after.leadId === before.leadId && after.status === "CONFIRMED", "the lead changed");
       },
@@ -223,18 +255,28 @@ export default defineScenario({
     },
     {
       id: "8",
-      title: "Six signup.start from the same test IP (the run's counters) → the sixth RATE_LIMITED",
+      title: "Public signup.start from the runner's IP until refused → RATE_LIMITED after at most 5 starts of the clock hour",
       kind: "det",
       flows: ["FL-113"],
       after: "preset",
       async run(ctx) {
-        const answers = [];
-        for (let n = 0; n < 6; n += 1) answers.push(await ctx.attempt("signup.start", { email: qaEmail(ctx.runId, `ip${n}`), scope: "s8" }));
-        for (const answer of answers) if (answer.ok) track(ctx, (answer.result as Started).username);
-        ctx.check(answers.slice(0, 5).every((answer) => answer.ok), "a start under the limit was refused");
-        const sixth = answers[5];
-        ensure(sixth !== undefined, "no sixth start");
-        ctx.check(!sixth.ok && sixth.error.reason === "RATE_LIMITED", `the sixth answered ${sixth.ok ? "ok" : sixth.error.reason ?? sixth.error.code}`);
+        // The hour may roll over while the step runs: its counters start again, so one more round.
+        for (let round = 0; round < 2; round += 1) {
+          const hour = Math.floor(ctx.now() / HOUR_MS);
+          let refusal: Extract<StartAnswer, { ok: false }> | undefined;
+          for (let n = 0; n <= PER_IP_PER_HOUR && refusal === undefined; n += 1) {
+            const answer = await attemptStart(ctx, `ip${round}${n}`);
+            if (!answer.ok) refusal = answer;
+          }
+          if (refusal === undefined && Math.floor(ctx.now() / HOUR_MS) !== hour) continue;
+          ensure(refusal !== undefined, `${PER_IP_PER_HOUR + 1} starts in one clock hour and none refused`);
+          ctx.check(refusal.reason === "RATE_LIMITED", `the refusal was ${refusal.code}${refusal.reason === undefined ? "" : `/${refusal.reason}`}`);
+          const accepted = ((ctx.state.startsByHour as Record<number, number> | undefined) ?? {})[hour] ?? 0;
+          ctx.check(accepted <= PER_IP_PER_HOUR, `${accepted} starts of the run were accepted in one clock hour`);
+          ctx.inform("ACCEPTED_IN_HOUR", String(accepted));
+          return;
+        }
+        throw new AssertionFailed("the clock hour rolled over twice during the step");
       },
     },
     {

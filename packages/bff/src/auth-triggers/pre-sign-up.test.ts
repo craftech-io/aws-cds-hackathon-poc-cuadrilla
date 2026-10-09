@@ -51,7 +51,7 @@ describe("pre sign-up trigger [FL-104] [FL-114] [FL-121] [FL-122]", () => {
   beforeEach(async () => {
     h = signupHarness();
     lines = [];
-    const started = await startSignup(() => h.ports(), { input: signupForm({ email: EMAIL }), edge: { viewerIp: "203.0.113.10" }, qa: null, log: createLogger({ sink: () => undefined }) });
+    const started = await startSignup(() => h.ports(), { input: signupForm({ email: EMAIL }), edge: { viewerIp: "203.0.113.10" }, log: createLogger({ sink: () => undefined }) });
     ticket = started.ticket;
     username = started.username;
   });
@@ -123,11 +123,11 @@ describe("pre sign-up trigger [FL-104] [FL-114] [FL-121] [FL-122]", () => {
     await h.cut("SIGNUP");
     expect(await refusalOf(signUpEvent(username, ticket))).toBe("CAP_REACHED");
     h = signupHarness();
-    const started = await startSignup(() => h.ports(), { input: signupForm({ email: EMAIL }), edge: { viewerIp: "203.0.113.10" }, qa: null, log: createLogger({ sink: () => undefined }) });
+    const started = await startSignup(() => h.ports(), { input: signupForm({ email: EMAIL }), edge: { viewerIp: "203.0.113.10" }, log: createLogger({ sink: () => undefined }) });
     await h.cut("ALL");
     expect(await refusalOf(signUpEvent(started.username, started.ticket))).toBe("CAP_REACHED");
     h = signupHarness();
-    const again = await startSignup(() => h.ports(), { input: signupForm({ email: EMAIL }), edge: { viewerIp: "203.0.113.10" }, qa: null, log: createLogger({ sink: () => undefined }) });
+    const again = await startSignup(() => h.ports(), { input: signupForm({ email: EMAIL }), edge: { viewerIp: "203.0.113.10" }, log: createLogger({ sink: () => undefined }) });
     const day = `SIGNUP#GLOBAL#${SIGNUP_T0.toISOString().slice(0, 10)}`;
     // The 300th start of the day still completes its SignUp; a day over the cap takes no more.
     await h.runtime.update("Runtime", { PK: day, SK: "META" }, { used: 300 }, SIGNUP_T0.toISOString());

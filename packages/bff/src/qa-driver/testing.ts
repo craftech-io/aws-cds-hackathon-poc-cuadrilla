@@ -1,11 +1,10 @@
 // Test kit of the `QaDriver` (never imported by a Lambda): its ports over the memory world factory of WP-39
 // (the committed templates, the memory connector on a movable real clock) with recording fakes of what
 // leaves the driver (the installer queue, `InboundWhatsApp`, the tool Lambdas, the mocks, the seam's
-// Cognito, the `Bff`'s QA seam), the real `QA_FORCE_EXPIRE` of `GuestWorlds` over the memory tables, and the
+// Cognito), the real `QA_FORCE_EXPIRE` of `GuestWorlds` over the memory tables, and the
 // driver itself over those ports with an instant `sleep` that moves the harness clock.
 import { QA_FORCE_EXPIRE, forceExpireQaAccount } from "../guest/qa-expire";
 import { createLogger } from "../lib/log";
-import { type QaSignupStartRequest, handleQaSeam } from "../routers/qa-seam";
 import { deriveSubkey } from "../lib/crypto";
 import { createMemoryRuntimeStore } from "../ops/memory-runtime-store";
 import type { InstallerQueueEventInput } from "../worker/events";
@@ -54,8 +53,6 @@ export interface MemoryQaPorts {
   readonly toolCalls: Array<{ readonly target: ToolTargetName; readonly event: unknown }>;
   readonly deletions: string[];
   readonly cognito: FakeSeamCognito;
-  /** The `signup.start` requests the `Bff`'s QA seam ran (after its own QA-address check). */
-  readonly starts: QaSignupStartRequest[];
 }
 
 const unavailable = (what: string) => () => {
@@ -69,7 +66,6 @@ export function memoryQaPorts(options: { readonly start?: string } = {}): Memory
   const inbound: unknown[] = [];
   const toolCalls: MemoryQaPorts["toolCalls"] = [];
   const deletions: string[] = [];
-  const starts: QaSignupStartRequest[] = [];
   const cognito = new FakeSeamCognito();
   const realClock = { now: async () => harness.now() };
   const log = createLogger({ sink: () => undefined });
@@ -109,11 +105,6 @@ export function memoryQaPorts(options: { readonly start?: string } = {}): Memory
       publishForeign: async () => ({ snsMessageId: "sns-1" }),
     },
     signup: () => ({
-      start: (request) =>
-        handleQaSeam(request, async (parsed) => {
-          starts.push(parsed);
-          return { ticket: `ticket-${starts.length}`, username: `gst-01K8000000000000000000${String(starts.length).padStart(4, "0")}`, expiresAt: new Date(harness.now().getTime() + 600_000).toISOString() };
-        }),
       forceExpire: (userId) => forceExpireQaAccount(harness.client, { op: QA_FORCE_EXPIRE, userId }, harness.now()),
       cognito,
       leads: { get: async () => undefined, listEvents: async () => [] },
@@ -127,7 +118,7 @@ export function memoryQaPorts(options: { readonly start?: string } = {}): Memory
     demoRecipients: () => [],
     runtimeSessionKey: () => deriveSubkey(TEST_MASTER_KEY, "runtime-session"),
   };
-  return { ports, harness, queued, inbound, toolCalls, deletions, cognito, starts };
+  return { ports, harness, queued, inbound, toolCalls, deletions, cognito };
 }
 
 /** The driver over memory ports: `sleep` moves the harness's real clock instead of waiting. */

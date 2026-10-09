@@ -1,7 +1,7 @@
-// [W5 review B1] The QA seam's writes, as the QaDriver makes them: `guest.capsOverride` writes only the
-// limits of its own run's room (the one key of the sign-up its IAM fence opens, infra/qa-driver-fence.ts);
-// `signup.start` and `guest.forceExpire` hand their writes to the Lambda that owns them (the Bff's QA seam,
-// GuestWorlds' `QA_FORCE_EXPIRE`), which re-check the QA address or the QA room on their side.
+// The QA seam's writes, as the QaDriver makes them: `guest.capsOverride` writes only the limits of its own
+// run's room (the one key of the sign-up its IAM fence opens, infra/qa-driver-fence.ts); `guest.forceExpire`
+// hands its write to the Lambda that owns it (GuestWorlds' `QA_FORCE_EXPIRE`), which re-checks the QA room
+// on its side. There is no `signup.start` here: `SC-20` starts through the public path (ADR-0025 §7).
 import { describe, expect, it } from "vitest";
 import { createAccountOp, getGuestAccount } from "../guest/account";
 import { qaSlotScope } from "../guest/slots";
@@ -25,17 +25,9 @@ async function account(memory: ReturnType<typeof memoryQaPorts>, slotScope: "PUB
 }
 
 describe("the QA seam's writes go through their owners [FL-104] [FL-111] [FL-112]", () => {
-  it("[FL-104] [FL-113] signup.start is the Bff's: the run (and its sub-scope) and the form, never a write of the driver", async () => {
+  it("[FL-104] [FL-113] the driver has no signup.start: a start is the public path's, never a write of the driver", async () => {
     const { memory, driver } = seam();
-    const started = await driver({ action: "signup.start", idempotencyKey: "812-1/sc-20/1/m1", input: { email: QA_EMAIL, contactAccepted: true } });
-    expect(started).toMatchObject({ ok: true, result: { username: expect.stringMatching(/^gst-/), ticket: "ticket-1" } });
-    await driver({ action: "signup.start", idempotencyKey: "812-1/sc-20/8/m1", input: { email: "success+qa-812-1-ip0@simulator.amazonses.com", scope: "s8" } });
-    expect(memory.starts.map((request) => [request.runId, request.form.email])).toEqual([
-      ["812-1", QA_EMAIL],
-      ["812-1-s8", "success+qa-812-1-ip0@simulator.amazonses.com"],
-    ]);
-    expect(memory.starts[0]?.form).toMatchObject({ consents: { TERMS_PRIVACY: { accepted: true }, CONTACT: { accepted: true } } });
-    // Only the driver's own idempotency marks: no counter of the sign-up written by the driver.
+    expect(refused(await driver({ action: "signup.start" as never, idempotencyKey: "812-1/sc-20/1/m1", input: { email: QA_EMAIL } }))).toMatchObject({ code: "INVALID" });
     expect(memory.harness.client.dump("Runtime").filter((row) => String(row.PK).startsWith("SIGNUP"))).toEqual([]);
   });
 

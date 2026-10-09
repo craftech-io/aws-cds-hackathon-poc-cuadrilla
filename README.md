@@ -32,6 +32,40 @@ Everything you operate is synthetic: the installers, customers and phone numbers
 and the emails the product sends from your world go to the Amazon SES mailbox simulator, visible in
 the console outbox. To delete your account and your data, use **Delete my account** in the console.
 
+## Guided tour
+
+The console's guided tour walks your demo world with the steps below (the expected simulated hours
+are those of a fresh world; every step can also be reached with "Jump to scene").
+
+<!-- TOUR:START -->
+### Express tour (~5 min)
+
+| # | Step | Button / action | What to look at | Expected wait |
+|---|---|---|---|---|
+| X1 | Voice → citation | Send the voice note “la ONU no prende la luz PON” (the ONU's PON light is off) (or “Jump to scene”: On site (09:20)) | Read receipt and “typing…” right away; then the transcript, the no-optical-signal state the orchestrator reports and the manual step citing §DIAG-02. | ~45 s (transcription + agent turn) |
+| X2 | Rejected photo, sent again | Send the two label photos: with glare, then a good one (or “Jump to scene”: Evidence (09:45)) | 🔁 and the glare rejection with an actionable reason; ✅ on the second photo. | ~20 s per photo |
+| X3 | Certificate | Tap “Cerrar instalación” (close installation) (or “Jump to scene”: Checklist complete (10:00)) | The certificate PDF in the simulator; in the outbox, the two emails (customer and operations) with their delivery event. | ~60 s (PDF + emails) |
+| X4 | Safety | Send “cable pelado en el poste” (bare cable on the pole) (or “Jump to scene”: Third visit (15:10)) | The safety instruction of §SEG-01 right away, the safety alert to Adriana and the email to the zone chief in the outbox. | ~20 s |
+
+### Full tour (~15 min)
+
+| # | Step | Button / action | What to look at | Expected wait |
+|---|---|---|---|---|
+| 1 | Sign in | Open your home page | Your own world with the clock paused on Oct 13 at 07:00, the start of the day pending at 07:30 and work order 24817 pinned as the main story. | ~10 s (the first sign-in creates your world) |
+| 2 | Start the day | Start the day (or “Jump to scene”: Start of the day (07:00)) | In the simulator (Rogelio), at 07:30, the orders-of-the-day template with the “Ver órdenes” (view orders) button. | ~5 s |
+| 3 | View orders | Tap “Ver órdenes” as Rogelio (or “Jump to scene”: Orders of the day (07:30)) | The day's three work orders with address, plan and time window. | ~30 s (agent turn) |
+| 4 | Voice note | Go to the first visit (09:20) and send the voice note (or “Jump to scene”: On site (09:20)) | Read receipt and “typing…” right away; then the transcript, the no-optical-signal state the orchestrator reports and the manual step citing §DIAG-02. | ~45 s (transcription + agent turn) |
+| 5 | ONU online | Send “Ya limpié el conector, ya prende” (I cleaned the connector, it's on now) (or “Jump to scene”: Troubleshooting step given (09:25)) | The ONU online at −21.4 dBm and the request for three photos. | ~30 s (agent turn) |
+| 6 | Policy question | Send “¿se cobra la roseta en otro cuarto?” (is moving the rosette to another room charged?) and open the Manual (or “Jump to scene”: ONU online (09:35)) | The answer citing §COM-04; the cited section opens in the Manual view. | ~30 s (agent turn) |
+| 7 | Photos | Send the photos in order (meter, label with glare, good label, rosette) and tap “Cliente conforme” (customer sign-off) (or “Jump to scene”: Evidence (09:45)) | The ✅ and 🔁 reactions, the glare rejection with its reason and the complete checklist in the order detail. | ~20 s per photo |
+| 8 | Certificate | Tap “Cerrar instalación” (close installation) and open the outbox (or “Jump to scene”: Checklist complete (10:00)) | The certificate PDF in the simulator; in the outbox, the two emails (customer and operations) with their delivery event. | ~60 s (PDF + emails) |
+| 9 | Escalation | Go to the second visit (11:50) and send three low-power voice notes (or “Jump to scene”: Second visit (11:50)) | A case for diagnosis attempts opened at 11:50 that times out at 12:00; in the simulator (Adriana), the escalated-case template. | ~90 s (three agent turns) |
+| 10 | Timeout | Advance to the next event and open Cases (or “Jump to scene”: Case with the supervisor on duty (11:50)) | At 12:00 nobody took the case: it moves to Héctor with the reassigned-case template; the ladder shows in the Cases view. | ~5 s |
+| 11 | Take and reply | As Héctor: take the case, send the instruction and close the case (or “Jump to scene”: Case with the backup supervisor (12:00)) | The summary and the photos reach Héctor; his reply reaches Rogelio over the bridge, the power is fixed in the simulated orchestrator and the agent resumes. | ~10 s per action |
+| 12 | Safety | Go to the third visit (15:10) and send “cable pelado en el poste” (bare cable on the pole) (or “Jump to scene”: Third visit (15:10)) | The safety instruction of §SEG-01 right away, the safety alert to Adriana and the email to the zone chief in the outbox. | ~20 s |
+| 13 | Metrics | Open Metrics | The manual and photo measurements with their N and label; 0 policy violations; the decisions per rule. | Right away |
+<!-- TOUR:END -->
+
 ## What is real and what is simulated
 
 To be completed at the end of the build: which AWS services run for real in every interaction,

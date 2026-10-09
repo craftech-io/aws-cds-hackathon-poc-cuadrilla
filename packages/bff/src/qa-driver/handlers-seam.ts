@@ -1,10 +1,8 @@
 // The QA seam of the own sign-up (ADR-0025 §7, docs/test-plan.md §4.1, `SC-20`): nobody reads the code
-// Cognito mails to the SES simulator, so the driver
+// Cognito mails to the SES simulator, so the driver does what IAM and its code can fence to QA, and nothing
+// else. The start itself is never here: `SC-20` calls the public `POST /api/signup.start` like a visitor
+// (scripts/scenarios/lib/public-signup.ts), so the driver never writes a lead nor a counter of the sign-up.
 //
-//   signup.start          the real `signup.start` of the `appRouter` with the run's counters
-//                         (`…#qa-<runId>[-<scope>]#…`, `createQaPublicContext`), run by the `Bff` on a direct
-//                         invocation (routers/qa-seam.ts), never over public HTTP: the lead and the counters
-//                         are the Bff's writes, which IAM denies this role (infra/qa-driver-fence.ts)
 //   auth.signUp           `SignUp` with the `GuestSignup` client and the ticket (or without it, or with
 //                         another user's, to see the pre sign-up refuse); the password is derived on the
 //                         server and never leaves the driver
@@ -19,10 +17,8 @@
 //
 // Every fenced action logs `QA_SIGNUP_CONFIRMED` / `QA_SIGNUP_REFUSED` lines with the address masked.
 import { ToolError } from "@cuadrilla/shared";
-import { CONSENTS_VERSION } from "@cuadrilla/shared/legal/consents";
 import { signupUserIdOf } from "../guest/registry";
 import { setQaSlotLimits } from "../guest/slots";
-import { QA_SIGNUP_START } from "../routers/qa-seam";
 import { QA_REASON, runIdOfKey } from "./contract";
 import type { QaParsedInput } from "./contract-inputs";
 import type { ActionContext } from "./driver";
@@ -48,19 +44,6 @@ async function fenced(ports: QaPorts, username: string, ctx: ActionContext) {
 
 export function seamActions(ports: QaPorts) {
   return {
-    async "signup.start"(input: QaParsedInput<"signup.start">, ctx: ActionContext) {
-      const runId = `${runIdOfKey(ctx.idempotencyKey)}${input.scope === undefined ? "" : `-${input.scope}`}`;
-      const form = {
-        email: input.email,
-        name: input.name,
-        locale: input.locale,
-        consents: { TERMS_PRIVACY: { accepted: input.termsAccepted, textVersion: CONSENTS_VERSION }, CONTACT: { accepted: input.contactAccepted, textVersion: CONSENTS_VERSION } },
-        ...(input.utm === undefined ? {} : { attribution: { utm: input.utm } }),
-      };
-      const answer = await ports.signup().start({ op: QA_SIGNUP_START, runId, correlationId: ctx.log.correlationId, form });
-      if (!answer.ok) throw new ToolError(answer.error.code, answer.error.message, answer.error.reason);
-      return { username: answer.result.username, ticket: answer.result.ticket, expiresAt: answer.result.expiresAt };
-    },
     async "auth.signUp"(input: QaParsedInput<"auth.signUp">, ctx: ActionContext) {
       const seam = ports.signup();
       // A user that exists already is the seam's only when the address Cognito holds is a QA one.

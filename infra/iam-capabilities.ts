@@ -270,12 +270,12 @@ export const LAMBDA_CAPABILITIES = {
     // Reads every app table; writes only by key and objects only by prefix (infra/qa-driver-fence.ts).
     tables: { ...allAt(APP_TABLES, "read"), Reference: "read" },
     grants: [
-      g(["cognito-idp:DescribeUserPoolClient"], ["{Auth}"]),
+      // `auth.probe`: the three clients and the pool's own settings (`attributesRequireVerificationBeforeUpdate`), this pool only.
+      g(["cognito-idp:DescribeUserPoolClient", "cognito-idp:DescribeUserPool"], ["{Auth}"]),
       ...QA_SEAM_GRANTS,
       g(["s3:GetObject"], ["{Seed}/brand/*"]),
       sqsSend(),
-      // `{Bff}`: the QA seam's `signup.start` (routers/qa-seam.ts); the lead and the run's counters are the Bff's writes.
-      g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{PolicyAudit}", "{Bff}", "{ToolOrders}", "{ToolKnowledge}", "{ToolEvidence}", "{ToolMessaging}", "{ToolCases}"]),
+      g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{PolicyAudit}", "{ToolOrders}", "{ToolKnowledge}", "{ToolEvidence}", "{ToolMessaging}", "{ToolCases}"]),
       g(["sns:Publish"], [arn.waTopic]),
       guardrailG1,
       g(["sqs:ReceiveMessage", "sqs:DeleteMessage"], ["{InstallerEventsDlq}"]),

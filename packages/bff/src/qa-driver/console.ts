@@ -26,7 +26,6 @@ export function procedureAt(caller: AppCaller, path: string): Procedure {
 }
 
 export interface ConsoleCallOptions {
-  readonly runId: string;
   readonly correlationId: string;
   /** Real time. */
   readonly now: Date;
@@ -46,10 +45,10 @@ async function signupCaller(ports: QaPorts, input: QaParsedInput<"console">, opt
 export async function callConsole(ports: QaPorts, input: QaParsedInput<"console">, options: ConsoleCallOptions): Promise<unknown> {
   let caller: AppCaller;
   if (input.signupUser !== undefined) caller = await signupCaller(ports, input, options);
-  else if (PUBLIC_CONSOLE.includes(input.procedure)) caller = ports.console.public(options.runId, options.correlationId);
+  else if (PUBLIC_CONSOLE.includes(input.procedure)) caller = ports.console.public(options.correlationId);
   else {
     const authTime = Math.floor(options.now.getTime() / 1000) - input.authTimeAgoSec;
-    caller = ports.console.server({ role: input.role, clockId: input.clockId, authTime, ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), runId: options.runId, correlationId: options.correlationId });
+    caller = ports.console.server({ role: input.role, clockId: input.clockId, authTime, ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), correlationId: options.correlationId });
   }
   return procedureAt(caller, input.procedure)(input.input);
 }

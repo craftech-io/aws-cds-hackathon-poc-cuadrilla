@@ -6,7 +6,7 @@
 // ACLs (signed JSON calls: the SDK of WAFv2 is not a dependency of the app); the pool's clients and JWKS;
 // and the QA seam's Cognito calls. Names and ids come from links (`Resource`, never `process.env`).
 import { CloudWatchClient, DescribeAlarmHistoryCommand } from "@aws-sdk/client-cloudwatch";
-import { AdminConfirmSignUpCommand, AdminGetUserCommand, AdminInitiateAuthCommand, CognitoIdentityProviderClient, DescribeUserPoolClientCommand, SignUpCommand, UserNotFoundException } from "@aws-sdk/client-cognito-identity-provider";
+import { AdminConfirmSignUpCommand, AdminGetUserCommand, AdminInitiateAuthCommand, CognitoIdentityProviderClient, DescribeUserPoolClientCommand, DescribeUserPoolCommand, SignUpCommand, UserNotFoundException } from "@aws-sdk/client-cognito-identity-provider";
 import { BedrockAgentCoreClient, ListEventsCommand, ListMemoryRecordsCommand, ListSessionsCommand, ResourceNotFoundException } from "@aws-sdk/client-bedrock-agentcore";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -242,9 +242,14 @@ export async function authConfiguration(): Promise<unknown> {
       generateSecret: client?.ClientSecret !== undefined,
     };
   };
+  const pool = (await cognitoClient().send(new DescribeUserPoolCommand({ UserPoolId: targets.userPoolId }))).UserPool;
   const jwks = await fetch(`https://cognito-idp.${REGION}.amazonaws.com/${targets.userPoolId}/.well-known/jwks.json`, { signal: AbortSignal.timeout(10_000) });
   const keys = jwks.ok ? ((await jwks.json()) as { keys?: unknown[] }).keys?.length ?? 0 : 0;
-  return { clients: { ConsoleWeb: await describe(targets.clients.consoleWeb), GuestSignup: await describe(targets.clients.guestSignup), QaProbe: await describe(targets.clients.qaProbe) }, jwks: { status: jwks.status, keys } };
+  return {
+    clients: { ConsoleWeb: await describe(targets.clients.consoleWeb), GuestSignup: await describe(targets.clients.guestSignup), QaProbe: await describe(targets.clients.qaProbe) },
+    pool: { attributesRequireVerificationBeforeUpdate: pool?.UserAttributeUpdateSettings?.AttributesRequireVerificationBeforeUpdate ?? [] },
+    jwks: { status: jwks.status, keys },
+  };
 }
 
 export const cognitoSeam: SeamCognito = {

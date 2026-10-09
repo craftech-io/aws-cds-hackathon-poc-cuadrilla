@@ -6,10 +6,8 @@
 // gets `400`, both before tRPC parses the path, the query or the body. Only then is the viewer's IP
 // read, and it travels in the tRPC context (`edge`), never in the input. A handler built without an
 // edge guard (the in-process routers of the tests and of the local servers) has no viewer at all, so
-// `signup.start` answers UNAVAILABLE there.
-//
-// The one other event is the QaDriver's direct invocation of the QA seam (`QA_SIGNUP_START`,
-// routers/qa-seam.ts): never a request of the Function URL, which always carries `requestContext`.
+// `signup.start` answers UNAVAILABLE there. Every event is a request of the Function URL: there is no
+// direct invocation that starts a sign-up (ADR-0025 §7; `SC-20` takes the public path).
 import type { AnyTRPCRouter } from "@trpc/server";
 import { awsLambdaRequestHandler } from "@trpc/server/adapters/aws-lambda";
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2, Context as LambdaContext } from "aws-lambda";
@@ -17,10 +15,8 @@ import { describeError } from "../auth/errors";
 import { createLogger } from "../lib/log";
 import { stripApiPrefix } from "./api-path";
 import { type EdgeGuardDeps, guardEdge, linkedEdgeGuard } from "./edge";
-import { defaultDeps } from "./deps";
 import { appRouter } from "./index";
-import { type QaSeamAnswer, type QaSignupStartRequest, handleQaSeam, isQaSeamEvent } from "./qa-seam";
-import { type Context, type CreateContextOptions, type EdgeContext, createCallerFactory, createContext, createQaPublicContext } from "./trpc";
+import { type Context, type CreateContextOptions, type EdgeContext, createContext } from "./trpc";
 
 // Failures that are the caller's doing are logged where they are refused (routers/trpc.ts).
 const EXPECTED = new Set(["UNAUTHORIZED", "FORBIDDEN", "BAD_REQUEST", "NOT_FOUND", "CONFLICT", "PRECONDITION_FAILED", "TOO_MANY_REQUESTS"]);
@@ -67,17 +63,4 @@ export function createHandler(router: AnyTRPCRouter, contextOf: (options: Create
   };
 }
 
-const http: BffHandler = createHandler(appRouter, createContext, { edge: linkedEdgeGuard() });
-const createAppCaller = createCallerFactory(appRouter);
-
-/** `signup.start` of the real `appRouter` with the run's context (its counters under `SIGNUP#qa-<runId>#…`). */
-function qaSignupStart(request: QaSignupStartRequest) {
-  return createAppCaller(createQaPublicContext({ runId: request.runId, correlationId: request.correlationId }, defaultDeps())).signup.start(request.form);
-}
-
-export function handler(event: APIGatewayProxyEventV2, context: LambdaContext): Promise<APIGatewayProxyStructuredResultV2>;
-export function handler(event: unknown, context: LambdaContext): Promise<APIGatewayProxyStructuredResultV2 | QaSeamAnswer>;
-export async function handler(event: unknown, context: LambdaContext): Promise<APIGatewayProxyStructuredResultV2 | QaSeamAnswer> {
-  if (isQaSeamEvent(event)) return handleQaSeam(event, qaSignupStart);
-  return http(event as APIGatewayProxyEventV2, context);
-}
+export const handler: BffHandler = createHandler(appRouter, createContext, { edge: linkedEdgeGuard() });

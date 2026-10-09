@@ -8,7 +8,7 @@
 //                           world.settle, metrics.get
 //   GUEST#isp-guest-test    world.create({template: guest}), world.destroy, snapshot, installer.settle,
 //                           world.settle and `console.*` with the `GUEST` principal on its closed list
-//   own sign-up accounts    the seam (signup.start, auth.*, guest.forceExpire, leads.get and `console.*`
+//   own sign-up accounts    the seam (auth.*, guest.forceExpire, leads.get and `console.*`
 //                           with the principal of `auth.qaLogin`): fenced by the address Cognito holds for
 //                           the user (signup-fence.ts), checked by the action itself after `AdminGetUser`
 //   no world                the probes of the stage (mocks, KB, WAF, the pool, G1), the foreign event and
@@ -56,7 +56,7 @@ export const WORLDLESS_ACTIONS: ReadonlySet<QaActionName> = new Set<QaActionName
 ]);
 
 /** The seam of the own sign-up: fenced by the address Cognito holds for the `gst-*` user. */
-export const SIGNUP_ACTIONS: ReadonlySet<QaActionName> = new Set<QaActionName>(["signup.start", "auth.signUp", "auth.confirmQaSignup", "auth.qaLogin", "auth.cleanupQaSignup", "guest.forceExpire", "leads.get"]);
+export const SIGNUP_ACTIONS: ReadonlySet<QaActionName> = new Set<QaActionName>(["auth.signUp", "auth.confirmQaSignup", "auth.qaLogin", "auth.cleanupQaSignup", "guest.forceExpire", "leads.get"]);
 
 export type ScopeFamily = "WORLD" | "WORLDLESS" | "SIGNUP";
 

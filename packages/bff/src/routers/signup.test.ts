@@ -183,7 +183,7 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     expect((await h.leads.get(emailHash))?.pendingUsernames).toEqual([answer.username]);
   });
 
-  it("[FL-114] without the edge's viewer and without a QA run: UNAVAILABLE, no lead, no ticket, no counter", async () => {
+  it("[FL-114] without the edge's viewer: UNAVAILABLE, no lead, no ticket, no counter", async () => {
     expect(await refusalOf(start(signupForm(), null))).toMatchObject({ code: "SERVICE_UNAVAILABLE", reason: "NO_VIEWER" });
     const context = await createContextFactory(() => deps)({ event: { headers: {} } });
     expect(await refusalOf(caller()(context).signup.start(signupForm()))).toMatchObject({ reason: "NO_VIEWER" });
@@ -191,13 +191,17 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     expect(h.leadTable.leads.size).toBe(0);
   });
 
-  it("[FL-113] a call of the QaDriver counts under SIGNUP#qa-<runId>#…, never under the public keys", async () => {
-    const qa = caller()(createQaPublicContext({ runId: "812-1" }, deps));
-    await qa.signup.start(signupForm({ email: "success+qa-sc20-1@simulator.amazonses.com" }));
+  it("[FL-113] a QA address through the edge has no exception: the public counters, origin QA; the QaDriver's context has no viewer", async () => {
+    await start(signupForm({ email: "success+qa-812-1-1@simulator.amazonses.com" }));
     expect(counters().length).toBeGreaterThan(0);
-    for (const pk of counters()) expect(pk.startsWith("SIGNUP#qa-812-1#")).toBe(true);
-    const lead = await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "success+qa-sc20-1@simulator.amazonses.com"));
+    for (const pk of counters()) expect(pk).not.toMatch(/^SIGNUP#qa-/);
+    expect(counters().some((pk) => pk.startsWith("SIGNUP#IP#"))).toBe(true);
+    const lead = await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "success+qa-812-1-1@simulator.amazonses.com"));
     expect(lead?.origin).toBe("QA");
+    const before = counters().length;
+    const fromDriver = caller()(createQaPublicContext({ correlationId: "812-1-sc-20-1-m1" }, deps));
+    expect(await refusalOf(fromDriver.signup.start(signupForm({ email: "success+qa-812-1-2@simulator.amazonses.com" })))).toMatchObject({ reason: "NO_VIEWER" });
+    expect(counters()).toHaveLength(before);
   });
 
   it("[FL-114] signup.start is a mutation: a GET never runs it and writes nothing", async () => {

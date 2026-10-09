@@ -109,7 +109,7 @@ async function signInToHome(page: Page, ispId = SIGNUP_ISP): Promise<{ readonly 
 }
 
 test.describe("guest portada", () => {
-  test("[FL-107] PROVISIONING while the world is built, then READY with its summary, its expiry and the parts that arrive in stages", async ({ page }) => {
+  test("[FL-107] PROVISIONING while the world is built, then READY with its summary, its expiry and every part of the console available", async ({ page }) => {
     const copy = guestHomeCopy[langOf()];
     // Development renders each effect twice: the first two calls come at once, the next ones every 2 s.
     await routeApi(page, { world: { status: "PROVISIONING", origin: "SIGNUP", canRetry: false }, readyAfterCalls: 4 });
@@ -123,7 +123,9 @@ test.describe("guest portada", () => {
     await expect(page.getByText(/Rogelio Méndez/)).toBeVisible();
     await expect(page.getByText(copy.ready.expiry(langOf() === "en" ? "October 8, 2026" : "8 de octubre de 2026"))).toBeVisible();
     await expect(page.getByRole("heading", { name: copy.stages.title })).toBeVisible();
-    await expect(page.getByRole("heading", { name: copy.stages.pending })).toBeVisible();
+    // Every view of the registry exists since wave 5: nothing is left "in the next stages".
+    await expect(page.getByRole("heading", { name: copy.stages.available })).toBeVisible();
+    await expect(page.getByRole("heading", { name: copy.stages.pending })).toHaveCount(0);
     await expect(page.getByRole("button", { name: copy.deletion.open })).toBeVisible();
     await expect(page.getByRole("button", { name: copy.retry })).toHaveCount(0);
     await expectReadableScreen(page);

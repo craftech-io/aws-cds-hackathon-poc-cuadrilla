@@ -13,8 +13,9 @@
 //                only by prefix of QA, evaluation and the test guest's worlds (infra/qa-driver-fence.ts;
 //                `Cases` fenced in code), plus the channel entries, the tool targets, G1, the DLQ, the
 //                topic of our WABA, the pool's QA seam and the reads of the two web ACLs. The seam's
-//                writes it may not make itself go through their owners: `signup.start` through the Bff
-//                (direct invocation, routers/qa-seam.ts) and `guest.forceExpire` through GuestWorlds.
+//                writes it may not make itself go through their owners (`guest.forceExpire` through
+//                GuestWorlds, the cleanup through GuestAccountDeletion); it never starts a sign-up nor
+//                invokes the Bff: `SC-20` starts through the public path like a visitor (ADR-0025 §7).
 //   PolicyAudit  re-evaluates every sent message and every certificate (§12): daily and on demand.
 //
 // Least privilege (infra/iam-capabilities.ts, checked by infra/observability-spec.test.ts). Data by
@@ -148,7 +149,6 @@ function carrier(resource: LinkCarriedResource, local: Readonly<Partial<Record<L
     case "{G3}":
       return lateExport("guardrail", "GuardrailG3");
     case "{PolicyAudit}":
-    case "{Bff}":
       throw new Error(`${resource.slice(1, -1)} is created by infra/bff.ts: pass it as a local carrier.`);
     default:
       return lateExport("messaging-whatsapp", "WaInbound"); // IAM_ARNS.waTopic: sns:Publish on our topic
@@ -261,8 +261,7 @@ export const QaTargets = new sst.Linkable("QaTargets", {
 });
 
 // Media and Evidence by name only: its object grants are the prefixes of infra/qa-driver-fence.ts.
-// The Bff by name: the QA seam's `signup.start` runs there (routers/qa-seam.ts), where the lead and the run's counters are written.
-const qaAccess = roleAccess("QaDriver", [...routerLinks, QaTargets, WhatsAppMetaPhoneNumberId, mediaBucket, evidenceBucket], { "{PolicyAudit}": policyAudit, "{Bff}": bff });
+const qaAccess = roleAccess("QaDriver", [...routerLinks, QaTargets, WhatsAppMetaPhoneNumberId, mediaBucket, evidenceBucket], { "{PolicyAudit}": policyAudit });
 
 export const qaDriver = new sst.aws.Function("QaDriver", {
   name: qaDriverFunctionName($app.name, $app.stage),

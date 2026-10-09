@@ -10,7 +10,7 @@ import { EVAL_ACTIONS } from "../evaluation/index";
 import { tokenCost } from "../evaluation/cost";
 import { fenceEmailRecipient } from "../outbound/recipient-fence";
 import { percentile } from "../metrics/kpis";
-import { QA_REASON, qaEventId, qaForeignId, runIdOfKey } from "./contract";
+import { QA_REASON, qaEventId, qaForeignId } from "./contract";
 import type { QaParsedInput } from "./contract-inputs";
 import type { ActionContext } from "./driver";
 import { sendInbound } from "./channel";
@@ -107,7 +107,7 @@ export function ioActions(ports: QaPorts) {
     },
     "eval.runQuestions": (input: unknown, ctx: ActionContext) => EVAL_ACTIONS["eval.runQuestions"](ports.evaluation(ctx.log, ctx.idempotencyKey), input),
     "eval.runPhotos": (input: unknown, ctx: ActionContext) => EVAL_ACTIONS["eval.runPhotos"](ports.evaluation(ctx.log, ctx.idempotencyKey), input),
-    console: (input: QaParsedInput<"console">, ctx: ActionContext) => callConsole(ports, input, { runId: runIdOfKey(ctx.idempotencyKey), correlationId: ctx.log.correlationId, now: ctx.now() }),
+    console: (input: QaParsedInput<"console">, ctx: ActionContext) => callConsole(ports, input, { correlationId: ctx.log.correlationId, now: ctx.now() }),
     async "memory.inspect"(input: QaParsedInput<"memory.inspect">, ctx: ActionContext) {
       const person = await ports.data.people.requirePerson(input.installerId);
       const clock = await ports.data.runtime.getClock(person.clockId);

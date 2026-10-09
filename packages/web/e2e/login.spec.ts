@@ -272,12 +272,14 @@ test.describe("console shell", () => {
     for (const id of ["cases", "evidence", "people", "manual", "simulator", "clock", "outbox", "metrics", "audit", "orders"] as const) {
       await navigation.getByRole("link", { name: copy.views[id].title }).click();
       await expect(page.getByRole("heading", { level: 1, name: copy.views[id].title })).toBeVisible();
-      await expect(page.getByText(copy.placeholder.title)).toBeVisible();
+      // Every view exists since wave 5: none falls back to the placeholder.
+      await expect(page.getByText(copy.placeholder.title)).toHaveCount(0);
     }
 
     await page.getByRole("button", { name: copy.tour.open }).click();
     const dock = page.getByRole("complementary", { name: copy.tour.title });
-    await expect(dock).toContainText(copy.tour.placeholderTitle);
+    await expect(dock).toBeVisible();
+    await expect(dock).not.toContainText(copy.tour.placeholderTitle);
     await dock.getByRole("button", { name: copy.tour.close }).click();
     await expect(dock).toHaveCount(0);
 

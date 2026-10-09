@@ -93,7 +93,7 @@ async function checkSignUp(deps: PreSignUpDeps, userName: string, attributes: Re
   if (blockingScope(await deps.kill.status(), "SIGNUP") !== undefined) throw new PreSignUpRefused("CAP_REACHED");
   // The day's starts were reserved by `signup.start`; a day over its cap (the cap lowered, or a start
   // that raced it) takes no more accounts. Read only: nothing here counts.
-  if ((await startsToday(deps.runtime, { kind: "PUBLIC" }, now)) > SIGNUP_LIMITS.startsPerDay) throw new PreSignUpRefused("CAP_REACHED");
+  if ((await startsToday(deps.runtime, now)) > SIGNUP_LIMITS.startsPerDay) throw new PreSignUpRefused("CAP_REACHED");
   const lead = await deps.leads.get(emailHash);
   if (lead?.status === "CONFIRMED") throw new PreSignUpRefused("EMAIL_TAKEN");
   // `signup.start` read it when it issued the ticket; another address of the person may have confirmed since.

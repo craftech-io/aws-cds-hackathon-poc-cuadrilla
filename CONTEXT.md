@@ -357,7 +357,7 @@ Todo texto que puede leer o escuchar una persona fuera del equipo (landing, alta
 _Avoid_: UI (suelto)
 
 **Costura de QA** (`auth.confirmQaSignup`, `npm run qa:confirm-signup`):
-Confirmación administrativa de un alta sin leer el código, permitida solo para usuarios cuyo email en Cognito (leído con `AdminGetUser`, nunca tomado del pedido) es `success+qa-…@simulator.amazonses.com`, y auditada; la usan el ejecutor de escenarios y las verificaciones desplegadas.
+Confirmación administrativa de un alta sin leer el código, permitida solo para usuarios cuyo email en Cognito (leído con `AdminGetUser`, nunca tomado del pedido) es `success+qa-…@simulator.amazonses.com`, y auditada; la usan el ejecutor de escenarios y las verificaciones desplegadas. No inicia altas: el inicio (`signup.start`) siempre va por el camino público, también en `SC-20`.
 _Avoid_: bypass, backdoor
 
 ### Tiempo y mundos

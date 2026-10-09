@@ -3,7 +3,7 @@
 // (except `Cases`, fenced in code), and its objects by prefix. The patterns are evaluated here the way
 // IAM evaluates `StringLike`, against keys of the live demo world, a real guest and the stage.
 import { describe, expect, it } from "vitest";
-import { type Grant, type LambdaName, expectedData, expectedGrants } from "./iam-capabilities";
+import { type Grant, LAMBDA_CAPABILITIES, type LambdaName, expectedData, expectedGrants } from "./iam-capabilities";
 import { ITEM_WRITES, QA_DRIVER_WRITE_KEYS, guestTestObjectPrefix, type QaFencedTable } from "./qa-driver-fence";
 import { TABLE_ACTIONS, dataAccessGrants } from "./storage-access";
 import { mediaKeySegment } from "../packages/shared/src/media/keys";
@@ -127,22 +127,18 @@ describe("QaDriver data access [W3 review B1/B4]", () => {
 
 // [W5 review B1/B2] Every key the QA seam writes, with the role that writes it: the QaDriver only where its
 // fence opens the key, otherwise the Lambda that owns the write, which the QaDriver may invoke and whose own
-// grants reach the key. Built with the bff's own key builders, so a key that moves breaks this test.
+// grants reach the key. Built with the bff's own key builders, so a key that moves breaks this test. The
+// start of a sign-up is not part of the seam: `SC-20` takes the public path, so the lead and the start's
+// counters are written by the Bff for a viewer, never on the QaDriver's behalf.
 type Writer = "QaDriver" | LambdaName;
 type SeamWrite = { readonly writer: Writer; readonly table: string; readonly key: string };
 
 const AT = new Date("2026-10-13T15:20:00.000Z");
-const RUN_SCOPE = { kind: "QA", runId: "812-1-s8" } as const;
 const QA_ROOM = qaSlotScope("812-1") as `QA#qa-${string}`;
 const SIGNUP_USER = "usr-g01K80000000000000000000001";
 
 /** The writes of each seam action (the sign-up's actions and the one of its caps); Cognito's own writes are the triggers'. */
 const SEAM_WRITES: Readonly<Record<string, readonly SeamWrite[]>> = {
-  "signup.start": [
-    { writer: "Bff", table: "Leads", key: `${LEAD_PARTITION_PREFIX}${"c".repeat(64)}` },
-    ...visitorCounters(RUN_SCOPE, { ipHash: "a".repeat(64), abuseHash: "b".repeat(64), anonymous: true }, AT).map((spec) => ({ writer: "Bff" as const, table: "Runtime", key: spec.key })),
-    { writer: "Bff", table: "Runtime", key: globalDayKey(RUN_SCOPE, AT) },
-  ],
   "auth.signUp": [],
   "auth.confirmQaSignup": [],
   "auth.qaLogin": [],
@@ -184,8 +180,23 @@ describe("the QA seam's writes and who makes them [W5 review B1/B2]", () => {
     expect(expectedGrants("QaDriver").some((grant) => grant.resources.some((resource) => resource.startsWith("{Leads}")) && grant.actions.some((action) => PUT.includes(action)))).toBe(false);
   });
 
+  it("auth.probe reads the pool's own settings: DescribeUserPool and DescribeUserPoolClient on this app's pool only, and no other role holds DescribeUserPool", () => {
+    const onPool = expectedGrants("QaDriver").filter((grant) => grant.actions.includes("cognito-idp:DescribeUserPool"));
+    expect(onPool).toEqual([{ actions: ["cognito-idp:DescribeUserPoolClient", "cognito-idp:DescribeUserPool"], resources: ["{Auth}"] }]);
+    for (const role of (Object.keys(LAMBDA_CAPABILITIES) as LambdaName[]).filter((name) => name !== "QaDriver")) expect(expectedGrants(role).some((grant) => grant.actions.includes("cognito-idp:DescribeUserPool")), role).toBe(false);
+  });
+
+  it("starts no sign-up: no signup.start action, no invocation of the Bff, and every key of a start stays closed", () => {
+    expect(QA_ACTIONS).not.toContain("signup.start");
+    expect(invokes("Bff")).toBe(false);
+    const start = [...visitorCounters({ ipHash: "a".repeat(64), abuseHash: "b".repeat(64), anonymous: true }, AT).map((spec) => spec.key), globalDayKey(AT)];
+    for (const key of start) expect(allows("Runtime", key), key).toBe(false);
+    expect("Leads" in QA_DRIVER_WRITE_KEYS).toBe(false);
+    expect(LEAD_PARTITION_PREFIX.length).toBeGreaterThan(0);
+  });
+
   it("opens of the sign-up only the limits of a QA run's room: never the public counters, the old shared key, nor a phone lease", () => {
-    for (const key of ["GUESTWORLDS#261013", "GUESTWORLDS#QA#LIMITS", "SIGNUPOK#GLOBAL#2026-10-13", "SIGNUPOK#QA#qa-812-1#2026-10-13", "SIGNUP#GLOBAL#2026-10-13", globalDayKey(RUN_SCOPE, AT), "PHONELEASE#0f3a"]) expect(allows("Runtime", key), key).toBe(false);
+    for (const key of ["GUESTWORLDS#261013", "GUESTWORLDS#QA#LIMITS", "SIGNUPOK#GLOBAL#2026-10-13", "SIGNUPOK#QA#qa-812-1#2026-10-13", "SIGNUP#GLOBAL#2026-10-13", globalDayKey(AT), "SIGNUP#qa-812-1-s8#GLOBAL#2026-10-13", "PHONELEASE#0f3a"]) expect(allows("Runtime", key), key).toBe(false);
     expect(allows("Runtime", qaLimitsKey(QA_ROOM))).toBe(true);
     expect(QA_ACTIONS.filter((action) => action.startsWith("lease."))).toEqual([]);
   });

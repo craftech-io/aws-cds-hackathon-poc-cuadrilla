@@ -1,6 +1,10 @@
 # Scenario suite against the deployed stage `poc` (docs/test-plan.md §4), on demand. The runner
 # drives every flow through the QA driver Lambda with the qa-runner role of the bootstrap
-# (ADR-0007); no human credentials and no password in any secret. Only `main` can assume the role, so
+# (ADR-0007); no human credentials and no password in any secret. The one exception is SC-20 (suite
+# `full`): it starts its sign-ups through the public path like a visitor, from a headless Chromium on
+# `/signup` that solves the edge's AWS WAF challenge (scripts/scenarios/lib/public-signup.ts), so the
+# job installs Playwright's Chromium on this runner first. Its starts spend this runner's per-IP room of
+# the clock hour: dispatch the full suite at most once per hour. Only `main` can assume the role, so
 # dispatch it from main. `eval` runs the agent evaluation set (EV-01 questions, EV-02 photos).
 name: Scenarios poc
 
@@ -45,6 +49,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Chromium for SC-20's public sign-up (this runner only)
+        if: inputs.suite == 'full'
+        run: npx playwright install --with-deps chromium
 
       - name: Assume the qa-runner role (OIDC, no access keys)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0

@@ -39,12 +39,12 @@ export default defineScenario({
     },
     {
       id: "2",
-      title: "auth.probe: the three clients of the pool with their flows and attributes, and the JWKS",
+      title: "auth.probe: the three clients of the pool with their flows and attributes, the pool's attributesRequireVerificationBeforeUpdate = [email], and the JWKS",
       kind: "det",
       flows: ["FL-079"],
       after: "preset",
       async run(ctx) {
-        const probe = (await ctx.qa("auth.probe", {})) as { clients: Record<"ConsoleWeb" | "GuestSignup" | "QaProbe", ClientView>; jwks: { status: number; keys: number } };
+        const probe = (await ctx.qa("auth.probe", {})) as { clients: Record<"ConsoleWeb" | "GuestSignup" | "QaProbe", ClientView>; pool: { attributesRequireVerificationBeforeUpdate: string[] }; jwks: { status: number; keys: number } };
         const { ConsoleWeb: web, GuestSignup: signup, QaProbe: qa } = probe.clients;
         ctx.check(sameSet(web.explicitAuthFlows, ["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]), `ConsoleWeb flows: ${web.explicitAuthFlows.join(", ")}`);
         ctx.check(web.idTokenValidity === 15 && web.tokenValidityUnits?.IdToken === "minutes", "ConsoleWeb id tokens last 15 minutes");
@@ -55,8 +55,7 @@ export default defineScenario({
         ctx.check(qa.explicitAuthFlows.includes("ALLOW_ADMIN_USER_PASSWORD_AUTH") && qa.explicitAuthFlows.every((flow) => flow === "ALLOW_ADMIN_USER_PASSWORD_AUTH" || flow === "ALLOW_REFRESH_TOKEN_AUTH"), `QaProbe flows: ${qa.explicitAuthFlows.join(", ")}`);
         ctx.check(qa.idTokenValidity === 5 && qa.writeAttributes.length === 0, "QaProbe: 5-minute tokens, writes nothing");
         ctx.check(probe.jwks.status === 200 && probe.jwks.keys > 0, "the pool's JWKS is downloadable");
-        // `attributesRequireVerificationBeforeUpdate` is a setting of the pool (DescribeUserPool), outside the driver's grants.
-        ctx.inform("attributesRequireVerificationBeforeUpdate", "not readable with the QaDriver's role");
+        ctx.check(sameSet(probe.pool.attributesRequireVerificationBeforeUpdate, ["email"]), `the pool verifies before updating: ${probe.pool.attributesRequireVerificationBeforeUpdate.join(", ") || "nothing"}`);
       },
     },
     {

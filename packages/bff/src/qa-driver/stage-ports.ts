@@ -19,7 +19,6 @@ import { killSwitchReader, runtimeStore } from "../ops/defaults";
 import { consolePortsOf } from "../routers/console-ports";
 import { defaultDeps } from "../routers/deps";
 import { appRouter } from "../routers/index";
-import { QaSeamAnswer } from "../routers/qa-seam";
 import { QA_FORCE_EXPIRE, QaForceExpireAnswer } from "../guest/qa-expire";
 import { type Context, createCallerFactory, createQaPublicContext, createServerContext } from "../routers/trpc";
 import { linkedG1Prefilter } from "../turns/prefilter";
@@ -48,12 +47,12 @@ function consoleCallers(): ConsoleCallers {
   let qaProbeVerifier: ReturnType<typeof createCognitoIdTokenVerifier> | undefined;
   return {
     server: (options) => createAppCaller(createServerContext(options, deps)),
-    public: (runId, correlationId) => createAppCaller(createQaPublicContext({ runId, correlationId }, deps)),
+    public: (correlationId) => createAppCaller(createQaPublicContext({ correlationId }, deps)),
     async token(idToken, correlationId) {
       const targets = qaTargets();
       qaProbeVerifier ??= createCognitoIdTokenVerifier({ userPoolId: targets.userPoolId, clientId: targets.clients.qaProbe });
       const principal = principalFromClaims(await qaProbeVerifier.verify(idToken));
-      const context: Context = { correlationId, principal, authFailure: null, deps, log: deps.loggerFor(correlationId), edge: null, qa: null };
+      const context: Context = { correlationId, principal, authFailure: null, deps, log: deps.loggerFor(correlationId), edge: null };
       return { caller: createAppCaller(context), clockId: principal.clockId, ispId: principal.ispId, userId: principal.userId, role: principal.role, isGuest: principal.isGuest };
     },
     procedureKind: procedureKindOf,
@@ -149,7 +148,6 @@ export function stageQaPorts(): QaPorts {
       publishForeign,
     },
     signup: () => ({
-      start: async (request) => QaSeamAnswer.parse(await invokeLinked("Bff", request)),
       forceExpire: async (userId) => QaForceExpireAnswer.parse(await invokeLinked("GuestWorlds", { op: QA_FORCE_EXPIRE, userId })),
       cognito: cognitoSeam,
       leads: dynamoLeadStore(),

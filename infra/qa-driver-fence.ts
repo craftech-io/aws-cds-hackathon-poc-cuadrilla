@@ -10,9 +10,10 @@
 // stage (`TURNCAP#GLOBAL#<day>`…), `LIVEWORLD`, `PHONELEASE#`, `JOINCODE#`, the sign-up's keys and any
 // row of the demo world or of a real guest. Its only `KILL#` write is `KILL#AGENT#qa-*`; of the sign-up,
 // only the limits of a QA run's room (`GUESTWORLDS#QA#qa-*`). The QA seam's other writes go through the
-// Lambda that owns them (docs/architecture.md §14): `signup.start` through the Bff (`Leads` and the run's
-// `SIGNUP#qa-<runId>#…`), `guest.forceExpire` through GuestWorlds (`GUESTACCOUNT#`); `PHONELEASE#` stays
-// denied, so QA never moves the real window of a phone bound by code.
+// Lambda that owns them (docs/architecture.md §14): `guest.forceExpire` through GuestWorlds
+// (`GUESTACCOUNT#`), the cleanup through GuestAccountDeletion. It never starts a sign-up: `SC-20` calls the
+// public `POST /api/signup.start`, so `Leads` and every `SIGNUP#` counter stay the Bff's writes for a
+// viewer. `PHONELEASE#` stays denied, so QA never moves the real window of a phone bound by code.
 //
 // Residual fence in code only (documented in §14): `Cases` is keyed by `CASE#<ulid>`, which names no
 // world, so its writes are not fenced by key; the generic transient keys of `Runtime` (`SESSION#`,
@@ -47,8 +48,8 @@ const QA_GLOBAL_TEST_SCOPES = ["TURNCAP#GLOBAL#qa-*", "VALCAP#GLOBAL#qa-*", "TRA
 /**
  * The QA seam's own key (ADR-0025 §7): the limits of one run's room for the sign-up worlds
  * (`GUESTWORLDS#QA#qa-<runId>#LIMITS`, `guest.capsOverride`, packages/bff/src/guest/slots.ts). Never the
- * public counters nor the room's counters, which the triggers write; the lead and the run's start counters
- * (`signup.start`) are the Bff's writes and the account's expiry (`guest.forceExpire`) is GuestWorlds'.
+ * public counters nor the room's counters, which the triggers write; the lead and the start counters are
+ * the Bff's writes for a viewer of the public path and the account's expiry (`guest.forceExpire`) is GuestWorlds'.
  */
 const QA_SEAM_KEYS = ["GUESTWORLDS#QA#qa-*"] as const;
 /** Transient keys that name no world; the code fences them (see the header). */

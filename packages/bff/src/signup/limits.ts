@@ -14,9 +14,8 @@
 // another: a visitor over its own limit never takes a place of the day. Only `signup.start` reserves;
 // the pre sign-up reads the day and the cut and never increments (ADR-0025 §1).
 //
-// A call of the QaDriver (`qa.runId`, ADR-0025 §7) counts under keys of its own,
-// `SIGNUP#qa-<runId>#…`, so public abuse never makes a scenario fail and a scenario never spends
-// public room. It has no viewer IP: its IP counters use the run as the address.
+// There is no other scope: every start, `SC-20`'s included, is a viewer's start through the edge
+// (ADR-0025 §7), so a scenario spends the same room as a visitor and proves the limits a visitor meets.
 import { ConnectorError } from "@cuadrilla/shared";
 import type { Item, TableClient, TransactOp } from "../connector/table-client";
 import { CONFIRMED_ACCOUNTS, signupKeyKey } from "../leads/guest-accounts";
@@ -42,14 +41,11 @@ const META = "META";
 export const realHour = (at: Date): string => at.toISOString().slice(0, 13);
 export const realDay = (at: Date): string => at.toISOString().slice(0, 10);
 
-/** Where the counters of a call live: the public scope, or the QaDriver's run. */
-export type LimitScope = { readonly kind: "PUBLIC" } | { readonly kind: "QA"; readonly runId: string };
+const PREFIX = "SIGNUP#";
 
-const prefix = (scope: LimitScope): string => (scope.kind === "QA" ? `SIGNUP#qa-${scope.runId}#` : "SIGNUP#");
+export const globalDayKey = (at: Date): string => `${PREFIX}GLOBAL#${realDay(at)}`;
 
-export const globalDayKey = (scope: LimitScope, at: Date): string => `${prefix(scope)}GLOBAL#${realDay(at)}`;
-
-/** `ipHash` of the limits: the viewer's IP (or the QA run) under the `ip-hash` subkey. */
+/** `ipHash` of the limits: the viewer's IP under the `ip-hash` subkey. */
 export function ipHashOf(ipHashKey: Uint8Array | string, address: string): string {
   return hmacSha256Hex(ipHashKey, address);
 }
@@ -76,8 +72,8 @@ function endOfDay(at: Date): Date {
 }
 
 /** The counters of one visitor for one start, the anonymous ones only when WAF labelled the IP. */
-export function visitorCounters(scope: LimitScope, keys: VisitorKeys, at: Date): CounterSpec[] {
-  const p = prefix(scope);
+export function visitorCounters(keys: VisitorKeys, at: Date): CounterSpec[] {
+  const p = PREFIX;
   const hour = endOfHour(at);
   const day = endOfDay(at);
   const specs: CounterSpec[] = [
@@ -119,16 +115,16 @@ function isFull(error: unknown): boolean {
  * One start: the visitor's counters together, then the stage's day. A full counter changes nothing of
  * its transaction; a full day after the visitor's counters leaves them counted (it was an attempt).
  */
-export async function reserveStart(client: TableClient, scope: LimitScope, keys: VisitorKeys, at: Date): Promise<ReserveOutcome> {
+export async function reserveStart(client: TableClient, keys: VisitorKeys, at: Date): Promise<ReserveOutcome> {
   const iso = at.toISOString();
   try {
-    await client.transact(visitorCounters(scope, keys, at).map((spec) => incrementOp(spec, at)), iso);
+    await client.transact(visitorCounters(keys, at).map((spec) => incrementOp(spec, at)), iso);
   } catch (error) {
     if (isFull(error)) return "RATE_LIMITED";
     throw error;
   }
   try {
-    await client.transact([incrementOp({ key: globalDayKey(scope, at), limit: SIGNUP_LIMITS.startsPerDay, periodEndsAt: endOfDay(at) }, at)], iso);
+    await client.transact([incrementOp({ key: globalDayKey(at), limit: SIGNUP_LIMITS.startsPerDay, periodEndsAt: endOfDay(at) }, at)], iso);
   } catch (error) {
     if (isFull(error)) return "CAP_REACHED";
     throw error;
@@ -147,6 +143,6 @@ export async function confirmedAccountsOf(client: Pick<TableClient, "get">, abus
 }
 
 /** Starts counted today in the stage (the pre sign-up reads it, never increments it). */
-export async function startsToday(client: Pick<TableClient, "get">, scope: LimitScope, at: Date): Promise<number> {
-  return numberOf(await client.get("Runtime", { PK: globalDayKey(scope, at), SK: META }), SIGNUP_COUNTER);
+export async function startsToday(client: Pick<TableClient, "get">, at: Date): Promise<number> {
+  return numberOf(await client.get("Runtime", { PK: globalDayKey(at), SK: META }), SIGNUP_COUNTER);
 }

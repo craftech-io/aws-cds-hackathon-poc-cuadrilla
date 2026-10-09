@@ -20,7 +20,7 @@ export function createSignupRouter(ports?: () => SignupPorts) {
     start: publicProcedure
       .input(z.unknown())
       .output(SignupStartOutput)
-      .mutation(({ ctx, input }) => startSignup(ports ?? ctx.deps.signup ?? defaultSignupPorts, { input, edge: ctx.edge, qa: ctx.qa, log: ctx.log })),
+      .mutation(({ ctx, input }) => startSignup(ports ?? ctx.deps.signup ?? defaultSignupPorts, { input, edge: ctx.edge, log: ctx.log })),
   });
 }
 

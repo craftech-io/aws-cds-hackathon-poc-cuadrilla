@@ -30,7 +30,9 @@ Para la landing, el alta, el login y los legales aplica la skill `poc-landing` d
 - **Alta de punta a punta**: formulario → código → login → mundo `READY`, con direcciones
   `success+qa-…@simulator.amazonses.com` y la costura de QA (`auth.confirmQaSignup` en `SC-20`,
   `npm run qa:confirm-signup` en §6.1); nunca un email real, nunca una contraseña en un secreto de CI;
-  limpieza con `npm run leads:delete` en la ola 2b y también `auth.cleanupQaSignup` desde WP-45. En la
+  limpieza con `npm run leads:delete` en la ola 2b y también `auth.cleanupQaSignup` desde WP-45. `SC-20`
+  inicia sus altas por el camino público (Chromium headless con el token de AWS WAF; el `QaDriver` nunca
+  inicia un alta ni escribe `Leads`), una corrida por hora de reloj. En la
   verificación desplegada, las altas van por el camino público con sus límites reales: primero la de
   evidencia, después las cuatro completas dentro del límite por IP y el chequeo anti abuso al final, en
   una hora nueva (`docs/test-plan.md` §6.1); la Function URL directa del `Bff` debe responder `403`.

@@ -165,21 +165,6 @@ export const ACTION_INPUTS = {
   "kb.probe": z.object({ ...World, installerId: InstallerId, query: z.string().min(3).max(500).optional() }).strict(),
   "waf.probe": z.object({}).strict(),
   "auth.probe": z.object({}).strict(),
-  "signup.start": z
-    .object({
-      email: QaSignupEmail,
-      name: z.string().trim().min(1).max(80).default("Invitada QA"),
-      locale: z.enum(["es-MX", "en"]).default("es-MX"),
-      termsAccepted: z.boolean().default(true),
-      contactAccepted: z.boolean().default(false),
-      utm: z.record(z.string(), z.string().max(100)).optional(),
-      /**
-       * A sub-scope of the run's counters (`…#qa-<runId>-<scope>#…`): the run is the "IP" of its starts, so a
-       * step that proves the per-IP limit (SC-20/8) counts apart from the others.
-       */
-      scope: z.string().regex(/^[a-z0-9]{1,8}$/).optional(),
-    })
-    .strict(),
   "auth.signUp": z.object({ username: SignupUser, email: QaSignupEmail, ticket: z.string().min(1).max(4096).optional(), omitTicket: z.boolean().default(false) }).strict(),
   "auth.confirmQaSignup": z.object({ username: SignupUser }).strict(),
   "auth.qaLogin": z.object({ username: SignupUser }).strict(),

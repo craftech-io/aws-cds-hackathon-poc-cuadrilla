@@ -24,14 +24,15 @@ export function EventsSection() {
   const { clock } = useWorldClock();
   return (
     <Section id="clock-events" title={copy.events.title} description={copy.events.description}>
-      <Table<UpcomingEvent>
+      <Table<UpcomingEvent & { readonly position: number }>
         caption={copy.events.title}
         columns={[
           { id: "when", header: copy.events.when, cell: (event) => <span className="tabular-nums">{formatSimTime(event.dueAtSim, consoleCopy.clock.weekdays)}</span> },
           { id: "kind", header: copy.events.kind, cell: (event) => copy.events.kinds[event.kind] },
         ]}
-        rows={clock?.next ?? []}
-        keyOf={(event) => `${event.kind}:${event.dueAtSim}`}
+        // Several timers share a kind and an instant (the day's start of each installer): the position keeps keys unique.
+        rows={(clock?.next ?? []).map((event, position) => ({ ...event, position }))}
+        keyOf={(event) => `${event.kind}:${event.dueAtSim}:${event.position}`}
         emptyTitle={copy.events.empty}
       />
     </Section>

@@ -15,12 +15,11 @@
 // comes only from a verified id token (`createContextFactory`); the `QaDriver` builds its principals
 // on the server (`createServerContext`, auth/qa-principal.ts) and the same middlewares run for both.
 //
-// Where a request came from is part of the context, never of the input (ADR-0025 §3):
-//   edge   set by routers/edge.ts only after the origin header matched: the viewer's IP (from
-//          `CloudFront-Viewer-Address`) and whether AWS WAF labelled it anonymous
-//   qa     set only by the `QaDriver` (`createServerContext`, `createQaPublicContext`): its run id, so
-//          the limits of the sign-up count under keys of their own (`…#qa-<runId>#…`)
-// A request with neither (a call that skipped the edge) has no viewer: `signup.start` answers UNAVAILABLE.
+// Where a request came from is part of the context, never of the input (ADR-0025 §3): `edge`, set by
+// routers/edge.ts only after the origin header matched, carries the viewer's IP (from
+// `CloudFront-Viewer-Address`) and whether AWS WAF labelled it anonymous. A call without it (one that
+// skipped the edge, or any call of the `QaDriver`) has no viewer: `signup.start` answers UNAVAILABLE, so
+// the own sign-up is only ever started through the public path (`SC-20` included).
 import { TRPCError, initTRPC } from "@trpc/server";
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { z } from "zod";
@@ -45,11 +44,6 @@ export interface EdgeContext {
   readonly anonymousIp?: boolean;
 }
 
-/** A call of the `QaDriver` (ADR-0025 §7): its counters live under `…#qa-<runId>#…`. */
-export interface QaContext {
-  readonly runId: string;
-}
-
 export interface Context {
   readonly correlationId: string;
   /** `null` when the request carries no acceptable token; `authFailure` says why. */
@@ -59,8 +53,6 @@ export interface Context {
   readonly log: Logger;
   /** `null` unless the request came through the Router and passed the origin check. */
   readonly edge: EdgeContext | null;
-  /** `null` unless the `QaDriver` made the call. */
-  readonly qa: QaContext | null;
 }
 
 /** The one world a principal acts on. */
@@ -106,7 +98,7 @@ export function createContextFactory(resolveDeps: () => ContextDeps) {
     const deps = resolveDeps();
     const correlationId = correlationIdOf(event);
     const log = deps.loggerFor(correlationId);
-    const origin = { edge: edge ?? null, qa: null };
+    const origin = { edge: edge ?? null };
     try {
       const claims = await deps.verifier.verify(bearerToken(header(event.headers, "authorization")));
       return { correlationId, principal: principalFromClaims(claims), authFailure: null, deps, log, ...origin };
@@ -123,16 +115,6 @@ export const createContext = createContextFactory(defaultDeps);
 
 export interface ServerCallOptions extends QaPrincipalInput {
   readonly correlationId?: string;
-  /** The scenario run the call belongs to (`qa.runId`). */
-  readonly runId?: string;
-}
-
-const QA_RUN_ID = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
-
-function qaContextOf(runId: string | undefined): QaContext | null {
-  if (runId === undefined) return null;
-  if (!QA_RUN_ID.test(runId) || runId.length > 64) throw new RangeError("a QA run id is letters, digits and single dashes (at most 64)");
-  return { runId };
 }
 
 /**
@@ -143,17 +125,17 @@ function qaContextOf(runId: string | undefined): QaContext | null {
 export function createServerContext(options: ServerCallOptions, deps: ContextDeps): Context {
   const correlationId = correlationIdFrom(options.correlationId);
   const principal = qaPrincipal(options, deps.wallClock());
-  return { correlationId, principal, authFailure: null, deps, log: deps.loggerFor(correlationId), edge: null, qa: qaContextOf(options.runId) };
+  return { correlationId, principal, authFailure: null, deps, log: deps.loggerFor(correlationId), edge: null };
 }
 
 /**
- * Context of a public call of the `QaDriver` (the own sign-up of `SC-20`, ADR-0025 §7): no principal
- * and no viewer, only its run id, so every limit counts under the run's own keys.
+ * Context of a public procedure the `QaDriver` reads (`health.live`, `brand.get`): no principal and no
+ * viewer, so it can never start a sign-up (that path is the public one, ADR-0025 §7).
  */
-export function createQaPublicContext(options: { readonly runId: string; readonly correlationId?: string }, deps: ContextDeps): Context {
+export function createQaPublicContext(options: { readonly correlationId?: string }, deps: ContextDeps): Context {
   const correlationId = correlationIdFrom(options.correlationId);
   const authFailure = new AuthError(AUTH_REASON.TOKEN_MISSING, "a public call carries no principal");
-  return { correlationId, principal: null, authFailure, deps, log: deps.loggerFor(correlationId), edge: null, qa: qaContextOf(options.runId) };
+  return { correlationId, principal: null, authFailure, deps, log: deps.loggerFor(correlationId), edge: null };
 }
 
 /** What the browser reads of an unexpected failure; the log keeps the rest under the correlation id. */

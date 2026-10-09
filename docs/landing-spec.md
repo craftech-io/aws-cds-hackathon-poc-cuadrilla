@@ -762,7 +762,15 @@ como captura.
 
 ## 6. Capturas: manifiesto de renders → capturas reales
 
-### 6.1 Mientras la consola de la GUEST no existe: renders con componentes y textos reales
+**Estado (cierre de la ola 5, WP-44): la landing no tiene ningún render.** Las 20 entradas de
+`public/landing/manifest.json` (§6.3) están en `status: "capture"`, cada una con su archivo y su hash en
+`scripts/landing/captures.json`, producidas por el pipeline de §6.2 sobre la consola real servida
+localmente con el mundo sintético determinista; ninguna está en `render` ni en `placeholder`
+(`npm run landing:check` lo verifica en CI). El marco de teléfono propio de la landing y los componentes de
+cada render se borraron con su reemplazo. §6.1 queda como el criterio histórico con el que se construyeron
+los renders de la ola 2b; una entrada nueva del manifiesto entra directamente como `capture`.
+
+### 6.1 Mientras la consola de la GUEST no existía: renders con componentes y textos reales (histórico, reemplazado por WP-44)
 
 Cada elemento visual de la landing (marco de teléfono de una escena, recorte de consola) se construye con
 componentes reales renderizados en un estado de datos fijo y curado — nunca una maqueta de Figma ni una
@@ -786,10 +794,9 @@ criterio que ya aplica la portada del invitado (§1.11) para lo que todavía no 
 
 ### 6.2 Pipeline de captura (para cuando la consola exista) — WP-60 adapta la referencia (N10)
 
-Estos cinco scripts **no existen todavía en este repo**: `docs/reuse-map.md` los marca como reusables de la
-referencia interna (solo lectura), y **WP-60 los adapta** a `scripts/landing/**` de Cuadrilla en la ola
-2b.2 (`docs/build-plan.md`), con el renombre a `GUEST` y el mundo `guest` de §0 ya hechos. Hasta que WP-60
-corra, §6.1 (renders con componentes reales) es la única fuente de las 18 entradas del manifiesto.
+Estos scripts están en `scripts/landing/**` (adaptados por WP-60 en la ola 2b.2 del scaffolding reusado,
+`docs/reuse-map.md`, con el renombre a `GUEST` y el mundo `guest` de §0) y WP-44 (ola 5) los corrió sobre
+la consola completa: son la única fuente de las 20 entradas del manifiesto.
 
 1. `scripts/landing/console-server.ts` (adaptado por WP-60 del scaffolding reusado, `docs/reuse-map.md`
    línea 156) sirve la consola localmente contra un mundo sintético determinista — el mismo mundo `guest`
@@ -813,8 +820,9 @@ corra, §6.1 (renders con componentes reales) es la única fuente de las 18 entr
 
 ### 6.3 Tabla de manifiesto — reescrita (B2, B4, N5, compliance-B5/B6)
 
-`id` es la clave dentro de `manifest.media` (`media.ts`); `estado inicial` es lo que existe el día que se
-integra esta spec (todo `render`, hecho con componentes reales, cero mockups de features inexistentes);
+`id` es la clave dentro de `manifest.media` (`media.ts`); `estado inicial` es lo que existía el día que se
+integró esta spec (todo `render`, hecho con componentes reales, cero mockups de features inexistentes; hoy
+todas las filas están en `capture`, ver el estado al principio de §6);
 `reemplazo real` dice la ruta/estado de consola + viewport que produce la captura definitiva y en qué
 paquete de trabajo (WP, a asignar por `pm`/`architect` en el plan de olas — aquí solo se numeran en
 orden). Los ids siguen el orden de escenas de §1.6 (N5); ninguna fila describe una función inexistente
@@ -844,7 +852,7 @@ orden). Los ids siguen el orden de escenas de §1.6 (N5); ninguna fila describe 
 | `signup-form` | Signup: formulario con los dos consentimientos separados | `render` (construido junto con la vista real de `/signup`, §7) | Es la vista real: no hay "reemplazo", es captura directa una vez que existe | Signup |
 | `signup-code` | Signup: pantalla de verificación por código | `render`/captura directa | Igual | Signup |
 
-19 entradas de manifiesto (17 de landing + 2 de signup, que en rigor no son "renders" sino la primera
+20 entradas de manifiesto (18 de landing: `hero-loop`, las 11 de escena y las 6 de la galería; + 2 de signup, que en rigor no son "renders" sino la primera
 captura real porque el signup se construye directo, sin una consola previa que reemplazar) — una más que
 antes, porque N5 agrega la escena de seguridad (S6) como sus dos propias entradas en vez de reusar las de
 S2/S5. Ninguna muestra una funcionalidad que el producto no vaya a tener: cada una corresponde a una vista

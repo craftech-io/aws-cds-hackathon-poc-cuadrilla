@@ -68,7 +68,6 @@ export const QA_ACTIONS = [
   "waf.probe",
   "auth.probe",
   // The QA seam of the own sign-up (ADR-0025 §7)
-  "signup.start",
   "auth.signUp",
   "auth.confirmQaSignup",
   "auth.qaLogin",
