@@ -75,7 +75,7 @@ export function guestTestObjectPrefix(): string {
 const QA_OBJECTS = ["qa/*", "eval/*"] as const;
 
 /** Every data grant of the QaDriver beyond its reads; `Cases` is the documented exception (no world in its key). */
-export function qaDriverDataGrants(): Grant[] {
+function qaDriverDataGrants(): Grant[] {
   const guestTest = guestTestObjectPrefix();
   const own = (bucket: "Media" | "Evidence"): string[] => [...QA_OBJECTS.map((prefix) => `{${bucket}}/${prefix}`), `{${bucket}}/${guestTest}`];
   return [
@@ -85,4 +85,15 @@ export function qaDriverDataGrants(): Grant[] {
     { actions: ["s3:GetObject"], resources: ["{Media}/sim/*", ...own("Evidence"), ...QA_LEASED_ORDERS.flatMap((id) => [`{Evidence}/photos/${id}`, `{Evidence}/certificates/${id}`])] },
     { actions: ["s3:DeleteObject"], resources: QA_OBJECTS.flatMap((prefix) => [`{Media}/${prefix}`, `{Evidence}/${prefix}`]) },
   ];
+}
+
+/**
+ * The same grants as customer-managed policies of the QaDriver's role: inline, with its reads, the
+ * links and the probes, they pass IAM's 10,240 characters of a role's inline policies. `Runtime`'s
+ * fence alone in one, everything else in the other, each under 6,144 (infra/role-policy-size.test.ts).
+ */
+export function qaDriverManagedPolicies(): Record<"QaDriverRuntimeWrites" | "QaDriverWorldWrites", Grant[]> {
+  const grants = qaDriverDataGrants();
+  const runtime = (grant: Grant): boolean => grant.resources.length === 1 && grant.resources[0] === "{Runtime}";
+  return { QaDriverRuntimeWrites: grants.filter(runtime), QaDriverWorldWrites: grants.filter((grant) => !runtime(grant)) };
 }

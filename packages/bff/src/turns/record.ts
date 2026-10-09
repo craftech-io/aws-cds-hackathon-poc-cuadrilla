@@ -6,15 +6,16 @@
 //   CuadrillaMetrics  the turn and its tokens on the order's KPI row, its latency, and the first-reply
 //                     latency: real ms from the inbound message to the first outbound of the turn
 //   log fields        `TurnLatency`, `TurnErrors`, `TurnMaxTokens`, `FirstReplyLatency` (logs only, ADR-0028)
-//   CostPerConversation  the order's conversation cost so far after the turn, by the verified rows of the
-//                     rate card (the Harness model's tokens until WP-49 verifies the rest): the metric
-//                     filter of the cost cut (ADR-0019) averages it per hour; QA and evaluation worlds,
-//                     with a budget per run, never log it
+//   AgentSpendUsd     the turn's OWN spend, by the verified rows of the rate card (the Harness model's
+//                     tokens until WP-49 verifies the rest), only in the demo and live worlds: the alarm of
+//                     the cost cut (ADR-0019) sums it per hour against the stage's hourly budget, so a
+//                     conversation adds what each turn spends, never its running total again. Guest worlds
+//                     (sign-up ones included) are capped by their own ceilings and never log it; QA and
+//                     evaluation worlds have a budget per run
 //   answered          whether the installer got something from the turn: a message of the turn, or an
 //                     escalation or a safety report that answers by itself (`ALWAYS_ANSWER`)
 import { ConnectorError, ispKindOfClock } from "@cuadrilla/shared";
 import type { HarnessUsage } from "../agent/harness-client";
-import type { ConversationKpi } from "../domain/metrics";
 import type { Connector } from "../connector/ports";
 import type { Message } from "../domain/conversations";
 import type { AgentMode } from "../domain/metrics";
@@ -26,7 +27,7 @@ import type { TurnRequest } from "./deps";
 export const TURN_LOG_METRICS = { latency: "TurnLatency", errors: "TurnErrors", maxTokens: "TurnMaxTokens", firstReply: "FirstReplyLatency" } as const;
 
 /** Read by the metric filter of the cost cut (infra/observability-spec.ts). */
-export const COST_PER_CONVERSATION_METRIC = "CostPerConversation";
+export const AGENT_SPEND_METRIC = "AgentSpendUsd";
 
 /** Fixed notes of the turns whose model text is not kept. */
 export const FIXED_NOTES = { guardrail: "GUARDRAIL_BLOCK", failed: "TURN_FAILED" } as const;
@@ -74,9 +75,13 @@ export async function writeTurnNote(deps: TurnRecordDeps, input: NoteInput): Pro
 
 /** The turn, its tokens and its latency on the order's KPI row (`EVAL` in an evaluation world). */
 export async function recordTurnKpi(deps: TurnRecordDeps, request: TurnRequest, usage: HarnessUsage, latencyMs: number, firstReplyLatencyMs?: number): Promise<void> {
-  if (request.workOrderId === undefined) return;
+  if (request.workOrderId !== undefined) await addTurnToKpi(deps, { ...request, workOrderId: request.workOrderId }, usage, latencyMs, firstReplyLatencyMs);
+  await logAgentSpend(deps, request, usage);
+}
+
+async function addTurnToKpi(deps: TurnRecordDeps, request: TurnRequest & { readonly workOrderId: string }, usage: HarnessUsage, latencyMs: number, firstReplyLatencyMs?: number): Promise<void> {
   const evaluation = ispKindOfClock(request.clockId) === "EVAL";
-  const kpi = await deps.data.metrics.addToKpi(
+  await deps.data.metrics.addToKpi(
     {
       ispId: request.ispId,
       source: evaluation ? "EVAL" : "WORLD",
@@ -91,13 +96,12 @@ export async function recordTurnKpi(deps: TurnRecordDeps, request: TurnRequest, 
       ...(firstReplyLatencyMs === undefined ? {} : { firstReplyLatencyMs }),
     },
   );
-  await logConversationCost(deps, request, kpi);
 }
 
-/** The conversation's cost in USD by the verified rate card rows, or `undefined` while a row it needs is not verified. */
-export function conversationCostUsd(kpi: Pick<ConversationKpi, "inputTokens" | "outputTokens">, rows: readonly unknown[]): number | undefined {
+/** The cost in USD of these model tokens by the verified rate card rows, or `undefined` while a row it needs is not verified. */
+export function tokensCostUsd(tokens: Pick<HarnessUsage, "inputTokens" | "outputTokens">, rows: readonly unknown[]): number | undefined {
   const usage = {
-    models: { [DEFAULT_MODEL_ID]: { input: kpi.inputTokens, output: kpi.outputTokens, cacheRead: 0, cacheWrite: 0 } },
+    models: { [DEFAULT_MODEL_ID]: { input: tokens.inputTokens, output: tokens.outputTokens, cacheRead: 0, cacheWrite: 0 } },
     embeddingTokens: 0,
     agentCore: { gateway: 0, memoryEvents: 0, memoryRecords: 0, harness: 0 },
     transcribeSeconds: 0,
@@ -109,16 +113,19 @@ export function conversationCostUsd(kpi: Pick<ConversationKpi, "inputTokens" | "
   return cost.status === "VERIFIED" ? cost.usd : undefined;
 }
 
-/** The `CostPerConversation` line; a rate card that cannot be read or priced only leaves a warning, never fails the turn. */
-async function logConversationCost(deps: TurnRecordDeps, request: TurnRequest, kpi: ConversationKpi): Promise<void> {
-  const kind = ispKindOfClock(request.clockId);
-  if (kind === "QA" || kind === "EVAL") return;
+/** The worlds whose spend the stage-wide cut sums: the demo and the live world, never a guest's, QA's or an evaluation's. */
+export const agentSpendCounts = (clockId: string): boolean => ispKindOfClock(clockId) === "DEMO";
+
+/** The `AgentSpendUsd` line of one turn; a rate card that cannot be read or priced only leaves a warning, never fails the turn. */
+async function logAgentSpend(deps: TurnRecordDeps, request: TurnRequest, usage: HarnessUsage): Promise<void> {
+  if (!agentSpendCounts(request.clockId)) return;
+  const order = request.workOrderId === undefined ? {} : { workOrderId: request.workOrderId };
   try {
-    const usd = conversationCostUsd(kpi, await deps.data.reference.listRateCard());
-    if (usd === undefined) deps.log.warn("turn.cost_unpriced", { workOrderId: kpi.workOrderId });
-    else deps.log.info("metric", { metric: COST_PER_CONVERSATION_METRIC, value: usd, workOrderId: kpi.workOrderId, turns: kpi.turns });
+    const usd = tokensCostUsd(usage, await deps.data.reference.listRateCard());
+    if (usd === undefined) deps.log.warn("turn.cost_unpriced", order);
+    else deps.log.info("metric", { metric: AGENT_SPEND_METRIC, value: usd, ...order });
   } catch (error) {
-    deps.log.warn("turn.cost_unavailable", { workOrderId: kpi.workOrderId, error });
+    deps.log.warn("turn.cost_unavailable", { ...order, error });
   }
 }
 

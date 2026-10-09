@@ -15,7 +15,7 @@ export class DeadlineError extends Error {
 export async function withDeadline<T>(operation: string, timeoutMs: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new RangeError(`timeoutMs must be positive, got ${timeoutMs}`);
   const controller = new AbortController();
-  let timer: NodeJS.Timeout | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
       const error = new DeadlineError(operation, timeoutMs);

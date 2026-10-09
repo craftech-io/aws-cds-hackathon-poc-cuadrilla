@@ -110,6 +110,7 @@ beforeAll(async () => {
     cognito: { UserGroup: recorder("aws.cognito.UserGroup") },
     sesv2: { EmailIdentity: { isInstance: () => false } },
     lambda: { EventSourceMapping: recorder("aws.lambda.EventSourceMapping") },
+    iam: { Policy: recorder("aws.iam.Policy"), getPolicyDocumentOutput: (args: unknown) => ({ json: out(args) }) },
     cloudwatch: { MetricAlarm: recorder("aws.cloudwatch.MetricAlarm") },
     wafv2: { WebAcl: recorder("aws.wafv2.WebAcl", { applicationIntegrationUrl: out("https://abc.edge.sdk.awswaf.com/abc/def/") }), WebAclAssociation: recorder("aws.wafv2.WebAclAssociation") },
     cloudfront: {
@@ -251,6 +252,25 @@ describe("the edge of the Bff (ADR-0025 §3) [FL-114]", () => {
     const permissions = (await deep(bff.args.permissions)) as unknown[];
     expect(permissions).toContainEqual(resolved(BFF_LEADS_GRANT));
     expect(JSON.stringify(permissions)).not.toMatch(/"(ses|social-messaging|bedrock|cognito-idp):/);
+  });
+});
+
+describe("the QaDriver's role [W3R1-N1]", () => {
+  it("keeps its fenced writes out of the inline policy, in the two managed policies its Function attaches", async () => {
+    const qa = fn("QaDriver");
+    const inline = JSON.stringify(await deep(qa.args.permissions));
+    expect(inline).not.toContain("KILL#AGENT#qa-*");
+    expect(inline).not.toContain("dynamodb:PutItem");
+    const names = ["QaDriverRuntimeWrites", "QaDriverWorldWrites"];
+    expect(await deep(qa.args.policies)).toEqual(names.map((name) => arnOf("aws.iam.Policy", name)));
+    const policies = created.filter((entry) => entry.type === "aws.iam.Policy");
+    expect(policies.map((entry) => entry.name)).toEqual(names);
+    const documents = (await deep(policies.map((entry) => entry.args.policy))) as Array<{ statements: Array<{ effect: string; actions: string[]; resources: string[] }> }>;
+    for (const document of documents) for (const statement of document.statements) expect(statement.effect).toBe("Allow");
+    expect(JSON.stringify(documents[0])).toContain("KILL#AGENT#qa-*");
+    expect(documents[0]?.statements.flatMap((statement) => statement.resources)).toEqual([arnOf("dynamodb", "table/Runtime")]);
+    expect(JSON.stringify(documents[1])).toContain(arnOf("dynamodb", "table/Cases"));
+    for (const other of ["Bff", "PolicyAudit"]) expect(await deep(fn(other).args.policies), other).toEqual([]);
   });
 });
 

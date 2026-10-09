@@ -14,7 +14,7 @@
 //   npm run ops:kill -- --scope SIGNUP --off
 //   npm run ops:kill -- --status          (reads the four global switches; writes nothing)
 //
-// `CostGuard` turns AGENT on for the cost cut (the global ceiling of turns, the cost per conversation,
+// `CostGuard` turns AGENT on for the cost cut (the global ceiling of turns, the hourly agent spend,
 // the project budget at 100 %) and SIGNUP for the sign-up's cut; the operator reads why with --status
 // and turns it off here once the cause is understood.
 import { resolve } from "node:path";

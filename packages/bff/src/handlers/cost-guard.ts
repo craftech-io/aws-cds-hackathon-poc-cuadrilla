@@ -4,7 +4,7 @@
 //
 //   the sign-up's alarms (bounces and complaints of the authentication emails, a burst of sign-ups)
 //   → `KILL#SIGNUP`, so the reputation of SES, shared by the whole account, is protected before a pause;
-//   the cost alarms (the global ceiling of turns reached, the cost per conversation over the threshold)
+//   the cost alarms (the global ceiling of turns reached, the agent's hourly spend over the stage's budget)
 //   and the project budget at 100 % (AWS Budgets publishes plain text with a `Budget Name:` line)
 //   → `KILL#AGENT`: no Harness turn, transcription or photo validation; physical safety goes on.
 //
@@ -32,7 +32,7 @@ export const ALARM_SCOPES: Readonly<Record<string, KillScope>> = {
   AuthEmailComplaints: "SIGNUP",
   SignupBurst: "SIGNUP",
   TurnCapHitsGlobal: "AGENT",
-  CostPerConversation: "AGENT",
+  AgentSpendHourly: "AGENT",
 };
 
 /** Budget (name after the prefix, infra/observability-spec.ts `budgetName`) → scope; it only notifies at 100 %. */

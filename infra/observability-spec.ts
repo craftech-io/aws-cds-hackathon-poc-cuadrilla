@@ -8,7 +8,7 @@
 // A CloudWatch metric exists only when an alarm that cuts reads it or a scenario step asserts it:
 //
 //   TurnCapHits{scope=GLOBAL}   alarm → CostAlerts → CostGuard → KILL#AGENT     (ADR-0019)
-//   CostPerConversation         alarm → CostAlerts → CostGuard → KILL#AGENT     (ADR-0019)
+//   AgentSpendUsd               alarm → CostAlerts → CostGuard → KILL#AGENT     (ADR-0019)
 //   OriginRejected              asserted by SMK/10 (the Bff's Function URL called directly)
 //   KillSwitchActive            asserted by SC-14/5 (a world's agent cut)
 //   SignupStarted               alarm of the sign-up's cut: infra/cost-guard.ts (WP-56), not here
@@ -18,7 +18,7 @@
 // The project budget notifies the operator at 50, 80 and 100 % and, at 100 %, CostAlerts too.
 
 import { SeedOverridesValue } from "../packages/bff/src/lib/secret-schemas";
-import { APP, CAPABILITIES, IAM_ARNS, METRICS_NAMESPACE, STAGE, expectedGrants, type CapabilityName, type Grant, type LambdaName } from "./iam-capabilities";
+import { APP, CAPABILITIES, IAM_ARNS, METRICS_NAMESPACE, STAGE, expectedGrants, isManagedGrant, type CapabilityName, type Grant, type LambdaName } from "./iam-capabilities";
 
 export { METRICS_NAMESPACE };
 
@@ -58,8 +58,8 @@ export const METRIC_FILTERS: readonly MetricFilterSpec[] = [
     readBy: "alarm",
     source: `${BFF}/ops/cost-caps.ts`,
   },
-  // The order's cost so far by the rate card, logged by the worker after each turn updates ConversationKpi.
-  { metric: "CostPerConversation", emitters: ["InstallerWorker"], pattern: '{ $.metric = "CostPerConversation" }', value: "$.value", unit: "None", readBy: "alarm", source: `${BFF}/turns/record.ts` },
+  // Each turn's own spend by the rate card, logged by the worker only in the demo and live worlds.
+  { metric: "AgentSpendUsd", emitters: ["InstallerWorker"], pattern: '{ $.metric = "AgentSpendUsd" }', value: "$.value", unit: "None", readBy: "alarm", source: `${BFF}/turns/record.ts` },
   { metric: "OriginRejected", emitters: ["Bff"], pattern: '{ $.metric = "OriginRejected" }', value: "1", unit: "Count", readBy: "SMK/10", source: `${BFF}/routers/edge.ts` },
   // A spend refused by a kill switch (`KILL_SWITCH_ACTIVE`), never the operator's own on/off lines.
   {
@@ -93,11 +93,16 @@ export interface CostAlarmSpec {
 }
 
 /**
- * The CTO's threshold of the cost per conversation in USD (ADR-0019; `IspSettings.costBudgetUsdPerConversation`).
- * Provisional until WP-49 fixes it with the CTO from the verified rate card; the average of an hour,
- * so one long conversation alone does not cut the agent of the stage.
+ * The stage's hourly budget of agent spend in USD over the demo and live worlds (ADR-0019). The alarm
+ * SUMS each turn's own spend (never a conversation's running total, which a long conversation would
+ * repeat once per turn), so it measures the spend rate. Guest worlds, sign-up ones included, never log
+ * it: their own ceilings (per world, per account and the global one) cap them, and a visitor can never
+ * cut the agent of every other world. One long conversation at a normal turn cost (40 turns at about
+ * USD 0.15) spends about USD 6, well under it. Provisional until WP-49 fixes it with the CTO from the
+ * verified rate card; the cost per conversation the product shows (`IspSettings.costBudgetUsdPerConversation`)
+ * comes from `CuadrillaMetrics`, not from this alarm.
  */
-export const COST_PER_CONVERSATION_ALARM_USD = 2;
+export const AGENT_SPEND_ALARM_USD_PER_HOUR = 20;
 
 export const COST_ALARMS: readonly CostAlarmSpec[] = [
   {
@@ -111,12 +116,12 @@ export const COST_ALARMS: readonly CostAlarmSpec[] = [
     comparison: "GreaterThanThreshold",
   },
   {
-    suffix: "CostPerConversation",
-    description: "The average cost per conversation of the last hour is over the threshold: cuts the agent (KILL#AGENT).",
-    metric: "CostPerConversation",
-    statistic: "Average",
+    suffix: "AgentSpendHourly",
+    description: "The agent's spend in the demo and live worlds over the last hour is over the stage's hourly budget: cuts the agent (KILL#AGENT).",
+    metric: "AgentSpendUsd",
+    statistic: "Sum",
     periodSeconds: 3600,
-    threshold: COST_PER_CONVERSATION_ALARM_USD,
+    threshold: AGENT_SPEND_ALARM_USD_PER_HOUR,
     comparison: "GreaterThanThreshold",
   },
 ];
@@ -265,9 +270,9 @@ export function linkCarried(grant: Grant): boolean {
   return carriedCapabilityGrants.has(grant) || grant.resources.every(isCarriedResource);
 }
 
-/** The grants of a role that become `permissions` statements (everything a link does not carry). */
+/** The grants of a role that become `permissions` statements (everything a link does not carry nor a managed policy holds). */
 export function statementGrants(fn: LambdaName): Grant[] {
-  return expectedGrants(fn).filter((grant) => !linkCarried(grant));
+  return expectedGrants(fn).filter((grant) => !linkCarried(grant) && !isManagedGrant(grant));
 }
 
 /** The link-carried resources a role needs, so its module links exactly those components. */

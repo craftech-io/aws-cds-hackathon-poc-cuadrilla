@@ -2,7 +2,8 @@
 // ADR-0012, ADR-0014, ADR-0028): the one path every message takes out of Cuadrilla. In order:
 //
 //   0. shape      the request (zod) and what the transports would refuse (render/whatsapp.ts); a
-//                 request whose message already exists is answered from it, never sent twice
+//                 request whose message already exists is answered from it, never sent twice, but for
+//                 a safety message a lost invocation left unconfirmed, sent again (unconfirmed.ts)
 //   1. context    the recipient from the registry (`LAM-RECIPIENT`) and its route, the policy records
 //                 at the instant, the turn's tool results and the person's thread (context.ts)
 //   2. repeat     the same WhatsApp asked twice in one turn is answered from the first (repeat.ts)
@@ -33,6 +34,7 @@ import { deliverEmail, deliverWhatsApp } from "./deliver";
 import { appendOutMessage, auditPolicyDecision, auditRefusal, authorKindOf } from "./persist";
 import { shapeOf } from "./render/whatsapp";
 import { contentKeyOf, repeatedInTurn } from "./repeat";
+import { existingOrResend } from "./unconfirmed";
 import { OUTBOUND_REASON, OutboundRequest, type OutboundCall, type OutboundInput, type OutboundRefused, type OutboundResult, type WhatsAppSendRequest } from "./types";
 
 export const BRIDGE_RULE = "LAM-BRIDGE";
@@ -92,11 +94,10 @@ function bridgeActive(request: WhatsAppSendRequest, context: WhatsAppContext): b
   return request.workOrderId !== undefined && (context.records.cases ?? []).some((item) => item.status === "TAKEN" && item.workOrderId === request.workOrderId);
 }
 
-async function sendWhatsApp(deps: OutboundDeps, call: OutboundCall, asked: OutboundInput, request: WhatsAppSendRequest): Promise<OutboundResult> {
-  if (request.messageId !== undefined) {
-    const existing = await deps.connector.conversations.findMessage(request.personId, request.messageId);
-    if (existing !== undefined) return replayOf(existing);
-  }
+async function sendWhatsApp(deps: OutboundDeps, call: OutboundCall, asked: OutboundInput, requested: WhatsAppSendRequest): Promise<OutboundResult> {
+  const settled = await existingOrResend(deps.connector, requested, call.log);
+  if ("replay" in settled) return replayOf(settled.replay);
+  const { request } = settled;
   const context = await loadWhatsAppContext(deps, request);
   const messageId = request.messageId ?? `msg-${deps.newId()}`;
   const day = localDateOf(new Date(context.at.sim), context.settings.timezone);

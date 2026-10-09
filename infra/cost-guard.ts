@@ -1,7 +1,7 @@
 // The cut in runtime (ADR-0019, ADR-0025 §4, docs/architecture.md §12 and §14): the topic `CostAlerts`,
 // `CostGuard` subscribed to it, and the four alarms of the sign-up that publish there (WP-56). The cost
 // cut of WP-38 publishes on the same topic from infra/observability.ts: the alarms `TurnCapHitsGlobal`
-// and `CostPerConversation` and the project budget at 100 %. `CostGuard` only turns a kill switch ON,
+// and `AgentSpendHourly` and the project budget at 100 %. `CostGuard` only turns a kill switch ON,
 // by the closed table of packages/bff/src/handlers/cost-guard.ts (`ALARM_SCOPES`, `BUDGET_SCOPES`):
 //
 //   <app>-<stage>-AuthEmailBounces      Bounce of AWS/SES (kind = AUTH) ≥ 5 in 1 h                       → KILL#SIGNUP
@@ -9,7 +9,7 @@
 //   <app>-<stage>-AuthEmailComplaints   Complaint (kind = AUTH) ≥ 2 in 24 h                               → KILL#SIGNUP
 //   <app>-<stage>-SignupBurst           SignupStarted (CuadrillaAgent, from the Bff's log lines) > 150 in 1 h → KILL#SIGNUP
 //   <app>-<stage>-TurnCapHitsGlobal     infra/observability.ts                                            → KILL#AGENT
-//   <app>-<stage>-CostPerConversation   infra/observability.ts                                            → KILL#AGENT
+//   <app>-<stage>-AgentSpendHourly      infra/observability.ts                                            → KILL#AGENT
 //   <app>-<stage>-monthly (budget)      infra/observability.ts, 100 % of the actual cost                  → KILL#AGENT
 //
 // The authentication emails are the only ones of the shared account that go to addresses nobody

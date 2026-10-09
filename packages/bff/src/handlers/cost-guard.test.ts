@@ -11,7 +11,7 @@ import { ALARM_PREFIX, ALARM_SCOPES, BUDGET_SCOPES, decide, handleCostAlerts } f
 const NOW = Date.parse("2026-10-20T15:00:00.000Z");
 const clock: Clock = { now: async () => new Date(NOW) };
 const SIGNUP_ALARMS = ["AuthEmailBounces", "AuthEmailBounceRate", "AuthEmailComplaints", "SignupBurst"];
-const COST_ALARMS = ["TurnCapHitsGlobal", "CostPerConversation"];
+const COST_ALARMS = ["TurnCapHitsGlobal", "AgentSpendHourly"];
 
 /** What AWS Budgets publishes on an SNS topic: plain text, never JSON. */
 function budgetNotice(name: string): string {

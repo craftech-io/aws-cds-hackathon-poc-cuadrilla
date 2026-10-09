@@ -10,7 +10,7 @@ import type { EmailSendOutcome } from "../channels/email/outbound";
 import { createSimulatedTransport } from "../channels/whatsapp/simulated";
 import type { SendRequest, WhatsAppSendResult } from "../channels/whatsapp/transport";
 import type { ArmTimerRequest } from "../agent-tools/common/ports";
-import { CLOCK, ISP, supervisor, workOrder } from "../connector/testing";
+import { CLOCK, ISP, supervisor, type testConnector, workOrder } from "../connector/testing";
 import { resolveBrand } from "../copy/brand";
 import type { JsonObject } from "../domain/common";
 import { createLogger } from "../lib/log";
@@ -66,16 +66,20 @@ export interface KitOptions {
   readonly g2?: Array<Partial<G2Verdict>>;
   /** Make the WhatsApp transport fail every send with this code. */
   readonly failSends?: boolean;
+  /** Replaces the transport's answer (the simulated transport is passed to delegate to); after `failSends`. */
+  readonly transport?: (request: SendRequest, simulated: SimulatedSend) => Promise<WhatsAppSendResult>;
 }
 
-/** The pipeline over the demo world, with Rogelio's two orders of 13/10 and Adriana and Héctor. */
-export async function pipelineKit(options: KitOptions = {}): Promise<PipelineKit> {
-  const world = await policyWorld();
+type SimulatedSend = (request: SendRequest) => Promise<WhatsAppSendResult>;
+type TestWorld = ReturnType<typeof testConnector>;
+
+export interface PipelineDeps extends Pick<PipelineKit, "deps" | "g2" | "sends" | "emails" | "armed" | "logs"> {
+  readonly log: OutboundCall["log"];
+}
+
+/** The pipeline's dependencies over any memory world: the real simulated transport (every send counted), a recording SES client, a scripted G2. */
+export function pipelineDeps(world: TestWorld, options: KitOptions = {}): PipelineDeps {
   const { connector } = world;
-  await connector.workOrders.createWorkOrder(workOrder());
-  await connector.workOrders.createWorkOrder(workOrder({ workOrderId: "wo-24818", workOrderNumber: "24818", customerId: "cust-10422" }));
-  await connector.people.createPerson(supervisor("sup-adriana", "e".repeat(64)));
-  await connector.people.createPerson(supervisor("sup-hector", "f".repeat(64), { phone: "+525501020002" }));
   const logs: Array<Record<string, unknown>> = [];
   const log = createLogger({ level: "debug", sink: (line) => logs.push(JSON.parse(line) as Record<string, unknown>), now: world.now });
   const realClock = { now: async () => world.now() };
@@ -93,7 +97,7 @@ export async function pipelineKit(options: KitOptions = {}): Promise<PipelineKit
       send: async (request: SendRequest): Promise<WhatsAppSendResult> => {
         sends.push(request);
         if (options.failSends === true) return { ok: false, code: "UNAVAILABLE", reason: "ThrottlingException", retryable: true };
-        return simulated.send(request);
+        return options.transport === undefined ? simulated.send(request) : options.transport(request, (asked) => simulated.send(asked));
       },
     }),
     email: {
@@ -119,14 +123,21 @@ export async function pipelineKit(options: KitOptions = {}): Promise<PipelineKit
     realClock,
     newId: () => `01JB8Z9Q2W3E4R5T6Y7V8X${String((seq += 1)).padStart(4, "0")}`,
   };
+  return { deps, g2, sends, emails, armed, logs, log };
+}
+
+/** The pipeline over the demo world, with Rogelio's two orders of 13/10 and Adriana and Héctor. */
+export async function pipelineKit(options: KitOptions = {}): Promise<PipelineKit> {
+  const world = await policyWorld();
+  const { connector } = world;
+  await connector.workOrders.createWorkOrder(workOrder());
+  await connector.workOrders.createWorkOrder(workOrder({ workOrderId: "wo-24818", workOrderNumber: "24818", customerId: "cust-10422" }));
+  await connector.people.createPerson(supervisor("sup-adriana", "e".repeat(64)));
+  await connector.people.createPerson(supervisor("sup-hector", "f".repeat(64), { phone: "+525501020002" }));
+  const { log, ...built } = pipelineDeps(world, options);
   return {
     world,
-    deps,
-    g2,
-    sends,
-    emails,
-    armed,
-    logs,
+    ...built,
     call: { actor: "AGENT", correlationId: TURN, log },
     result: async (tool, output) => {
       await connector.runtime.putTurnResult(TURN, tool, output);

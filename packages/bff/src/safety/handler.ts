@@ -4,9 +4,11 @@
 //
 //   1. the fixed instruction of manual §SEG-01 (`copy/es-MX.ts` `safetyInstruction`, `SAFE-FIXED-TEXT`)
 //      to the installer at once, exempt from quiet hours; once per inbound message, so the agent's
-//      report of a message the lexicon already caught does not repeat it
+//      report of a message the lexicon already caught does not repeat it; sent again only when a lost
+//      invocation left it unconfirmed (a repeated instruction is acceptable, a missing one is not)
 //   2. in parallel, `open_case(SAFETY)`: the `alerta_seguridad` template to the supervisor on duty and
-//      the `ZONE_CHIEF_ALERT` email at the same time (`SAFE-PARALLEL`, cases/ladder.ts)
+//      the `ZONE_CHIEF_ALERT` email at the same time (`SAFE-PARALLEL`, cases/ladder.ts); a case a lost
+//      invocation created without running its ladder gets it on the redelivery (cases/open.ts)
 //   3. the order goes `onHoldSafety` until a supervisor closes the case (the agent guides no work on it)
 //
 // The model never writes the instruction. An installer with no order in progress still gets it; the
@@ -81,9 +83,13 @@ function instructionId(report: SafetyReport): string {
   return `safety-${sha256Hex(`${report.clockId}\n${report.installerId}\n${anchor}`).slice(0, 40)}`;
 }
 
+/**
+ * The instruction under its deterministic id. A redelivered event asks again: the pipeline replays one
+ * the transport confirmed and sends again one a lost invocation left unconfirmed (outbound/unconfirmed.ts),
+ * so it is never skipped because it was only written `QUEUED`.
+ */
 async function sendInstruction(deps: CaseDeps, report: SafetyReport, workOrderId: string | undefined): Promise<boolean> {
   const messageId = instructionId(report);
-  if ((await deps.connector.conversations.findMessage(report.installerId, messageId)) !== undefined) return true;
   const sent = await deps.outbound.sendWhatsApp({
     clockId: report.clockId,
     ispId: report.ispId,

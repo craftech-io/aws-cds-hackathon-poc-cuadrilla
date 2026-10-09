@@ -23,53 +23,11 @@
 // set of the account belongs to another app, ADR-0003) nor any WABA association or
 // `PutWhatsAppBusinessAccountEventDestinations` (the operator applies the event destination).
 import { BFF_LEADS_GRANT, GUEST_WORLDS_LEADING_KEYS, QA_SEAM_GRANTS, SIGNUP_CAPABILITIES, SIGNUP_ROLES, type SignupCapability } from "./leads-spec";
-import { qaDriverDataGrants } from "./qa-driver-fence";
+import { qaDriverManagedPolicies } from "./qa-driver-fence";
 
-export const REGION = "us-east-1";
-export const ACCOUNT_ID = "776805327629";
-export const APP = "aws-cds-hackathon-poc-cuadrilla";
-export const STAGE = "poc";
-export const APP_DOMAIN = "cuadrilla.demo.craftech.io";
+import { REGION, ACCOUNT_ID, APP, STAGE, APP_DOMAIN, TRANSCRIBE_PREFIX, SCHEDULE_GROUP, EMAIL_CONFIGURATION_SET, METRICS_NAMESPACE, SENDERS, foundationModelOf, agentModelArns, whatsappPhoneArn } from "./iam-arns";
 
-/** Prefix of Transcribe jobs and of the vocabulary: short, unique in the account (docs/architecture.md §1). */
-export const TRANSCRIBE_PREFIX = "cuadrilla-poc-";
-export const SCHEDULE_GROUP = `${APP}-${STAGE}-schedules`;
-export const EMAIL_CONFIGURATION_SET = `${APP}-email-${STAGE}`;
-export const METRICS_NAMESPACE = "CuadrillaAgent";
-export const SENDERS = [`actas@${APP_DOMAIN}`, `avisos@${APP_DOMAIN}`] as const;
-
-// ---- ARN helpers ---------------------------------------------------------------------------------
-/** Base foundation model of a model id (`global.anthropic.claude-opus-5` → `anthropic.claude-opus-5`). */
-export function foundationModelOf(modelId: string): string {
-  return modelId.replace(/^(global|us|eu|apac)\./, "");
-}
-
-/**
- * Everything `bedrock:InvokeModel` must name to call a model through the app's inference profile
- * (ADR-0028), which copies a global one: the app's profile when given, the global profile in this
- * region, plus its foundation model region-less (global routing) and in every region the profile may
- * route to. A profile alone gives AccessDenied; nothing else is named, never `*`.
- */
-export function agentModelArns(modelId: string, region: string = REGION, account: string = ACCOUNT_ID, appProfileArn?: string): string[] {
-  const foundation = foundationModelOf(modelId);
-  const models = [`arn:aws:bedrock:::foundation-model/${foundation}`, `arn:aws:bedrock:*::foundation-model/${foundation}`];
-  const profiles = foundation === modelId ? [] : [`arn:aws:bedrock:${region}:${account}:inference-profile/${modelId}`];
-  return [...(appProfileArn === undefined ? [] : [appProfileArn]), ...profiles, ...models];
-}
-
-const AWS_PHONE_NUMBER_ID = /^phone-number-id-([0-9a-f]{32})$/;
-
-/**
- * ARN of our WhatsApp number from its AWS id (`phone-number-id-<32 hex>`, secret WhatsAppPhoneNumberId):
- * `…:phone-number-id/<32 hex>`, without the `phone-number-id-` prefix. `undefined` while the secret
- * is `not-connected`: the statement is omitted, never widened to `phone-number-id/*`.
- */
-export function whatsappPhoneArn(awsPhoneNumberId: string, region: string = REGION, account: string = ACCOUNT_ID): string | undefined {
-  if (awsPhoneNumberId === "not-connected") return undefined;
-  const hex = AWS_PHONE_NUMBER_ID.exec(awsPhoneNumberId)?.[1];
-  if (!hex) throw new Error("WhatsAppPhoneNumberId must be `not-connected` or `phone-number-id-<32 hex>` (the AWS id, never the Meta id).");
-  return `arn:aws:social-messaging:${region}:${account}:phone-number-id/${hex}`;
-}
+export { REGION, ACCOUNT_ID, APP, STAGE, APP_DOMAIN, TRANSCRIBE_PREFIX, SCHEDULE_GROUP, EMAIL_CONFIGURATION_SET, METRICS_NAMESPACE, SENDERS, foundationModelOf, agentModelArns, whatsappPhoneArn };
 
 const arn = {
   schedules: `arn:aws:scheduler:${REGION}:${ACCOUNT_ID}:schedule/${SCHEDULE_GROUP}/*`,
@@ -213,6 +171,8 @@ export interface RoleCapabilities {
   readonly buckets?: Readonly<Partial<Record<BucketName, Access>>>;
   /** Grants beyond the capabilities and the linked data. */
   readonly grants?: readonly Grant[];
+  /** Grants kept out of the role's one inline policy, in customer-managed policies by logical name (infra/role-policy-size.ts). */
+  readonly managed?: Readonly<Record<string, readonly Grant[]>>;
 }
 
 const g = (actions: readonly string[], resources: readonly string[], conditions?: readonly Condition[]): Grant => (conditions ? { actions, resources, conditions } : { actions, resources });
@@ -308,8 +268,9 @@ export const LAMBDA_CAPABILITIES = {
       g(["sqs:ReceiveMessage", "sqs:DeleteMessage"], ["{InstallerEventsDlq}"]),
       g(["cloudwatch:DescribeAlarmHistory"], [arn.dlqAlarm]),
       g(["scheduler:DeleteSchedule"], [`arn:aws:scheduler:${REGION}:${ACCOUNT_ID}:schedule/${SCHEDULE_GROUP}/tm-q-*`, `arn:aws:scheduler:${REGION}:${ACCOUNT_ID}:schedule/${SCHEDULE_GROUP}/tm-e-*`]),
-      ...qaDriverDataGrants(),
     ],
+    // Its fenced writes: too big for the inline policy (IAM's 10,240 characters), so two managed policies.
+    managed: qaDriverManagedPolicies(),
   },
   ...SIGNUP_ROLES,
 } as const satisfies Record<string, RoleCapabilities>;
@@ -362,11 +323,20 @@ export function resolveCapabilities(names: readonly CapabilityName[]): Capabilit
   return [...seen].sort();
 }
 
-/** Every grant a role must receive through `sst.aws.permission` (data access goes by `link`). */
+/** Every grant a role must receive, inline or managed (data access goes by `link`). */
 export function expectedGrants(role: RoleName): Grant[] {
   const entry = roleEntry(role);
-  return [...(entry.grants ?? []), ...resolveCapabilities(entry.capabilities).flatMap((name) => CAPABILITIES[name].grants)];
+  return [...(entry.grants ?? []), ...Object.values(entry.managed ?? {}).flat(), ...resolveCapabilities(entry.capabilities).flatMap((name) => CAPABILITIES[name].grants)];
 }
+
+/** The customer-managed policies of a role, by logical name: their grants never go inline. */
+export function managedPolicies(role: RoleName): Readonly<Record<string, readonly Grant[]>> {
+  return roleEntry(role).managed ?? {};
+}
+
+const MANAGED_GRANTS = new Set<Grant>([...Object.values(LAMBDA_CAPABILITIES), ...Object.values(SERVICE_ROLES)].flatMap((entry: RoleCapabilities) => Object.values(entry.managed ?? {}).flat()));
+
+export const isManagedGrant = (grant: Grant): boolean => MANAGED_GRANTS.has(grant);
 
 export const expectedActions = (role: RoleName): string[] => [...new Set(expectedGrants(role).flatMap((grant) => grant.actions))].sort();
 

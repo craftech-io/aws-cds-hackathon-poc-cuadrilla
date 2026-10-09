@@ -21,7 +21,10 @@
 // Function grants InvokeFunction on it alone, the queues their one role, `Scheduler` TIMERS, `Memory`
 // MEMORY_ADMIN, `GuardrailG1` and `WaInbound` theirs. Every other grant of the role's row becomes a
 // statement here (`Leads` with the form's attributes, Cognito and WAF on the stage's own pool and ACLs,
-// the QaDriver's writes fenced by key and prefix, infra/qa-driver-fence.ts, and its Scheduler fence); a placeholder nobody resolves fails the deploy.
+// the QaDriver's Scheduler fence); a placeholder nobody resolves fails the deploy. The grants a row keeps
+// in `managed` (the QaDriver's writes fenced by key and prefix, infra/qa-driver-fence.ts) become
+// customer-managed policies under the app's IAM path attached with `policies`: SST puts every statement
+// and link include in ONE inline policy, which IAM caps at 10,240 characters (infra/role-policy-size.ts).
 //
 // Modules created before this one whose top level a test of this module cannot evaluate (the queues,
 // the scheduler, WhatsApp, the guardrails, the tool targets) are read late: sst.config.ts has already
@@ -32,6 +35,7 @@
 //   curl -s -o /dev/null -w "%{http_code}" -X POST "<Bff Function URL>api/signup.start"   → 403, empty body
 //   curl -s https://cuadrilla.demo.craftech.io/api/health                               → {"result":{"data":{"ok":true,…}}}
 //   aws --profile craftech-demos lambda get-policy --function-name aws-cds-hackathon-poc-cuadrilla-poc-qa-driver   → lambda:InvokeFunction for …-qa-runner only
+//   aws --profile craftech-demos iam list-attached-role-policies --role-name <QaDriver role>   → QaDriverRuntimeWrites-… and QaDriverWorldWrites-… under /<app>/
 //   aws --profile craftech-demos iam simulate-principal-policy --policy-source-arn <QaDriver role ARN> \
 //     --action-names dynamodb:PutItem --resource-arns <Network ARN> --context-entries \
 //     ContextKeyName=dynamodb:LeadingKeys,ContextKeyValues=ONU#GLOBAL#isp-demo#X,ContextKeyType=stringList   → implicitDeny
@@ -45,7 +49,7 @@ import { Auth, guestSignupClient, qaProbeClient, userPool, webClient } from "./a
 import { ChannelModes } from "./channel-modes";
 import { CostCaps } from "./cost-caps";
 import { guestWorlds } from "./guest-worlds";
-import { LAMBDA_CAPABILITIES, resolveCapabilities, type LambdaName } from "./iam-capabilities";
+import { LAMBDA_CAPABILITIES, managedPolicies, resolveCapabilities, type LambdaName } from "./iam-capabilities";
 import { Leads, grantStatement, grantTableLinks, guestAccountDeletion, type Refs, type Statement } from "./leads";
 import { mockLinks, mockPermissions } from "./mocks";
 import {
@@ -168,6 +172,18 @@ interface RoleAccess {
   /** One element per link (SST resolves each Output, never a nested list). */
   readonly link: Array<$util.Input<unknown>>;
   readonly permissions: $util.Output<Statement[]>;
+  /** ARNs of the role's customer-managed policies (`managed` of its row), under the app's IAM path (infra/ci.ts). */
+  readonly policies: $util.Output<string[]>;
+}
+
+/** One `aws.iam.Policy` per managed policy of the row: kept out of the inline policy, which IAM caps at 10,240 characters. */
+function managedPolicyArns(fn: LambdaName): $util.Output<string[]> {
+  return $util.all(
+    Object.entries(managedPolicies(fn)).map(([name, grants]) => {
+      const statements = grants.map((grant) => ({ ...grantStatement(grant, refs), effect: "Allow" }));
+      return new aws.iam.Policy(name, { description: `${fn}: ${name} (infra/iam-capabilities.ts).`, policy: aws.iam.getPolicyDocumentOutput({ statements }).json }).arn;
+    }),
+  );
 }
 
 /** Everything a role of this module links and is granted, from its row and nothing else. */
@@ -177,6 +193,7 @@ function roleAccess(fn: LambdaName, base: unknown[], local: Readonly<Partial<Rec
     permissions: $util
       .all([storagePermissions(fn), mockPermissions(fn), statementGrants(fn).map((grant) => grantStatement(grant, refs))])
       .apply((parts) => parts.flat() as Statement[]),
+    policies: managedPolicyArns(fn),
   };
 }
 
@@ -194,6 +211,7 @@ export const policyAudit = new sst.aws.Function("PolicyAudit", {
   memory: `${POLICY_AUDIT.memoryMb} MB`,
   link: auditAccess.link,
   permissions: auditAccess.permissions,
+  policies: auditAccess.policies,
 });
 
 export const policyAuditDaily = new sst.aws.Cron("PolicyAuditDaily", {
@@ -219,6 +237,7 @@ export const bff = new sst.aws.Function("Bff", {
   // The origin key (routers/handler.ts) is the Bff's alone: the QaDriver runs the appRouter in process.
   link: [OriginVerifyKey, ...bffAccess.link],
   permissions: bffAccess.permissions,
+  policies: bffAccess.policies,
   timeout: `${budget.timeoutSeconds} seconds`,
   memory: `${budget.memoryMb} MB`,
   concurrency: { reserved: budget.reservedConcurrency },
@@ -249,6 +268,7 @@ export const qaDriver = new sst.aws.Function("QaDriver", {
   memory: `${QA_DRIVER.memoryMb} MB`,
   link: qaAccess.link,
   permissions: qaAccess.permissions,
+  policies: qaAccess.policies,
 });
 
 /** Only the bootstrap's qa-runner role (ADR-0007); its ARN comes from the account the deploy runs in. */

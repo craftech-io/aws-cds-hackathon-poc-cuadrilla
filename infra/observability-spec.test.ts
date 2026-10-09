@@ -2,10 +2,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALARM_PREFIX, ALARM_SCOPES, BUDGET_SCOPES } from "../packages/bff/src/handlers/cost-guard";
+import { testConnector } from "../packages/bff/src/connector/testing";
+import { createLogger } from "../packages/bff/src/lib/log";
 import { capMetric, planCounters } from "../packages/bff/src/ops/cost-caps";
+import { MODEL_RATES, bedrockRateKey } from "../packages/bff/src/services/ratecard/ratecard";
+import { recordTurnKpi } from "../packages/bff/src/turns/record";
 import { TOOL_LAMBDAS } from "./agentcore-spec";
-import { IAM_ARNS, LAMBDA_CAPABILITIES, QA_DRIVER_DLQ_ONLY_ACTIONS, expectedGrants, type LambdaName } from "./iam-capabilities";
+import { IAM_ARNS, LAMBDA_CAPABILITIES, QA_DRIVER_DLQ_ONLY_ACTIONS, expectedGrants, managedPolicies, type LambdaName } from "./iam-capabilities";
 import {
+  AGENT_SPEND_ALARM_USD_PER_HOUR,
   CERTIFICATE_WRITER,
   COST_ALARMS,
   LINK_CARRIED_RESOURCES,
@@ -71,14 +76,14 @@ describe("metric filters: only what a cutting alarm or a scenario step reads (AD
       expect(spec.pendingIn, spec.metric).toBeUndefined();
       expect(spec.source, spec.metric).toBeDefined();
     }
-    expect(read("packages/bff/src/turns/record.ts")).toContain('deps.log.info("metric", { metric: COST_PER_CONVERSATION_METRIC, value: usd');
+    expect(read("packages/bff/src/turns/record.ts")).toContain('deps.log.info("metric", { metric: AGENT_SPEND_METRIC, value: usd');
   });
 
   it("counts only the global ceiling of turns and only refused spends of a kill switch", () => {
     const turnCaps = METRIC_FILTERS.find((spec) => spec.metric === "TurnCapHits");
     expect(turnCaps).toMatchObject({ pattern: '{ $.metric = "TurnCapHits" && $.scope = "GLOBAL" }', dimensions: { scope: "$.scope" }, readBy: "alarm" });
     expect(METRIC_FILTERS.find((spec) => spec.metric === "KillSwitchActive")?.pattern).toContain('$.action = "KILL_SWITCH_ACTIVE"');
-    expect(METRIC_FILTERS.find((spec) => spec.metric === "CostPerConversation")).toMatchObject({ value: "$.value", unit: "None" });
+    expect(METRIC_FILTERS.find((spec) => spec.metric === "AgentSpendUsd")).toMatchObject({ value: "$.value", unit: "None" });
   });
 });
 
@@ -101,6 +106,59 @@ describe("[W3 review B1] a QA world's test ceiling never counts as the stage's g
     expect(test && matchesFilter(pattern, capMetric(test))).toBe(false);
     expect(test && capMetric(test)).toEqual({ metric: "TurnCapHits", scope: "GLOBAL_TEST" });
     expect(real && matchesFilter(pattern, capMetric(real))).toBe(true);
+  });
+});
+
+/** Every metric line of a log stream, as JSON. */
+async function spendLines(turns: ReadonlyArray<readonly [clockId: string, ispId: string]>, usage = NORMAL_TURN): Promise<Array<Record<string, unknown>>> {
+  const world = testConnector();
+  for (const kind of ["input", "output"] as const) {
+    await world.connector.reference.put("RateCard", { key: bedrockRateKey(kind), price: MODEL_RATES.prices[kind], unit: "PER_1M_TOKENS", provisional: false, source: MODEL_RATES.source, asOf: MODEL_RATES.asOf });
+  }
+  const lines: Array<Record<string, unknown>> = [];
+  const log = createLogger({ level: "info", sink: (line) => void lines.push(JSON.parse(line) as Record<string, unknown>) });
+  for (const [clockId, ispId] of turns) {
+    const request = { trigger: "INSTALLER_MESSAGE" as const, eventId: "evt", clockId, ispId, installerId: "inst-rogelio", workOrderId: "wo-24817", eventAtSim: "2026-10-13T09:15:00-06:00" };
+    await recordTurnKpi({ data: world.connector, agentMode: "REAL", log }, request, usage, 1_000);
+  }
+  return lines;
+}
+
+/** The cost alarm's statistic over one period's lines, and whether it breaches. */
+function costAlarmBreaches(lines: ReadonlyArray<Record<string, unknown>>): { readonly value: number; readonly breaches: boolean } {
+  const alarm = COST_ALARMS.find((spec) => spec.suffix === "AgentSpendHourly");
+  const filter = METRIC_FILTERS.find((spec) => spec.metric === alarm?.metric);
+  if (alarm === undefined || filter === undefined) throw new Error("the cost alarm or its filter is missing");
+  const samples = lines.filter((line) => matchesFilter(filter.pattern, line)).map((line) => Number(line[filter.value.slice(2)]));
+  const value = alarm.statistic === "Sum" ? samples.reduce((sum, sample) => sum + sample, 0) : samples.reduce((sum, sample) => sum + sample, 0) / Math.max(1, samples.length);
+  return { value, breaches: value > alarm.threshold };
+}
+
+/** 50 k input and 2 k output tokens: USD 0.12 at USD 2/10 per M, a long Harness turn with its preloads. */
+const NORMAL_TURN = { inputTokens: 50_000, outputTokens: 2_000, cacheReadTokens: 0, cacheWriteTokens: 0 };
+const times = <T,>(count: number, value: T): T[] => Array.from({ length: count }, () => value);
+
+describe("[W3R1 N1] the hourly spend cut: one conversation never cuts the agent of the stage", () => {
+  it("sums each turn's own spend, so the alarm is the spend rate and never a running total repeated per turn", () => {
+    const alarm = COST_ALARMS.find((spec) => spec.metric === "AgentSpendUsd");
+    expect(alarm).toMatchObject({ statistic: "Sum", periodSeconds: 3600, threshold: AGENT_SPEND_ALARM_USD_PER_HOUR });
+    expect(ALARM_SCOPES[alarm?.suffix ?? ""]).toBe("AGENT");
+  });
+
+  it("a 40-turn guest conversation (sign-up world or invited) logs no spend sample and never trips it, however costly its turns", async () => {
+    const heavy = { ...NORMAL_TURN, inputTokens: 400_000, outputTokens: 40_000 };
+    for (const world of [["GUEST#isp-guest-s261009abcde", "isp-guest-s261009abcde"], ["GUEST#isp-guest-07", "isp-guest-07"]] as const) {
+      const lines = await spendLines(times(40, world), heavy);
+      expect(costAlarmBreaches(lines)).toEqual({ value: 0, breaches: false });
+    }
+  });
+
+  it("a 40-turn conversation of the demo world at a normal turn cost stays under the budget; a sustained overspend trips it", async () => {
+    const long = costAlarmBreaches(await spendLines(times(40, ["GLOBAL#isp-demo", "isp-demo"] as const)));
+    expect(long.value).toBeCloseTo(40 * 0.12, 6);
+    expect(long.breaches).toBe(false);
+    const runaway = costAlarmBreaches(await spendLines(times(200, ["GLOBAL#isp-demo", "isp-demo"] as const)));
+    expect(runaway.breaches).toBe(true);
   });
 });
 
@@ -207,10 +265,11 @@ describe("every grant of the four roles is a link or a statement nobody can wide
   const resolvable = (resource: string) =>
     parseStorageRef(resource) !== undefined || /^\{Leads\}(\/index\/\*)?$/.test(resource) || (STATEMENT_REFS as readonly string[]).includes(resource) || resource.startsWith("arn:aws:");
 
-  it.each(ROLES)("%s: each statement names storage, Leads, the stage's pool or web ACLs, or an exact ARN", (fn) => {
-    for (const grant of statementGrants(fn)) for (const resource of grant.resources) expect(resolvable(resource), `${fn}: ${resource}`).toBe(true);
+  it.each(ROLES)("%s: each statement or managed policy names storage, Leads, the stage's pool or web ACLs, or an exact ARN", (fn) => {
+    const managed = Object.values(managedPolicies(fn)).flat();
+    for (const grant of [...statementGrants(fn), ...managed]) for (const resource of grant.resources) expect(resolvable(resource), `${fn}: ${resource}`).toBe(true);
     const all = expectedGrants(fn);
-    expect([...statementGrants(fn), ...all.filter(linkCarried)].length).toBe(all.length);
+    expect([...statementGrants(fn), ...all.filter(linkCarried), ...managed].length).toBe(all.length);
   });
 
   it.each(ROLES)("%s: a link carries only the role that link grants", (fn) => {

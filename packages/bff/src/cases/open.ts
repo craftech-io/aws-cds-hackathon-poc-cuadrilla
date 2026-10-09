@@ -1,5 +1,6 @@
 // `open_case` (docs/tool-catalog.md, handlers of direct invocation): one case per order and reason
-// while it is not closed (a second open returns the existing one, `LAD-OPEN`), with the shift roster
+// while it is not closed (a second open returns the existing one, `LAD-OPEN`, and runs its ladder only
+// when a lost invocation created it without one), with the shift roster
 // of the order's crew in force at that instant and the zone's chief, then `advance_ladder(OPEN)`.
 // Callers: the code that counts attempts (`record_troubleshooting_step`, the validator, the second
 // `NOT_PROVISIONED` reading), `escalate_case`, the safety handler, the G1 block, the
@@ -33,7 +34,7 @@ export interface OpenCaseInput {
 
 export interface OpenCaseResult {
   readonly caseItem: Case;
-  /** A case of the same order and reason was already open: nothing new was sent. */
+  /** A case of the same order and reason was already open: nothing new was sent, unless its ladder had never started. */
   readonly existing: boolean;
   readonly ladder?: LadderResult;
 }
@@ -77,11 +78,25 @@ async function latestEvidence(deps: CaseDeps, workOrderId: string): Promise<stri
     .map((item) => item.evidenceId);
 }
 
-/** Opens the case and its ladder; idempotent per order and reason while the case is not closed. */
+/** Created but its ladder never ran: the invocation that opened it was lost between the two writes. */
+export function ladderNeverStarted(caseItem: Case): boolean {
+  return caseItem.status === "OPEN" && caseItem.rung === "PRIMARY" && caseItem.rungVersion === 0 && caseItem.ladder.length === 0;
+}
+
+/**
+ * Opens the case and its ladder; idempotent per order and reason while the case is not closed. An
+ * existing case whose ladder never started (a lost invocation, then a redelivered event) gets it now:
+ * the ladder's conditional writes keep it single, and its messages have deterministic ids.
+ */
 export async function openCase(deps: CaseDeps, input: OpenCaseInput): Promise<OpenCaseResult> {
   const workOrder = await deps.connector.workOrders.requireWorkOrder(input.workOrderId);
   const existing = await openCaseOf(deps, workOrder.workOrderId, input.reason);
-  if (existing !== undefined) return { caseItem: existing, existing: true };
+  if (existing !== undefined && !ladderNeverStarted(existing)) return { caseItem: existing, existing: true };
+  if (existing !== undefined) {
+    deps.logger.warn("case.ladder.resumed", { caseId: existing.caseId, reason: existing.reason });
+    const ladder = await advanceLadder(deps, existing.caseId, { kind: "OPEN" }, input.atSim);
+    return { caseItem: ladder.caseItem, existing: true, ladder };
+  }
 
   const atReal = (await deps.realClock.now()).toISOString();
   const history: HistoryEntry[] =
