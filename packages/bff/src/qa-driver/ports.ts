@@ -8,12 +8,14 @@ import type { Connector } from "../connector/ports";
 import type { TableClient } from "../connector/table-client";
 import type { AdvanceDeps } from "../clock/advance";
 import type { EvalDeps } from "../evaluation/ports";
+import type { QaForceExpireOutcome } from "../guest/qa-expire";
 import type { SecretKey } from "../lib/crypto";
 import type { LeadStore } from "../leads/store";
 import type { Logger } from "../lib/log";
 import type { NetworkClient } from "../network/client";
 import type { SetKillSwitchDeps } from "../ops/kill-switch";
 import type { AppCaller } from "../routers/index";
+import type { QaSeamAnswer, QaSignupStartRequest } from "../routers/qa-seam";
 import type { DispatchControlClient } from "../services/demo-controls/dispatch-client";
 import type { InstallerEventSink } from "../worker/ports";
 import type { WorldsDeps } from "../worlds/deps";
@@ -41,7 +43,7 @@ export interface ConsoleCallers {
   server(options: { readonly role: "SUPERVISOR" | "OPS" | "GUEST"; readonly clockId: string; readonly authTime?: number; readonly sessionId?: string; readonly runId?: string; readonly correlationId: string }): AppCaller;
   /** The `appRouter` with a verified id token of `auth.qaLogin` (the post authentication and pre token ran). */
   token(idToken: string, correlationId: string): Promise<TokenPrincipal>;
-  /** A public call of the QA seam: no principal, the run's counters (`createQaPublicContext`). */
+  /** A public procedure without a principal (`brand.get`, `health.live`), with the run's context. */
   public(runId: string, correlationId: string): AppCaller;
   /** Query or mutation of a procedure; `undefined` when the router has no such procedure. */
   procedureKind(procedure: string): "query" | "mutation" | undefined;
@@ -100,6 +102,10 @@ export interface PolicyAuditPort {
 
 /** The QA seam's view of the own sign-up's stores (ADR-0025 §7). */
 export interface SignupSeamPorts {
+  /** `signup.start` in the `Bff` (routers/qa-seam.ts): the lead and the run's counters are its writes. */
+  readonly start: (request: QaSignupStartRequest) => Promise<QaSeamAnswer>;
+  /** `GuestWorlds` with `{op: QA_FORCE_EXPIRE, userId}` (guest/qa-expire.ts): the account row is its write. */
+  readonly forceExpire: (userId: string) => Promise<QaForceExpireOutcome>;
   readonly cognito: SeamCognito;
   readonly leads: Pick<LeadStore, "get" | "listEvents">;
   readonly emailHash: (email: string) => string;
@@ -138,8 +144,8 @@ export interface QaPorts {
   readonly dispatch: DispatchControlClient;
   readonly tools: ToolInvoker;
   readonly console: ConsoleCallers;
-  /** The evaluation's dependencies (WP-46) over this driver's own actions. */
-  readonly evaluation: (log: Logger) => EvalDeps;
+  /** The evaluation's dependencies (WP-46) over this driver's own actions, for one driver call (its key). */
+  readonly evaluation: (log: Logger, callKey: string) => EvalDeps;
   readonly kill: SetKillSwitchDeps;
   readonly memory: MemoryReader;
   readonly dlq: DlqPort;

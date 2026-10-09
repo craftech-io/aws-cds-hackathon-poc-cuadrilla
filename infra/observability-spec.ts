@@ -247,6 +247,7 @@ export const LINK_CARRIED_RESOURCES = [
   "{GuestWorlds}",
   "{GuestAccountDeletion}",
   "{PolicyAudit}",
+  "{Bff}",
   "{CertificateWriter}",
   "{ToolOrders}",
   "{ToolKnowledge}",

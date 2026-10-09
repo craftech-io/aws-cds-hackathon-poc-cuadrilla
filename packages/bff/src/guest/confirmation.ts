@@ -32,7 +32,7 @@ import { openGeneration } from "../worlds/guest-lifecycle";
 import { type GuestAccount, createAccountOp, getGuestAccount } from "./account";
 import type { WorldProvisioner } from "./provisioner";
 import { confirmedAccountOp, getSignupSub, rowsBySub, signupRowOp, signupSubOp, signupUserIdOf } from "./registry";
-import { type SlotScope, planSlot } from "./slots";
+import { type SlotScope, planSlot, slotScopeOf } from "./slots";
 
 export const CONFIRM_SIGNUP = "PostConfirmation_ConfirmSignUp";
 
@@ -113,7 +113,7 @@ export async function confirmSignup(deps: ConfirmationDeps, event: ConfirmationE
   if (!pendingFor(lead, event.userName)) return ignore(deps, "NO_PENDING_LEAD", event.sub);
   if ((await rowsBySub(deps.client, event.sub)).length > 0) return ignore(deps, "SUB_REGISTERED", event.sub);
 
-  const scope: SlotScope = lead.origin === "QA" ? "QA" : "PUBLIC";
+  const scope: SlotScope = slotScopeOf(lead);
   let decided: Decided = { status: "CAP_FULL" };
   const generation = await openGeneration({
     client: deps.client,

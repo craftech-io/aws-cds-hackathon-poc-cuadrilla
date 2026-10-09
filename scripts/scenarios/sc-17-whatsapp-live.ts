@@ -311,7 +311,10 @@ export default defineScenario({
         },
         {
           part: "b",
-          title: "Window of 25 real hours: the supervisor's text → CP-WA-24H with the real clock DENY, respuesta_supervisor to the phone, quiet hours NOT_APPLICABLE_LEASE",
+          // The QaDriver never writes `PHONELEASE#` (IAM denies it, infra/qa-driver-fence.ts), so a closed real
+          // window of a bound phone is proven locally (U policy/window.test.ts, LF onboarding.flow.test.ts);
+          // here, the open one with the world's clock paused: the policy of the bound phone runs on real time.
+          title: "Within the real window, world clock paused: the supervisor's text → CP-WA-24H with the real clock ALLOW, the relay to the phone on the live transport, quiet hours NOT_APPLICABLE_LEASE",
           kind: "det",
           flows: ["FL-072", "FL-101"],
           after: "9.a",
@@ -323,15 +326,16 @@ export default defineScenario({
             const opened = await caseOn(ctx, w, "a", "INSTALLER_ASKED");
             await tap(ctx, w, supervisor, "TAKE_CASE", { objectId: opened.caseId });
             await settledOn(ctx, w, a.installerId, [a.workOrderId], [a.installerId, supervisor]);
-            await ctx.qa("lease.setLastInboundAtReal", { clockId: w.clockId, personId: a.installerId, agoSec: 25 * 3600 });
+            await phone().prompt('From the team phone, send "Sigo en la orden"');
+            await ctx.eventually("the team phone's message in its world", async () => personIn(await ctx.snapshot({ clockId: w.clockId }), a.installerId).messages.find((message) => message.direction === "IN" && message.transport === "live" && message.text === "Sigo en la orden"), HUMAN_SEC, 5);
             await say(ctx, w, supervisor, "Revisa el conector del poste, ahí está la falla");
             const snapshot = await settledOn(ctx, w, a.installerId, [a.workOrderId], [a.installerId, supervisor]);
-            const denied = decided(orderIn(snapshot, a.workOrderId).decisions, "DENY", "CP-WA-24H").filter((entry) => entry.evaluated.some((rule) => rule.ruleId === "CP-WA-24H" && rule.clock === "REAL"));
-            ctx.check(denied.length > 0, "no DENY CP-WA-24H with the real clock");
-            const quiet = orderIn(snapshot, a.workOrderId).decisions.flatMap((entry) => entry.evaluated).filter((rule) => rule.ruleId === "CP-QUIET-HOURS");
+            const allowed = decided(orderIn(snapshot, a.workOrderId).decisions, "ALLOW").filter((entry) => entry.evaluated.some((rule) => rule.ruleId === "CP-WA-24H" && rule.clock === "REAL" && rule.result === "PASS"));
+            ctx.check(allowed.length > 0, "no ALLOW with CP-WA-24H on the real clock");
+            const quiet = allowed.flatMap((entry) => entry.evaluated).filter((rule) => rule.ruleId === "CP-QUIET-HOURS");
             ctx.check(quiet.some((rule) => rule.result === "NOT_APPLICABLE_LEASE"), "CP-QUIET-HOURS was not NOT_APPLICABLE_LEASE");
-            const template = outOf(personIn(snapshot, a.installerId).messages, { templateName: "respuesta_supervisor" }).filter((message) => message.transport === "live");
-            ctx.check(template.length >= 1, "no respuesta_supervisor to the team phone");
+            const relayed = outOf(personIn(snapshot, a.installerId).messages, { kind: "RELAY" }).filter((message) => message.transport === "live");
+            ctx.check(relayed.length >= 1, "no relay of the supervisor to the team phone");
           },
         },
       ],

@@ -103,6 +103,7 @@ export async function evalHarness(kind: EvalKind, options: { readonly channel?: 
     evalTemplate: async () => template,
     log: createLogger({ sink: () => undefined }),
     now: () => harness.now(),
+    callKey: "local-1/EV/2/m1",
   };
   return { harness, deps, clockId, modelCalls: () => model.calls.length };
 }

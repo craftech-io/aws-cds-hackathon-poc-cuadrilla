@@ -22,6 +22,8 @@ const ALLOWED_LEAD_MODULES: Readonly<Record<string, readonly string[]>> = {
   "account.ts": ["deletion", "model"],
   // `signup.start` (WP-57) writes a pending lead and answers a ticket, never the lead.
   "signup.ts": ["store", "dynamo-table", "keys", "consent", "attribution", "model", "transitions"],
+  // The QaDriver's direct `signup.start` (routers/qa-seam.ts): only the origin of an address, to refuse a non-QA one.
+  "qa-seam.ts": ["keys"],
 };
 /** Store reads a router must never make: they hand back leads. */
 const LEAD_READS = /\.(scan|findBySub|listEvents|get)\(\s*(?:hashOf|emailHash|leadEmailHash|input\.)/;

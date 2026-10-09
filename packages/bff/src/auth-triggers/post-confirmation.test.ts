@@ -147,12 +147,12 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     expect(await harness.client.get("Runtime", { PK: worldsDayKey("PUBLIC", "261001"), SK: "META" })).toMatchObject({ count: 2 });
   });
 
-  it("an address of the QA seam takes the slots of the QA scope, never the public ones", async () => {
+  it("an address of the QA seam takes the slots of its run's QA scope, never the public ones", async () => {
     const harness = guestHarness();
     await pendingLead(harness, { email: QA_EMAIL });
     await handlerOf(harness, ["abcde"])(confirmationEvent({ email: QA_EMAIL }));
-    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PROVISIONING", slotScope: "QA" });
-    expect(await harness.client.get("Runtime", { PK: worldsDayKey("QA", "261001"), SK: "META" })).toMatchObject({ count: 1 });
+    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PROVISIONING", slotScope: "QA#qa-812-1" });
+    expect(await harness.client.get("Runtime", { PK: "GUESTWORLDS#QA#qa-812-1#261001", SK: "META" })).toMatchObject({ count: 1 });
     expect(await harness.client.get("Runtime", { PK: worldsDayKey("PUBLIC", "261001"), SK: "META" })).toBeUndefined();
   });
 

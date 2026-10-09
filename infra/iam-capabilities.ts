@@ -272,7 +272,8 @@ export const LAMBDA_CAPABILITIES = {
       ...QA_SEAM_GRANTS,
       g(["s3:GetObject"], ["{Seed}/brand/*"]),
       sqsSend(),
-      g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{PolicyAudit}", "{ToolOrders}", "{ToolKnowledge}", "{ToolEvidence}", "{ToolMessaging}", "{ToolCases}"]),
+      // `{Bff}`: the QA seam's `signup.start` (routers/qa-seam.ts); the lead and the run's counters are the Bff's writes.
+      g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{PolicyAudit}", "{Bff}", "{ToolOrders}", "{ToolKnowledge}", "{ToolEvidence}", "{ToolMessaging}", "{ToolCases}"]),
       g(["sns:Publish"], [arn.waTopic]),
       guardrailG1,
       g(["sqs:ReceiveMessage", "sqs:DeleteMessage"], ["{InstallerEventsDlq}"]),

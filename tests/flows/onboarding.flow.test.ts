@@ -117,6 +117,24 @@ describe("onboarding flows", () => {
       expect((await world.thread("inst-rogelio-gtest")).filter((message) => message.direction === "OUT" && message.transport === "simulated" && message.sentAtSim > "2026-10-13")).toEqual([]);
     });
 
+    // [W5 review B2] The QaDriver never moves a lease's real window (IAM denies it `PHONELEASE#`): FL-072 (c) is proven here.
+    it("[FL-072] (c) [FL-101] 25 real hours after the bound phone's last message, with the world's clock paused, the supervisor's text is not relayed: CP-WA-24H DENY on the real clock and respuesta_supervisor on the live transport", async () => {
+      const { world } = await bound();
+      await world.data.worlds.setActiveWorkOrder("inst-rogelio-gtest", GUEST_TEST_CLOCK, "wo-24818-gtest", await world.simNow(GUEST_TEST_CLOCK));
+      await world.preset("wo-24818-gtest", { case: { reason: "INSTALLER_ASKED", rung: "PRIMARY", status: "TAKEN" } });
+      const simBefore = await world.simNow(GUEST_TEST_CLOCK);
+      world.advanceReal(25 * 3_600_000);
+      await world.text("sup-adriana-gtest", "Revisa el conector del poste, ahí está la falla", GUEST_TEST_CLOCK);
+      expect(await world.simNow(GUEST_TEST_CLOCK)).toBe(simBefore);
+      const toPhone = (await world.thread("inst-rogelio-gtest")).filter((message) => message.direction === "OUT" && message.transport === "live");
+      expect(toPhone.filter((message) => message.kind === "RELAY" && ["SENT", "DELIVERED", "READ"].includes(message.status))).toEqual([]);
+      expect(toPhone.filter((message) => message.templateName === "respuesta_supervisor")).toHaveLength(1);
+      const denied = (await world.decisions("isp-guest-test")).filter((decision) => decision.decision === "DENY" && decision.ruleIds.includes("CP-WA-24H"));
+      const onRealClock = denied.flatMap((decision) => decision.evaluated).filter((rule) => rule.ruleId === "CP-WA-24H" && rule.clock === "REAL");
+      expect(onRealClock).not.toEqual([]);
+      expect(onRealClock.every((rule) => rule.result === "FAIL")).toBe(true);
+    });
+
     it("[FL-101] a used code and a phone already bound are refused; resetting the demo removes the lease", async () => {
       const { world, code, hash } = await bound();
       const reused = await world.sendLive("+5215511112222", `ALTA ${code}`);

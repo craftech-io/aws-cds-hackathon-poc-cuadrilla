@@ -19,11 +19,13 @@ import { killSwitchReader, runtimeStore } from "../ops/defaults";
 import { consolePortsOf } from "../routers/console-ports";
 import { defaultDeps } from "../routers/deps";
 import { appRouter } from "../routers/index";
+import { QaSeamAnswer } from "../routers/qa-seam";
+import { QA_FORCE_EXPIRE, QaForceExpireAnswer } from "../guest/qa-expire";
 import { type Context, createCallerFactory, createQaPublicContext, createServerContext } from "../routers/trpc";
 import { linkedG1Prefilter } from "../turns/prefilter";
 import { stageWorldsDeps } from "../worlds/stage";
 import { loadTemplate } from "../worlds/templates";
-import { sendInbound } from "./channel";
+import { evalInboundKey, sendInbound } from "./channel";
 import type { GuardLookups } from "./guard";
 import { connectorLookups } from "./lookups";
 import type { ConsoleCallers, QaPorts } from "./ports";
@@ -65,13 +67,12 @@ export function seamPasswordOf(key: Uint8Array | string, username: string): stri
 
 function evalChannel(ports: QaPorts): EvalChannel {
   return {
-    async sendText({ clockId, installerId, text }) {
-      const key = `eval/${clockId}/${installerId}/${hmacSha256Base64Url("eval", text).slice(0, 16)}`;
-      const sent = await sendInbound(ports, { clockId, identity: installerId, content: { type: "text", text }, key, now: new Date() });
+    async sendText({ clockId, installerId, text, attempt }) {
+      const sent = await sendInbound(ports, { clockId, identity: installerId, content: { type: "text", text }, key: evalInboundKey({ clockId, installerId, attempt }), now: new Date() });
       return { messageId: sent.wamid };
     },
-    async tapButton({ clockId, installerId, action, nonce }) {
-      await sendInbound(ports, { clockId, identity: installerId, content: { type: "button", action }, key: `eval/${clockId}/${installerId}/tap/${nonce}`, now: new Date() });
+    async tapButton({ clockId, installerId, action, nonce, attempt }) {
+      await sendInbound(ports, { clockId, identity: installerId, content: { type: "button", action }, key: evalInboundKey({ clockId, installerId, attempt, tapNonce: nonce }), now: new Date() });
     },
     async settleInstaller({ installerId, timeoutSec }) {
       const person = await ports.data.people.requirePerson(installerId);
@@ -80,8 +81,9 @@ function evalChannel(ports: QaPorts): EvalChannel {
   };
 }
 
-function evaluation(ports: QaPorts, log: Logger): EvalDeps {
+function evaluation(ports: QaPorts, log: Logger, callKey: string): EvalDeps {
   return {
+    callKey,
     connector: ports.data,
     client: ports.client,
     channel: evalChannel(ports),
@@ -123,7 +125,7 @@ export function stageQaPorts(): QaPorts {
     dispatch: consolePorts.dispatch,
     tools: lambdaTools,
     console: consoleCallers(),
-    evaluation: (requestLog) => evaluation(ports, requestLog),
+    evaluation: (requestLog, callKey) => evaluation(ports, requestLog, callKey),
     kill: { store: runtimeStore(), reader: killSwitchReader(), logger: log, audit: async (event) => void (await data.audit.append({ ispId: ispIdOfClock(event.record.clockId ?? ""), ...(event.record.clockId === undefined ? {} : { clockId: event.record.clockId }), decision: "ACTION", action: "KILL_SWITCH_SET", actor: "QA", detail: { scope: event.record.scope, state: event.record.state } })) },
     memory: agentCoreMemoryReader,
     dlq: sqsDlq,
@@ -147,6 +149,8 @@ export function stageQaPorts(): QaPorts {
       publishForeign,
     },
     signup: () => ({
+      start: async (request) => QaSeamAnswer.parse(await invokeLinked("Bff", request)),
+      forceExpire: async (userId) => QaForceExpireAnswer.parse(await invokeLinked("GuestWorlds", { op: QA_FORCE_EXPIRE, userId })),
       cognito: cognitoSeam,
       leads: dynamoLeadStore(),
       emailHash: (email) => leadEmailHash(subkey("email-hash"), email),

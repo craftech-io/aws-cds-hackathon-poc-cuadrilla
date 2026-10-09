@@ -105,8 +105,8 @@ export function ioActions(ports: QaPorts) {
       const caller = { kind: "QA", ispId: clock.ispId, clockId: input.clockId, eventId: qaEventId(ctx.idempotencyKey) };
       return ports.tools.invoke(TARGET_OF_TOOL[input.tool], { tool: input.tool, input: { ...input.args, caller }, subject, correlationId: ctx.log.correlationId });
     },
-    "eval.runQuestions": (input: unknown, ctx: ActionContext) => EVAL_ACTIONS["eval.runQuestions"](ports.evaluation(ctx.log), input),
-    "eval.runPhotos": (input: unknown, ctx: ActionContext) => EVAL_ACTIONS["eval.runPhotos"](ports.evaluation(ctx.log), input),
+    "eval.runQuestions": (input: unknown, ctx: ActionContext) => EVAL_ACTIONS["eval.runQuestions"](ports.evaluation(ctx.log, ctx.idempotencyKey), input),
+    "eval.runPhotos": (input: unknown, ctx: ActionContext) => EVAL_ACTIONS["eval.runPhotos"](ports.evaluation(ctx.log, ctx.idempotencyKey), input),
     console: (input: QaParsedInput<"console">, ctx: ActionContext) => callConsole(ports, input, { runId: runIdOfKey(ctx.idempotencyKey), correlationId: ctx.log.correlationId, now: ctx.now() }),
     async "memory.inspect"(input: QaParsedInput<"memory.inspect">, ctx: ActionContext) {
       const person = await ports.data.people.requirePerson(input.installerId);

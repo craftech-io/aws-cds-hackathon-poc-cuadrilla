@@ -24,7 +24,7 @@ import { type ConfirmationDeps, type ConfirmationOutcome, confirmSignup } from "
 import type { WorldProvisioner } from "./provisioner";
 import { type RegistryRow, originOf, rowsBySub } from "./registry";
 import { renewGeneration } from "./renewal";
-import type { SlotScope } from "./slots";
+import { type SlotScope, slotScopeOf } from "./slots";
 
 export const SIGN_IN = "PostAuthentication_Authentication";
 
@@ -78,7 +78,7 @@ async function signupSignIn(deps: SignInDeps, row: RegistryRow, event: SignInEve
   // A current generation stays, even when the index still shows the row of a previous one (it lags);
   // an account over the person's limit never gets a world, whatever its age.
   if (account !== undefined && (!isExpiredAt(account, now) || account.status === "PERSON_LIMIT")) return { kind: "KEPT", userId: row.userId };
-  const scope: SlotScope = account?.slotScope ?? (lead?.origin === "QA" ? "QA" : "PUBLIC");
+  const scope: SlotScope = account?.slotScope ?? (lead === undefined ? "PUBLIC" : slotScopeOf(lead));
   const renewal = await renewGeneration({ client: deps.client, now, scope, withClock: false, ...(deps.suffix === undefined ? {} : { suffix: deps.suffix }) }, { row, account });
   if (renewal.status === "PROVISIONING") await deps.provisioner.request({ userId: row.userId, clockId: renewal.generation.clockId, origin: "SIGNUP" });
   deps.log.info("guest.world.renewed", { userId: row.userId, ispId: renewal.generation.ispId, status: renewal.status, generation: renewal.generationNumber, metric: "GuestWorldRenewed", value: 1 });

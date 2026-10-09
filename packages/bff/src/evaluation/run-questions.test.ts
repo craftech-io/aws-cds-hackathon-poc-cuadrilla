@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { tableEvalRuns } from "../metrics/eval-runs";
 import { scoreQuestions } from "../metrics/eval-score";
+import { evalInboundKey } from "../qa-driver/channel";
+import type { EvalChannel } from "./ports";
 import { inPool, runQuestions } from "./run-questions";
-import { type AnswerScript, type AnsweringRecord, type EvalHarness, answeringChannel, evalHarness } from "./testing";
+import { type AnswerScript, type AnsweringRecord, type EvalHarness, type WorldRef, answeringChannel, evalHarness } from "./testing";
 
 const SAFETY = "Detén el trabajo y aléjate del riesgo.";
+let turns = 0;
 
 const SCRIPTS: Readonly<Record<string, AnswerScript>> = {
   "q-A-01": async (world, installerId) => {
-    await world.turn(installerId, "turn-a01", [["MED-01", 0.71], ["MED-02", 0.42]]);
-    await world.reply(installerId, "En B+ el mínimo para cerrar es −25 dBm (Manual v1, §MED-01).", { citations: ["MED-01"], turnId: "turn-a01" });
+    const turnId = `turn-a01-${(turns += 1)}`;
+    await world.turn(installerId, turnId, [["MED-01", 0.71], ["MED-02", 0.42]]);
+    await world.reply(installerId, "En B+ el mínimo para cerrar es −25 dBm (Manual v1, §MED-01).", { citations: ["MED-01"], turnId });
   },
   "q-A-27": async (world, installerId) => {
     await world.reply(installerId, SAFETY, { author: "SYSTEM", kind: "SAFETY_INSTRUCTION" });
@@ -32,9 +36,25 @@ const SCRIPTS: Readonly<Record<string, AnswerScript>> = {
 
 const script: AnswerScript = async (world, installerId, questionId) => SCRIPTS[questionId]?.(world, installerId, questionId);
 
-async function setup(): Promise<{ kit: EvalHarness; record: AnsweringRecord }> {
+type ChannelOf = (world: WorldRef) => EvalChannel;
+
+async function setup(wrap: (channel: ChannelOf) => ChannelOf = (channel) => channel): Promise<{ kit: EvalHarness; record: AnsweringRecord }> {
   const record: AnsweringRecord = { sent: [], taps: [] };
-  return { kit: await evalHarness("Q", { channel: answeringChannel(script, record) }), record };
+  return { kit: await evalHarness("Q", { channel: wrap(answeringChannel(script, record)) }), record };
+}
+
+/** `InboundWhatsApp`'s idempotency (FL-093): an inbound whose key (so whose wamid) was seen is dropped. */
+function deduplicating(channel: ChannelOf): ChannelOf {
+  const seen = new Set<string>();
+  const fresh = (key: string): boolean => !seen.has(key) && Boolean(seen.add(key));
+  return (world) => {
+    const inner = channel(world);
+    return {
+      ...inner,
+      sendText: async (input) => (fresh(evalInboundKey(input)) ? inner.sendText(input) : {}),
+      tapButton: async (input) => (fresh(evalInboundKey({ ...input, tapNonce: input.nonce })) ? inner.tapButton(input) : undefined),
+    };
+  };
 }
 
 describe("eval.runQuestions over a measurement world, with scripted answers [FL-028] [FL-030] [FL-032] [FL-087]", () => {
@@ -87,6 +107,22 @@ describe("eval.runQuestions over a measurement world, with scripted answers [FL-
     expect(retried.ran[0]?.result.outcome).toBe("NO_REPLY");
     expect(retried.publish).toMatchObject({ published: false, missing: expect.arrayContaining(["q-A-01"]) });
     expect(retried.publish?.results.map((row) => row.itemId)).toEqual(["q-A-05"]);
+  }, 30_000);
+
+  it("[FL-087] [FL-093] a retried or re-run question is a new inbound that reaches the agent again; a transport retry of the same call is not [W5 review B2]", async () => {
+    const { kit, record } = await setup(deduplicating);
+    const call = (callKey: string) => ({ ...kit.deps, callKey });
+    const failing = { ...call("s1/EV-01/2/a1"), channel: { ...kit.deps.channel, settleInstaller: async () => Promise.reject(Object.assign(new Error("settle timed out"), { code: "SETTLE_TIMEOUT" })) } };
+    expect((await runQuestions(failing, { clockId: kit.clockId, questionIds: ["q-A-01"] })).ran[0]?.result.outcome).toBe("ERROR:SETTLE_TIMEOUT");
+    const retried = await runQuestions(call("s1/EV-01/2/r1"), { clockId: kit.clockId, questionIds: ["q-A-01"] });
+    expect(retried.ran[0]?.result).toMatchObject({ outcome: "CITED_ANSWER(MED-01)", passed: true, latencyMs: expect.any(Number) });
+    expect(record.sent.map((entry) => entry.questionId)).toEqual(["q-A-01", "q-A-01"]);
+    // The same driver call delivered twice (a transport retry): the same inbound, dropped as a duplicate.
+    await runQuestions(call("s1/EV-01/2/r1"), { clockId: kit.clockId, questionIds: ["q-A-01"], rerun: true });
+    expect(record.sent).toHaveLength(2);
+    const rerun = await runQuestions(call("s1/EV-01/2/x1"), { clockId: kit.clockId, questionIds: ["q-A-01"], rerun: true });
+    expect(record.sent).toHaveLength(3);
+    expect(rerun.ran[0]?.result).toMatchObject({ outcome: "CITED_ANSWER(MED-01)", passed: true });
   }, 30_000);
 
   it("refuses an unknown question and more than a batch", async () => {

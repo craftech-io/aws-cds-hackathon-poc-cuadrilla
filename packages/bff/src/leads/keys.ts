@@ -56,6 +56,19 @@ export function leadOriginOf(raw: string): LeadOrigin {
   return QA_ADDRESS_PATTERN.test(normalizeLeadEmail(raw)) ? "QA" : "WEB";
 }
 
+/** `success+qa-<runId>-<n>@…`: the run ids of the QaDriver (qa-driver/contract.ts `RunId`) and a label. */
+const QA_ADDRESS_RUN = /^success\+qa-(\d{1,20}-\d{1,3}(?:-r\d)?|local-[0-9a-hjkmnp-tv-z]{26})-[a-z0-9]{1,24}@simulator\.amazonses\.com$/;
+
+/**
+ * The QA run an address belongs to, so its account counts in that run's room (guest/slots.ts): the run of
+ * `success+qa-<runId>-<n>@…`, any other QA address its whole tag; `undefined` for a non-QA address.
+ */
+export function qaRunOfAddress(raw: string): string | undefined {
+  const email = normalizeLeadEmail(raw);
+  if (!QA_ADDRESS_PATTERN.test(email)) return undefined;
+  return QA_ADDRESS_RUN.exec(email)?.[1] ?? email.slice("success+qa-".length, email.indexOf("@"));
+}
+
 /** The first 8 characters of a hash: the only trace of a lead a log line may carry. */
 export function hashPrefix(hash: string): string {
   return hash.slice(0, 8);

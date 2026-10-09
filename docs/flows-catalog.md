@@ -535,7 +535,7 @@ Convenciones:
 - Pasos: (a) texto libre; (b) `CASE_NOTICE` o aviso de despacho sin plantilla → `DENY CP-WA-24H`, queda en la línea de tiempo; (c) la política mide con el reloj real y `PHONELEASE#.lastInboundAtReal` (ADR-0002): texto libre `DENY CP-WA-24H` y sale la plantilla `respuesta_supervisor`; si Meta igual devuelve `failed` con `131047`, cae a la plantilla y se audita `WINDOW_FALLBACK`.
 - Estado esperado: (a) `SENT`; (b) ningún mensaje de texto libre fuera de ventana; `AuditLog DENY CP-WA-24H`; (c) la decisión registra `clock: REAL` y `lastInboundAtReal`; ningún texto libre al teléfono real fuera de su ventana real aunque el reloj del mundo diga que está abierta.
 - Reglas: `CP-WA-24H`.
-- Prueba: U `policy/window.test.ts`, `channels/whatsapp/events.test.ts` · LF `policy.flow.test.ts` · SR `SC-11/1..2`, `SC-17/9.b` (variante c, pendiente P-01). Notas: la variante (c) es excepción §2.1 hasta P-01.
+- Prueba: U `policy/window.test.ts`, `channels/whatsapp/events.test.ts` · LF `policy.flow.test.ts`, `onboarding.flow.test.ts` · SR `SC-11/1..2`, `SC-17/9.b` (variante c, pendiente P-01). Notas: la variante (c) es excepción §2.1 hasta P-01; la ventana real cerrada de un teléfono ligado la prueban U y LF (`onboarding.flow.test.ts`: 25 h reales con el reloj del mundo en pausa), porque el `QaDriver` nunca escribe `PHONELEASE#`; `SC-17/9.b` prueba en vivo la ventana real abierta.
 
 ### FL-073 · Horario de silencio
 - Actores: sistema · Canal: WhatsApp · Disparador: reprogramación del despacho a las 22:00 que genera un aviso proactivo.

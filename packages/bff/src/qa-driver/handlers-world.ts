@@ -55,7 +55,6 @@ export interface WorldActionInputs {
   readonly "event.poison": QaParsedInput<"event.poison">;
   readonly "schedule.fireStale": QaParsedInput<"schedule.fireStale">;
   readonly "nonce.expire": QaParsedInput<"nonce.expire">;
-  readonly "lease.setLastInboundAtReal": QaParsedInput<"lease.setLastInboundAtReal">;
   readonly snapshot: QaParsedInput<"snapshot">;
 }
 
@@ -181,16 +180,6 @@ export function worldActions(ports: QaPorts) {
       if (nonce === undefined) throw new ToolError("NOT_FOUND", "no nonce");
       await ports.data.runtime.expireNonce(nonce);
       return { expired: true };
-    },
-    async "lease.setLastInboundAtReal"(input, ctx) {
-      const lease =
-        input.phoneHash === undefined
-          ? (await ports.data.worlds.listPhoneLeases(input.clockId)).find((entry) => entry.personId === input.personId)
-          : await ports.data.worlds.getPhoneLease(input.phoneHash);
-      if (lease === undefined || lease.clockId !== input.clockId) throw new ToolError("NOT_FOUND", "no lease of this phone in this world");
-      const at = new Date(ctx.now().getTime() - input.agoSec * 1_000).toISOString();
-      await ports.data.worlds.touchPhoneLease(lease.phoneHash, at);
-      return { lastInboundAtReal: at };
     },
     snapshot: (input, ctx): Promise<QaSnapshot> => takeSnapshot({ data: ports.data, now: ctx.now }, input),
   };

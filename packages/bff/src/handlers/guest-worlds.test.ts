@@ -82,6 +82,23 @@ describe("[FL-107] GuestWorlds", () => {
     await expect(handleGuestWorlds(depsOf(harness), { ...REQUEST, clockId: "GLOBAL#isp-demo#x" })).rejects.toBeInstanceOf(ToolError);
   });
 
+  it("[FL-111] QA_FORCE_EXPIRE ends only the generation of a QA run's sign-up account, builds nothing, and refuses any other account [W5 review B1]", async () => {
+    const harness = guestHarness();
+    const op = createAccountOp({ userId: SIGNUP_USER, guestOrigin: "SIGNUP", ispId: SIGNUP_ISP, clockId: SIGNUP_CLOCK, generation: 1, status: "READY", slotScope: "QA#qa-812-1" }, harness.now());
+    await harness.client.transact([op], harness.now().toISOString());
+    const expired = await handleGuestWorlds(depsOf(harness), { op: "QA_FORCE_EXPIRE", userId: SIGNUP_USER });
+    expect(expired).toMatchObject({ outcome: "EXPIRED", userId: SIGNUP_USER, clockId: SIGNUP_CLOCK });
+    expect(Date.parse((await getGuestAccount(harness.client, SIGNUP_USER))?.expiresAtReal ?? "")).toBeLessThan(harness.now().getTime());
+    expect(allRows(harness).filter(({ row }) => row.entity !== "GuestAccount")).toEqual([]);
+
+    const other = "usr-g01K60000000000000000000002";
+    await openAccount(harness, "PROVISIONING", { userId: other });
+    expect(await handleGuestWorlds(depsOf(harness), { op: "QA_FORCE_EXPIRE", userId: other })).toEqual({ outcome: "REFUSED", reason: "NOT_A_QA_ACCOUNT" });
+    expect(await handleGuestWorlds(depsOf(harness), { op: "QA_FORCE_EXPIRE", userId: "usr-g01K60000000000000000000003" })).toEqual({ outcome: "REFUSED", reason: "NO_ACCOUNT" });
+    await expect(handleGuestWorlds(depsOf(harness), { op: "QA_FORCE_EXPIRE", userId: "usr-guest-07" })).rejects.toBeInstanceOf(ToolError);
+    await expect(handleGuestWorlds(depsOf(harness), { op: "QA_FORCE_EXPIRE", userId: SIGNUP_USER, expiresAtReal: "2020-01-01T00:00:00.000Z" })).rejects.toBeInstanceOf(ToolError);
+  });
+
   it("[FL-105] a failure is logged with the store's code, table and cause, never a row", () => {
     const cause = Object.assign(new Error("denied"), { name: "AccessDeniedException" });
     expect(failureDetail(new ConnectorError("UNAVAILABLE", "dynamodb failure on Runtime", "Runtime", { cause }))).toEqual({ error: "ConnectorError", code: "UNAVAILABLE", table: "Runtime", cause: "AccessDeniedException" });

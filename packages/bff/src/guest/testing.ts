@@ -45,7 +45,7 @@ export function guestHarness(start = "2026-10-01T15:00:00.000Z"): GuestHarness {
 }
 
 export const EMAIL = "ana.prueba@example.com";
-export const QA_EMAIL = "success+qa-run-812@simulator.amazonses.com";
+export const QA_EMAIL = "success+qa-812-1-1@simulator.amazonses.com";
 export const SUB = "sub-0001";
 
 /** A pending lead started by user `n` (`gst-…000n`) for `email`. */

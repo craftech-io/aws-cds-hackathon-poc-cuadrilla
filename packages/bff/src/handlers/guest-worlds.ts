@@ -11,11 +11,15 @@
 // A failure never throws back to the asynchronous invocation: the account becomes FAILED with its reason
 // (a collision of the generation id asks the next retry for a new generation) and the portada offers
 // "Reintentar". The world is READY within 60 s of the request.
+//
+// The QaDriver's synchronous `{op: QA_FORCE_EXPIRE, userId}` (`guest.forceExpire`, guest/qa-expire.ts) is
+// the only other payload: it ends the generation of a QA run's sign-up account and builds nothing.
 import { ConnectorError, type GuestOrigin, ToolError, ispIdOfClock } from "@cuadrilla/shared";
 import { connector, tableClient } from "../connector/index";
 import type { TableClient } from "../connector/table-client";
 import { type GuestAccount, type WorldFailure, getGuestAccount, setStatus } from "../guest/account";
 import { ProvisionRequest } from "../guest/provisioner";
+import { type QaForceExpireOutcome, forceExpireQaAccount, isQaForceExpire } from "../guest/qa-expire";
 import { phoneHash } from "../lib/crypto";
 import { type Logger, createLogger } from "../lib/log";
 import { brandConfig, subkey } from "../lib/secrets";
@@ -60,7 +64,12 @@ function skip(account: GuestAccount | undefined, clockId: string, origin: GuestO
   return undefined;
 }
 
-export async function handleGuestWorlds(deps: GuestWorldsDeps, event: unknown): Promise<{ readonly outcome: GuestWorldsOutcome }> {
+export async function handleGuestWorlds(deps: GuestWorldsDeps, event: unknown): Promise<{ readonly outcome: GuestWorldsOutcome } | QaForceExpireOutcome> {
+  if (isQaForceExpire(event)) {
+    const expired = await forceExpireQaAccount(deps.client, event, deps.now());
+    deps.log.info("guest.world.qa_force_expire", { outcome: expired.outcome, ...(expired.outcome === "EXPIRED" ? { userId: expired.userId } : { reason: expired.reason }) });
+    return expired;
+  }
   const parsed = ProvisionRequest.safeParse(event);
   if (!parsed.success) throw new ToolError("INVALID", "GuestWorlds takes {userId, clockId, origin} and nothing else");
   const { userId, clockId, origin } = parsed.data;
@@ -108,6 +117,6 @@ function defaultDeps(): GuestWorldsDeps {
   return { client: tableClient(), factory, now: () => new Date(), log };
 }
 
-export async function handler(event: unknown): Promise<{ readonly outcome: GuestWorldsOutcome }> {
+export async function handler(event: unknown): Promise<{ readonly outcome: GuestWorldsOutcome } | QaForceExpireOutcome> {
   return handleGuestWorlds(defaultDeps(), event);
 }

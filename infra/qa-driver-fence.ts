@@ -8,7 +8,11 @@
 // (`isp-guest-test`, ids tagged `-gtest`). Every write is fenced by `dynamodb:LeadingKeys`, so IAM
 // itself denies `KILL#ALL`, `KILL#AGENT`, `KILL#SIGNUP`, `KILL#SIMULATOR`, the global counters of the
 // stage (`TURNCAP#GLOBAL#<day>`…), `LIVEWORLD`, `PHONELEASE#`, `JOINCODE#`, the sign-up's keys and any
-// row of the demo world or of a real guest. Its only `KILL#` write is `KILL#AGENT#qa-*`.
+// row of the demo world or of a real guest. Its only `KILL#` write is `KILL#AGENT#qa-*`; of the sign-up,
+// only the limits of a QA run's room (`GUESTWORLDS#QA#qa-*`). The QA seam's other writes go through the
+// Lambda that owns them (docs/architecture.md §14): `signup.start` through the Bff (`Leads` and the run's
+// `SIGNUP#qa-<runId>#…`), `guest.forceExpire` through GuestWorlds (`GUESTACCOUNT#`); `PHONELEASE#` stays
+// denied, so QA never moves the real window of a phone bound by code.
 //
 // Residual fence in code only (documented in §14): `Cases` is keyed by `CASE#<ulid>`, which names no
 // world, so its writes are not fenced by key; the generic transient keys of `Runtime` (`SESSION#`,
@@ -40,6 +44,13 @@ const clockKeys = (prefix: string): string[] => [...QA_CLOCKS.map((clock) => `${
 const CLOCK_PREFIXES = ["CLOCK", "WORLDSTATE", "WORLDSESSION", "PENDING", "COUNTER#EPOCH", "TOMB", "FAULTS", "RATE", "SIMCAP", "JUMP"] as const;
 /** The test scope of the global ceiling (`…#GLOBAL#<qa clock>#<day>`, packages/bff/src/ops/cost-caps.ts): `qa-*` only. */
 const QA_GLOBAL_TEST_SCOPES = ["TURNCAP#GLOBAL#qa-*", "VALCAP#GLOBAL#qa-*", "TRANSCRIBE#GLOBAL#qa-*"] as const;
+/**
+ * The QA seam's own key (ADR-0025 §7): the limits of one run's room for the sign-up worlds
+ * (`GUESTWORLDS#QA#qa-<runId>#LIMITS`, `guest.capsOverride`, packages/bff/src/guest/slots.ts). Never the
+ * public counters nor the room's counters, which the triggers write; the lead and the run's start counters
+ * (`signup.start`) are the Bff's writes and the account's expiry (`guest.forceExpire`) is GuestWorlds'.
+ */
+const QA_SEAM_KEYS = ["GUESTWORLDS#QA#qa-*"] as const;
 /** Transient keys that name no world; the code fences them (see the header). */
 const TRANSIENT_KEYS = ["SESSION#*", "TURN#*", "NONCE#*", "IDEMP#*", "UPLOAD#*", "PROBE#*", "LEASE#PHONE#*", "LEASE#WONUM#*"] as const;
 
@@ -51,6 +62,7 @@ export const QA_DRIVER_WRITE_KEYS = {
     ...QA_GLOBAL_TEST_SCOPES,
     ...operatorKeys("TURNCAP#"),
     ...QA_PERSON_IDS.map((id) => `INSTSTATE#${id}`),
+    ...QA_SEAM_KEYS,
     ...TRANSIENT_KEYS,
   ],
   Isps: operatorKeys("ISP#"),

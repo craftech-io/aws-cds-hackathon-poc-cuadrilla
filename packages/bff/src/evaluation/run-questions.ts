@@ -10,14 +10,16 @@
 //      details the report needs (observed outcomes, citations, cases, guardrail, safety, `Retrieve`)
 //
 // Up to 4 questions at once, each in its own FIFO group (its own installer). A question already measured
-// in this run is skipped unless `rerun`; one that could not be run (`ERROR:…`) is retried. The texts the
+// in this run is skipped unless `rerun`; one that could not be run (`ERROR:…`) is retried. Every attempt
+// sends a new inbound (its key is the driver call's and the question's, `evalAttempt`), so a retried or
+// re-run question reaches the agent again instead of being dropped as a duplicate (FL-093). The texts the
 // agent wrote travel back to the runner for the ADR-0023 check and are never persisted.
 import { ToolError } from "@cuadrilla/shared";
 import type { EvalResult } from "../domain/metrics";
 import { tokenCost } from "./cost";
 import { escalationOffer, readQuestion, type QuestionReading } from "./observe";
 import { type QuestionSpec, questionSpecOf } from "./outcomes";
-import { type EvalDeps, RunQuestionsInput } from "./ports";
+import { type EvalDeps, RunQuestionsInput, evalAttempt } from "./ports";
 import { type PublishOutcome, closeRun, isErrorOutcome } from "./publish";
 import { scoreQuestion } from "./score";
 import { evalRunOf, itemInstallerId } from "./world-request";
@@ -87,15 +89,16 @@ async function targetOf(deps: EvalDeps, clockId: string, questionId: string): Pr
 
 async function askAndObserve(deps: EvalDeps, target: QuestionTarget, question: QuestionSpec, settleTimeoutSec: number): Promise<{ readonly reading: QuestionReading; readonly tapped: boolean }> {
   const { clockId, installerId, workOrderId } = target;
+  const attempt = evalAttempt(deps.callKey, question.questionId);
   const sinceReal = new Date(deps.now().getTime() - CLOCK_MARGIN_MS).toISOString();
-  const sent = await deps.channel.sendText({ clockId, installerId, text: question.text });
+  const sent = await deps.channel.sendText({ clockId, installerId, text: question.text, attempt });
   await deps.channel.settleInstaller({ installerId, timeoutSec: settleTimeoutSec });
   const window = { installerId, workOrderId, sinceReal, ...(sent.messageId === undefined ? {} : { inboundMessageId: sent.messageId }) };
   const first = await readQuestion(deps.connector, window);
   const offer = escalationOffer(first.observation);
   if (offer === undefined) return { reading: first, tapped: false };
   const tapAtReal = new Date(deps.now().getTime() - CLOCK_MARGIN_MS).toISOString();
-  await deps.channel.tapButton({ clockId, installerId, nonce: offer.nonce, action: "CONSULT_SUPERVISOR" });
+  await deps.channel.tapButton({ clockId, installerId, nonce: offer.nonce, action: "CONSULT_SUPERVISOR", attempt });
   await deps.channel.settleInstaller({ installerId, timeoutSec: settleTimeoutSec });
   const second = await readQuestion(deps.connector, { ...window, tapAtReal });
   // The latency is the question's: to the first reply, which came before the tap.

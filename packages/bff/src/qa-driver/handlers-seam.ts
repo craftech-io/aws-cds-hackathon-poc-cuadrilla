@@ -1,24 +1,28 @@
 // The QA seam of the own sign-up (ADR-0025 §7, docs/test-plan.md §4.1, `SC-20`): nobody reads the code
 // Cognito mails to the SES simulator, so the driver
 //
-//   signup.start          runs the real `signup.start` of the `appRouter` with the run's counters
-//                         (`…#qa-<runId>[-<scope>]#…`, `createQaPublicContext`), never over public HTTP
+//   signup.start          the real `signup.start` of the `appRouter` with the run's counters
+//                         (`…#qa-<runId>[-<scope>]#…`, `createQaPublicContext`), run by the `Bff` on a direct
+//                         invocation (routers/qa-seam.ts), never over public HTTP: the lead and the counters
+//                         are the Bff's writes, which IAM denies this role (infra/qa-driver-fence.ts)
 //   auth.signUp           `SignUp` with the `GuestSignup` client and the ticket (or without it, or with
 //                         another user's, to see the pre sign-up refuse); the password is derived on the
 //                         server and never leaves the driver
 //   auth.confirmQaSignup  `AdminConfirmSignUp`, only for a user whose email IN COGNITO is a QA address
 //   auth.qaLogin          `AdminInitiateAuth` with `QaProbe` (same fence): the principal the token carries
 //   auth.cleanupQaSignup  `GuestAccountDeletion` with the user's `userId` (same fence; no `AdminDeleteUser`)
-//   guest.forceExpire     the generation's `expiresAtReal` in the past (same fence)
-//   guest.capsOverride    the limits of the QA scope of the slots (`GUESTWORLDS#QA#LIMITS`), never the public ones
+//   guest.forceExpire     the generation's `expiresAtReal` in the past (same fence), written by `GuestWorlds`
+//                         (`QA_FORCE_EXPIRE`, guest/qa-expire.ts) only for an account of a QA run's room
+//   guest.capsOverride    the limits of the run's QA room (`GUESTWORLDS#QA#qa-<runId>#LIMITS`), never the
+//                         public ones nor another run's
 //   leads.get             the lead with its email masked (same fence)
 //
 // Every fenced action logs `QA_SIGNUP_CONFIRMED` / `QA_SIGNUP_REFUSED` lines with the address masked.
 import { ToolError } from "@cuadrilla/shared";
 import { CONSENTS_VERSION } from "@cuadrilla/shared/legal/consents";
-import { guestAccountKey } from "../leads/guest-accounts";
 import { signupUserIdOf } from "../guest/registry";
 import { setQaSlotLimits } from "../guest/slots";
+import { QA_SIGNUP_START } from "../routers/qa-seam";
 import { QA_REASON, runIdOfKey } from "./contract";
 import type { QaParsedInput } from "./contract-inputs";
 import type { ActionContext } from "./driver";
@@ -53,8 +57,9 @@ export function seamActions(ports: QaPorts) {
         consents: { TERMS_PRIVACY: { accepted: input.termsAccepted, textVersion: CONSENTS_VERSION }, CONTACT: { accepted: input.contactAccepted, textVersion: CONSENTS_VERSION } },
         ...(input.utm === undefined ? {} : { attribution: { utm: input.utm } }),
       };
-      const started = await ports.console.public(runId, ctx.log.correlationId).signup.start(form);
-      return { username: started.username, ticket: started.ticket, expiresAt: started.expiresAt };
+      const answer = await ports.signup().start({ op: QA_SIGNUP_START, runId, correlationId: ctx.log.correlationId, form });
+      if (!answer.ok) throw new ToolError(answer.error.code, answer.error.message, answer.error.reason);
+      return { username: answer.result.username, ticket: answer.result.ticket, expiresAt: answer.result.expiresAt };
     },
     async "auth.signUp"(input: QaParsedInput<"auth.signUp">, ctx: ActionContext) {
       const seam = ports.signup();
@@ -102,14 +107,15 @@ export function seamActions(ports: QaPorts) {
     async "guest.forceExpire"(input: QaParsedInput<"guest.forceExpire">, ctx: ActionContext) {
       await fenced(ports, input.username, ctx);
       const userId = signupUserIdOf(input.username);
-      const now = ctx.now();
-      const past = new Date(now.getTime() - 60_000).toISOString();
-      const account = await ports.client.update("Runtime", guestAccountKey(userId), { expiresAtReal: past }, now.toISOString(), { equals: { guestOrigin: "SIGNUP" } });
-      return { userId, clockId: account.clockId ?? null, expiresAtReal: past };
+      const expired = await ports.signup().forceExpire(userId);
+      if (expired.outcome === "REFUSED") {
+        throw expired.reason === "NO_ACCOUNT" ? new ToolError("NOT_FOUND", "the user has no guest account", "NO_ACCOUNT") : new ToolError("FORBIDDEN", "only an account of a QA run expires here", QA_REASON.NOT_A_QA_ADDRESS);
+      }
+      return { userId, clockId: expired.clockId, expiresAtReal: expired.expiresAtReal };
     },
     async "guest.capsOverride"(input: QaParsedInput<"guest.capsOverride">, ctx: ActionContext) {
       const limits = { activeWorlds: input.activeWorlds ?? 150, confirmedPerDay: input.signupsPerDay ?? 150 };
-      await setQaSlotLimits(ports.client, limits, ctx.now());
+      await setQaSlotLimits(ports.client, runIdOfKey(ctx.idempotencyKey), limits, ctx.now());
       return limits;
     },
     async "leads.get"(input: QaParsedInput<"leads.get">, ctx: ActionContext) {

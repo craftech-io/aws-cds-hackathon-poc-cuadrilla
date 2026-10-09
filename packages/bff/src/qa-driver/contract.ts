@@ -33,7 +33,6 @@ export const QA_ACTIONS = [
   "probe.foreign",
   "mail.outcome",
   "nonce.expire",
-  "lease.setLastInboundAtReal",
   // The simulated systems and the faults of a world
   "network.setBehaviour",
   "network.fix",

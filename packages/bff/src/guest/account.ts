@@ -14,6 +14,7 @@ import { z } from "zod";
 import { ClockId, ConnectorError, ConsoleUserId, GuestOrigin, GuestWorldStatus, IsoInstant, IspId } from "@cuadrilla/shared";
 import { guestAccountKey } from "../leads/guest-accounts";
 import type { Item, TableClient, TransactOp, WriteCondition } from "../connector/table-client";
+import { type SlotScope, SlotScopeSchema } from "./slots";
 
 export const GUEST_ACCOUNT_ENTITY = "GuestAccount";
 
@@ -45,7 +46,7 @@ export const GuestAccount = z.looseObject({
   /** The real day (`yymmdd`) whose slot the generation holds; absent while `CAP_FULL`. */
   slotDay: z.string().regex(/^\d{6}$/).optional(),
   /** Whose counters the slots of this account take: the public ones, or the QA seam's (guest/slots.ts). */
-  slotScope: z.enum(["PUBLIC", "QA"]).optional(),
+  slotScope: SlotScopeSchema.optional(),
   version: z.int().min(1),
   createdAt: IsoInstant,
   updatedAt: IsoInstant,
@@ -60,7 +61,7 @@ export interface NewGuestAccount {
   readonly generation: number;
   readonly status: GuestWorldStatus;
   readonly slotDay?: string | undefined;
-  readonly slotScope?: "PUBLIC" | "QA" | undefined;
+  readonly slotScope?: SlotScope | undefined;
 }
 
 export function signupWorldExpiry(createdAtReal: Date): Date {

@@ -59,6 +59,16 @@ export async function buttonOf(ports: Pick<QaPorts, "data">, personId: string, a
   throw new ToolError("CONFLICT", `no live ${action} button was offered to ${personId}`, "NO_BUTTON");
 }
 
+/**
+ * The key of an inbound of the evaluation (`eval.runQuestions`): one per attempt at an item (the driver
+ * call's key and the item, `evalAttempt`) and per message of that attempt (`text`, or the tap of a nonce).
+ * A transport retry of the call is the same message; the runner's retry of an item, or a `rerun`, is not.
+ */
+export function evalInboundKey(input: { readonly clockId: string; readonly installerId: string; readonly attempt: string; readonly tapNonce?: string }): string {
+  const digest = createHash("sha256").update(`${input.attempt}\n${input.tapNonce ?? "text"}`, "utf8").digest("base64url").slice(0, 22);
+  return `eval/${input.clockId}/${input.installerId}/${input.tapNonce === undefined ? "q" : "tap"}/${digest}`;
+}
+
 function uploadIdOf(key: string): string {
   return `qa-${createHash("sha256").update(key, "utf8").digest("hex").slice(0, 40)}`;
 }

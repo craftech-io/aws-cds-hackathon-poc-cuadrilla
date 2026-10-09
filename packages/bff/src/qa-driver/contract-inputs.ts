@@ -89,11 +89,6 @@ export const ACTION_INPUTS = {
   "probe.foreign": z.object({ eventId: z.string().min(1).max(128), timeoutSec: Timeout(60, 300) }).strict(),
   "mail.outcome": z.object({ ...World, mailId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/), until: z.enum(["ANY", "FINAL"]).default("FINAL"), timeoutSec: Timeout(300) }).strict(),
   "nonce.expire": z.object({ ...World, personId: PersonId, action: WaButtonAction }).strict(),
-  /** By the phone's hash, or by the person it is bound to (the runner never sees a real phone nor its hash). */
-  "lease.setLastInboundAtReal": z
-    .object({ ...World, phoneHash: z.string().regex(/^[0-9a-f]{64}$/).optional(), personId: PersonId.optional(), agoSec: z.int().min(0).max(14 * 86_400) })
-    .strict()
-    .refine((input) => (input.phoneHash === undefined) !== (input.personId === undefined), "phoneHash or personId, one of them"),
   "network.setBehaviour": z.object({ ...OrderRef, behaviour: OnuBehaviour.optional(), rxPowerDbm: z.number().min(-50).max(10).optional(), fixed: z.boolean().optional() }).strict(),
   "network.fix": z.object({ ...OrderRef, kind: PhysicalActionKind }).strict(),
   "network.setFaults": FaultInput(NetworkFault),

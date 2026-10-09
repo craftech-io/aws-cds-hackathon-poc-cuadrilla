@@ -3,10 +3,16 @@
 // (except `Cases`, fenced in code), and its objects by prefix. The patterns are evaluated here the way
 // IAM evaluates `StringLike`, against keys of the live demo world, a real guest and the stage.
 import { describe, expect, it } from "vitest";
-import { expectedGrants, type Grant } from "./iam-capabilities";
+import { type Grant, type LambdaName, expectedData, expectedGrants } from "./iam-capabilities";
 import { ITEM_WRITES, QA_DRIVER_WRITE_KEYS, guestTestObjectPrefix, type QaFencedTable } from "./qa-driver-fence";
 import { TABLE_ACTIONS, dataAccessGrants } from "./storage-access";
 import { mediaKeySegment } from "../packages/shared/src/media/keys";
+import { qaLimitsKey, qaSlotScope } from "../packages/bff/src/guest/slots";
+import { guestAccountKey } from "../packages/bff/src/leads/guest-accounts";
+import { LEAD_PARTITION_PREFIX } from "../packages/bff/src/leads/model";
+import { QA_ACTIONS } from "../packages/bff/src/qa-driver/contract";
+import { SIGNUP_ACTIONS } from "../packages/bff/src/qa-driver/guard";
+import { globalDayKey, visitorCounters } from "../packages/bff/src/signup/limits";
 
 /** IAM `StringLike`: `*` any run of characters (`#` included), `?` one character. */
 function like(pattern: string, value: string): boolean {
@@ -116,5 +122,71 @@ describe("QaDriver data access [W3 review B1/B4]", () => {
     for (const action of ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]) expect(on(action), action).not.toEqual(expect.arrayContaining(["{Media}/*", "{Media}/wa/*", "{Evidence}/*"]));
     expect(like(guestTestObjectPrefix(), `guest/${mediaKeySegment("GUEST#isp-guest-test", 3)}`)).toBe(true);
     expect(like(guestTestObjectPrefix(), `guest/${mediaKeySegment("GUEST#isp-guest-07", 3)}`)).toBe(false);
+  });
+});
+
+// [W5 review B1/B2] Every key the QA seam writes, with the role that writes it: the QaDriver only where its
+// fence opens the key, otherwise the Lambda that owns the write, which the QaDriver may invoke and whose own
+// grants reach the key. Built with the bff's own key builders, so a key that moves breaks this test.
+type Writer = "QaDriver" | LambdaName;
+type SeamWrite = { readonly writer: Writer; readonly table: string; readonly key: string };
+
+const AT = new Date("2026-10-13T15:20:00.000Z");
+const RUN_SCOPE = { kind: "QA", runId: "812-1-s8" } as const;
+const QA_ROOM = qaSlotScope("812-1") as `QA#qa-${string}`;
+const SIGNUP_USER = "usr-g01K80000000000000000000001";
+
+/** The writes of each seam action (the sign-up's actions and the one of its caps); Cognito's own writes are the triggers'. */
+const SEAM_WRITES: Readonly<Record<string, readonly SeamWrite[]>> = {
+  "signup.start": [
+    { writer: "Bff", table: "Leads", key: `${LEAD_PARTITION_PREFIX}${"c".repeat(64)}` },
+    ...visitorCounters(RUN_SCOPE, { ipHash: "a".repeat(64), abuseHash: "b".repeat(64), anonymous: true }, AT).map((spec) => ({ writer: "Bff" as const, table: "Runtime", key: spec.key })),
+    { writer: "Bff", table: "Runtime", key: globalDayKey(RUN_SCOPE, AT) },
+  ],
+  "auth.signUp": [],
+  "auth.confirmQaSignup": [],
+  "auth.qaLogin": [],
+  "auth.cleanupQaSignup": [{ writer: "GuestAccountDeletion", table: "Runtime", key: guestAccountKey(SIGNUP_USER).PK }],
+  "guest.forceExpire": [{ writer: "GuestWorlds", table: "Runtime", key: guestAccountKey(SIGNUP_USER).PK }],
+  "guest.capsOverride": [{ writer: "QaDriver", table: "Runtime", key: qaLimitsKey(QA_ROOM) }],
+  "leads.get": [],
+};
+
+const PUT = ["dynamodb:PutItem", "dynamodb:UpdateItem"];
+
+/** Whether `role` may put or update the item of `key` in `table`: unconditioned write access, or a grant whose leading keys match. */
+function roleWrites(role: LambdaName, table: string, key: string): boolean {
+  if ((expectedData(role, "tables") as Record<string, string>)[table] === "write") return true;
+  return expectedGrants(role).some(
+    (grant) => grant.resources.includes(`{${table}}`) && grant.actions.some((action) => PUT.includes(action)) && (grant.conditions ?? []).every((condition) => condition.variable !== "dynamodb:LeadingKeys" || condition.values.some((pattern) => like(pattern, key))),
+  );
+}
+
+const invokes = (target: string): boolean => expectedGrants("QaDriver").some((grant) => grant.actions.includes("lambda:InvokeFunction") && grant.resources.includes(`{${target}}`));
+
+describe("the QA seam's writes and who makes them [W5 review B1/B2]", () => {
+  it("maps every action of the seam", () => {
+    expect(Object.keys(SEAM_WRITES).sort()).toEqual([...SIGNUP_ACTIONS, "guest.capsOverride"].sort());
+  });
+
+  it("each key is either inside the QaDriver's fence, or written by an owner the QaDriver invokes and whose grants reach it", () => {
+    for (const [action, writes] of Object.entries(SEAM_WRITES)) {
+      for (const { writer, table, key } of writes) {
+        if (writer === "QaDriver") {
+          expect(table in QA_DRIVER_WRITE_KEYS && allows(table as QaFencedTable, key), `${action} ${table} ${key}`).toBe(true);
+          continue;
+        }
+        expect(invokes(writer), `${action}: the QaDriver invokes ${writer}`).toBe(true);
+        expect(roleWrites(writer, table, key), `${action}: ${writer} writes ${table} ${key}`).toBe(true);
+        expect(table in QA_DRIVER_WRITE_KEYS && allows(table as QaFencedTable, key), `${action}: the QaDriver's own fence keeps ${key} closed`).toBe(false);
+      }
+    }
+    expect(expectedGrants("QaDriver").some((grant) => grant.resources.some((resource) => resource.startsWith("{Leads}")) && grant.actions.some((action) => PUT.includes(action)))).toBe(false);
+  });
+
+  it("opens of the sign-up only the limits of a QA run's room: never the public counters, the old shared key, nor a phone lease", () => {
+    for (const key of ["GUESTWORLDS#261013", "GUESTWORLDS#QA#LIMITS", "SIGNUPOK#GLOBAL#2026-10-13", "SIGNUPOK#QA#qa-812-1#2026-10-13", "SIGNUP#GLOBAL#2026-10-13", globalDayKey(RUN_SCOPE, AT), "PHONELEASE#0f3a"]) expect(allows("Runtime", key), key).toBe(false);
+    expect(allows("Runtime", qaLimitsKey(QA_ROOM))).toBe(true);
+    expect(QA_ACTIONS.filter((action) => action.startsWith("lease."))).toEqual([]);
   });
 });

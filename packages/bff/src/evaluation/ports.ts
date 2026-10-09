@@ -12,12 +12,17 @@ import type { WorkOrder } from "../domain/work-orders";
 import type { Logger } from "../lib/log";
 import type { EvalTemplate, OnuModelBehaviour } from "../worlds/templates";
 
-/** The simulated phone of an installer of the world (the world is `simulated`; same path as the simulator). */
+/**
+ * The simulated phone of an installer of the world (the world is `simulated`; same path as the simulator).
+ * `attempt` names one attempt at one item (`evalAttempt`): the inbound's key derives from it, so a
+ * transport retry of the same driver call is the same message (FL-093) and a new attempt (the runner's
+ * retry of an `ERROR:` item, a `rerun`) is a new one that reaches the agent again.
+ */
 export interface EvalChannel {
   /** `wa.inbound` text from the installer's identity; the id of the inbound message when the driver knows it. */
-  sendText(input: { readonly clockId: string; readonly installerId: string; readonly text: string }): Promise<{ readonly messageId?: string }>;
+  sendText(input: { readonly clockId: string; readonly installerId: string; readonly text: string; readonly attempt: string }): Promise<{ readonly messageId?: string }>;
   /** `wa.inbound button(action)`: taps the button whose nonce a message to the installer carries. */
-  tapButton(input: { readonly clockId: string; readonly installerId: string; readonly nonce: string; readonly action: WaButtonAction }): Promise<void>;
+  tapButton(input: { readonly clockId: string; readonly installerId: string; readonly nonce: string; readonly action: WaButtonAction; readonly attempt: string }): Promise<void>;
   /** `installer.settle`: resolves once nothing of the installer is in flight (rejects on its timeout). */
   settleInstaller(input: { readonly installerId: string; readonly timeoutSec: number }): Promise<void>;
 }
@@ -57,6 +62,13 @@ export interface EvalDeps {
   readonly log: Logger;
   /** Real clock: latencies and the run's finish. */
   readonly now: () => Date;
+  /** The driver call's idempotency key: one per call, the same on a transport retry of that call. */
+  readonly callKey: string;
+}
+
+/** One attempt at one item: the driver call that runs it and the item. */
+export function evalAttempt(callKey: string, itemId: string): string {
+  return `${callKey}/${itemId}`;
 }
 
 const EvalClock = ClockId.refine((clockId) => parseClockId(clockId)?.kind === "EVAL", "expected an eval-* world");

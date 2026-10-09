@@ -10,11 +10,15 @@
 // sums: the race the ADR declares and tolerates (the stage's cost ceiling still holds). Without room,
 // the account and the lead are created all the same and the world waits in `CAP_FULL`.
 //
-// Accounts of the QA seam (`success+qa-…` addresses, ADR-0025 §7) count under keys of their own
-// (`GUESTWORLDS#QA#…`, `SIGNUPOK#QA#…`) with limits `guest.capsOverride` may set
-// (`GUESTWORLDS#QA#LIMITS`): a scenario proves the caps without ever touching the real ones.
+// Accounts of the QA seam (`success+qa-<runId>-<n>` addresses, ADR-0025 §7) count under keys of their
+// run (`GUESTWORLDS#QA#qa-<runId>#…`, `SIGNUPOK#QA#qa-<runId>#…`) with limits `guest.capsOverride` of that
+// run may set (`GUESTWORLDS#QA#qa-<runId>#LIMITS`): a scenario proves the caps without ever touching the
+// real ones, and two runs never share an override. The QaDriver writes only the limits
+// (infra/qa-driver-fence.ts); the counters are the triggers'.
 import { z } from "zod";
 import { generationDateTag } from "@cuadrilla/shared";
+import { qaRunOfAddress } from "../leads/keys";
+import type { LeadOrigin } from "../leads/model";
 import type { RuntimePort } from "../connector/ports-runtime";
 import type { Item, TableClient, TransactOp } from "../connector/table-client";
 
@@ -29,13 +33,24 @@ const CONFIRMED_TTL_AFTER_DAY_SECONDS = 48 * 3_600;
 const DAY_MS = 86_400_000;
 export const SLOT_COUNTER = "count";
 
-export type SlotScope = "PUBLIC" | "QA";
+/** Whose counters the slots of an account take: the public ones, or those of one QA run (`QA#qa-<run>`). */
+export type SlotScope = "PUBLIC" | `QA#qa-${string}`;
+const QA_SCOPE = /^QA#qa-[a-z0-9-]{1,60}$/;
+export const SlotScopeSchema = z.union([z.literal("PUBLIC"), z.custom<`QA#qa-${string}`>((value) => typeof value === "string" && QA_SCOPE.test(value), "expected QA#qa-<run>")]);
 
-const worldsPrefix = (scope: SlotScope): string => (scope === "QA" ? "GUESTWORLDS#QA#" : "GUESTWORLDS#");
+export const qaSlotScope = (run: string): SlotScope => SlotScopeSchema.parse(`QA#qa-${run}`);
+
+/** The scope of a lead's account, decided by the server from its address (leads/keys.ts). */
+export function slotScopeOf(lead: { readonly origin: LeadOrigin; readonly email: string }): SlotScope {
+  const run = lead.origin === "QA" ? qaRunOfAddress(lead.email) : undefined;
+  return run === undefined ? "PUBLIC" : qaSlotScope(run);
+}
+
+const worldsPrefix = (scope: SlotScope): string => (scope === "PUBLIC" ? "GUESTWORLDS#" : `GUESTWORLDS#${scope}#`);
 export const worldsDayKey = (scope: SlotScope, yymmdd: string): string => `${worldsPrefix(scope)}${yymmdd}`;
-export const confirmedDayKey = (scope: SlotScope, realDay: string): string => `${scope === "QA" ? "SIGNUPOK#QA#" : "SIGNUPOK#GLOBAL#"}${realDay}`;
-/** Limits of the QA scope (`guest.capsOverride`); the public limits are code, never a row. */
-export const QA_LIMITS_KEY = "GUESTWORLDS#QA#LIMITS";
+export const confirmedDayKey = (scope: SlotScope, realDay: string): string => `${scope === "PUBLIC" ? "SIGNUPOK#GLOBAL#" : `SIGNUPOK#${scope}#`}${realDay}`;
+/** Limits of one QA run's scope (`guest.capsOverride`); the public limits are code, never a row. */
+export const qaLimitsKey = (scope: `QA#qa-${string}`): string => `${worldsPrefix(scope)}LIMITS`;
 
 const meta = (pk: string) => ({ PK: pk, SK: "META" });
 /** The shape of a plain `Counter` of the connector (domain/runtime.ts), so any reader parses it. */
@@ -50,7 +65,7 @@ const QaLimits = z.object({ activeWorlds: z.int().min(0), confirmedPerDay: z.int
 
 async function limitsOf(client: TableClient, scope: SlotScope): Promise<SlotLimits> {
   if (scope === "PUBLIC") return SIGNUP_WORLD_LIMITS;
-  const parsed = QaLimits.safeParse(await client.get("Runtime", meta(QA_LIMITS_KEY)));
+  const parsed = QaLimits.safeParse(await client.get("Runtime", meta(qaLimitsKey(scope))));
   return parsed.success ? parsed.data : SIGNUP_WORLD_LIMITS;
 }
 
@@ -109,11 +124,13 @@ export async function activeWorlds(client: TableClient, scope: SlotScope, now: D
   return counts.reduce((sum, value) => sum + value, 0);
 }
 
-/** `guest.capsOverride` of the QA seam: the limits of the QA scope only, never the public ones. */
-export async function setQaSlotLimits(client: TableClient, limits: SlotLimits, now: Date): Promise<void> {
+/** `guest.capsOverride` of the QA seam: the limits of one run's scope only, never the public ones nor another run's. */
+export async function setQaSlotLimits(client: TableClient, run: string, limits: SlotLimits, now: Date): Promise<{ readonly key: string }> {
   const parsed = QaLimits.parse(limits);
-  const item: Item = { ...meta(QA_LIMITS_KEY), entity: "QaSlotLimits", ...parsed, updatedAt: now.toISOString(), expiresAt: Math.floor(now.getTime() / 1000) + WORLDS_TTL_SECONDS };
+  const key = qaLimitsKey(qaSlotScope(run) as `QA#qa-${string}`);
+  const item: Item = { ...meta(key), entity: "QaSlotLimits", ...parsed, updatedAt: now.toISOString(), expiresAt: Math.floor(now.getTime() / 1000) + WORLDS_TTL_SECONDS };
   await client.put("Runtime", item);
+  return { key };
 }
 
 // ---- guest.retryWorld: once a minute ---------------------------------------------------------------
