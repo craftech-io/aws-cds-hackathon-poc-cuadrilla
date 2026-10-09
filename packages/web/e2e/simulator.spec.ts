@@ -256,20 +256,31 @@ test.describe("phone simulator", () => {
 
   test("@webkit [FL-082] WebKit records the voice note as MP4", async ({ page, ui, browserName }) => {
     test.skip(browserName !== "webkit", "WebKit only");
-    // A synthetic microphone, and only MP4 offered, as Safari records.
+    // A synthetic microphone, and only MP4 offered, as Safari records. The Linux WebKit of CI may have no
+    // `mediaDevices` at all: the fake is defined then, and the recorder is always WebKit's own.
     await page.addInitScript(() => {
-      const context = new AudioContext();
-      navigator.mediaDevices.getUserMedia = async () => {
+      const getUserMedia = async () => {
+        const context = new AudioContext();
+        await context.resume();
         const oscillator = context.createOscillator();
         const destination = context.createMediaStreamDestination();
         oscillator.connect(destination);
         oscillator.start();
         return destination.stream;
       };
+      if (navigator.mediaDevices === undefined) Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
+      else navigator.mediaDevices.getUserMedia = getUserMedia;
+      if (typeof MediaRecorder === "undefined") return;
       const supported = MediaRecorder.isTypeSupported.bind(MediaRecorder);
       MediaRecorder.isTypeSupported = (type: string) => type.startsWith("audio/mp4") && supported(type);
     });
     await openSimulator(page, ui);
+    const offered = await page.evaluate(() => ({
+      recorder: typeof MediaRecorder,
+      mp4: typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/mp4"),
+      streamDestination: typeof AudioContext !== "undefined" && typeof AudioContext.prototype.createMediaStreamDestination,
+    }));
+    expect(offered, "what this WebKit offers to record a voice note").toEqual({ recorder: "function", mp4: true, streamDestination: "function" });
     const before = storedAudio(ui).length;
     await page.getByRole("button", { name: copy.composer.voice, exact: true }).click();
     await page.getByRole("button", { name: copy.voice.record }).click();
