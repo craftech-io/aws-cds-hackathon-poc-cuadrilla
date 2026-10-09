@@ -15,9 +15,9 @@ import { g2RefusalRecord, type G2RefusalRecord } from "../agent/grounding";
 import { type PolicyDecision, evaluate } from "../policy/engine";
 import { policyInputAt } from "../policy/context";
 import { consoleCaseUrl } from "../policy/rules-content";
-import type { PolicyMessage } from "../policy/types";
+import type { PolicyInputShape, PolicyMessage } from "../policy/types";
 import type { z } from "zod";
-import { type SendContext, questionOf } from "./context";
+import { type SendContext, type WhatsAppContext, questionOf } from "./context";
 import type { OutboundDeps } from "./deps";
 import { GuardrailUnavailableError, groundingSourceOf, queryOf } from "./grounding";
 import { maskParams } from "./g3";
@@ -72,14 +72,17 @@ function emailPolicyMessage(request: EmailSendOutbound): z.input<typeof PolicyMe
   };
 }
 
+/** What the policy evaluates for a WhatsApp send: also what the delivery keeps for `PolicyAudit` (policy/as-of.ts). */
+export function whatsAppPolicyInput(request: WhatsAppSendRequest, context: WhatsAppContext): PolicyInputShape {
+  return policyInputAt(whatsAppPolicyMessage(request, outgoingTextOf(request)), { kind: "PERSON", route: context.policyRoute }, context.records, context.at);
+}
+
 /** Step 4: the contact policy at the context's instant. */
 export function decidePolicy(request: OutboundRequest, context: SendContext): PolicyDecision {
   if (request.channel === "EMAIL" && context.channel === "EMAIL") {
     return evaluate(policyInputAt(emailPolicyMessage(request), { kind: "EMAIL", role: request.toRole, fence: context.fence }, context.records, context.at));
   }
-  if (request.channel === "WHATSAPP" && context.channel === "WHATSAPP") {
-    return evaluate(policyInputAt(whatsAppPolicyMessage(request, outgoingTextOf(request)), { kind: "PERSON", route: context.policyRoute }, context.records, context.at));
-  }
+  if (request.channel === "WHATSAPP" && context.channel === "WHATSAPP") return evaluate(whatsAppPolicyInput(request, context));
   throw new RangeError("the context does not belong to the request's channel");
 }
 

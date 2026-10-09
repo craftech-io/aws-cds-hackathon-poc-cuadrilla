@@ -4,13 +4,17 @@
 // route (End User Messaging Social, or the simulated transport for every synthetic identity) sends it
 // and records `SENT` with the payload as it left. An email goes through the single SES client, which
 // fences the address again, takes the world's email cap and writes the outbox. A failed send is
-// `UNAVAILABLE` (or the channel's code) and the message `FAILED`; nothing is retried here.
+// `UNAVAILABLE` (or the channel's code) and the message `FAILED`; nothing is retried here. A WhatsApp
+// message keeps what the policy saw of it (`refs.policy`: form, author, route, citations, the turn's
+// sections…), so `PolicyAudit` re-evaluates it as it was sent once the turn's results expired.
 import type { Guardrail } from "@cuadrilla/shared";
 import { toSendToolFailure } from "../channels/adapter";
 import { type WhatsAppSendResult, sendFailureOf } from "../channels/whatsapp/transport";
 import { localDateOf } from "../services/business-hours/zoned-time";
+import { POLICY_REFS_KEY, policyRefs } from "../policy/as-of";
 import type { PolicyDecision } from "../policy/engine";
 import { toMessagePolicy } from "../policy/result";
+import { whatsAppPolicyInput } from "./checks";
 import type { EmailContext, WhatsAppContext } from "./context";
 import type { OutboundDeps } from "./deps";
 import { appendOutMessage, auditPolicyDecision, auditRefusal } from "./persist";
@@ -58,7 +62,7 @@ export async function deliverWhatsApp(deps: OutboundDeps, call: OutboundCall, in
     ...(rendered.interactive === undefined ? {} : { interactive: rendered.interactive }),
     ...(media === undefined ? {} : { media }),
     policy: toMessagePolicy(decision, decisionId),
-    extraRefs: { [CONTENT_KEY_REF]: input.contentKey, ...(request.reaction === undefined ? {} : { reactsTo: request.reaction.wamid }) },
+    extraRefs: { [CONTENT_KEY_REF]: input.contentKey, [POLICY_REFS_KEY]: policyRefs(whatsAppPolicyInput(request, context)), ...(request.reaction === undefined ? {} : { reactsTo: request.reaction.wamid }) },
   });
   const ref = { personId: message.personId, sentAtSim: message.sentAtSim, messageId };
   let sent: WhatsAppSendResult;

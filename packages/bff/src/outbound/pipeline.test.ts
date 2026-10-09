@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { VERDICT_REACTIONS } from "../copy/buttons";
-import { openCase } from "../connector/testing";
+import { CLOCK, openCase } from "../connector/testing";
+import { auditWorld } from "../policy-audit/audit";
+import { POLICY_REFS_KEY } from "../policy/as-of";
 import { fireDeferredSend, sendOutbound } from "./pipeline";
 import { AT_0921, TURN, agentReply, mx, pipelineKit, rogelioWrote } from "./testing";
 
@@ -28,6 +30,18 @@ describe("outbound pipeline: an agent reply from policy to transport", () => {
     const allow = (await auditRows(kit)).find((row) => row.decision === "ALLOW");
     expect(allow).toMatchObject({ action: "SEND_WHATSAPP", messageId: result.status === "SENT" ? result.messageId : "", actor: "AGENT" });
     expect(allow?.evaluated).toHaveLength(15);
+  });
+
+  it("[FL-077] a cited reply keeps what the policy saw of it, so PolicyAudit allows it again without the turn's results", async () => {
+    const kit = await pipelineKit();
+    await rogelioWrote(kit, "La señora quiere la roseta en el otro cuarto, ¿se le cobra?");
+    await kit.result("get_work_order", ORDER);
+    await kit.result("search_procedures", COM_04);
+    await sendOutbound(kit.deps, agentReply("Hasta 15 m de cable no tiene costo; si pasa, se carga en la siguiente factura y tú nunca cobras en sitio (Manual v1, §COM-04).", { citations: ["COM-04"] }), kit.call);
+    const message = (await kit.world.connector.conversations.listMessages("inst-rogelio")).find((item) => item.direction === "OUT");
+    expect(message?.refs?.[POLICY_REFS_KEY]).toEqual({ form: "TEXT", author: "AGENT", route: "SIMULATED", citations: ["COM-04"], claimsPolicy: true, inResponseToInbound: true, turnSections: ["COM-04"] });
+    const report = await auditWorld({ connector: kit.world.connector, readCertificate: async () => undefined }, { clockId: CLOCK });
+    expect(report).toMatchObject({ messages: 1, violations: [], errors: 0 });
   });
 
   it("[FL-025] a greeting is measured against the fixed status question", async () => {
