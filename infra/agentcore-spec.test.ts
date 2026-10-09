@@ -386,7 +386,7 @@ describe("IAM of the agent roles (docs/architecture.md §14)", () => {
 
 describe("Linkables", () => {
   it("carry exactly the grants of their capability, under the names their consumers read", () => {
-    expect(spec.harnessInvokeActions()).toEqual(["bedrock-agentcore:InvokeHarness"]);
+    expect(spec.harnessInvokeActions()).toEqual(["bedrock-agentcore:InvokeAgentRuntime", "bedrock-agentcore:InvokeHarness"]);
     expect(ROLES.filter((role) => expectedGrants(role).some((grant) => grant.resources.includes(spec.HARNESS_REF)))).toEqual(["InstallerWorker"]);
     for (const grant of CAPABILITIES.MEMORY_ADMIN.grants) expect(grant.resources).toEqual([spec.MEMORY_REF]);
     const memoryHolders = (Object.keys(LAMBDA_CAPABILITIES) as LambdaName[]).filter((fn) => resolveCapabilities(LAMBDA_CAPABILITIES[fn].capabilities).includes("MEMORY_ADMIN"));

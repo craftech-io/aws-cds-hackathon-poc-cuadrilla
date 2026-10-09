@@ -71,11 +71,23 @@ function sentAt(sentAtSim: string, sentAtReal: string | undefined): PolicyInstan
   return { sim: sentAtSim, real: sentAtReal ?? sentAtSim };
 }
 
+const OwnRefs = z.looseObject({ notice: NoticeKey.optional(), citations: z.array(ManualSectionId).optional() });
+
+/**
+ * What the message's own references say when the policy's were not kept: the pipeline stores the notice
+ * key and the citations of every send there (outbound/persist.ts `messageRefsOf`).
+ */
+function ownRefsOf(sent: Message): Partial<PolicyRefs> {
+  const own = OwnRefs.safeParse(sent.refs ?? {});
+  if (!own.success) return {};
+  return { ...(own.data.notice === undefined ? {} : { notice: own.data.notice }), ...(own.data.citations === undefined ? {} : { citations: own.data.citations }) };
+}
+
 /** Re-evaluates an outbound WhatsApp message to a person at the instant it left. */
 export function evaluateSentAsOf(sent: Message, records: PolicyRecords): PolicyDecision {
   if (sent.direction !== "OUT" || sent.kind === undefined) throw new RangeError("only an outbound message with its kind can be re-evaluated");
   const stored = PolicyRefs.safeParse(sent.refs?.[POLICY_REFS_KEY]);
-  const refs: Partial<PolicyRefs> = stored.success ? stored.data : {};
+  const refs: Partial<PolicyRefs> = stored.success ? stored.data : ownRefsOf(sent);
   const message: z.input<typeof PolicyMessage> = {
     kind: sent.kind,
     channel: "WHATSAPP",

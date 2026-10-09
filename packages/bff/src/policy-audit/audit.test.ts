@@ -69,6 +69,18 @@ describe("PolicyAudit [FL-077]", () => {
     expect((await auditWorld(deps(world), { clockId: CLOCK })).violations).toEqual([{ check: "REEVALUATION", subject: "msg-ds-09-30", ruleIds: ["CP-OPTIN"] }]);
   });
 
+  it("[FL-077] a system notice is re-evaluated with the notice key the pipeline kept in its references", async () => {
+    const world = await policyWorld();
+    const notice = (messageId: string, refs: Record<string, string>): NewEntity<typeof Message> => ({ ...dayStart(messageId, "2026-10-13 10:00"), kind: "SYSTEM_NOTICE", content: "TEXT", templateName: undefined, text: "No pude procesar tu mensaje, intenta de nuevo en un momento.", refs });
+    await world.connector.people.recordInbound("inst-rogelio", { atSim: mx("2026-10-13 09:59") });
+    await world.connector.conversations.appendMessage(notice("ntc-1", { notice: "agentFallback", replyTo: "wamid.SIM.1" }));
+    await allow(world, "ntc-1", "2026-10-13 10:00");
+    expect((await auditWorld(deps(world), { clockId: CLOCK })).violations).toEqual([]);
+    await world.connector.conversations.appendMessage(notice("ntc-2", { replyTo: "wamid.SIM.2" }));
+    await allow(world, "ntc-2", "2026-10-13 10:00");
+    expect((await auditWorld(deps(world), { clockId: CLOCK })).violations).toEqual([{ check: "REEVALUATION", subject: "ntc-2", ruleIds: ["CP-KIND-CHANNEL"] }]);
+  });
+
   it("[FL-077] a certificate needs every item closed with its evidence and the PDF's stored sha256", async () => {
     const world = await policyWorld();
     const { connector } = world;

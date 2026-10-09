@@ -165,7 +165,7 @@ export async function auditWorld(deps: PolicyAuditDeps, input: { readonly clockI
       detail: { check: violation.check, subject: violation.subject },
     });
     known.add(`${violation.check}#${violation.subject}`);
-    deps.logger?.warn("policy_audit.violation", { clockId, check: violation.check, metric: "PolicyViolations", value: 1 });
+    deps.logger?.warn("policy_audit.violation", { clockId, check: violation.check, subject: violation.subject, ruleIds: [...violation.ruleIds], metric: "PolicyViolations", value: 1 });
   }
   const report = { clockId, messages: messages.length, emails: mails.length, certificates: certified.length, violations, errors };
   deps.logger?.info("policy_audit.done", { clockId, messages: report.messages, emails: report.emails, certificates: report.certificates, violations: violations.length, errors });

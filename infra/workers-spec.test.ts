@@ -122,7 +122,7 @@ async function evaluate(owners: "built" | "stubs") {
   vi.doMock("./secrets", () => Object.fromEntries(SECRETS.map((name) => [name, rt.once("sst.Secret", name)])));
   const mockLinks = (fn: LambdaName) => (fn === "WorldJanitor" ? ["Dispatch", "Network"].map((name) => rt.once("sst.aws.Dynamo", name)) : [rt.linkable("NetworkMock", capabilityActions("MOCK_NETWORK"))]);
   const modules: Record<string, Record<string, unknown>> = {
-    agentcore: { Harness: rt.linkable("Harness", ["bedrock-agentcore:InvokeHarness"]), Memory: rt.linkable("Memory", capabilityActions("MEMORY_ADMIN")) },
+    agentcore: { Harness: rt.linkable("Harness", ["bedrock-agentcore:InvokeHarness", "bedrock-agentcore:InvokeAgentRuntime"]), Memory: rt.linkable("Memory", capabilityActions("MEMORY_ADMIN")) },
     media: { Transcribe: rt.linkable("Transcribe", capabilityActions("TRANSCRIBE")) },
     "messaging-email": { EmailChannel: rt.linkable("EmailChannel", capabilityActions("SEND_EMAIL")) },
     certificates: { CertificateWriter: rt.once("sst.aws.Function", "CertificateWriter") },
