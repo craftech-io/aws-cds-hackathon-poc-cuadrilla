@@ -142,6 +142,10 @@ jobs:
         if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') == '' }}
         run: npx tsx scripts/smoke/interim.ts --base-url "${APP_URL}" --aws
 
+      - name: The Bff's Function URL for the smoke (this app's SST state, masked)
+        if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') != '' }}
+        run: npx tsx scripts/qa/bff-url.ts
+
       - name: Assume the qa-runner role (OIDC)
         if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') != '' }}
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -152,4 +156,4 @@ jobs:
 
       - name: Smoke scenarios (SC-00)
         if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') != '' }}
-        run: npm run scenarios -- --suite smoke
+        run: npm run scenarios -- --suite smoke --bff-url "${BFF_URL}"

@@ -247,10 +247,26 @@ export class MemoryTableClient implements TableClient {
   }
 
   async batchPut(table: Table, items: readonly Item[]): Promise<void> {
+    rejectDuplicateKeys(table, items);
     for (const item of items) await this.put(table, item);
   }
 
   async batchDelete(table: Table, keys: readonly Key[]): Promise<void> {
+    rejectDuplicateKeys(table, keys);
     for (const key of keys) await this.delete(table, key);
+  }
+}
+
+// DynamoDB refuses a BatchWriteItem request (25 items) that names one key twice with a ValidationException.
+const BATCH_WRITE_MAX = 25;
+
+function rejectDuplicateKeys(table: Table, keys: readonly Key[]): void {
+  for (let offset = 0; offset < keys.length; offset += BATCH_WRITE_MAX) {
+    const seen = new Set<string>();
+    for (const key of keys.slice(offset, offset + BATCH_WRITE_MAX)) {
+      const id = rowId(key);
+      if (seen.has(id)) throw new ConnectorError("VALIDATION", `invalid request on ${table}: the batch repeats ${key.PK}/${key.SK}`, table);
+      seen.add(id);
+    }
   }
 }

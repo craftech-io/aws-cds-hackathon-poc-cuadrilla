@@ -300,7 +300,10 @@ describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
     for (const arn of [...WEB_ACLS, ...WEB_ACLS.map((arn) => arn.replace("webacl/${AppName}-*", "managedruleset/*/*"))]) expect(acls).toContain(arn);
     for (const action of ["CreateWebACL", "UpdateWebACL", "DeleteWebACL", "GetWebACL", "AssociateWebACL", "DisassociateWebACL", "TagResource"]) expect(acls).toContain(`- wafv2:${action}\n`);
     expect(acls).not.toContain('Resource: "*"');
-    expect(template).not.toMatch(/wafv2:\*|webacl\/\*/);
+    // The one `webacl/*/*` is the boundary's lookup of the pool's ACL (WAF evaluates it on that pattern).
+    const lookup = block(boundary, "Sid: WebAclLookupForThePool", "- Sid:");
+    expect(lookup).not.toMatch(/- wafv2:/);
+    expect(template.replace(lookup, "")).not.toMatch(/wafv2:\*|webacl\/\*/);
     for (const { sid, body } of allows.filter(({ body }) => /- wafv2:(Create|Update|Delete|Associate|Disassociate|Tag|Untag)/.test(body))) for (const arn of WEB_ACLS) expect(body, sid).toContain(arn);
   });
 
@@ -334,6 +337,7 @@ describe("own sign-up, leads and AWS WAF (ADR-0025, ADR-0026) [FL-114]", () => {
     const reads = block(boundary, "Sid: WebAclReadsOfThisApp", "- Sid:");
     expect([...reads.matchAll(/- (wafv2:\w+)/g)].map((match) => match[1])).toEqual(["wafv2:GetWebACL", "wafv2:GetWebACLForResource"]);
     for (const arn of WEB_ACLS) expect(reads).toContain(arn);
+    expect(block(boundary, "Sid: WebAclLookupForThePool", "- Sid:")).toMatch(/Action: wafv2:GetWebACLForResource\n\s+Resource: !Sub "arn:\$\{AWS::Partition\}:wafv2:\$\{Region\}:\$\{AWS::AccountId\}:regional\/webacl\/\*\/\*"/);
     expect(block(boundary, "Sid: InvokeAccountDeletionByName", "- Sid:")).toContain("function:${AppName}-${DeployStage}-guest-account-deletion");
   });
 

@@ -11,7 +11,8 @@
 //   per operation   its installer (`inst-<clockId>-<key>`, own, or the one of another operation), a
 //                   customer with an email of the simulator tagged by the world (`bounce+`/`complaint+`
 //                   when the model asks), the order with a leased number, its checklist, its `Network`
-//                   and `Dispatch` rows, and one `DAY_START` per installer of the start day
+//                   and `Dispatch` rows, and one `DAY_START` per installer of the start day; operations
+//                   of one model share its ONU serial (labels ask for it) and so its single `Network` row
 //
 // Ids, phones and emails never repeat across worlds: the clock id is in every person and customer id,
 // numbers and phones come from leases. No row names an operator: the visible name is runtime config.
@@ -108,8 +109,11 @@ class Rows {
     this.domain.set(table, [...(this.domain.get(table) ?? []), { ...row, ...this.meta, ...this.scope(table) } as Item]);
   }
 
+  /** A mock row; the first one of a key wins (operations of one model share its ONU, one row per serial). */
   mock(table: "Network" | "Dispatch", row: Item): void {
-    (table === "Network" ? this.network : this.dispatch).push({ ...row, ...this.scope(table) });
+    const rows = table === "Network" ? this.network : this.dispatch;
+    if (rows.some((existing) => existing.PK === row.PK && existing.SK === row.SK)) return;
+    rows.push({ ...row, ...this.scope(table) });
   }
 }
 

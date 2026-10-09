@@ -77,6 +77,16 @@ describe("QA and evaluation worlds", () => {
     expect(timers.map((timer) => timer.kind)).toEqual(["DAY_START"]);
   });
 
+  it("writes one ONU row for the operations of a repeated model, which share its serial", async () => {
+    const harness = worldsHarness();
+    const created = await createWorld(harness.deps, { clockId: RUN, operations: [{ key: "a", model: "wo-24817", installer: "own" }, { key: "c", model: "wo-24817", installer: "own" }, { key: "p", model: "wo-24817", installer: "own" }] });
+    if (created.kind !== "QA") throw new Error("expected a QA world");
+    const orders = await Promise.all(created.world.operations.map((operation) => harness.connector.workOrders.requireWorkOrder(operation.workOrderId)));
+    expect(new Set(orders.map((order) => order.workOrderId)).size).toBe(3);
+    expect(new Set(orders.map((order) => order.onuSerial)).size).toBe(1);
+    expect(await harness.client.get("Network", { PK: `ONU#${RUN}#${orders[0]?.onuSerial ?? ""}`, SK: "META" })).toMatchObject({ behaviour: "LOS_THEN_ONLINE", fixed: false });
+  });
+
   it("answers a repeated request with the same world and refuses another request for the same clock", async () => {
     const harness = worldsHarness();
     const request = { clockId: RUN, operations: [{ key: "a", model: "wo-24820", installer: "own" }] };

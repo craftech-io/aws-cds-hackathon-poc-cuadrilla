@@ -227,8 +227,9 @@ describe("QaDriver", () => {
     const grants = expectedGrants("QaDriver");
     const on = (resource: string) => grants.filter((grant) => grant.resources.includes(resource)).flatMap((grant) => grant.actions);
     expect(on("{UserPool}").sort()).toEqual(["cognito-idp:AdminConfirmSignUp", "cognito-idp:AdminGetUser", "cognito-idp:AdminInitiateAuth", "cognito-idp:GetWebACLForResource"]);
-    expect(on("{EdgeWebAcl}")).toEqual(["wafv2:GetWebACL", "wafv2:GetWebACLForResource"]);
-    expect(on("{AuthWebAcl}")).toEqual(["wafv2:GetWebACL", "wafv2:GetWebACLForResource"]);
+    expect(on("{EdgeWebAcl}")).toEqual(["wafv2:GetWebACL"]);
+    expect(on("{AuthWebAcl}")).toEqual(["wafv2:GetWebACL"]);
+    expect(on("arn:aws:wafv2:us-east-1:776805327629:regional/webacl/*/*")).toEqual(["wafv2:GetWebACLForResource"]);
     expect(resolveCapabilities(LAMBDA_CAPABILITIES.QaDriver.capabilities)).toContain("LEADS_READ");
     expect(resolveCapabilities(LAMBDA_CAPABILITIES.QaDriver.capabilities)).not.toContain("LEADS_WRITE");
   });
