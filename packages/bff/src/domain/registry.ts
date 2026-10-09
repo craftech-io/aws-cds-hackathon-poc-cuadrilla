@@ -11,7 +11,7 @@ import { ConversationKpi, EvalResult } from "./metrics";
 import { AddressClaim, Consent, Customer, InstallerProfile, Person, ShiftWindow } from "./people";
 import { EvalPhoto, EvalQuestion, KbThreshold, ManualIndex, NameCheck, RateCard, RejectReasonCopy, Rubric, SafetyLexicon, Template } from "./reference";
 import { CapCounter, Clock, Counter, Idempotency, KillSwitch, Nonce, Session, Turn, TurnResult } from "./runtime";
-import { Faults, InstallerState, JoinCode, Lease, LiveWorld, PendingMail, PhoneLease, Probe, Tombstone, Upload, WorldState } from "./runtime-world";
+import { Faults, InstallerState, JoinCode, Lease, LiveWorld, PendingMail, PhoneLease, Probe, Tombstone, Upload, WorldSession, WorldState } from "./runtime-world";
 import { Timer } from "./timers";
 import { Certificate, ChecklistEntry, Evidence, PhotoValidation, TroubleshootingStep, WorkOrder } from "./work-orders";
 
@@ -82,6 +82,7 @@ export const ENTITIES: Readonly<Record<EntityName, EntitySpec>> = {
   Tombstone: spec(Tombstone, "Runtime"),
   Probe: spec(Probe, "Runtime"),
   Faults: spec(Faults, "Runtime"),
+  WorldSession: spec(WorldSession, "Runtime"),
   ConversationKpi: spec(ConversationKpi, "CuadrillaMetrics"),
   EvalResult: spec(EvalResult, "CuadrillaMetrics"),
 };

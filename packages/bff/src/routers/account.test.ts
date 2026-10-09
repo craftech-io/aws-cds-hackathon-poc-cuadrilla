@@ -122,7 +122,26 @@ describe("account.session, changePassword and mfa.setup", () => {
     expect(await a.account.session()).toMatchObject({ role: "GUEST", otherSession: false, canReset: true, canChangePassword: false, canSetupMfa: false, canDeleteAccount: false });
     expect(await b.account.session()).toMatchObject({ otherSession: true, canReset: false });
     expect(await a.account.session()).toMatchObject({ otherSession: false, canReset: true });
-    expect((await t.memory.connector.runtime.getClock(t.world.clockId))?.lastSession).toMatchObject({ sessionId: "session-a", userId: "usr-qa-guest" });
+    expect(await t.memory.connector.worlds.getWorldSession(t.world.clockId)).toMatchObject({ sessionId: "session-a", userId: "usr-qa-guest" });
+  });
+
+  it("[W4 review B3] recording the session never moves the clock: a reset read before it still applies", async () => {
+    const t = await consoleTestWorld(GUEST_TEST);
+    const clock = await t.memory.connector.runtime.getClock(t.world.clockId);
+    if (clock === undefined) throw new Error("no clock");
+    for (const sessionId of ["session-a", "session-a", "session-b"]) await t.qa("GUEST", { sessionId }).account.session();
+    expect(await t.memory.connector.runtime.getClock(t.world.clockId)).toEqual(clock);
+    // The reset's own conditional write on the version it read before the session polls still succeeds.
+    await expect(t.memory.connector.runtime.updateClock(clock.clockId, { mode: "PAUSED" }, clock.version)).resolves.toMatchObject({ version: clock.version + 1 });
+    await expect(t.qa("GUEST", { sessionId: "session-a" }).clock.reset()).resolves.toMatchObject({ previousEpoch: 1 });
+  });
+
+  it("[W4 review B3] the world's own session is written again only when it is more than 5 minutes old", async () => {
+    const t = await consoleTestWorld(GUEST_TEST);
+    await t.qa("GUEST", { sessionId: "session-a" }).account.session();
+    const first = await t.memory.connector.worlds.getWorldSession(t.world.clockId);
+    await t.qa("GUEST", { sessionId: "session-a" }).account.session();
+    expect(await t.memory.connector.worlds.getWorldSession(t.world.clockId)).toEqual(first);
   });
 
   it("staff change their password and set up TOTP (the console asks first); a guest gets 403", async () => {

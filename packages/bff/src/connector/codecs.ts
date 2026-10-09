@@ -166,6 +166,7 @@ export const CODECS: Readonly<Record<EntityName, RowCodec>> = {
   Tombstone: codec("Runtime", (f) => K.tombstoneKey(str(f, "clockId"), num(f, "worldEpoch"))),
   Probe: codec("Runtime", (f) => K.probeKey(str(f, "probeId"))),
   Faults: codec("Runtime", (f) => K.faultsKey(str(f, "clockId"))),
+  WorldSession: codec("Runtime", (f) => K.worldSessionKey(str(f, "clockId"))),
   ConversationKpi: codec("CuadrillaMetrics", (f) => K.kpiKey(str(f, "ispId"), str(f, "source"), str(f, "clockId"), str(f, "workOrderId"))),
   EvalResult: codec("CuadrillaMetrics", (f) => K.evalResultKey(str(f, "ispId"), str(f, "runId"), str(f, "kind") as "Q" | "P", str(f, "itemId"))),
 };

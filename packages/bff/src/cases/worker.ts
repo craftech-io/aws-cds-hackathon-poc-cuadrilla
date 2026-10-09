@@ -7,6 +7,8 @@
 //   supervisorAction    a supervisor's tap or text (cases/events.ts), or the same action ordered from the
 //                       console (no message: the actor is the console user, the instant the world's now);
 //                       an action armed with an older rung of the ladder is ignored and logged
+//   preset              the world factory's `case` preset (cases/preset.ts) for the order of the epoch the
+//                       world was loaded with; a later reset or jump makes it stale and it is skipped
 //   classify / handle   the lexicon classifier and the fixed §SEG-01 response (safety/, ADR-0016)
 import { classifySafety } from "../safety/classifier";
 import { handleSafety } from "../safety/handler";
@@ -16,6 +18,7 @@ import { closeCase, relayFromInstaller } from "./bridge";
 import { type SupervisorActionEvent as ChannelSupervisorAction, runSupervisorAction } from "./events";
 import { openCase } from "./open";
 import type { CaseDeps } from "./ports";
+import { openPresetCase } from "./preset";
 import { type CaseActor, declineCase, takeCase } from "./take";
 
 /** The world's simulated now (channels/whatsapp/ports.ts `connectorWorldTime`). */
@@ -70,6 +73,15 @@ export function workerCasePort(deps: CaseDeps, simNow: SimNowReader): CasePort {
           ? await consoleAction(deps, event, await simNow(event.clockId), ctx)
           : await runSupervisorAction(deps, { ...event, message: event.message } as ChannelSupervisorAction);
       ctx.log.info("worker.supervisor_action", { caseId: event.caseId, action: event.action, outcome });
+    },
+    async preset(event, ctx) {
+      const order = await deps.connector.workOrders.getWorkOrder(event.workOrderId);
+      if (order === undefined || order.clockId !== event.clockId || order.worldEpoch !== event.worldEpoch) {
+        ctx.log.info("worker.case_preset_stale", { workOrderId: event.workOrderId, worldEpoch: event.worldEpoch, current: order?.worldEpoch });
+        return;
+      }
+      const { caseId } = await openPresetCase(deps, { workOrderId: event.workOrderId, reason: event.reason, rung: event.rung, status: event.status, atSim: event.atSim });
+      ctx.log.info("worker.case_preset", { caseId, rung: event.rung, status: event.status });
     },
   };
 }

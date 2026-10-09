@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ConversationKpi } from "../domain/metrics";
 import { consoleTestWorld } from "../routers/console-testing";
 import { DEMO } from "../services/people/testing";
+import { publishEvalRun } from "./eval-runs";
 import { scorePhotos, scoreQuestions } from "./eval-score";
 import { TAB_TITLES, latencyCostTab, manualTab, metricsCsv, percentile, photosTab, policyTab, worldTab } from "./kpis";
 
@@ -80,8 +81,7 @@ describe("metrics with labels [FL-087]", () => {
       { kind: "P" as const, itemId: "ph-meter-06", outcome: "REJECT", passed: true },
     ];
     for (const row of rows) await metrics.putEvalResult({ ispId: "isp-eval-r7", runId: "r7", ...row });
-    t.ports.evalRunPointers.set("Q", { ispId: "isp-eval-r7", runId: "r7" });
-    t.ports.evalRunPointers.set("P", { ispId: "isp-eval-r7", runId: "r7" });
+    for (const kind of ["Q", "P"] as const) await publishEvalRun(t.memory.client, kind, { ispId: "isp-eval-r7", runId: "r7", finishedAtReal: "2026-11-02T17:00:00.000Z" });
     await metrics.putKpi({ ispId: "isp-demo", clockId: t.world.clockId, workOrderId: t.world.ids.order, source: "WORLD", agentMode: "REAL", firstReplyLatenciesMs: [9_000], costUsd: 0.31 });
     const summary = await (await t.as("OPS", "usr-ops")).metrics.summary();
     const report = { questions: scoreQuestions(await metrics.listEvalResults("isp-eval-r7", "r7", "Q")), photos: scorePhotos(await metrics.listEvalResults("isp-eval-r7", "r7", "P"), await reference.listEvalPhotos()) };
@@ -94,6 +94,10 @@ describe("metrics with labels [FL-087]", () => {
     expect(value("LATENCY_COST", "killSwitch")).toMatchObject({ value: 0 });
     expect(value("LATENCY_COST", "globalCap.turns")).toMatchObject({ n: 0, target: "1000 por día" });
     expect(summary.runs).toEqual({ manual: "r7", photos: "r7" });
+    // [W4 review B6] the pointer the evaluation publishes and the rows it names never expire.
+    const stored = t.memory.client.dump("CuadrillaMetrics").filter((row) => row.PK === "EVALRUN#LATEST" || row.entity === "EvalResult");
+    expect(stored.length).toBe(rows.length + 2);
+    expect(stored.every((row) => row.expiresAt === undefined)).toBe(true);
     const csv = await (await t.as()).metrics.export({ tab: "PHOTOS" });
     expect(csv).toMatchObject({ contentType: "text/csv", fileName: "metricas-photos.csv" });
     expect(csv.csv.split("\n")[1]).toContain("Medición de fotos,accuracy");

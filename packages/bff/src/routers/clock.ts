@@ -9,7 +9,7 @@
 //                       "Avanzar igual", accepted after five minutes of the same wait)
 //   setTemplateStatus, setOnuBehaviour, dispatch.reschedule|reassign|cancel
 //                       the demo controls (services/demo-controls), behind the same gate
-//   jumpToScene         S: "Saltar a escena" (guest and QA worlds; 30 per real hour, outside the reset limit)
+//   jumpToScene         S: "Saltar a escena" (guest worlds; 30 per real hour, outside the reset limit)
 //   reset               S: "Reiniciar demo" of this world, once every 10 real minutes for every principal
 //                       (the QaDriver's GUEST included); both keep the world's real-time counters
 import { z } from "zod";

@@ -1,7 +1,10 @@
-// `WorldJanitor` (docs/architecture.md §8 and §9.3, infra/scheduler.ts): two entries, each validated.
+// `WorldJanitor` (docs/architecture.md §8 and §9.3, infra/scheduler.ts): three entries, each validated.
 //
-//   MEMORY_PURGE       invoked asynchronously by the `Bff` and the `QaDriver` after a reset, a scene jump
-//                      or a destruction: pass 2 and the listings of the Memory purge, up to its 10 minutes
+//   MEMORY_PURGE       invoked asynchronously by the `Bff` and the `QaDriver` at a reset, a scene jump or
+//                      a destruction: the passes of the Memory purge it owes (every one from the console,
+//                      pass 2 and the listings otherwise), up to its 10 minutes
+//   RENDER_CERTIFICATES invoked asynchronously by the `Bff` after it reloaded a world: the PDFs of that
+//                      world's historical certificates still `pdfPending`, out of the console's request
 //   IDLE_GUEST_RESET   the nightly run (04:00 America/Mexico_City):
 //                      - every invited guest world (`GUEST#isp-guest-<nn>`) that moved since its last
 //                        reset and saw no activity for 24 real hours is reset ("Reiniciar demo" as the
@@ -14,16 +17,21 @@
 // Nothing else: never a demo, QA or evaluation world, never a world of the rehearsal or of a sign-up
 // that is still alive.
 import { z } from "zod";
-import { GUEST_TEST_CLOCK_ID, clockIdOfIsp, guestClockId, isSignupGuestIsp } from "@cuadrilla/shared";
+import { ClockId, GUEST_TEST_CLOCK_ID, clockIdOfIsp, guestClockId, isSignupGuestIsp, ispIdOfClock, parseClockId } from "@cuadrilla/shared";
 import { signupGenerationExpiresAt } from "../connector/world";
 import type { Clock } from "../domain/runtime";
 import type { WorldsDeps } from "./deps";
-import { MemoryPurgeEvent, type PurgeDeps, type PurgeTarget, purgeFirstPass, purgeRemainingPasses } from "./memory-purge";
+import { MemoryPurgeEvent, type PurgeDeps, type PurgeFromPass, type PurgeTarget, purgeFirstPass, purgeFrom } from "./memory-purge";
 import { resetWorld } from "./rebuild";
 import { GUEST_WORLD_START_SIM } from "./template";
 
 export const NightlyEvent = z.object({ kind: z.literal("IDLE_GUEST_RESET") }).strict();
-export const JanitorEvent = z.union([NightlyEvent, MemoryPurgeEvent]);
+/** Only the worlds the `Bff` reloads (guest and demo); never a QA or evaluation world. */
+export const RenderCertificatesEvent = z
+  .object({ kind: z.literal("RENDER_CERTIFICATES"), clockId: ClockId.refine((clockId) => ["GUEST", "DEMO"].includes(parseClockId(clockId)?.kind ?? ""), "only guest and demo worlds") })
+  .strict();
+export type RenderCertificatesEvent = z.input<typeof RenderCertificatesEvent>;
+export const JanitorEvent = z.union([NightlyEvent, MemoryPurgeEvent, RenderCertificatesEvent]);
 
 /** A guest world quiet for this long is reset at night. */
 export const IDLE_MS = 24 * 60 * 60_000;
@@ -31,7 +39,7 @@ export const IDLE_MS = 24 * 60 * 60_000;
 export const INVITED_SLOTS = { first: 1, last: 98 } as const;
 
 export interface JanitorOutcome {
-  readonly kind: "MEMORY_PURGE" | "IDLE_GUEST_RESET";
+  readonly kind: "MEMORY_PURGE" | "IDLE_GUEST_RESET" | "RENDER_CERTIFICATES";
   readonly reset: readonly string[];
   readonly purgedActors: number;
   readonly complete: boolean;
@@ -105,9 +113,14 @@ async function expiredGenerationTargets(deps: WorldsDeps): Promise<Array<Omit<Pu
 export async function runJanitor(deps: WorldsDeps, event: unknown, sleep: (ms: number) => Promise<void>): Promise<JanitorOutcome> {
   const parsed = JanitorEvent.parse(event);
   if (parsed.kind === "MEMORY_PURGE") {
-    const { kind: _kind, startedAtReal, ...target } = parsed;
-    const outcome = await purgeRemainingPasses(purgeDeps(deps, sleep), { ...target, startedAtReal: startedAtReal ?? deps.now().toISOString() });
+    const { kind: _kind, startedAtReal, fromPass, ...target } = parsed;
+    const outcome = await purgeFrom(purgeDeps(deps, sleep), { ...target, startedAtReal: startedAtReal ?? deps.now().toISOString() }, fromPass ?? 2);
     return { kind: "MEMORY_PURGE", reset: [], purgedActors: target.actorIds.length, complete: outcome.complete };
+  }
+  if (parsed.kind === "RENDER_CERTIFICATES") {
+    const rendered = (await deps.certificates?.render({ clockId: parsed.clockId, ispId: ispIdOfClock(parsed.clockId) }, "PENDING")) ?? 0;
+    deps.log.info("worlds.janitor_certificates", { clockId: parsed.clockId, rendered });
+    return { kind: "RENDER_CERTIFICATES", reset: [], purgedActors: 0, complete: true };
   }
   const reset = await resetIdleWorlds(deps);
   let purgedActors = 0;
@@ -124,14 +137,14 @@ export async function runJanitor(deps: WorldsDeps, event: unknown, sleep: (ms: n
  * The janitor's own `continuePurge`: the passes after the first of every reset of the run, together at
  * the end, so the nightly run waits for them once and not once per world.
  */
-export function collectingPurge(): { readonly continuePurge: (target: PurgeTarget) => Promise<void>; readonly drain: (deps: PurgeDeps) => Promise<void> } {
-  const pending: PurgeTarget[] = [];
+export function collectingPurge(): { readonly continuePurge: (target: PurgeTarget, fromPass?: PurgeFromPass) => Promise<void>; readonly drain: (deps: PurgeDeps) => Promise<void> } {
+  const pending: Array<{ readonly target: PurgeTarget; readonly fromPass: PurgeFromPass }> = [];
   return {
-    continuePurge: async (target) => {
-      pending.push(target);
+    continuePurge: async (target, fromPass = 2) => {
+      pending.push({ target, fromPass });
     },
     drain: async (deps) => {
-      await Promise.all(pending.splice(0).map((target) => purgeRemainingPasses(deps, target)));
+      await Promise.all(pending.splice(0).map(({ target, fromPass }) => purgeFrom(deps, target, fromPass)));
     },
   };
 }

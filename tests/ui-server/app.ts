@@ -2,8 +2,9 @@
 // scripts/landing/console-server.ts: the real `appRouter` behind `/api` and the S3 emulator behind `/s3`,
 // on the same origin as the page, over one in-memory world (world.ts). The console's ports are the
 // memory ones of the router tests (packages/bff/src/routers/console-testing.ts) with this server's
-// origin for the presigned links, the repository's seed files as the buckets' content, and the real
-// `InboundWhatsApp` in process for the phone simulator (inbound.ts). The own sign-up (`signup.start`
+// origin for the presigned links, the repository's seed files as the buckets' content, the real world
+// factory behind "Reiniciar demo" and "Saltar a escena" (worlds.ts) and the real `InboundWhatsApp` in
+// process for the phone simulator (inbound.ts). The own sign-up (`signup.start`
 // over memory), the guest's portada (`guest.*`) and the account (`account.*`) answer as in the stage.
 //
 // This server plays the Router's and routers/edge.ts's part for what it answers: it forwards only the
@@ -20,6 +21,7 @@ import { createLogger } from "../../packages/bff/src/lib/log";
 import { API_PREFIX } from "../../packages/bff/src/routers/api-path";
 import { bindConsolePorts } from "../../packages/bff/src/routers/console-ports";
 import { type MemoryConsolePorts, memoryConsolePorts } from "../../packages/bff/src/routers/console-testing";
+import type { ConsolePorts } from "../../packages/bff/src/routers/console-ports";
 import type { ContextDeps } from "../../packages/bff/src/routers/deps";
 import { appRouter } from "../../packages/bff/src/routers/index";
 import { createContextFactory } from "../../packages/bff/src/routers/trpc";
@@ -28,6 +30,7 @@ import { stampingVerifier } from "./identity";
 import { type LocalInbound, UI_SIM_ENVELOPE_KEY, createLocalInbound } from "./inbound";
 import { handleS3 } from "./s3-emulator";
 import { UI_PHONE_HASH_KEY, createUiWorld, repositoryObject, uiPhoneHash } from "./world";
+import { type UiWorlds, createUiWorlds } from "./worlds";
 
 export interface UiAppOptions {
   /** `http://127.0.0.1:<port>`: the page, the API and the emulator share it. */
@@ -38,9 +41,15 @@ export interface UiAppOptions {
   readonly jwks: { readonly keys: readonly unknown[] };
 }
 
+/** The memory ports with the real world factory in place of the recording one. */
+export type UiPorts = Omit<MemoryConsolePorts, "rebuild"> & Pick<ConsolePorts, "rebuild">;
+
 export interface UiApp {
   readonly memory: MemoryConnector;
-  readonly ports: MemoryConsolePorts;
+  readonly ports: UiPorts;
+  readonly worlds: UiWorlds["worlds"];
+  /** The router's dependencies, bound to these ports (the server's own tests call the router with them). */
+  readonly deps: ContextDeps;
   readonly inbound: LocalInbound;
   /** Answers `/api` and `/s3`; false for anything else (the caller hands it to Vite). */
   handle(request: IncomingMessage, response: ServerResponse): Promise<boolean>;
@@ -64,7 +73,8 @@ export async function createUiApp(options: UiAppOptions): Promise<UiApp> {
   const base = memoryConsolePorts({ connector: memory.connector, client: memory.client, hashPhone: uiPhoneHash, realClock: systemClock, origin: options.origin, fallback: repositoryObject });
   const inbound = createLocalInbound({ connector: memory.connector, objects: base.objects, phoneHashKey: UI_PHONE_HASH_KEY, kill: base.kill, logger: log });
   base.onInbound = inbound.handle;
-  const ports: MemoryConsolePorts = { ...base, simEnvelopeKey: () => UI_SIM_ENVELOPE_KEY };
+  const factory = createUiWorlds(memory, base.objects);
+  const ports: UiPorts = { ...base, rebuild: factory.rebuild, simEnvelopeKey: () => UI_SIM_ENVELOPE_KEY };
   const fetcher = staticJwksFetcher(options.jwks);
   const verifiers = options.pool.clientIds.map((clientId) => createCognitoIdTokenVerifier({ userPoolId: options.pool.userPoolId, clientId } satisfies IdTokenVerifierConfig, { fetcher }));
   const signup = memorySignupPorts();
@@ -92,6 +102,8 @@ export async function createUiApp(options: UiAppOptions): Promise<UiApp> {
   return {
     memory,
     ports,
+    worlds: factory.worlds,
+    deps,
     inbound,
     async handle(request, response) {
       if (await handleS3(ports.objects, request, response, options.origin)) return true;

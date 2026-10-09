@@ -8,6 +8,7 @@
 //   TIMER              `fire_timer`, then the handler of its `kind`; a timer not yet due is re-armed by the
 //                      timer port and dispatches nothing; an old version is ignored and audited
 //   DISPATCH_EVENT, EMAIL_EVENT, OUTBOUND_SEND                                EventHandlers
+//   CASE_PRESET        the world factory's `case` preset                       CasePort
 //   HEALTH_PROBE       `GET /v1/health` of the mocks with the worker's role → `Runtime/PROBE#<probeId>`
 //   POISON             fails on purpose until the DLQ (only `qa-*` worlds, FL-099 d)
 import type { NetworkClient } from "../network/client";
@@ -131,6 +132,8 @@ export async function dispatchEvent(deps: DispatchDeps, ctx: WorkerContext, even
       return deps.ports.handlers.applyEmailEvent(event, ctx);
     case "OUTBOUND_SEND":
       return deps.ports.handlers.outboundSend(event, ctx);
+    case "CASE_PRESET":
+      return deps.ports.cases.preset(event, ctx);
     case "HEALTH_PROBE":
       return healthProbe(deps, ctx, event);
     case "POISON":

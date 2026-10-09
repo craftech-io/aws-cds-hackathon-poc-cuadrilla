@@ -70,6 +70,7 @@ export const EntityName = z.enum([
   "Tombstone",
   "Probe",
   "Faults",
+  "WorldSession",
   // CuadrillaMetrics
   "ConversationKpi",
   "EvalResult",

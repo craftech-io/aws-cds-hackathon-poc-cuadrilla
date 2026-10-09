@@ -166,6 +166,7 @@ export const uploadKey = (uploadId: string): Key => ({ PK: `UPLOAD#${uploadId}`,
 export const LIVE_WORLD_KEY: Key = { PK: "LIVEWORLD", SK: META };
 export const tombstoneKey = (clockId: string, worldEpoch: number): Key => ({ PK: `TOMB#${clockId}#${worldEpoch}`, SK: META });
 export const probeKey = (probeId: string): Key => ({ PK: `PROBE#${probeId}`, SK: META });
+export const worldSessionKey = (clockId: string): Key => ({ PK: `WORLDSESSION#${clockId}`, SK: META });
 export const foreignProbeId = (eventId: string): string => `foreign#${eventId}`;
 export const faultsKey = (clockId: string): Key => ({ PK: `FAULTS#${clockId}`, SK: META });
 /** `KILL#<scope>` (global) or `KILL#AGENT#<clockId>` (one world). */

@@ -4,7 +4,7 @@
 // rows). guest-lifecycle.ts empties each one to destroy a generation; the cases, whose ids are ULIDs,
 // come from the operator's index of cases instead.
 import { clockIdOfIsp } from "@cuadrilla/shared";
-import { addressClaimKey, auditPartition, clockKey, installerStateKey, outboxPartition, pendingPartition, worldStateKey } from "../connector/keys";
+import { addressClaimKey, auditPartition, clockKey, installerStateKey, outboxPartition, pendingPartition, worldSessionKey, worldStateKey } from "../connector/keys";
 import type { Table } from "../connector/table-client";
 import { type WorldMarkers, fillTemplate } from "./template";
 
@@ -46,7 +46,7 @@ export function worldPartitions(text: string, markers: WorldMarkers, phoneHash: 
   }
   for (const month of auditMonths(templateMonths, now)) add("AuditLog", auditPartition(markers.ispId, `${month}-01T00:00:00.000Z`));
   add("Conversations", outboxPartition(markers.ispId));
-  for (const key of [clockKey(clockId), worldStateKey(clockId)]) add("Runtime", key.PK);
+  for (const key of [clockKey(clockId), worldStateKey(clockId), worldSessionKey(clockId)]) add("Runtime", key.PK);
   // The epoch counter (`COUNTER#EPOCH#<clockId>`) is never deleted (docs/architecture.md §5).
   add("Runtime", pendingPartition(clockId));
   return out;

@@ -11,19 +11,24 @@
 //
 // Every evidence of the world gets bytes no other evidence of the world has (`RenderAllocator`), so no
 // seeded evidence makes a later photo of the set a `DUPLICATE_EVIDENCE`, unless a step asks for it with
-// an explicit `photoId`. Validations are `source: SEED`; evidence names the photo it stands for.
+// an explicit `photoId`. Validations are `source: SEED`; evidence names the photo it stands for, and its
+// object exists: `Seed/photos/<photoId>.jpg` is copied to the evidence key before the row is written, so
+// the review queue's link, the order's detail and the certificate read it like any other evidence.
 import { type ChecklistItem, type PhotoItem, type RejectReason, ToolError, type Verdict } from "@cuadrilla/shared";
 import { evidencePhotoKey } from "@cuadrilla/shared/media/keys";
 import type { Connector } from "../connector/ports";
 import type { ChecklistEntry, WorkOrder } from "../domain/work-orders";
 import { ulid } from "../lib/crypto";
 import { type PhotoIndex, type RenderAllocator, type RenderAspect, SEED_RENDERS_PER_ASPECT } from "./photo-catalog";
+import type { SeedMediaCopier } from "./presets";
 import { type ChecklistPreset, isPhotoItem } from "./templates";
 
 export interface ChecklistDeps {
   readonly connector: Pick<Connector, "workOrders">;
   readonly photos: PhotoIndex;
   readonly allocator: RenderAllocator;
+  /** Copies the seeded photo to its evidence key; a world factory without it cannot seed photo items. */
+  readonly media?: Pick<SeedMediaCopier, "copySeedPhotoToEvidence">;
   /** Real time: the ids of the seeded rows. */
   readonly now: () => Date;
 }
@@ -78,6 +83,9 @@ async function seedShot(deps: ChecklistDeps, order: WorkOrder, item: PhotoItem, 
   const nowMs = deps.now().getTime();
   const evidenceId = `ev-${ulid(nowMs)}`;
   const validationId = `val-${ulid(nowMs)}`;
+  const s3Key = evidencePhotoKey(order.clockId, order.worldEpoch, order.workOrderId, item, evidenceId);
+  if (deps.media === undefined) throw new ToolError("UNAVAILABLE", "this world factory cannot seed evidence photos", "PRESET_UNAVAILABLE");
+  await deps.media.copySeedPhotoToEvidence(shot.photoId, s3Key);
   await workOrders.createEvidence({
     evidenceId,
     workOrderId: order.workOrderId,
@@ -85,7 +93,7 @@ async function seedShot(deps: ChecklistDeps, order: WorkOrder, item: PhotoItem, 
     worldEpoch: order.worldEpoch,
     item,
     sha256: shot.sha256,
-    s3Key: evidencePhotoKey(order.clockId, order.worldEpoch, order.workOrderId, item, evidenceId),
+    s3Key,
     mime: "image/jpeg",
     bytes: shot.bytes,
     photoId: shot.photoId,

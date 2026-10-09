@@ -12,8 +12,10 @@ import { historicalCertificates } from "./certificates";
 import type { WorldsDeps } from "./deps";
 import type { FactoryDeps } from "./factory";
 import type { DestroyDeps, ObjectBucket, ObjectStore } from "./guest-lifecycle";
-import type { MemoryAdmin, PurgeTarget } from "./memory-purge";
+import type { MemoryAdmin, PurgeFromPass, PurgeTarget } from "./memory-purge";
 import { PhotoIndex, catalogOfDatasheets } from "./photo-catalog";
+import type { InstallerEventSink } from "../worker/ports";
+import { queuedCasePresetEffects } from "./preset-effects";
 import type { PresetEffects } from "./presets";
 import { type WorldTemplateName, staticTemplateSource } from "./templates";
 
@@ -160,44 +162,58 @@ export class FakeMemory implements MemoryAdmin {
   }
 }
 
-export interface WorldsHarness extends WorldHarness {
+/** The world factory's ports over one memory connector, with what they wrote recorded. */
+export interface MemoryWorlds {
   readonly deps: WorldsDeps;
   readonly memory: FakeMemory;
   readonly scheduler: RecordingScheduler;
   readonly dispatcher: RecordingDispatcher;
-  /** Targets handed to `continuePurge` (the passes after the first). */
-  readonly purges: PurgeTarget[];
+  /** Targets handed to `continuePurge`, with the pass they start from (1: the whole purge). */
+  readonly purges: Array<PurgeTarget & { readonly fromPass: PurgeFromPass }>;
   /** PDFs written by the historical certificates, by key. */
   readonly pdfs: Map<string, Uint8Array>;
   /** Keys of `Media` the `candidates` preset copied a photo to. */
   readonly media: Map<string, string>;
+  /** Keys of `Evidence` the `checklist` preset copied a photo to, with the photo copied. */
+  readonly evidencePhotos: Map<string, string>;
   /** Changes `BrandConfig` (a brand change between two loads). */
   setBrand(next: BrandConfigValue): void;
 }
 
-export interface WorldsHarnessOptions {
-  readonly start?: string;
+export interface WorldsHarness extends WorldHarness, MemoryWorlds {}
+
+export interface MemoryWorldsOptions {
   readonly brand?: BrandConfigValue;
   readonly overrides?: SeedOverridesValue;
+  /** The `case` preset in process; without it, `queue` hands it to the installer queue as the stage does. */
   readonly effects?: PresetEffects;
+  readonly queue?: InstallerEventSink;
   readonly certificates?: boolean;
   readonly sessionListing?: boolean;
+  readonly phoneHash?: (phone: string) => string;
+}
+
+export interface WorldsHarnessOptions extends MemoryWorldsOptions {
+  readonly start?: string;
 }
 
 export const RUNTIME_SESSION_KEY = deriveSubkey(TEST_MASTER_KEY, "runtime-session");
 export const NONCE_KEY = deriveSubkey(TEST_MASTER_KEY, "nonce");
 
-export function worldsHarness(options: WorldsHarnessOptions = {}): WorldsHarness {
-  const base = worldHarness(options.start);
+/** The world factory over a memory connector: the committed templates and photo catalog, fakes of the rest. */
+export function memoryWorlds(base: MemoryConnector & { now(): Date }, options: MemoryWorldsOptions = {}): MemoryWorlds {
   let brand = options.brand ?? NEUTRAL;
   const memory = new FakeMemory(options.sessionListing === undefined ? {} : { sessionListing: options.sessionListing });
   const scheduler = new RecordingScheduler();
   const dispatcher = new RecordingDispatcher();
-  const purges: PurgeTarget[] = [];
+  const purges: MemoryWorlds["purges"] = [];
   const pdfs = new Map<string, Uint8Array>();
   const media = new Map<string, string>();
+  const evidencePhotos = new Map<string, string>();
   const log = createLogger({ sink: () => undefined });
+  const now = () => base.now();
   const certificates = historicalCertificates({ connector: base.connector, objects: { putPdf: async (key, bytes) => void pdfs.set(key, bytes) }, photo: async (photoId) => photoBytes(photoId), brand: () => brand, logger: log });
+  const effects = options.effects ?? (options.queue === undefined ? undefined : queuedCasePresetEffects(options.queue));
   const deps: WorldsDeps = {
     connector: base.connector,
     client: base.client,
@@ -205,18 +221,23 @@ export function worldsHarness(options: WorldsHarnessOptions = {}): WorldsHarness
     photos: async () => PHOTO_INDEX,
     brand: () => brand,
     overrides: () => options.overrides ?? {},
-    phoneHash: phoneHashOf,
+    phoneHash: options.phoneHash ?? phoneHashOf,
     runtimeSessionKey: RUNTIME_SESSION_KEY,
     scheduler,
     dispatcher,
     memory,
-    continuePurge: async (target) => void purges.push(target),
+    continuePurge: async (target, fromPass = 2) => void purges.push({ ...target, fromPass }),
     ...(options.certificates === false ? {} : { certificates }),
-    nonces: { runtime: base.connector.runtime, nonceKey: NONCE_KEY, realClock: { now: async () => base.now() } },
-    ...(options.effects === undefined ? {} : { effects: options.effects }),
-    media: { copySeedPhoto: async (photoId, key) => void media.set(key, photoId) },
+    nonces: { runtime: base.connector.runtime, nonceKey: NONCE_KEY, realClock: { now: async () => now() } },
+    ...(effects === undefined ? {} : { effects }),
+    media: { copySeedPhoto: async (photoId, key) => void media.set(key, photoId), copySeedPhotoToEvidence: async (photoId, key) => void evidencePhotos.set(key, photoId) },
     log,
-    now: base.now,
+    now,
   };
-  return Object.assign(base, { deps, memory, scheduler, dispatcher, purges, pdfs, media, setBrand: (next: BrandConfigValue) => void (brand = next) });
+  return { deps, memory, scheduler, dispatcher, purges, pdfs, media, evidencePhotos, setBrand: (next: BrandConfigValue) => void (brand = next) };
+}
+
+export function worldsHarness(options: WorldsHarnessOptions = {}): WorldsHarness {
+  const base = worldHarness(options.start);
+  return Object.assign(base, memoryWorlds(base, options));
 }

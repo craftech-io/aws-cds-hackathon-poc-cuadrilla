@@ -3,9 +3,11 @@
 // the principal and what it may do with its own account (ADR-0024, ADR-0025 §6, ADR-0026).
 //
 //   session          who is signed in and what the shell offers: for a GUEST, "one session per world"
-//                    (`Runtime/CLOCK#.lastSession`): a session that finds another one active in the last
-//                    30 real minutes gets the notice and no "Reiniciar demo"; otherwise it becomes the
-//                    world's session. Staff never share a world's session.
+//                    (`Runtime/WORLDSESSION#<clockId>`, its own item: recording it never moves the clock's
+//                    version, so it never makes a reset, a jump or a move fail): a session that finds
+//                    another one active in the last 30 real minutes gets the notice and no "Reiniciar
+//                    demo"; otherwise it becomes the world's session, written only when it changes or is
+//                    more than 5 real minutes old. Staff never share a world's session.
 //   changePassword   staff only: the console asks before it calls Cognito's `ChangePassword` with the
 //                    user's own access token (the password never reaches the BFF); a GUEST gets 403
 //   mfa.setup        staff only, the same for associating a TOTP; a GUEST gets 403
@@ -72,23 +74,20 @@ export function lambdaAccountPorts(client?: Pick<LambdaClient, "send">, function
 
 /** A guest's session is the world's while it acted in the last 30 real minutes. */
 export const SESSION_ACTIVE_MS = 30 * 60_000;
+/** The world's own session is written again only after this long (each page load asks for it). */
+export const SESSION_REFRESH_MS = 5 * 60_000;
 
 type SessionCtx = Pick<IspContext, "deps" | "world" | "principal" | "log">;
 
 async function claimSession(ctx: SessionCtx): Promise<boolean> {
-  const runtime = ctx.deps.connector.runtime;
-  const clock = await runtime.getClock(ctx.world.clockId);
-  if (clock === undefined) return false;
+  const { worlds } = ctx.deps.connector;
   const now = ctx.deps.wallClock();
-  const last = clock.lastSession;
-  const other = last !== undefined && last.sessionId !== ctx.principal.sessionId && now.getTime() - Date.parse(last.atReal) < SESSION_ACTIVE_MS;
-  if (other) return true;
-  try {
-    await runtime.updateClock(clock.clockId, { lastSession: { userId: ctx.principal.userId, sessionId: ctx.principal.sessionId, atReal: now.toISOString() } }, clock.version);
-  } catch (error) {
-    // A concurrent move of the clock wins; this session is recorded on its next call.
-    ctx.log.warn("account.session.not_recorded", { reason: error instanceof Error ? error.name : "unknown" });
-  }
+  const last = await worlds.getWorldSession(ctx.world.clockId);
+  const age = last === undefined ? Number.POSITIVE_INFINITY : now.getTime() - Date.parse(last.atReal);
+  const own = last?.sessionId === ctx.principal.sessionId;
+  if (last !== undefined && !own && age < SESSION_ACTIVE_MS) return true;
+  if (own && age < SESSION_REFRESH_MS) return false;
+  await worlds.putWorldSession({ clockId: ctx.world.clockId, userId: ctx.principal.userId, sessionId: ctx.principal.sessionId, atReal: now.toISOString() });
   return false;
 }
 

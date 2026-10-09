@@ -67,6 +67,8 @@ describe("preset checklist", () => {
     const set = PHOTO_INDEX.setHashes();
     expect(hashes.some((hash) => set.has(hash))).toBe(false);
     expect(evidence.every((row) => /^ph-seed-/.test(String(row.photoId)) && row.seeded === true)).toBe(true);
+    // [W4 review B2] each seeded evidence has its object: the seed's photo, at the key the row points at.
+    for (const row of evidence) expect(harness.evidencePhotos.get(String(row.s3Key))).toBe(row.photoId);
     const items = allRows(harness).filter(({ table, row }) => table === "WorkOrders" && row.entity === "ChecklistItem" && row.clockId === RUN && row.item === "POWER_READING_PHOTO");
     expect(items.map(({ row }) => [row.status, row.attempts]).sort()).toEqual([["PASSED", 0], ["REJECTED", 2]]);
     const rejected = items.find(({ row }) => row.status === "REJECTED")?.row;

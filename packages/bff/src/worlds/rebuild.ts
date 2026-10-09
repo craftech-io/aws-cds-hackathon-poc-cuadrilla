@@ -3,13 +3,15 @@
 // the world's schedules and items (keeping the real-time counters of a guest world and deleting its
 // phone leases) and paused the clock at the start. Here:
 //
+//   checkScene    the preflight of a jump: a guest world, a scene of its template, every preset seedable
+//   handOffPurge  the whole Memory purge of the previous epoch's installers through `continuePurge`
+//                 (`WorldJanitor` asynchronously, or in process), computed before the items go
 //   reload        writes the world again from its template at the new epoch, by kind: a guest world
 //                 through the minimal factory of wave 2b, the demo world from `demo.json` (with the
 //                 operator's overrides and the live world), a QA or evaluation world from the request
 //                 its clock keeps (same numbers, phones and presets); renders the historical
-//                 certificates when it can; for a jump, seeds the scene (worlds/scenes.ts)
-//   purgeMemory   pass 1 of the Memory purge of the previous epoch's installers here, the rest through
-//                 `continuePurge` (`WorldJanitor` asynchronously, or in process)
+//                 certificates when it can (or hands them to `WorldJanitor`); for a jump, seeds the scene
+//                 (worlds/scenes.ts)
 import { type GuestOrigin, ToolError, guestOriginOfIsp, parseClockId } from "@cuadrilla/shared";
 import { type ResetCaller, type ResetDeps, type WorldRebuild, type WorldReset, jumpToScene as clockJump, resetWorld as clockReset } from "../clock/reset";
 import type { Actor } from "../domain/common";
@@ -17,10 +19,10 @@ import { localDateOf } from "../services/business-hours/zoned-time";
 import { type WorldsDeps, factoryDepsOf, resetDepsOf } from "./deps";
 import { writeDemoWorld } from "./demo";
 import { buildWorld } from "./factory";
-import { purgeFirstPass } from "./memory-purge";
+import { handOffTarget } from "./memory-purge";
 import { purgeTargetOf, scopeOfWorld } from "./memory-targets";
 import { writeQaWorld } from "./qa-world";
-import { applyScene } from "./scenes";
+import { applyScene, checkScene } from "./scenes";
 import { GUEST_WORLD_START_SIM } from "./template";
 
 const TIME_ZONE = "America/Mexico_City";
@@ -47,18 +49,20 @@ export function worldRebuild(deps: WorldsDeps): WorldRebuild {
       else if (kind === "QA" || kind === "EVAL") startAtSim = (await writeQaWorld(deps, input.clockId, input.worldEpoch)).startAtSim;
       else throw new ToolError("INVALID", `no world to reload for ${input.clockId}`);
       if (input.sceneId === undefined) return { startAtSim };
-      if (kind !== "GUEST") throw new ToolError("NOT_FOUND", "scenes exist only in a world of the guest template", "SCENE_NOT_FOUND");
       const scene = await applyScene(deps, { clockId: input.clockId, ispId: input.ispId, sceneId: input.sceneId });
       return { startAtSim, sceneAtSim: scene.sceneAtSim };
     },
 
-    async purgeMemory(input) {
+    async checkScene(input) {
+      await checkScene(deps, input);
+    },
+
+    async handOffPurge(input) {
       if (deps.memory === undefined) return;
       const clock = await deps.connector.runtime.getClock(input.clockId);
       const start = typeof clock?.settings?.startAtSim === "string" ? clock.settings.startAtSim : (clock?.pausedSimNow ?? deps.now().toISOString());
       const scope = await scopeOfWorld(deps.connector, { clockId: input.clockId, ispId: input.ispId, epoch: input.previousEpoch, startDate: localDateOf(new Date(start), TIME_ZONE), installerIds: input.installerIds });
-      const { target } = await purgeFirstPass({ memory: deps.memory, now: deps.now }, purgeTargetOf(scope, deps.runtimeSessionKey));
-      await deps.continuePurge(target);
+      await deps.continuePurge(handOffTarget(purgeTargetOf(scope, deps.runtimeSessionKey), deps.now()), 1);
     },
   };
 }
@@ -73,7 +77,7 @@ export function resetWorld(deps: WorldsDeps, input: { readonly clockId: string; 
   return clockReset(input, worldResetDeps(deps));
 }
 
-/** "Saltar a escena" of a guest world (or a `qa-*` world built from the guest template). */
+/** "Saltar a escena" of a guest world. */
 export function jumpToScene(deps: WorldsDeps, input: { readonly clockId: string; readonly sceneId: string; readonly actor: Actor }): Promise<WorldReset> {
   return clockJump(input, worldResetDeps(deps));
 }

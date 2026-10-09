@@ -10,7 +10,7 @@ import { runtimeSessionId } from "../lib/crypto";
 import { factoryDepsOf } from "./deps";
 import { buildWorld } from "./factory";
 import { destroyGeneration } from "./guest-lifecycle";
-import { MEMORY_PURGE_INCOMPLETE_METRIC, PURGE_TIMING, type PurgeDeps, actorBelongsTo, purgeAllPasses, purgeFirstPass, purgeRemainingPasses } from "./memory-purge";
+import { MEMORY_PURGE_INCOMPLETE_METRIC, type MemoryAdmin, PURGE_TIMING, PurgeBudgetExceeded, type PurgeDeps, actorBelongsTo, purgeAllPasses, purgeFirstPass, purgeRemainingPasses } from "./memory-purge";
 import { purgeTargetOf, scopeOfWorld } from "./memory-targets";
 import { resetWorld } from "./rebuild";
 import { FakeMemory, RUNTIME_SESSION_KEY, SIGNUP_CLOCK, SIGNUP_ISP, SIGNUP_USER, worldsHarness } from "./testing";
@@ -101,19 +101,19 @@ describe("[FL-086] purge of a reset world", () => {
     harness.memory.addRecord("inst-rogelio-gtest-e2", "record-new");
 
     await resetWorld(harness.deps, { clockId: GUEST_TEST_CLOCK_ID, caller: "QA", actor: "QA" });
-    expect(harness.memory.eventsOf(ACTOR)).toBe(0);
-    expect(harness.memory.recordsOf(ACTOR)).toBe(0);
-    expect(harness.memory.recordsOf("inst-rogelio-gtest-e2")).toBe(1);
-    // The rest goes to WorldJanitor, which runs it to the end.
+    // The whole purge goes to WorldJanitor, handed off before the items went: nothing slow in the request.
+    expect(harness.memory.recordsOf(ACTOR)).toBe(2);
     expect(harness.purges).toHaveLength(1);
     const target = harness.purges[0];
     if (target === undefined) throw new Error("no purge target");
-    expect(target).toMatchObject({ clockId: GUEST_TEST_CLOCK_ID, epoch: 1, actorIds: expect.arrayContaining([ACTOR]) });
+    expect(target).toMatchObject({ clockId: GUEST_TEST_CLOCK_ID, epoch: 1, fromPass: 1, actorIds: expect.arrayContaining([ACTOR]) });
     expect(target.sessions.map((entry) => entry.sessionId)).toEqual(expect.arrayContaining([session, day]));
     harness.memory.addRecord(ACTOR, "late-record");
     const outcome = await handleWorldJanitor({ worlds: () => harness.deps, log: harness.deps.log, sleep: async () => undefined }, { kind: "MEMORY_PURGE", ...target });
     expect(outcome).toMatchObject({ kind: "MEMORY_PURGE", complete: true });
+    expect(harness.memory.eventsOf(ACTOR)).toBe(0);
     expect(harness.memory.recordsOf(ACTOR)).toBe(0);
+    expect(harness.memory.recordsOf("inst-rogelio-gtest-e2")).toBe(1);
   });
 
   it("WorldJanitor refuses an event that is not one of its two", async () => {
@@ -134,12 +134,10 @@ describe("Memory of sign-up generations", () => {
     await destroyGeneration(
       {
         ...harness.destroyDeps(),
-        purgeMemory: async (clockId, epochs) => {
-          for (const epoch of epochs.filter((value) => value >= 1)) {
-            const scope = await scopeOfWorld(harness.connector, { clockId, ispId: SIGNUP_ISP, epoch, startDate: "2026-10-13" });
-            seen.push(scope.installerIds.length);
-            await purgeFirstPass({ memory: harness.memory, now: harness.now }, purgeTargetOf(scope, RUNTIME_SESSION_KEY));
-          }
+        purgeMemory: async (clockId, epoch) => {
+          const scope = await scopeOfWorld(harness.connector, { clockId, ispId: SIGNUP_ISP, epoch, startDate: "2026-10-13" });
+          seen.push(scope.installerIds.length);
+          await purgeFirstPass({ memory: harness.memory, now: harness.now }, purgeTargetOf(scope, RUNTIME_SESSION_KEY));
         },
       },
       SIGNUP_CLOCK,
@@ -147,6 +145,50 @@ describe("Memory of sign-up generations", () => {
     expect(seen[0]).toBeGreaterThan(0);
     expect(harness.memory.recordsOf(actor)).toBe(0);
     expect(harness.memory.recordsOf("inst-rogelio-gtest-e1")).toBe(1);
+  });
+
+  it("[W4 review B4] after 20 epochs the deletion purges only the current one, a bounded number of Memory calls", async () => {
+    const harness = worldsHarness();
+    await buildWorld(factoryDepsOf(harness.deps), { ispId: SIGNUP_ISP, origin: "SIGNUP", ownerUserId: SIGNUP_USER });
+    while ((await harness.connector.runtime.currentEpoch(SIGNUP_CLOCK)) < 20) await harness.connector.runtime.nextEpoch(SIGNUP_CLOCK);
+    let calls = 0;
+    const counted: MemoryAdmin = {
+      listSessionIds: (actorId) => ((calls += 1), harness.memory.listSessionIds(actorId)),
+      listEventIds: (actorId, sessionId) => ((calls += 1), harness.memory.listEventIds(actorId, sessionId)),
+      deleteEvent: (actorId, sessionId, eventId) => ((calls += 1), harness.memory.deleteEvent(actorId, sessionId, eventId)),
+      listRecordIds: (prefix) => ((calls += 1), harness.memory.listRecordIds(prefix)),
+      deleteRecord: (recordId) => ((calls += 1), harness.memory.deleteRecord(recordId)),
+      listRecordActors: () => ((calls += 1), harness.memory.listRecordActors()),
+    };
+    const epochs: number[] = [];
+    let perEpoch = 0;
+    await destroyGeneration(
+      {
+        ...harness.destroyDeps(),
+        purgeMemory: async (clockId, epoch) => {
+          epochs.push(epoch);
+          const target = purgeTargetOf(await scopeOfWorld(harness.connector, { clockId, ispId: SIGNUP_ISP, epoch, startDate: "2026-10-13" }), RUNTIME_SESSION_KEY);
+          perEpoch = target.actorIds.length * 2 + target.sessions.length;
+          await purgeFirstPass({ memory: counted, now: harness.now }, target, 10_000);
+        },
+      },
+      SIGNUP_CLOCK,
+    );
+    expect(epochs).toEqual([20]);
+    expect(calls).toBeLessThanOrEqual(perEpoch);
+  });
+
+  it("[W4 review B4] a Memory purge that fails or runs out of its budget never holds back the destruction", async () => {
+    const harness = worldsHarness();
+    await buildWorld(factoryDepsOf(harness.deps), { ispId: SIGNUP_ISP, origin: "SIGNUP", ownerUserId: SIGNUP_USER });
+    const lines: string[] = [];
+    const result = await destroyGeneration({ ...harness.destroyDeps(), purgeMemory: async () => Promise.reject(new Error("ThrottlingException")), log: createLogger({ sink: (line) => void lines.push(line) }) }, SIGNUP_CLOCK);
+    expect(result.items).toBeGreaterThan(0);
+    expect(await harness.connector.runtime.getClock(SIGNUP_CLOCK)).toBeUndefined();
+    expect(lines.some((line) => line.includes(MEMORY_PURGE_INCOMPLETE_METRIC))).toBe(true);
+    // The budget stops a pass between two calls; what is left goes at night.
+    harness.memory.addRecord("inst-rogelio-gs261001abcde-e1", "record-1");
+    await expect(purgeFirstPass({ memory: harness.memory, now: harness.now }, { clockId: SIGNUP_CLOCK, epoch: 1, actorIds: ["inst-rogelio-gs261001abcde-e1"], sessions: [] }, -1)).rejects.toBeInstanceOf(PurgeBudgetExceeded);
   });
 
   it("WorldJanitor purges at night the records of generations that expired, never of a living one", async () => {

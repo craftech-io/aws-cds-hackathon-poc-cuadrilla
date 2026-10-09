@@ -6,7 +6,8 @@
 //
 //   VoiceTranscriber   `transcribe_voice_note`                  media/ (WP-31)
 //   SafetyPort         `classify_safety` / `handle_safety`      safety/ (WP-34)
-//   CasePort           `open_case`, `relay_message`, supervisor actions, `advance_ladder(TIMEOUT)`   cases/ (WP-34)
+//   CasePort           `open_case`, `relay_message`, supervisor actions, `advance_ladder(TIMEOUT)`, the
+//                      factory's `case` preset (`CASE_PRESET`)                                     cases/ (WP-34)
 //   WorkerNoticeSender the worker's fixed notices (`SYSTEM_NOTICE`) through the outbound pipeline   outbound/ (WP-28)
 //   TimerPort          `fire_timer` (versions, `dueAtSim` re-evaluated)   timers/ (WP-36)
 //   TimerHandlers      `fire_day_start`, `deferred_send`, `CERT_RETRY`   dayplan/ (WP-29), outbound/ (WP-28), certificates/ (WP-35)
@@ -22,7 +23,7 @@ import type { Message } from "../domain/conversations";
 import type { Timer } from "../domain/timers";
 import type { Logger } from "../lib/log";
 import type { OrderChoiceSender } from "../outbound/adapters";
-import type { DispatchEvent, EmailEventEvent, InstallerQueueEventInput, OutboundSendEvent, SupervisorActionEvent, TimerEvent } from "./events";
+import type { CasePresetEvent, DispatchEvent, EmailEventEvent, InstallerQueueEventInput, OutboundSendEvent, SupervisorActionEvent, TimerEvent } from "./events";
 
 /** The producer of follow-up events: marks them in flight, then sends them to the installer's group. */
 export interface InstallerEventSink {
@@ -146,6 +147,8 @@ export interface CasePort {
   relayFromInstaller(relay: InstallerRelay, ctx: WorkerContext): Promise<void>;
   /** `take_case`, `decline_case`, `close_case` or `relay_message` supervisor → installer; `close_case` enqueues `AGENT_TURN(CASE_CLOSED)`. */
   supervisorAction(event: SupervisorActionEvent, ctx: WorkerContext): Promise<void>;
+  /** The world factory's `case` preset (cases/preset.ts); skipped when the order is of another epoch. */
+  preset(event: CasePresetEvent, ctx: WorkerContext): Promise<void>;
 }
 
 // ---- Timers ---------------------------------------------------------------------------------------

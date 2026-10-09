@@ -4,15 +4,18 @@
 // last turn may appear after a first deletion; the purge runs in passes, one module for its callers
 // ("Reiniciar demo", "Saltar a escena", `world.destroy`, `WorldJanitor`, `GuestAccountDeletion`, `seed:load`):
 //
-//   pass 1     in the call itself (`purgeFirstPass`)
+//   pass 1     in the call itself (`purgeFirstPass`), or in `WorldJanitor` when the caller hands it the
+//              whole purge (`fromPass: 1`: "Reiniciar demo" and "Saltar a escena" from the console)
 //   pass 2     60 real seconds later
 //   listings   every 15 s over the sessions' events and the actors' records, deleting what they find,
 //              until two listings in a row find nothing
 //   cap        10 minutes from pass 1: `ACTION MEMORY_PURGE_INCOMPLETE` and one log line with the
 //              `MemoryPurgeIncomplete` metric
 //
-// From the console and the `QaDriver` the passes after the first run in `WorldJanitor` (asynchronous
-// invocation with `MEMORY_PURGE`); `seed:load` and the nightly job run every pass in the same process.
+// From the console every pass runs in `WorldJanitor` (asynchronous invocation with `MEMORY_PURGE`, handed
+// off before the world's items go, so a request that dies later never leaves the old epoch's Memory
+// behind); from the `QaDriver` the passes after the first; `seed:load` and the nightly job run every pass
+// in the same process.
 // Nothing here trusts the event: every actor must belong to the world and the epoch it names.
 import { z } from "zod";
 import { ClockId, clockTagOf, parseClockId } from "@cuadrilla/shared";
@@ -53,8 +56,15 @@ export const PurgeTarget = z
   .strict();
 export type PurgeTarget = z.infer<typeof PurgeTarget>;
 
-/** Event of the asynchronous invocation of `WorldJanitor`; without `startedAtReal` the cap counts from its arrival. */
-export const MemoryPurgeEvent = PurgeTarget.extend({ kind: z.literal("MEMORY_PURGE"), startedAtReal: PurgeTarget.shape.startedAtReal.optional() }).strict();
+/** Which passes a hand-off still owes: every one (`1`, nobody purged the target yet) or those after the first (`2`). */
+export const PurgeFromPass = z.union([z.literal(1), z.literal(2)]);
+export type PurgeFromPass = z.infer<typeof PurgeFromPass>;
+
+/**
+ * Event of the asynchronous invocation of `WorldJanitor`; without `startedAtReal` the cap counts from its
+ * arrival, without `fromPass` pass 1 already ran.
+ */
+export const MemoryPurgeEvent = PurgeTarget.extend({ kind: z.literal("MEMORY_PURGE"), startedAtReal: PurgeTarget.shape.startedAtReal.optional(), fromPass: PurgeFromPass.optional() }).strict();
 export type MemoryPurgeEvent = z.input<typeof MemoryPurgeEvent>;
 
 export const PURGE_TIMING = {
@@ -101,18 +111,37 @@ async function sessionsOf(memory: MemoryAdmin, target: Pick<PurgeTarget, "actorI
   return [...seen.values()];
 }
 
-/** Lists and deletes everything of the target once; how many events and records it found. */
-export async function purgePass(memory: MemoryAdmin, target: Pick<PurgeTarget, "actorIds" | "sessions">): Promise<number> {
+/** A pass that ran out of its caller's real-time budget (the deletion of an account): the rest goes at night. */
+export class PurgeBudgetExceeded extends Error {
+  override readonly name = "PurgeBudgetExceeded";
+}
+
+/** Real-time budget of one pass: it stops between two calls once `deadlineMs` has passed. */
+export interface PassBudget {
+  readonly now: () => Date;
+  readonly deadlineMs: number;
+}
+
+/**
+ * Lists and deletes everything of the target once; how many events and records it found. The actors'
+ * records (tips, preferences, summaries) go first, then the sessions' events.
+ */
+export async function purgePass(memory: MemoryAdmin, target: Pick<PurgeTarget, "actorIds" | "sessions">, budget?: PassBudget): Promise<number> {
+  const inBudget = (): void => {
+    if (budget !== undefined && budget.now().getTime() > budget.deadlineMs) throw new PurgeBudgetExceeded("the Memory purge ran out of its time budget");
+  };
   let found = 0;
-  for (const { actorId, sessionId } of await sessionsOf(memory, target)) {
-    const events = await memory.listEventIds(actorId, sessionId);
-    found += events.length;
-    for (const eventId of events) await memory.deleteEvent(actorId, sessionId, eventId);
-  }
   for (const actorId of target.actorIds) {
+    inBudget();
     const records = await memory.listRecordIds(actorNamespace(actorId));
     found += records.length;
     for (const recordId of records) await memory.deleteRecord(recordId);
+  }
+  for (const { actorId, sessionId } of await sessionsOf(memory, target)) {
+    inBudget();
+    const events = await memory.listEventIds(actorId, sessionId);
+    found += events.length;
+    for (const eventId of events) await memory.deleteEvent(actorId, sessionId, eventId);
   }
   return found;
 }
@@ -124,10 +153,14 @@ export function assertOwnActors(target: Pick<PurgeTarget, "clockId" | "epoch" | 
 }
 
 /** Pass 1, in the reset, jump or destroy call itself; the target the remaining passes continue with. */
-export async function purgeFirstPass(deps: Pick<PurgeDeps, "memory" | "now">, target: Omit<PurgeTarget, "startedAtReal">): Promise<{ readonly target: PurgeTarget; readonly deleted: number }> {
+export async function purgeFirstPass(
+  deps: Pick<PurgeDeps, "memory" | "now">,
+  target: Omit<PurgeTarget, "startedAtReal">,
+  budgetMs?: number,
+): Promise<{ readonly target: PurgeTarget; readonly deleted: number }> {
   const parsed = PurgeTarget.parse({ ...target, startedAtReal: deps.now().toISOString() });
   assertOwnActors(parsed);
-  const deleted = await purgePass(deps.memory, parsed);
+  const deleted = await purgePass(deps.memory, parsed, budgetMs === undefined ? undefined : { now: deps.now, deadlineMs: deps.now().getTime() + budgetMs });
   return { target: parsed, deleted };
 }
 
@@ -189,4 +222,16 @@ export async function purgeAllPasses(deps: PurgeDeps, target: Omit<PurgeTarget, 
   const first = await purgeFirstPass(deps, target);
   const rest = await purgeRemainingPasses(deps, first.target);
   return { ...rest, deleted: rest.deleted + first.deleted };
+}
+
+/** The passes a hand-off owes, in this process (`WorldJanitor`, `seed:load`): pass 1 first when nobody ran it. */
+export async function purgeFrom(deps: PurgeDeps, target: PurgeTarget, fromPass: PurgeFromPass): Promise<PurgeOutcome> {
+  return fromPass === 1 ? purgeAllPasses(deps, target) : purgeRemainingPasses(deps, target);
+}
+
+/** A target nobody purged yet, checked: what a caller hands off whole (`continuePurge(target, 1)`). */
+export function handOffTarget(target: Omit<PurgeTarget, "startedAtReal">, now: Date): PurgeTarget {
+  const parsed = PurgeTarget.parse({ ...target, startedAtReal: now.toISOString() });
+  assertOwnActors(parsed);
+  return parsed;
 }

@@ -15,8 +15,9 @@
 //   profile            the measured installer profile
 //
 // Everything seeded is marked `seeded: true`.
-import { type PhotoItem, ToolError } from "@cuadrilla/shared";
+import { type ChecklistItem, type PhotoItem, ToolError } from "@cuadrilla/shared";
 import { simMediaKey } from "@cuadrilla/shared/media/keys";
+import type { CasePresetInput } from "../cases/preset";
 import { BUTTON_LABELS } from "../copy/buttons";
 import { esMX } from "../copy/es-MX";
 import type { Connector } from "../connector/ports";
@@ -30,17 +31,23 @@ import { WhatsAppSendRequest } from "../outbound/types";
 import { MAIN_STORY } from "../story/main-story";
 import type { PhotoIndex, RenderAllocator } from "./photo-catalog";
 import { type SeededPhoto, seedChecklist } from "./presets-checklist";
-import type { OfferPreset, OrderPreset } from "./templates";
+import { type OfferPreset, type OrderPreset, isPhotoItem } from "./templates";
 
 /** What a preset does through handlers that send (the ladder's templates go through the pipeline). */
 export interface PresetEffects {
-  /** `open_case` and `advance_ladder` with `caller QA` up to `rung`, then the take for `TAKEN`. */
-  openCase(input: { readonly workOrderId: string; readonly reason: NonNullable<OrderPreset["case"]>["reason"]; readonly rung: NonNullable<OrderPreset["case"]>["rung"]; readonly status: NonNullable<OrderPreset["case"]>["status"]; readonly atSim: string }): Promise<{ readonly caseId: string }>;
+  /**
+   * `open_case` and `advance_ladder` with `caller QA` up to `rung`, then the take for `TAKEN`
+   * (worlds/preset-effects.ts): the case's id when it ran in process, none when it was queued.
+   */
+  openCase(input: CasePresetInput & { readonly order: WorkOrder }): Promise<{ readonly caseId?: string }>;
 }
 
-/** Copies a photo of `Seed/photos/` to a key of `Media` (the candidates of a preset). */
+/** Copies a photo of `Seed/photos/<photoId>.jpg`, byte for byte, to where a seeded row points at it. */
 export interface SeedMediaCopier {
+  /** To a key of `Media` (the candidates of a preset). */
   copySeedPhoto(photoId: string, mediaKey: string): Promise<void>;
+  /** To an evidence key of `Evidence` (`[guest/<seg>/]photos/…`, the checklist's seeded evidence). */
+  copySeedPhotoToEvidence(photoId: string, evidenceKey: string): Promise<void>;
 }
 
 export interface PresetDeps {
@@ -74,6 +81,17 @@ export interface AppliedPreset {
 function need<T>(value: T | undefined, what: string): T {
   if (value === undefined) throw new ToolError("UNAVAILABLE", `this world factory cannot seed ${what}`, "PRESET_UNAVAILABLE");
   return value;
+}
+
+/** What this factory cannot seed of a preset, by the port it lacks (the preflight of a scene jump). */
+export function missingPresetPorts(deps: Pick<PresetDeps, "effects" | "nonces" | "media">, preset: OrderPreset): string[] {
+  const missing: string[] = [];
+  if (preset.case !== undefined && deps.effects === undefined) missing.push("cases");
+  if (preset.offer !== undefined && deps.nonces === undefined) missing.push("button nonces");
+  if ((preset.candidates?.length ?? 0) > 0 && deps.media === undefined) missing.push("candidate photos");
+  const photos = Object.entries(preset.checklist ?? {}).some(([item, entry]) => isPhotoItem(item as ChecklistItem) && entry !== undefined && (entry.status !== "PENDING" || (entry.attempts ?? 0) > 0));
+  if (photos && deps.media === undefined) missing.push("evidence photos");
+  return missing;
 }
 
 async function seedOnu(deps: PresetDeps, target: PresetTarget, onu: NonNullable<OrderPreset["onu"]>): Promise<void> {
@@ -180,10 +198,10 @@ async function seedCandidates(deps: PresetDeps, target: PresetTarget, photoIds: 
 /** Applies every preset of one operation, in the order of the header. */
 export async function applyOrderPreset(deps: PresetDeps, allocator: RenderAllocator, target: PresetTarget, preset: OrderPreset): Promise<AppliedPreset> {
   const { order, installer, atSim } = target;
-  const photos = preset.checklist === undefined ? [] : await seedChecklist({ connector: deps.connector, photos: deps.photos, allocator, now: deps.now }, order, preset.checklist, atSim);
+  const photos = preset.checklist === undefined ? [] : await seedChecklist({ connector: deps.connector, photos: deps.photos, allocator, now: deps.now, ...(deps.media === undefined ? {} : { media: deps.media }) }, order, preset.checklist, atSim);
   if (preset.onu !== undefined) await seedOnu(deps, target, preset.onu);
   if (preset.steps !== undefined) await seedSteps(deps, target, preset.steps);
-  const caseId = preset.case === undefined ? undefined : (await need(deps.effects, "cases").openCase({ workOrderId: order.workOrderId, ...preset.case, atSim })).caseId;
+  const caseId = preset.case === undefined ? undefined : (await need(deps.effects, "cases").openCase({ order, workOrderId: order.workOrderId, ...preset.case, atSim })).caseId;
   if (preset.lastInboundAtSim !== undefined) await deps.connector.people.recordInbound(installer.personId, { atSim: preset.lastInboundAtSim });
   if (preset.activeWorkOrderId === true) await deps.connector.worlds.setActiveWorkOrder(installer.personId, order.clockId, order.workOrderId, atSim);
   const offers = [];

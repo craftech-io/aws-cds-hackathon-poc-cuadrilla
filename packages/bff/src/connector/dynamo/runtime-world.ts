@@ -6,7 +6,7 @@
 import { ConnectorError } from "@cuadrilla/shared";
 import type { EntityName } from "../../domain/common";
 import { RUNTIME_TTL_SECONDS, PENDING_MAIL_STALE_SECONDS } from "../../domain/runtime";
-import { Faults, InstallerState, JoinCode, Lease, LiveWorld, PendingMail, PhoneLease, Probe, Tombstone, Upload, WorldState } from "../../domain/runtime-world";
+import { Faults, InstallerState, JoinCode, Lease, LiveWorld, PendingMail, PhoneLease, Probe, Tombstone, Upload, WorldSession, WorldState } from "../../domain/runtime-world";
 import { LIVE_WORLD_KEY, MAIL_PREFIX, installerStateKey, joinCodeKey, leaseKey, pendingPartition, phoneLeaseKey, worldStateKey } from "../keys";
 import type { WorldRuntimePort } from "../ports-runtime";
 import { TTL_ATTRIBUTE, type Patch, type TransactOp } from "../table-client";
@@ -195,6 +195,9 @@ export function worldRuntimeRepo(ctx: RepoContext): WorldRuntimePort {
       }
     },
     getProbe: async (probeId) => valid(await getEntity(ctx, Probe, "Probe", { probeId })),
+
+    getWorldSession: async (clockId) => valid(await getEntity(ctx, WorldSession, "WorldSession", { clockId })),
+    putWorldSession: (session) => upsertEntity(ctx, WorldSession, "WorldSession", session, { ttlSeconds: RUNTIME_TTL_SECONDS.worldSession }),
 
     getFaults: async (clockId) => (clockId.startsWith("qa-") ? getEntity(ctx, Faults, "Faults", { clockId }) : undefined),
     setFaults: (faults) => upsertEntity(ctx, Faults, "Faults", faults),

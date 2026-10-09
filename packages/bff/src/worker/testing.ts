@@ -195,6 +195,7 @@ function fakePorts(kit: () => WorkerKit, rec: Recorded): WorkerPorts {
         rec.relays.push(relay);
       },
       supervisorAction: handled("SUPERVISOR_ACTION"),
+      preset: handled("CASE_PRESET"),
     },
     notices: {
       send: async (notice) => {

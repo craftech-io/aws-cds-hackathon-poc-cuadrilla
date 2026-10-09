@@ -10,10 +10,13 @@
 //
 // Destruction. `GuestAccountDeletion` destroys the current generation of a deleted account: every item
 // of its operator in the demo's tables (found from the partitions the template gives it and from its
-// cases), its objects under `guest/<seg>/` in `Media` and `Evidence` and, when a purger is given, its
-// Memory (first, while its installers are still there to name its actors). Only that generation: a key
-// that does not carry its ids is never touched, and destroying one that is already gone is a no-op. The
-// previous generations expire by TTL (`WorldJanitor` purges their Memory at night).
+// cases), its objects under `guest/<seg>/` in `Media` and `Evidence` and, when a purger is given, the
+// Memory of its current epoch (first, while its installers are still there to name its actors; every
+// earlier epoch was purged by the reset or jump that ended it). The Memory purge is best effort: it never
+// holds back the erasure of the account (ADR-0026); a failure is logged with `MemoryPurgeIncomplete`, and
+// what is left belongs to a generation whose world is gone, which `WorldJanitor` sweeps at night. Only that
+// generation: a key that does not carry its ids is never touched, and destroying one that is already gone
+// is a no-op. The previous generations expire by TTL (`WorldJanitor` purges their Memory at night).
 import { randomBytes } from "node:crypto";
 import { CaseStatus, ConnectorError, type IspId, ToolError, clockIdOfIsp, isSignupGuestIsp, ispIdOfClock, signupGenerationIspId } from "@cuadrilla/shared";
 import { worldObjectPrefix } from "@cuadrilla/shared/media/keys";
@@ -23,6 +26,8 @@ import type { Connector } from "../connector/ports";
 import { counterRowKey, COUNTER_KEYS, clockKey, ispKey } from "../connector/keys";
 import { createRepoContext, entityRow } from "../connector/dynamo/repo";
 import type { Key, Table, TableClient, TransactOp } from "../connector/table-client";
+import type { Logger } from "../lib/log";
+import { MEMORY_PURGE_INCOMPLETE_LOG, MEMORY_PURGE_INCOMPLETE_METRIC } from "./memory-purge";
 import { markersFor } from "./template";
 import { worldPartitions } from "./partitions";
 
@@ -134,8 +139,10 @@ export interface DestroyDeps {
   readonly template: () => Promise<string>;
   readonly phoneHash: (phone: string) => string;
   readonly objects: ObjectStore;
-  /** Purges the Memory of the world's actors of every epoch, when the stage has one (worlds/destroyer.ts). */
-  readonly purgeMemory?: (clockId: string, epochs: readonly number[]) => Promise<void>;
+  /** Purges the Memory of the world's actors of its current epoch, when the stage has one (worlds/destroyer.ts). */
+  readonly purgeMemory?: (clockId: string, epoch: number) => Promise<void>;
+  /** Where a Memory purge that failed is reported. */
+  readonly log?: Pick<Logger, "error">;
   readonly now: () => Date;
 }
 
@@ -175,7 +182,13 @@ export async function destroyGeneration(deps: DestroyDeps, clockId: string): Pro
   const epoch = await deps.connector.runtime.currentEpoch(clockId);
   const epochs = Array.from({ length: epoch + 1 }, (_unused, index) => index);
   // Before the items go: the purge finds the world's installers and orders from them.
-  await deps.purgeMemory?.(clockId, epochs);
+  if (epoch >= 1 && deps.purgeMemory !== undefined) {
+    try {
+      await deps.purgeMemory(clockId, epoch);
+    } catch (error) {
+      deps.log?.error(MEMORY_PURGE_INCOMPLETE_LOG, { metric: MEMORY_PURGE_INCOMPLETE_METRIC, value: 1, clockId, epoch, cause: error instanceof Error ? error.name : "unknown" });
+    }
+  }
   let items = 0;
   for (const { table, partition } of partitions) items += await deletePartition(deps.client, table, partition);
   for (const key of cases) items += await deletePartition(deps.client, "Cases", key.PK);

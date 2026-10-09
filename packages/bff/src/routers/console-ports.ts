@@ -28,6 +28,7 @@ import { CLIENT_TIMEOUTS, awsClientConfig } from "../lib/clients";
 import { type Clock, systemClock } from "../lib/clock";
 import { type SecretKey, phoneHash, ulid } from "../lib/crypto";
 import { type Logger, createLogger } from "../lib/log";
+import { type EvalRunIndex, tableEvalRuns } from "../metrics/eval-runs";
 import { type BucketName, bucketName, channelModes, readLinked } from "../lib/resource";
 import type { BrandConfigValue } from "../lib/secret-schemas";
 import { brandConfig, seedOverrides, subkey } from "../lib/secrets";
@@ -44,6 +45,7 @@ import type { ServiceDeps } from "../services/people/direct-call";
 import type { SchedulerPort } from "../timers/scheduler-client";
 import { eventBridgeScheduler } from "../timers/scheduler-client";
 import { type TimerDispatcher, queueTimerDispatcher } from "../timers/dispatch";
+import type { InstallerEventSink } from "../worker/ports";
 import { worldRebuild } from "../worlds/rebuild";
 import { stageWorldsDeps } from "../worlds/stage";
 import type { ContextDeps } from "./deps";
@@ -85,17 +87,6 @@ export interface ConsoleObjects {
   manualText(version: string, sectionId: string): Promise<string | undefined>;
   /** Whether an object exists (the partner's logos before presigning them). */
   exists(bucket: BucketName, key: string): Promise<boolean>;
-}
-
-/** The latest published run of a measurement (`EV-01` questions or `EV-02` photos), written by the evaluation. */
-export interface EvalRunRef {
-  readonly ispId: string;
-  readonly runId: string;
-  readonly finishedAtReal?: string;
-}
-
-export interface EvalRunIndex {
-  latest(kind: "Q" | "P"): Promise<EvalRunRef | undefined>;
 }
 
 export interface ConsolePorts {
@@ -205,21 +196,6 @@ const POST_LINK_SECONDS = 600;
 const LinkedFunction = z.object({ name: z.string().min(1) });
 const LinkedFunctionUrl = z.object({ url: z.url() });
 
-/** `CuadrillaMetrics` row the evaluation writes when a run is published (`PK EVALRUN#LATEST`, `SK Q|P`). */
-export const EVAL_RUN_POINTER_PK = "EVALRUN#LATEST";
-const EvalRunPointer = z.object({ ispId: z.string().min(1), runId: z.string().min(1), finishedAtReal: z.string().optional() }).loose();
-
-export function tableEvalRuns(client: Pick<TableClient, "get">): EvalRunIndex {
-  return {
-    async latest(kind) {
-      const item = await client.get("CuadrillaMetrics", { PK: EVAL_RUN_POINTER_PK, SK: kind });
-      const parsed = EvalRunPointer.safeParse(item);
-      if (!parsed.success) return undefined;
-      return { ispId: parsed.data.ispId, runId: parsed.data.runId, ...(parsed.data.finishedAtReal === undefined ? {} : { finishedAtReal: parsed.data.finishedAtReal }) };
-    },
-  };
-}
-
 function isMissing(error: unknown): boolean {
   return error instanceof Error && (error.name === "NoSuchKey" || error.name === "NotFound");
 }
@@ -304,13 +280,19 @@ function stageAddresses(): AddressOptions {
 }
 
 /**
- * The world factory of the stage (worlds/rebuild.ts), built on the first reset or jump: the BFF runs pass 1
- * of the Memory purge in the request and hands the rest to `WorldJanitor` (asynchronous).
+ * The world factory of the stage (worlds/rebuild.ts), built on the first reset or jump. Nothing slow runs in
+ * the request: the whole Memory purge and the historical certificates' PDFs go to `WorldJanitor`
+ * (asynchronous), and a scene's `case` preset to the installer's queue (`CASE_PRESET`: the worker holds the
+ * outbound pipeline the ladder sends through, the BFF never does).
  */
-function stageRebuild(log: Logger, dispatcher: TimerDispatcher): WorldRebuild {
+function stageRebuild(log: Logger, dispatcher: TimerDispatcher, queue: InstallerEventSink): WorldRebuild {
   let rebuild: WorldRebuild | undefined;
-  const factory = (): WorldRebuild => (rebuild ??= worldRebuild(stageWorldsDeps({ log, dispatcher, certificates: true })));
-  return { reload: (input) => factory().reload(input), purgeMemory: (input) => factory().purgeMemory(input) };
+  const factory = (): WorldRebuild => (rebuild ??= worldRebuild(stageWorldsDeps({ log, dispatcher, queue, certificates: "janitor" })));
+  return {
+    checkScene: (input) => factory().checkScene(input),
+    handOffPurge: (input) => factory().handOffPurge(input),
+    reload: (input) => factory().reload(input),
+  };
 }
 
 function stageConsolePorts(): ConsolePorts {
@@ -329,7 +311,7 @@ function stageConsolePorts(): ConsolePorts {
     queue: sink,
     scheduler: eventBridgeScheduler(),
     dispatcher,
-    rebuild: stageRebuild(log, dispatcher),
+    rebuild: stageRebuild(log, dispatcher, sink),
     network: networkClient(),
     dispatch: createDispatchControlClient({ transport: (request, signal) => sigv4Transport({ baseUrl: readLinked("DispatchMock", LinkedFunctionUrl).url })(request, signal) }),
     hashPhone: (phone) => phoneHash(subkey("phone-hash"), phone),

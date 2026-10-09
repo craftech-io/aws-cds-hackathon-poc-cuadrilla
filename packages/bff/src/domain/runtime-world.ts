@@ -115,6 +115,19 @@ export const Probe = defineEntity("Probe", {
 });
 export type Probe = z.infer<typeof Probe>;
 
+/**
+ * `WORLDSESSION#<clockId>`: the console session that last acted in a guest world ("one session per world",
+ * routers/account.ts). Its own item, never the clock's: recording a session never moves `CLOCK#`'s version,
+ * so it never races a reset, a jump or a move of the clock. 24 h.
+ */
+export const WorldSession = defineEntity("WorldSession", {
+  clockId: ClockId,
+  userId: ConsoleUserId,
+  sessionId: z.string().min(1).max(128),
+  atReal: IsoInstant,
+});
+export type WorldSession = z.infer<typeof WorldSession>;
+
 /** The fault a client injects (a mode such as `ERROR_503` for the orchestrator, or a detailed setting). */
 export const FaultSetting = z.union([z.string().min(1).max(64), JsonObject]);
 export type FaultSetting = z.infer<typeof FaultSetting>;

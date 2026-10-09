@@ -6,12 +6,12 @@
 // installer's queue at its own `dueAtSim`, as "Avanzar" does (the day start of 07:30 included). A step
 // of the tour never depends on earlier turns of the model.
 import { z } from "zod";
-import { IsoInstant, ToolError } from "@cuadrilla/shared";
+import { IsoInstant, ToolError, parseClockId } from "@cuadrilla/shared";
 import { dispatchDue } from "../clock/state";
 import { readWorldClock } from "../timers/timers";
 import { type WorldsDeps, presetDepsOf } from "./deps";
 import { RenderAllocator } from "./photo-catalog";
-import { type AppliedPreset, applyOrderPreset } from "./presets";
+import { type AppliedPreset, applyOrderPreset, missingPresetPorts } from "./presets";
 import { GUEST_TEMPLATE, fillTemplate, markersFor, readTemplate } from "./template";
 import { OrderPreset } from "./templates";
 
@@ -33,6 +33,25 @@ export async function scenesOf(deps: Pick<WorldsDeps, "templates">, ispId: strin
   return parsed.data;
 }
 
+/** A scene of the world's guest template, or `SCENE_NOT_FOUND`. */
+export async function sceneOf(deps: Pick<WorldsDeps, "templates">, ispId: string, sceneId: string): Promise<Scene> {
+  const scene = (await scenesOf(deps, ispId)).find((candidate) => candidate.sceneId === sceneId);
+  if (scene === undefined) throw new ToolError("NOT_FOUND", `no scene ${sceneId} in this world`, "SCENE_NOT_FOUND");
+  return scene;
+}
+
+/**
+ * The preflight of "Saltar a escena", before the clock half touches the world: the scene exists in the
+ * guest template and this factory can seed every preset of it (`PRESET_UNAVAILABLE` otherwise).
+ */
+export async function checkScene(deps: WorldsDeps, input: { readonly clockId: string; readonly ispId: string; readonly sceneId: string }): Promise<Scene> {
+  if (parseClockId(input.clockId)?.kind !== "GUEST") throw new ToolError("NOT_FOUND", "scenes exist only in a world of the guest template", "SCENE_NOT_FOUND");
+  const scene = await sceneOf(deps, input.ispId, input.sceneId);
+  const missing = [...new Set(Object.values(scene.orders).flatMap((preset) => missingPresetPorts(deps, preset)))];
+  if (missing.length > 0) throw new ToolError("UNAVAILABLE", `this world factory cannot seed ${missing.join(", ")}`, "PRESET_UNAVAILABLE");
+  return scene;
+}
+
 export interface SceneApplied {
   readonly sceneId: string;
   readonly sceneAtSim: string;
@@ -42,8 +61,7 @@ export interface SceneApplied {
 
 /** Seeds the scene in a freshly reloaded guest world and moves its clock to the scene's instant. */
 export async function applyScene(deps: WorldsDeps, input: { readonly clockId: string; readonly ispId: string; readonly sceneId: string }): Promise<SceneApplied> {
-  const scene = (await scenesOf(deps, input.ispId)).find((candidate) => candidate.sceneId === input.sceneId);
-  if (scene === undefined) throw new ToolError("NOT_FOUND", `no scene ${input.sceneId} in this world`, "SCENE_NOT_FOUND");
+  const scene = await checkScene(deps, input);
   const { connector } = deps;
   const photos = await deps.photos();
   const allocator = new RenderAllocator(photos);

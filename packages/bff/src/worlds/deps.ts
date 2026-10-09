@@ -15,7 +15,7 @@ import type { TimerDispatcher } from "../timers/dispatch";
 import type { SchedulerPort } from "../timers/scheduler-client";
 import type { HistoricalCertificates } from "./certificates";
 import type { FactoryDeps } from "./factory";
-import type { MemoryAdmin, PurgeTarget } from "./memory-purge";
+import type { MemoryAdmin, PurgeFromPass, PurgeTarget } from "./memory-purge";
 import type { PhotoIndex } from "./photo-catalog";
 import type { PresetDeps, PresetEffects, SeedMediaCopier } from "./presets";
 import { GUEST_TEMPLATE, type TemplateSource, readTemplate } from "./template";
@@ -40,8 +40,11 @@ export interface WorldsDeps {
   readonly dispatcher: TimerDispatcher;
   /** AgentCore Memory; without it nothing is purged (a stage with no Memory, or a test). */
   readonly memory?: MemoryAdmin;
-  /** The passes after the first: in process (`seed:load`, `WorldJanitor`) or `MEMORY_PURGE` to `WorldJanitor`. */
-  readonly continuePurge: (target: PurgeTarget) => Promise<void>;
+  /**
+   * The passes a purge still owes (`fromPass` 1: every one, 2 by default: those after the first): in process
+   * (`seed:load`, `WorldJanitor`) or `MEMORY_PURGE` to `WorldJanitor`.
+   */
+  readonly continuePurge: (target: PurgeTarget, fromPass?: PurgeFromPass) => Promise<void>;
   /** The PDFs of the historical certificates (needs `Evidence` writes); absent: they stay `pdfPending`. */
   readonly certificates?: HistoricalCertificates;
   readonly nonces?: NonceDeps;

@@ -182,9 +182,10 @@ const guardrailG1 = g(["bedrock:ApplyGuardrail"], ["{G1}"]);
 const invokeModels = (model: "HARNESS" | "PHOTO", actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]): Grant => g(actions, [`{model:${model}}`]);
 /** AgentCore and Bedrock resolve the app's inference profile before they call through it (ADR-0028). */
 const readModelProfile: Grant = { sid: "ModelProfileRead", ...g(["bedrock:GetInferenceProfile"], ["{model:PROFILE}"]) };
-/** The historical certificates' PDFs a world factory renders (worlds/certificates.ts): guest worlds, and every world. */
-const GUEST_CERTIFICATES = g(["s3:PutObject"], ["{Evidence}/guest/*/certificates/*"]);
+/** The historical certificates' PDFs a world factory renders (worlds/certificates.ts), of every world. */
 const WORLD_CERTIFICATES = g(["s3:PutObject"], ["{Evidence}/certificates/*", "{Evidence}/guest/*/certificates/*"]);
+/** The seeded evidence of the `checklist` preset (worlds/presets-checklist.ts): the seed's photo copied to its key. */
+const WORLD_EVIDENCE_PHOTOS = g(["s3:PutObject"], ["{Evidence}/photos/*", "{Evidence}/guest/*/photos/*"]);
 const metrics = g(["cloudwatch:PutMetricData"], ["*"], [{ test: "StringEquals", variable: "cloudwatch:namespace", values: [METRICS_NAMESPACE] }]);
 
 export const LAMBDA_CAPABILITIES = {
@@ -236,20 +237,22 @@ export const LAMBDA_CAPABILITIES = {
   FeedEvents: { capabilities: [], tables: { WorkOrders: "write", Runtime: "write", AuditLog: "write" }, grants: [sqsSend()] },
   ScheduleDispatch: { capabilities: [], tables: { WorkOrders: "read", Cases: "read", People: "read", Runtime: "write" }, grants: [sqsSend()] },
   // Leads: only `signup.start`'s writes, fenced by key and attributes; retryWorld and deleteGuest invoke.
-  // Manual: `manual.section`. Evidence certificates: the historical PDFs of a world it resets (worlds/stage.ts).
+  // Manual: `manual.section`. Evidence photos: the seeded evidence of a scene (worlds/presets-checklist.ts);
+  // the historical certificates' PDFs and the Memory purge go to WorldJanitor (worlds/stage.ts).
   Bff: {
     capabilities: ["MOCK_NETWORK", "MOCK_DISPATCH", "WORLDS"],
     tables: { ...allAt(APP_TABLES, "write"), Reference: "read" },
     buckets: { Evidence: "read", Media: "write", Manual: "read" },
-    grants: [g(["s3:GetObject"], ["{Seed}/brand/*"]), WORLD_CERTIFICATES, sqsSend(), g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{GuestWorlds}", "{GuestAccountDeletion}"]), BFF_LEADS_GRANT],
+    grants: [g(["s3:GetObject"], ["{Seed}/brand/*"]), WORLD_EVIDENCE_PHOTOS, sqsSend(), g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{GuestWorlds}", "{GuestAccountDeletion}"]), BFF_LEADS_GRANT],
   },
   CostGuard: {
     capabilities: [],
     tables: { AuditLog: "write" },
     grants: [g(["dynamodb:PutItem"], ["{Runtime}"], [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#*"] }])],
   },
-  // The historical certificates of the guest worlds it resets at night.
-  WorldJanitor: { capabilities: ["WORLDS", "WORLD_DATA"], grants: [GUEST_CERTIFICATES] },
+  // The historical certificates of the guest worlds it resets at night and of every world the Bff reloads
+  // (`RENDER_CERTIFICATES`: guest and demo).
+  WorldJanitor: { capabilities: ["WORLDS", "WORLD_DATA"], grants: [WORLD_CERTIFICATES] },
   // Runtime: the phone leases of messages sent by the live transport (policy/records.ts).
   PolicyAudit: {
     capabilities: [],

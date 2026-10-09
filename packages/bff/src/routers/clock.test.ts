@@ -74,7 +74,7 @@ describe("reset and scene jumps [FL-086]", () => {
     expect(await failure(guest.clock.jumpToScene({ sceneId: "evidencia" }))).toEqual({ code: "TOO_MANY_REQUESTS", reason: "SCENE_JUMP_CAP" });
   });
 
-  it("[FL-084] a demo world's staff cannot jump (guest and QA worlds only); OPS can neither reset nor jump", async () => {
+  it("[FL-084] a demo world's staff cannot jump (guest worlds only); OPS can neither reset nor jump", async () => {
     const t = await consoleTestWorld(DEMO);
     expect(await failure((await t.as()).clock.jumpToScene({ sceneId: "evidencia" }))).toEqual({ code: "FORBIDDEN", reason: "SCENE_JUMP_NOT_ALLOWED" });
     expect((await failure((await t.as("OPS", "usr-ops")).clock.reset())).code).toBe("FORBIDDEN");

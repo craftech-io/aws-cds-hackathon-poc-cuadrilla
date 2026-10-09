@@ -9,7 +9,7 @@ import type { DomainTable } from "../domain/registry";
 import type { z } from "zod";
 import type { EvalPhoto, EvalQuestion, KbThreshold, ManualIndex, NameCheck, RateCard, REFERENCE_ENTITIES, ReferenceEntityName, RejectReasonCopy, Rubric, SafetyLexicon, Template } from "../domain/reference";
 import type { CapCounter, Clock, Counter, CounterKind, Idempotency, Nonce, Session, Turn, TurnResult } from "../domain/runtime";
-import type { Faults, InstallerState, JoinCode, LeaseKind, LiveWorld, PendingMail, PhoneLease, ProcessError, Probe, Tombstone, Upload, WorldState } from "../domain/runtime-world";
+import type { Faults, InstallerState, JoinCode, LeaseKind, LiveWorld, PendingMail, PhoneLease, ProcessError, Probe, Tombstone, Upload, WorldSession, WorldState } from "../domain/runtime-world";
 import type { Item, Key } from "./table-client";
 
 export interface MessageRef {
@@ -215,6 +215,10 @@ export interface WorldRuntimePort {
   /** Idempotent: `false` when the probe already existed. */
   putProbe(probeId: string, detail?: JsonObject): Promise<boolean>;
   getProbe(probeId: string): Promise<Probe | undefined>;
+  /** The console session that last acted in the world, while it has not expired (24 h). */
+  getWorldSession(clockId: string): Promise<WorldSession | undefined>;
+  /** Unconditional: never touches the clock, so it never races a move, a reset or a jump. */
+  putWorldSession(session: NewEntity<typeof WorldSession>): Promise<WorldSession>;
   /** Faults of a `qa-*` world; always `undefined` for any other clock. */
   getFaults(clockId: string): Promise<Faults | undefined>;
   setFaults(faults: NewEntity<typeof Faults>): Promise<Faults>;

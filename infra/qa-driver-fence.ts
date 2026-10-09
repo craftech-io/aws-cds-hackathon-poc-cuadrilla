@@ -17,8 +17,9 @@
 // writes `world IN (:qa, :eval)`).
 //
 // Objects: QA and evaluation keys (`qa/*`, `eval/*`), the test guest's own prefix
-// (`guest/<sha256(GUEST#isp-guest-test)[0:16]>-e*`, packages/shared/src/media/keys.ts) and, read only,
-// the simulator's uploads and the evidence of the QA and evaluation orders (`wo-7…`, `wo-8…`).
+// (`guest/<sha256(GUEST#isp-guest-test)[0:16]>-e*`, packages/shared/src/media/keys.ts), the seeded evidence
+// photos of the QA and evaluation orders (`wo-7…`, `wo-8…`) and, read only, the simulator's uploads and the
+// evidence of those orders.
 import { createHash } from "node:crypto";
 import type { Condition, Grant } from "./iam-capabilities";
 
@@ -36,7 +37,7 @@ const operatorKeys = (prefix: string): string[] => [...QA_OPERATORS.map((isp) =>
 const clockKeys = (prefix: string): string[] => [...QA_CLOCKS.map((clock) => `${prefix}#${clock}`), `${prefix}#${GUEST_TEST_CLOCK}`, `${prefix}#${GUEST_TEST_CLOCK}#*`];
 
 /** `Runtime` keys keyed by a world's clock id (docs/architecture.md §5). */
-const CLOCK_PREFIXES = ["CLOCK", "WORLDSTATE", "PENDING", "COUNTER#EPOCH", "TOMB", "FAULTS", "RATE", "SIMCAP", "JUMP"] as const;
+const CLOCK_PREFIXES = ["CLOCK", "WORLDSTATE", "WORLDSESSION", "PENDING", "COUNTER#EPOCH", "TOMB", "FAULTS", "RATE", "SIMCAP", "JUMP"] as const;
 /** The test scope of the global ceiling (`…#GLOBAL#<qa clock>#<day>`, packages/bff/src/ops/cost-caps.ts): `qa-*` only. */
 const QA_GLOBAL_TEST_SCOPES = ["TURNCAP#GLOBAL#qa-*", "VALCAP#GLOBAL#qa-*", "TRANSCRIBE#GLOBAL#qa-*"] as const;
 /** Transient keys that name no world; the code fences them (see the header). */
@@ -54,7 +55,8 @@ export const QA_DRIVER_WRITE_KEYS = {
   ],
   Isps: operatorKeys("ISP#"),
   AuditLog: operatorKeys("ISP#"),
-  CuadrillaMetrics: operatorKeys("ISP#"),
+  // The evaluation's runs, and the pointer to the latest published one (packages/bff/src/metrics/eval-runs.ts).
+  CuadrillaMetrics: [...operatorKeys("ISP#"), "EVALRUN#LATEST"],
   People: [...QA_PERSON_IDS.map((id) => `PERSON#${id}`), "CUST#cust-7*", "CUST#cust-8*", ...QA_PERSON_IDS.map((id) => `CUST#${id}`), ...QA_CLOCKS.map((clock) => `ADDR#${clock}`), `ADDR#${GUEST_TEST_CLOCK}#*`],
   Conversations: [...QA_PERSON_IDS.map((id) => `PERSON#${id}`), ...operatorKeys("OUTBOX#")],
   WorkOrders: [...QA_LEASED_ORDERS, "wo-*-gtest"].map((id) => `WO#${id}`),
@@ -83,6 +85,8 @@ function qaDriverDataGrants(): Grant[] {
     { sid: "CasesFencedInCode", actions: ITEM_WRITES, resources: ["{Cases}"] },
     { actions: ["s3:GetObject", "s3:PutObject"], resources: own("Media") },
     { actions: ["s3:GetObject"], resources: ["{Media}/sim/*", ...own("Evidence"), ...QA_LEASED_ORDERS.flatMap((id) => [`{Evidence}/photos/${id}`, `{Evidence}/certificates/${id}`])] },
+    // The seeded evidence of its presets and scenes (worlds/presets-checklist.ts): QA and evaluation orders, the test guest.
+    { actions: ["s3:PutObject"], resources: [...QA_LEASED_ORDERS.map((id) => `{Evidence}/photos/${id}`), `{Evidence}/${guestTest}/photos/*`] },
     { actions: ["s3:DeleteObject"], resources: QA_OBJECTS.flatMap((prefix) => [`{Media}/${prefix}`, `{Evidence}/${prefix}`]) },
   ];
 }

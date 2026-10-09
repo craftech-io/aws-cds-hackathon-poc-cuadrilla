@@ -73,7 +73,7 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = { jpg: "image/jpeg", ogg
 /** Where a bucket's object lives in the repository, if it is one of the seed's files. */
 function repositoryPathOf(bucket: BucketName, key: string): string | undefined {
   if (key.includes("..")) return undefined;
-  if (bucket === "Seed" && /^photos\/ph-[a-z0-9-]+\.jpg$/.test(key)) return join(ROOT, "scripts/seed/photos/out", key.slice("photos/".length));
+  if (bucket === "Seed" && /^photos\/ph-[A-Za-z0-9_-]+\.jpg$/.test(key)) return join(ROOT, "scripts/seed/photos/out", key.slice("photos/".length));
   if (bucket === "Seed" && /^audio\/vn-\d{2}\.ogg$/.test(key)) return join(ROOT, "scripts/seed/audio", key.slice("audio/".length));
   if (bucket === "Manual" && /^manual\/v\d{3}\/[A-Z]{2,4}-\d{2}\.md$/.test(key)) return join(SEED, key);
   return undefined;

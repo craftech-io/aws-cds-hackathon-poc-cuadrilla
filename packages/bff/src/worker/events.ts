@@ -11,6 +11,8 @@
 //   DISPATCH_EVENT     FeedEvents (rescheduled, reassigned, cancelled)
 //   EMAIL_EVENT        ChannelEvents (an SES event about one of our emails)
 //   OUTBOUND_SEND      the console and the QaDriver (a send a person orders)
+//   CASE_PRESET        the world factory (a scene's or a QA world's `case` preset): the real `open_case` and
+//                      `advance_ladder` with `caller QA`, so the ladder's templates go through the pipeline
 //   HEALTH_PROBE       QaDriver (`probe.mocks`): no installer, its own FIFO group
 //   POISON             QaDriver (`event.poison`), only `qa-*` worlds
 //
@@ -19,11 +21,14 @@
 import { z } from "zod";
 import {
   CaseId,
+  CaseReason,
+  CaseStatus,
   ClockId,
   InstallerId,
   IsoInstant,
   IspId,
   PersonId,
+  Rung,
   SupervisorId,
   TimerFiredBy,
   TurnTrigger,
@@ -44,7 +49,7 @@ export const EventId = z.string().regex(/^[A-Za-z0-9_.:#=+/-]{1,128}$/, "expecte
 /** Events the `QaDriver` injects carry `qa-<40 hex>` ids, so `dlq.*` never touches a real one. */
 export const QaEventId = z.string().regex(/^qa-[0-9a-f]{40}$/, "expected qa-<40 hex>");
 
-export const InstallerEventType = z.enum(["INBOUND_MESSAGE", "AGENT_TURN", "BUTTON_ACTION", "SUPERVISOR_ACTION", "TIMER", "DISPATCH_EVENT", "EMAIL_EVENT", "OUTBOUND_SEND", "HEALTH_PROBE", "POISON"]);
+export const InstallerEventType = z.enum(["INBOUND_MESSAGE", "AGENT_TURN", "BUTTON_ACTION", "SUPERVISOR_ACTION", "TIMER", "DISPATCH_EVENT", "EMAIL_EVENT", "OUTBOUND_SEND", "CASE_PRESET", "HEALTH_PROBE", "POISON"]);
 export type InstallerEventType = z.infer<typeof InstallerEventType>;
 
 /** A stored message of a person's thread (`Conversations`): the queue never carries its text. */
@@ -142,6 +147,19 @@ export type EmailEventEvent = z.infer<typeof EmailEventEvent>;
 export const OutboundSendEvent = WorldEventBase.extend({ type: z.literal("OUTBOUND_SEND"), author: Actor, request: JsonObject });
 export type OutboundSendEvent = z.infer<typeof OutboundSendEvent>;
 
+/** A `case` preset of the world factory, run in the installer's group; an order of another epoch is skipped. */
+export const CasePresetEvent = WorldEventBase.extend({
+  type: z.literal("CASE_PRESET"),
+  workOrderId: WorkOrderId,
+  /** The epoch the world was loaded with: a later reset or jump makes the preset stale. */
+  worldEpoch: z.int().min(0),
+  reason: CaseReason,
+  rung: Rung,
+  status: CaseStatus.exclude(["CLOSED"]),
+  atSim: IsoInstant,
+});
+export type CasePresetEvent = z.infer<typeof CasePresetEvent>;
+
 /** `GET /v1/health` of the mocks with the worker's role; the result lands in `Runtime/PROBE#<probeId>`. */
 export const HealthProbeEvent = z.object({
   type: z.literal("HEALTH_PROBE"),
@@ -168,6 +186,7 @@ export const InstallerQueueEvent = z.discriminatedUnion("type", [
   DispatchEvent,
   EmailEventEvent,
   OutboundSendEvent,
+  CasePresetEvent,
   HealthProbeEvent,
   PoisonEvent,
 ]);

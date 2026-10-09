@@ -23,7 +23,9 @@ interface ResetWorld {
   readonly deps: ResetDeps;
   readonly scheduler: RecordingScheduler;
   readonly reloads: Array<Parameters<WorldRebuild["reload"]>[0]>;
-  readonly purges: Array<Parameters<WorldRebuild["purgeMemory"]>[0]>;
+  readonly handOffs: Array<Parameters<WorldRebuild["handOffPurge"]>[0]>;
+  /** Makes the next reload throw (a request that dies halfway). */
+  failReload(): void;
 }
 
 async function resetWorldHarness(): Promise<ResetWorld> {
@@ -32,21 +34,26 @@ async function resetWorldHarness(): Promise<ResetWorld> {
   await buildWorld(harness.factoryDeps(), { ispId: OTHER_ISP, origin: "INVITED" });
   const scheduler = new RecordingScheduler();
   const reloads: ResetWorld["reloads"] = [];
-  const purges: ResetWorld["purges"] = [];
+  const handOffs: ResetWorld["handOffs"] = [];
+  let failing = false;
   const rebuild: WorldRebuild = {
+    async checkScene(input) {
+      if (!TEMPLATE.scenes.some((candidate) => candidate.sceneId === input.sceneId)) throw new ToolError("NOT_FOUND", "no such scene", "SCENE_NOT_FOUND");
+    },
+    async handOffPurge(input) {
+      handOffs.push(input);
+    },
     async reload(input) {
+      if (failing) throw new Error("the request died while reloading");
       reloads.push(input);
       await buildWorld(harness.factoryDeps(), { ispId: input.ispId, origin: "TEST" });
       const scene = TEMPLATE.scenes.find((candidate) => candidate.sceneId === input.sceneId);
       if (input.sceneId !== undefined && scene === undefined) throw new ToolError("NOT_FOUND", "no such scene");
       return { startAtSim: TEMPLATE.startAtSim, ...(scene === undefined ? {} : { sceneAtSim: scene.advanceToSim }) };
     },
-    async purgeMemory(input) {
-      purges.push(input);
-    },
   };
   const deps: ResetDeps = { data: harness.connector, scheduler, dispatcher: new RecordingDispatcher(), realClock: { now: async () => harness.now() }, client: harness.client, rebuild };
-  return { harness, deps, scheduler, reloads, purges };
+  return { harness, deps, scheduler, reloads, handOffs, failReload: () => void (failing = true) };
 }
 
 /** Rows of one guest world, per table: its partitions carry its operator or its clock tag. */
@@ -113,7 +120,7 @@ describe("reset_demo_world [FL-086]", () => {
     expect(timers.map((timer) => [timer.kind, timer.status, timer.version])).toEqual(timers.map(() => ["DAY_START", "SCHEDULED", 1]));
     expect(await world.harness.connector.worlds.getPhoneLease("c".repeat(64))).toBeUndefined();
     expect(world.reloads).toEqual([{ clockId: CLOCK, ispId: ISP, template: "guest", worldEpoch: 2, previousEpoch: 1 }]);
-    expect(world.purges).toEqual([expect.objectContaining({ clockId: CLOCK, previousEpoch: 1, installerIds: expect.arrayContaining([ROGELIO]) })]);
+    expect(world.handOffs).toEqual([expect.objectContaining({ clockId: CLOCK, previousEpoch: 1, installerIds: expect.arrayContaining([ROGELIO]) })]);
 
     // What resetting never empties, and what it does.
     expect(await counter(world, COUNTER_KEYS.rateReal(CLOCK, activity.phoneHash, activity.realHourKey))).toMatchObject({ count: 1 });
@@ -174,5 +181,27 @@ describe("jump_to_scene [FL-084] [FL-086]", () => {
     expect(await world.harness.connector.runtime.currentEpoch(CLOCK)).toBe(epoch);
     expect(await counter(world, jumpKey)).toMatchObject({ count: 30 });
     await expect(jumpToScene({ clockId: "GLOBAL#isp-demo", sceneId: "ordenes-del-dia", actor: SUPERVISOR }, world.deps)).rejects.toMatchObject({ code: "FORBIDDEN", reason: "SCENE_JUMP_NOT_ALLOWED" });
+  });
+
+  it("[FL-084] [W4 review B5] a qa-* world has no scenes, and a scene the factory cannot load changes nothing", async () => {
+    const world = await resetWorldHarness();
+    await expect(jumpToScene({ clockId: "qa-31-sc-18", sceneId: "ordenes-del-dia", actor: "QA" }, world.deps)).rejects.toMatchObject({ code: "FORBIDDEN", reason: "SCENE_JUMP_NOT_ALLOWED" });
+    const epoch = await world.harness.connector.runtime.currentEpoch(CLOCK);
+    const before = worldCounts(world.harness, ISP, "gtest");
+    await expect(jumpToScene({ clockId: CLOCK, sceneId: "no-such-scene", actor: SUPERVISOR }, world.deps)).rejects.toMatchObject({ reason: "SCENE_NOT_FOUND" });
+    expect(await world.harness.connector.runtime.currentEpoch(CLOCK)).toBe(epoch);
+    expect(await world.harness.connector.worlds.getTombstone(CLOCK, epoch)).toBeUndefined();
+    expect(worldCounts(world.harness, ISP, "gtest")).toEqual(before);
+    expect(await counter(world, COUNTER_KEYS.jump(CLOCK, hourKey(world.harness.now())))).toBeUndefined();
+    expect(world.handOffs).toEqual([]);
+  });
+});
+
+describe("Memory of the previous epoch [W4 review security B2]", () => {
+  it("is handed off before the world's items go, so a reload that dies still leaves its purge handed off", async () => {
+    const world = await resetWorldHarness();
+    world.failReload();
+    await expect(resetWorld({ clockId: CLOCK, caller: "QA", actor: "QA" }, world.deps)).rejects.toThrow(/died/);
+    expect(world.handOffs).toEqual([expect.objectContaining({ clockId: CLOCK, previousEpoch: 1, installerIds: expect.arrayContaining([ROGELIO]) })]);
   });
 });

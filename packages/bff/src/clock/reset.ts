@@ -5,18 +5,22 @@
 //   1. limits. "Reiniciar demo" from the console: once every 10 real minutes per world
 //      (`Clock.settings.lastResetAtReal`, written first and pinned to the clock's version, so two
 //      concurrent resets cannot both run); the `QaDriver`, `WorldJanitor` and `seed:load` are exempt.
-//      "Saltar a escena": only `GUEST` and `qa-*` worlds, outside the reset limit, with its own limit
-//      of scene jumps per real hour per world (`JUMP#<clockId>#<realHour>`, conditional; 30, or the
-//      world's `simulatorCaps.sceneJumpsPerRealHour`; `CAP_REACHED` with when it frees up);
+//      "Saltar a escena": only `GUEST` worlds (the scenes are the guest template's), outside the reset
+//      limit, with its own limit of scene jumps per real hour per world (`JUMP#<clockId>#<realHour>`,
+//      conditional; 30, or the world's `simulatorCaps.sceneJumpsPerRealHour`; `CAP_REACHED` with when it
+//      frees up); the factory checks first that the scene exists and that it can seed every preset of it
+//      (`checkScene`), so a jump that cannot finish never touches the world;
 //   2. the epoch goes up from `COUNTER#EPOCH#<clockId>` (`ADD`: never back, never reused) and
 //      `TOMB#<clockId>#<previous epoch>` is written;
-//   3. the world's schedules go, then every item of the world except what both keep
+//   3. the Memory purge of the previous epoch's installers is handed off (`handOffPurge`), computed from
+//      the world's people and orders before they go: whatever fails later, the old epoch's Memory goes;
+//   4. the world's schedules go, then every item of the world except what both keep
 //      (clock/world-items.ts: `CLOCK#`, `COUNTER#EPOCH#` and the real-time counters `RATE#…#REAL#…`,
 //      `SIMCAP#`, `TURNCAP#`, `JUMP#`, so neither empties a world's caps), phone leases included;
-//   4. the clock is PAUSED at the world's start with the new epoch;
-//   5. the factory writes the world again (`reload`, with the scene for a jump) and answers where its
-//      clock stands; the Memory of the previous epoch's installers is purged (`purgeMemory`);
-//   6. `ACTION WORLD_RESET` or `WORLD_SCENE_JUMP`. No other world changes.
+//   5. the clock is PAUSED at the world's start with the new epoch;
+//   6. the factory writes the world again (`reload`, with the scene for a jump) and answers where its
+//      clock stands;
+//   7. `ACTION WORLD_RESET` or `WORLD_SCENE_JUMP`. No other world changes.
 import { z } from "zod";
 import { ConnectorError, IsoInstant, ToolError, ispKindOfClock } from "@cuadrilla/shared";
 import { COUNTER_KEYS, hourKey } from "../connector/keys";
@@ -66,14 +70,19 @@ export class SceneJumpCapError extends ToolError {
 
 /** The part of a reset and of a scene jump that belongs to the world factory (worlds/, WP-39). */
 export interface WorldRebuild {
+  /** Throws, before anything changes, unless the world can be loaded in the scene (it exists, every preset can be seeded). */
+  checkScene(input: { readonly clockId: string; readonly ispId: string; readonly sceneId: string }): Promise<void>;
+  /**
+   * Hands the whole Memory purge of the previous epoch's installers to its asynchronous runner, from the
+   * world's orders as they are before the reset deletes them.
+   */
+  handOffPurge(input: { readonly clockId: string; readonly ispId: string; readonly previousEpoch: number; readonly installerIds: readonly string[] }): Promise<void>;
   /**
    * Writes the world again from its template with the new epoch (`Network` and `Dispatch` rows
    * included) and, for a jump, the seeded state of the scene. Answers the template's start and, for a
    * scene, the simulated instant its clock stands at.
    */
   reload(input: { readonly clockId: string; readonly ispId: string; readonly template?: string; readonly worldEpoch: number; readonly previousEpoch: number; readonly sceneId?: string }): Promise<{ readonly startAtSim: string; readonly sceneAtSim?: string }>;
-  /** First pass of the Memory purge of the previous epoch's installers, and the asynchronous rest. */
-  purgeMemory(input: { readonly clockId: string; readonly ispId: string; readonly previousEpoch: number; readonly installerIds: readonly string[] }): Promise<void>;
 }
 
 export interface ResetDeps extends ClockDeps {
@@ -125,7 +134,7 @@ interface Rebuild {
   readonly detail: JsonObject;
 }
 
-/** Steps 2 to 6, from a clock already claimed for this reset. */
+/** Steps 2 to 7, from a clock already claimed for this reset. */
 async function rebuildWorld(input: Rebuild, deps: ResetDeps): Promise<WorldReset> {
   const { clock } = input;
   const realNow = await deps.realClock.now();
@@ -134,6 +143,7 @@ async function rebuildWorld(input: Rebuild, deps: ResetDeps): Promise<WorldReset
   await deps.data.worlds.putTombstone({ clockId: clock.clockId, worldEpoch: previousEpoch, reason: input.reason, atReal: realNow.toISOString() });
 
   const installerIds = (await deps.data.people.listPeople(clock.ispId, "INSTALLER")).map((person) => person.personId);
+  await deps.rebuild.handOffPurge({ clockId: clock.clockId, ispId: clock.ispId, previousEpoch, installerIds });
   for (const timer of await scheduledTimers(clock, deps)) if (timer.scheduleName !== undefined) await deps.scheduler.delete(timer.scheduleName);
   const simNow = simNowOf(clock, realNow.getTime()).toISOString();
   const settings = resetSettingsOf(clock);
@@ -153,7 +163,6 @@ async function rebuildWorld(input: Rebuild, deps: ResetDeps): Promise<WorldReset
   const standsAt = reloaded.sceneAtSim ?? reloaded.startAtSim;
   const paused = await readWorldClock(deps.data, clock.clockId);
   await deps.data.runtime.updateClock(clock.clockId, { pausedSimNow: standsAt, settings: { ...(paused.settings ?? {}), startAtSim: reloaded.startAtSim } }, paused.version);
-  await deps.rebuild.purgeMemory({ clockId: clock.clockId, ispId: clock.ispId, previousEpoch, installerIds });
 
   await auditClock(deps, { clock, action: input.action, actor: input.actor, atSim: standsAt, detail: { ...input.detail, previousEpoch, worldEpoch, deleted: { ...deleted } } });
   return { clockId: clock.clockId, previousEpoch, worldEpoch, startAtSim: reloaded.startAtSim, simNow: standsAt, deleted };
@@ -184,9 +193,9 @@ export async function sceneJumpLimit(ispId: string, deps: Pick<ResetDeps, "data"
 /** "Saltar a escena": the world reset and loaded in the seeded state of one scene of the tour. */
 export async function jumpToScene(input: { readonly clockId: string; readonly sceneId: string; readonly actor: Actor }, deps: ResetDeps): Promise<WorldReset> {
   const sceneId = SceneId.parse(input.sceneId);
-  const kind = ispKindOfClock(input.clockId);
-  if (kind !== "GUEST" && kind !== "QA") throw new ToolError("FORBIDDEN", "scene jumps exist only in guest and QA worlds", "SCENE_JUMP_NOT_ALLOWED");
+  if (ispKindOfClock(input.clockId) !== "GUEST") throw new ToolError("FORBIDDEN", "scene jumps exist only in guest worlds", "SCENE_JUMP_NOT_ALLOWED");
   const clock = await readWorldClock(deps.data, input.clockId);
+  await deps.rebuild.checkScene({ clockId: clock.clockId, ispId: clock.ispId, sceneId });
   const realNow = await deps.realClock.now();
   const limit = await sceneJumpLimit(clock.ispId, deps);
   const counter = { counterKey: COUNTER_KEYS.jump(clock.clockId, hourKey(realNow)), kind: "JUMP" as const, by: 1, max: limit };

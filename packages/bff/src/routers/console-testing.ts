@@ -20,7 +20,8 @@ import { type MemoryRuntimeStore, createMemoryRuntimeStore } from "../ops/memory
 import type { ConsoleQueueEvent } from "../services/case-console/queue";
 import type { DispatchControlClient } from "../services/demo-controls/dispatch-client";
 import { RecordingDispatcher, RecordingScheduler } from "../timers/testing";
-import { type ConsoleObjects, type ConsolePorts, type EvalRunRef, type PresignGetInput, bindConsolePorts } from "./console-ports";
+import { tableEvalRuns } from "../metrics/eval-runs";
+import { type ConsoleObjects, type ConsolePorts, type PresignGetInput, bindConsolePorts } from "./console-ports";
 import { type AppCaller, appRouter, createQaCaller } from "./index";
 import { type ServerCallOptions, createCallerFactory, createContextFactory } from "./trpc";
 
@@ -110,19 +111,23 @@ export function fakeNetwork(): FakeNetwork {
 
 export interface RecordingRebuild extends WorldRebuild {
   readonly reloads: Array<{ readonly clockId: string; readonly sceneId?: string; readonly worldEpoch: number }>;
+  readonly handOffs: Array<{ readonly clockId: string; readonly previousEpoch: number }>;
 }
 
 /** The world factory's half of a reset: records the reload and stands the clock at the template's start. */
 export function recordingRebuild(startAtSim = "2026-10-13T07:00:00-06:00", scenes: Readonly<Record<string, string>> = {}): RecordingRebuild {
   const reloads: RecordingRebuild["reloads"] = [];
+  const handOffs: RecordingRebuild["handOffs"] = [];
   return {
     reloads,
+    handOffs,
+    checkScene: async () => undefined,
+    handOffPurge: async (input) => void handOffs.push({ clockId: input.clockId, previousEpoch: input.previousEpoch }),
     async reload(input) {
       reloads.push({ clockId: input.clockId, worldEpoch: input.worldEpoch, ...(input.sceneId === undefined ? {} : { sceneId: input.sceneId }) });
       const sceneAtSim = input.sceneId === undefined ? undefined : (scenes[input.sceneId] ?? startAtSim);
       return { startAtSim, ...(sceneAtSim === undefined ? {} : { sceneAtSim }) };
     },
-    purgeMemory: async () => undefined,
   };
 }
 
@@ -135,7 +140,6 @@ export interface MemoryConsolePorts extends ConsolePorts {
   readonly queued: ConsoleQueueEvent[];
   readonly envelopes: unknown[];
   readonly runtimeStore: MemoryRuntimeStore;
-  readonly evalRunPointers: Map<"Q" | "P", EvalRunRef>;
   readonly read: string[];
   /** What `InboundWhatsApp` does with each envelope (recorded only, by default). */
   onInbound: ((event: unknown) => Promise<unknown>) | undefined;
@@ -163,7 +167,6 @@ export function memoryConsolePorts(options: MemoryPortsOptions): MemoryConsolePo
   const queued: ConsoleQueueEvent[] = [];
   const envelopes: unknown[] = [];
   const read: string[] = [];
-  const evalRunPointers = new Map<"Q" | "P", EvalRunRef>();
   let sequence = 0;
   const dispatch: DispatchControlClient = { send: async () => ({ kind: "OK", status: 202 }) } as unknown as DispatchControlClient;
   const ports: MemoryConsolePorts = {
@@ -197,12 +200,11 @@ export function memoryConsolePorts(options: MemoryPortsOptions): MemoryConsolePo
     costCaps: { store: runtimeStore, globalCaps: () => options.globalCaps ?? { turnsPerDay: 1_000, validationsPerDay: 1_000, transcribeSecondsPerDay: 36_000 }, kill, realClock },
     kill,
     stageTransports: () => ports.transports,
-    evalRuns: { latest: async (kind) => evalRunPointers.get(kind) },
+    evalRuns: tableEvalRuns(options.client),
     newId: () => `01K7SIM${String(++sequence).padStart(19, "0")}`,
     queued,
     envelopes,
     runtimeStore,
-    evalRunPointers,
     read,
     onInbound: options.inbound,
     transports: ["simulated"],

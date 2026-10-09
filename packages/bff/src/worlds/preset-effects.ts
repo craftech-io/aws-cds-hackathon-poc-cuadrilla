@@ -1,37 +1,40 @@
-// The `case` preset through the real case handlers (docs/tool-catalog.md, `world.create`): `open_case`
-// with `caller QA` and a summary built by code, `advance_ladder` on the rung's timeout until the case is
-// on the rung the preset names, and the take of that rung's supervisor for `TAKEN`. Every message of the
-// ladder (`caso_escalado`, `caso_reasignado`, the zone chief's email) leaves through the pipeline of the
-// `CaseDeps` given, with the contact policy deciding, exactly as in a run of the product.
-import { ToolError } from "@cuadrilla/shared";
-import { advanceLadder, personOfCurrentRung, rungIndex } from "../cases/ladder";
-import { openCase } from "../cases/open";
+// The `case` preset's effects (docs/tool-catalog.md, `world.create`; worlds/presets.ts `PresetEffects`),
+// the real `open_case` and `advance_ladder` with `caller QA` (cases/preset.ts), two ways:
+//
+//   casePresetEffects    in process, over `CaseDeps` with an outbound pipeline (`seed:load`, the tests)
+//   queuedCasePresetEffects  a `CASE_PRESET` event on the installer's FIFO group (ADR-0017): a Lambda
+//                        without the pipeline (the `Bff`, the `QaDriver`) hands it to the `InstallerWorker`,
+//                        which holds it; the ladder's templates go through the pipeline there. The event
+//                        marks the world busy until the worker settles it, and its id is the order's and
+//                        the epoch's, so a retried load is the same event.
+import { openPresetCase } from "../cases/preset";
 import type { CaseDeps } from "../cases/ports";
-import { takeCase } from "../cases/take";
-import { esMX } from "../copy/es-MX";
+import { consoleEventId } from "../services/case-console/queue";
+import type { InstallerEventSink } from "../worker/ports";
 import type { PresetEffects } from "./presets";
 
-/** Rungs a preset climbs at most (PRIMARY → SECONDARY → ZONE_CHIEF). */
-const MAX_CLIMB = 3;
-
 export function casePresetEffects(deps: CaseDeps): PresetEffects {
+  return { openCase: (input) => openPresetCase(deps, input) };
+}
+
+export function queuedCasePresetEffects(sink: InstallerEventSink): PresetEffects {
   return {
     async openCase(input) {
-      const opened = await openCase(deps, { workOrderId: input.workOrderId, reason: input.reason, summary: esMX.caseReason({ reason: input.reason }), atSim: input.atSim, actor: "QA" });
-      let caseItem = opened.caseItem;
-      for (let climb = 0; climb < MAX_CLIMB && rungIndex(caseItem.rung) < rungIndex(input.rung); climb += 1) {
-        const moved = await advanceLadder(deps, caseItem.caseId, { kind: "TIMEOUT", rungVersion: caseItem.rungVersion, firedBy: "MANUAL" }, input.atSim);
-        if (moved.status !== "MOVED" || moved.caseItem.rung === caseItem.rung) break;
-        caseItem = moved.caseItem;
-      }
-      if (caseItem.rung !== input.rung) throw new ToolError("CONFLICT", `the case stopped at ${caseItem.rung}, not ${input.rung}`, "PRESET_CASE_RUNG");
-      if (input.status === "TAKEN") {
-        const supervisorId = personOfCurrentRung(caseItem);
-        if (supervisorId === undefined) throw new ToolError("INVALID", "only a supervisor's rung is taken", "PRESET_CASE_TAKE");
-        const taken = await takeCase(deps, { caseId: caseItem.caseId, actor: { via: "WHATSAPP", supervisorId }, atSim: input.atSim });
-        if (taken.outcome !== "TAKEN") throw new ToolError("CONFLICT", `the case could not be taken (${taken.outcome})`, "PRESET_CASE_TAKE");
-      }
-      return { caseId: caseItem.caseId };
+      const { order } = input;
+      await sink.enqueue({
+        type: "CASE_PRESET",
+        eventId: consoleEventId("case-preset", order.clockId, order.worldEpoch, order.workOrderId, input.reason, input.rung, input.status),
+        clockId: order.clockId,
+        ispId: order.ispId,
+        installerId: order.installerId,
+        workOrderId: order.workOrderId,
+        worldEpoch: order.worldEpoch,
+        reason: input.reason,
+        rung: input.rung,
+        status: input.status,
+        atSim: input.atSim,
+      });
+      return {};
     },
   };
 }

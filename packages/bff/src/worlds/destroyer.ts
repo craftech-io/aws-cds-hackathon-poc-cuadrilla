@@ -3,9 +3,11 @@
 // (leads/deletion.ts `GenerationDestroyer`, ADR-0025 §6): the demo's tables through the process-wide
 // connector, the guest template of the `Seed` bucket (the partitions of the world, `WorldTemplates`
 // link), the phone hashes of its people (`SessionTokenKey`), the `guest/` objects of `Media` and
-// `Evidence`, and the Memory of its installers: the first pass of every epoch here, before the items go
-// (so the actors and sessions are still known); whatever the strategies extract later belongs to a
-// generation that no longer exists, and `WorldJanitor` purges it at night. Built once per container.
+// `Evidence`, and the Memory of its installers: one pass over the current epoch here, before the items go
+// (so the actors and sessions are still known), within a real-time budget the synchronous caller can wait
+// for (every earlier epoch was purged by its reset or jump); whatever is left, or what the strategies
+// extract later, belongs to a generation that no longer exists, and `WorldJanitor` purges it at night.
+// Built once per container.
 import { connector, tableClient } from "../connector/index";
 import { phoneHash } from "../lib/crypto";
 import { createLogger } from "../lib/log";
@@ -20,21 +22,18 @@ import { GUEST_WORLD_START_SIM, readTemplate } from "./template";
 /** The simulated start day of every guest world (its orders and day sessions are around it). */
 const START_DATE = GUEST_WORLD_START_SIM.slice(0, 10);
 
-let destroyer: ReturnType<typeof signupGenerationDestroyer> | undefined;
+/** What the deletion waits for the Memory at most: the `Bff` invokes it synchronously (28 s). */
+export const DELETION_MEMORY_BUDGET_MS = 10_000;
 
-/** First pass of the Memory purge of every epoch of a generation, from its installers and orders. */
-async function purgeGenerationMemory(clockId: string, epochs: readonly number[]): Promise<void> {
+let destroyer: ReturnType<typeof signupGenerationDestroyer> | undefined;
+const log = createLogger({ bindings: { component: "guest-account-deletion" } });
+
+/** One pass of the Memory purge of the generation's current epoch, from its installers and orders, within the budget. */
+async function purgeGenerationMemory(clockId: string, epoch: number): Promise<void> {
   const data = connector();
-  const memory = agentCoreMemoryAdmin();
-  const ispId = clockId.slice("GUEST#".length);
-  const runtimeSessionKey = subkey("runtime-session");
-  const log = createLogger({ bindings: { component: "guest-account-deletion" } });
-  for (const epoch of epochs) {
-    if (epoch < 1) continue;
-    const scope = await scopeOfWorld(data, { clockId, ispId, epoch, startDate: START_DATE });
-    const { deleted } = await purgeFirstPass({ memory, now: () => new Date() }, purgeTargetOf(scope, runtimeSessionKey));
-    log.info("worlds.generation_memory_purged", { epoch, deleted });
-  }
+  const scope = await scopeOfWorld(data, { clockId, ispId: clockId.slice("GUEST#".length), epoch, startDate: START_DATE });
+  const { deleted } = await purgeFirstPass({ memory: agentCoreMemoryAdmin(), now: () => new Date() }, purgeTargetOf(scope, subkey("runtime-session")), DELETION_MEMORY_BUDGET_MS);
+  log.info("worlds.generation_memory_purged", { epoch, deleted });
 }
 
 export function defaultSignupGenerationDestroyer(): ReturnType<typeof signupGenerationDestroyer> {
@@ -46,6 +45,7 @@ export function defaultSignupGenerationDestroyer(): ReturnType<typeof signupGene
     phoneHash: (phone) => phoneHash(subkey("phone-hash"), phone),
     objects: s3ObjectStore(),
     purgeMemory: purgeGenerationMemory,
+    log,
     now: () => new Date(),
   });
   return destroyer;

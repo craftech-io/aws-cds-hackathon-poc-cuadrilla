@@ -84,6 +84,9 @@ describe("QaDriver data access [W3 review B1/B4]", () => {
       ["AuditLog", "ISP#isp-demo#2026-10", false],
       ["AuditLog", "ISP#isp-guest-test#2026-10", true],
       ["CuadrillaMetrics", "ISP#isp-demo", false],
+      ["CuadrillaMetrics", "EVALRUN#LATEST", true],
+      ["Runtime", "WORLDSESSION#GUEST#isp-guest-test", true],
+      ["Runtime", "WORLDSESSION#GUEST#isp-guest-07", false],
       ["People", "PERSON#inst-rogelio", false],
       ["People", "PERSON#inst-rogelio-g03", false],
       ["People", "CUST#cust-10421", false],
@@ -107,7 +110,9 @@ describe("QaDriver data access [W3 review B1/B4]", () => {
     const objectGrants = expectedGrants("QaDriver").filter((grant) => grant.actions.some((action) => action.startsWith("s3:")));
     const on = (action: string) => objectGrants.filter((grant) => grant.actions.includes(action)).flatMap((grant) => grant.resources);
     expect(on("s3:DeleteObject").sort()).toEqual(["{Evidence}/eval/*", "{Evidence}/qa/*", "{Media}/eval/*", "{Media}/qa/*"]);
-    for (const resource of on("s3:PutObject")) expect(resource).toMatch(/^\{Media\}\/(qa\/\*|eval\/\*|sim\/\*|guest\/[0-9a-f]{16}-e\*)$/);
+    for (const resource of on("s3:PutObject")) expect(resource).toMatch(/^\{Media\}\/(qa\/\*|eval\/\*|sim\/\*|guest\/[0-9a-f]{16}-e\*)$|^\{Evidence\}\/(photos\/wo-[78]\*|guest\/[0-9a-f]{16}-e\*\/photos\/\*)$/);
+    // [W4 review B2] the seeded evidence of its presets: only QA and evaluation orders and the test guest's prefix.
+    expect(on("s3:PutObject").filter((resource) => resource.startsWith("{Evidence}"))).toEqual(["{Evidence}/photos/wo-7*", "{Evidence}/photos/wo-8*", `{Evidence}/${guestTestObjectPrefix()}/photos/*`]);
     for (const action of ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]) expect(on(action), action).not.toEqual(expect.arrayContaining(["{Media}/*", "{Media}/wa/*", "{Evidence}/*"]));
     expect(like(guestTestObjectPrefix(), `guest/${mediaKeySegment("GUEST#isp-guest-test", 3)}`)).toBe(true);
     expect(like(guestTestObjectPrefix(), `guest/${mediaKeySegment("GUEST#isp-guest-07", 3)}`)).toBe(false);

@@ -9,6 +9,7 @@ export default defineConfig({
       "infra/**/*.test.ts",
       "scripts/**/*.test.ts",
       "tests/flows/**/*.test.ts",
+      "tests/ui-server/**/*.test.ts",
     ],
     exclude: ["**/node_modules/**", "**/dist/**", "**/.sst/**", "packages/web/e2e/**"],
     passWithNoTests: true,

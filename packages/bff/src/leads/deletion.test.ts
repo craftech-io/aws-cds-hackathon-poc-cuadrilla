@@ -3,6 +3,9 @@ import { deleteGuestAccount } from "./deletion";
 import { EMAIL, GENERATION, SUB, type World, otherAccount, signupGuest, world } from "./deletion-testing";
 import { CONFIRMED_ACCOUNTS, guestAccountKey, signupKeyKey, signupSubKey } from "./guest-accounts";
 import { T0, confirmedLead, hashOf, signupUserId, startLead, username } from "./testing";
+import { buildWorld } from "../worlds/factory";
+import { signupGenerationDestroyer } from "../worlds/guest-lifecycle";
+import { worldHarness } from "../worlds/testing";
 
 const at = T0.toISOString();
 
@@ -26,6 +29,19 @@ describe("GuestAccountDeletion [FL-118]", () => {
     expect(await w.data.get("Runtime", guestAccountKey(signupUserId(1)))).toBeUndefined();
     expect(await w.data.get("Runtime", signupSubKey(SUB))).toBeUndefined();
     expect((await w.data.get("Runtime", signupKeyKey(lead?.abuseHash ?? "")))?.[CONFIRMED_ACCOUNTS]).toBe(0);
+  });
+
+  it("[FL-118] [W4 review B4] a Memory purge that fails never keeps the Cognito user, the lead or the world's items", async () => {
+    const worlds = worldHarness();
+    await buildWorld(worlds.factoryDeps(), { ispId: GENERATION.ispId, origin: "SIGNUP", ownerUserId: signupUserId(1) });
+    const failing = signupGenerationDestroyer({ ...worlds.destroyDeps(), purgeMemory: async () => Promise.reject(new Error("ThrottlingException")), log: w.deps.log });
+    await signupGuest(w, { user: 1 });
+    const result = await deleteGuestAccount({ ...w.deps, worlds: failing }, { userId: signupUserId(1) });
+    expect(result).toMatchObject({ outcome: "DELETED" });
+    expect(w.cognitoCalls).toEqual([username(1)]);
+    expect(await w.store.get(hashOf(EMAIL))).toBeUndefined();
+    expect(await worlds.connector.runtime.getClock(GENERATION.clockId)).toBeUndefined();
+    expect(w.lines.some((line) => line.includes("MemoryPurgeIncomplete"))).toBe(true);
   });
 
   it("[FL-114] an account opened over the person's limit (PERSON_LIMIT) never counted: its deletion gives nothing back", async () => {

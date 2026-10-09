@@ -320,13 +320,13 @@ describe("timers: EventBridge Scheduler (ADR-0004)", () => {
 });
 
 describe("WorldJanitor", () => {
-  it("15 minutes; WORLDS: its tables, Seed, Media and the templates by name, guest certificates, the mocks' tables fenced to guest worlds, timers and Memory", async () => {
+  it("15 minutes; WORLDS: its tables, Seed, Media and the templates by name, the certificates of the worlds it renders, the mocks' tables fenced to guest worlds, timers and Memory", async () => {
     const janitor = await fnArgs("WorldJanitor");
     expect(janitor).toMatchObject({ handler: "packages/bff/src/handlers/world-janitor.handler", timeout: "900 seconds", memory: "512 MB" });
     expect(linkNames(janitor.link)).toEqual([...stored("WorldJanitor"), ...["Seed", "Media", "WorldTemplates", "Scheduler", "SessionTokenKey", "SeedOverrides", "BrandConfig", "Memory", "Dispatch", "Network"]]);
     expect(janitor.permissions).toEqual([
       ...storageStatements("WorldJanitor"),
-      ...[{ actions: ["s3:PutObject"], resources: ["Evidence.arn/guest/*/certificates/*"] }, { actions: ["s3:GetObject"], resources: ["Seed.arn/*"] }],
+      ...[{ actions: ["s3:PutObject"], resources: ["Evidence.arn/certificates/*", "Evidence.arn/guest/*/certificates/*"] }, { actions: ["s3:GetObject"], resources: ["Seed.arn/*"] }],
       ...[{ actions: ["s3:PutObject"], resources: ["Media.arn/sim/*"] }, ...mockTableStatement("WorldJanitor")],
     ]);
     expect(JSON.stringify(mockTableStatement("WorldJanitor"))).toContain("isp-guest-");

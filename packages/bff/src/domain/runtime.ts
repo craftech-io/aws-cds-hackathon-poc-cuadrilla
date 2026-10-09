@@ -6,7 +6,6 @@ import { z } from "zod";
 import {
   ClockId,
   ClockMode,
-  ConsoleUserId,
   InstallerId,
   IsoInstant,
   IspId,
@@ -33,6 +32,7 @@ export const RUNTIME_TTL_SECONDS = {
   phoneLease: 48 * 60 * 60,
   joinCode: 30 * 60,
   upload: 10 * 60,
+  worldSession: 24 * 60 * 60,
 } as const;
 
 /** A pending email that got no SES event within this real time stops keeping its world busy. */
@@ -97,8 +97,6 @@ export const Nonce = defineEntity("Nonce", {
 export type Nonce = z.infer<typeof Nonce>;
 
 /** Who last opened the world from the console (one session per world, with a notice). */
-export const ClockSession = z.object({ userId: ConsoleUserId, sessionId: z.string().min(1).max(128), atReal: IsoInstant });
-export type ClockSession = z.infer<typeof ClockSession>;
 
 /**
  * The demo clock of a world (ADR-0010). `PAUSED`: `simNow = pausedSimNow`. `RUNNING`:
@@ -114,7 +112,6 @@ export const Clock = defineEntity("Clock", {
   worldEpoch: z.int().min(0),
   template: z.string().regex(/^[a-z0-9-]{1,32}$/).optional(),
   runningUntilReal: IsoInstant.optional(),
-  lastSession: ClockSession.optional(),
   settings: JsonObject.optional(),
 });
 export type Clock = z.infer<typeof Clock>;
