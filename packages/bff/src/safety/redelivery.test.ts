@@ -4,6 +4,9 @@
 // the simulated transport. The first run dies where a Lambda timeout or an out-of-memory would leave it
 // (a promise that never settles), and the second run is the redelivery: the installer gets §SEG-01, the
 // supervisor on duty `alerta_seguridad` and the zone chief the email, with one SAFETY_DETECTED row.
+// [W3R3] The ladder is not one write either: the run also dies after PRIMARY's entry while the zone
+// chief's email is in flight, and after a skipped PRIMARY while the SECONDARY is being alerted; the
+// redelivery finishes each from what the case shows (cases/resume.ts), every piece exactly once.
 import { beforeEach, describe, expect, it } from "vitest";
 import { CLOCK, ISP } from "../connector/testing";
 import type { Connector } from "../connector/ports";
@@ -27,12 +30,15 @@ function report(): SafetyReport {
 }
 
 let kit: CaseKit;
-/** While true, the transport never answers: the invocation dies inside it, after the message was written QUEUED. */
-let transportLost = false;
+/** The sends the transport never answers: the invocation dies inside it, after the message was written QUEUED. */
+let transportLost: (request: SendRequest) => boolean = () => false;
+/** While true, SES never answers the zone chief's email. */
+let emailLost = false;
 
 function wiring(connector: Connector = kit.world.connector) {
-  const pipeline = pipelineDeps(kit.world, { transport: (request: SendRequest, simulated) => (transportLost ? NEVER : simulated(request)) });
-  const outbound = createCaseOutbound({ ...pipeline.deps, connector }, pipeline.log);
+  const pipeline = pipelineDeps(kit.world, { transport: (request: SendRequest, simulated) => (transportLost(request) ? NEVER : simulated(request)) });
+  const email: typeof pipeline.deps.email = { send: (request) => (emailLost ? NEVER : pipeline.deps.email.send(request)) };
+  const outbound = createCaseOutbound({ ...pipeline.deps, connector, email }, pipeline.log);
   const deps: CaseDeps = { ...kit.deps, connector, outbound };
   return { deps, pipeline };
 }
@@ -56,21 +62,41 @@ async function expectFullResponse(emails: ReadonlyArray<{ readonly kind: string;
   expect(caseItem?.ladder.map((entry) => `${entry.rung} ${entry.outcome}`)).toEqual(["PRIMARY NOTIFIED"]);
 }
 
+async function auditCount(action: string): Promise<number> {
+  return (await kit.world.connector.audit.listByWorkOrder(ORDER)).filter((row) => row.action === action).length;
+}
+
+async function ladderOfCase(): Promise<string[]> {
+  const [caseItem] = await kit.world.connector.cases.listCasesOfWorkOrder(ORDER);
+  return caseItem?.ladder.map((entry) => `${entry.rung} ${entry.outcome}`) ?? [];
+}
+
+async function waitsOfCase(): Promise<string[]> {
+  const [caseItem] = await kit.world.connector.cases.listCasesOfWorkOrder(ORDER);
+  if (caseItem === undefined) return [];
+  return (await kit.world.connector.timers.listTimers({ kind: "CASE", id: caseItem.caseId })).filter((timer) => timer.kind === "CASE_TIMEOUT").map((timer) => timer.timerId);
+}
+
+function zoneChiefEmails(...runs: ReadonlyArray<{ readonly pipeline: { readonly emails: ReadonlyArray<{ readonly kind: string }> } }>): number {
+  return runs.flatMap((run) => run.pipeline.emails).filter((email) => email.kind === "ZONE_CHIEF_ALERT").length;
+}
+
 beforeEach(async () => {
   kit = await caseKit();
-  transportLost = false;
+  transportLost = () => false;
+  emailLost = false;
   await inbound(kit.world, "inst-rogelio", mx("2026-10-13 15:10"), { messageId: "wamid.SIM.safety.01", text: TEXT });
 });
 
 describe("[W3R1 B2] a lost invocation in the safety response, then the redelivery", () => {
   it("the transport never answered: the QUEUED instruction and alert go out again, the zone chief is emailed once, one audit row", async () => {
-    transportLost = true;
+    transportLost = () => true;
     const lost = wiring();
     void handleSafety(lost.deps, report());
     await settle();
     expect((await outbox("inst-rogelio", "SAFETY_INSTRUCTION")).map((message) => message.status)).toEqual(["QUEUED"]);
     expect((await outbox("sup-adriana", "SAFETY_ALERT")).map((message) => message.status)).toEqual(["QUEUED"]);
-    transportLost = false;
+    transportLost = () => false;
     const redelivery = wiring();
     const outcome = await handleSafety(redelivery.deps, report());
     expect(outcome).toMatchObject({ instructionSent: true, existingCase: true, workOrderId: ORDER });
@@ -104,5 +130,67 @@ describe("[W3R1 B2] a lost invocation in the safety response, then the redeliver
     await handleSafety(again.deps, report());
     expect(again.pipeline.sends).toEqual([]);
     await expectFullResponse([...lost.pipeline.emails, ...redelivery.pipeline.emails]);
+  });
+});
+
+describe("[W3R3] a lost invocation in the middle of the safety ladder, then the redelivery", () => {
+  it("the zone chief's email never answered after PRIMARY was notified: the redelivery emails and audits it once", async () => {
+    emailLost = true;
+    const lost = wiring();
+    void handleSafety(lost.deps, report());
+    await settle();
+    expect(await ladderOfCase()).toEqual(["PRIMARY NOTIFIED"]);
+    expect(await auditCount("SAFETY_ZONE_CHIEF_ALERT")).toBe(0);
+    emailLost = false;
+    const redelivery = wiring();
+    expect(await handleSafety(redelivery.deps, report())).toMatchObject({ instructionSent: true, existingCase: true });
+    await expectFullResponse([...lost.pipeline.emails, ...redelivery.pipeline.emails]);
+    expect(zoneChiefEmails(lost, redelivery)).toBe(1);
+    expect(await auditCount("SAFETY_ZONE_CHIEF_ALERT")).toBe(1);
+    expect(await auditCount("SAFETY_ZONE_CHIEF_SKIPPED")).toBe(0);
+    expect(await auditCount("CASE_NOTIFIED")).toBe(1);
+    expect(await waitsOfCase()).toHaveLength(1);
+    expect(await outbox("inst-rogelio", "CASE_NOTICE")).toHaveLength(1);
+    const again = wiring();
+    await handleSafety(again.deps, report());
+    expect(again.pipeline.sends).toEqual([]);
+    expect(zoneChiefEmails(again)).toBe(0);
+    expect(await auditCount("SAFETY_ZONE_CHIEF_ALERT")).toBe(1);
+    expect(await auditCount("CASE_NOTIFIED")).toBe(1);
+  });
+
+  it.each([
+    ["before the alert was written", "PERSON"],
+    ["inside the transport, the alert written QUEUED", "TRANSPORT"],
+  ] as const)("PRIMARY was skipped and the run died sending to the SECONDARY %s: the redelivery climbs, alerting once", async (_where, cut) => {
+    await kit.world.connector.people.revokeConsent("sup-adriana", { actor: "PERSON:sup-adriana", atSim: mx("2026-10-13 07:10") });
+    const { connector } = kit.world;
+    let hang = true;
+    const people: Connector["people"] = { ...connector.people, getPerson: (personId) => (cut === "PERSON" && hang && personId === "sup-hector" ? NEVER : connector.people.getPerson(personId)) };
+    transportLost = (request) => cut === "TRANSPORT" && /-SECONDARY-/.test(request.message.messageId);
+    const lost = wiring({ ...connector, people });
+    void handleSafety(lost.deps, report());
+    await settle();
+    expect(await ladderOfCase()).toEqual(["PRIMARY SKIPPED"]);
+    expect((await outbox("sup-hector", "SAFETY_ALERT")).map((message) => message.status)).toEqual(cut === "PERSON" ? [] : ["QUEUED"]);
+    hang = false;
+    transportLost = () => false;
+    const redelivery = wiring();
+    expect(await handleSafety(redelivery.deps, report())).toMatchObject({ instructionSent: true, existingCase: true });
+    expect(await ladderOfCase()).toEqual(["PRIMARY SKIPPED", "SECONDARY NOTIFIED"]);
+    expect((await outbox("sup-hector", "SAFETY_ALERT")).filter((message) => message.status === "SENT")).toHaveLength(1);
+    expect((await outbox("sup-adriana", "SAFETY_ALERT")).map((message) => message.status)).toEqual(["DENIED"]);
+    expect(zoneChiefEmails(lost, redelivery)).toBe(1);
+    expect(await auditCount("CASE_SKIPPED")).toBe(1);
+    expect(await auditCount("CASE_NOTIFIED")).toBe(1);
+    expect(await auditCount("SAFETY_ZONE_CHIEF_ALERT")).toBe(1);
+    expect(await waitsOfCase()).toEqual([expect.stringMatching(/-SECONDARY$/)]);
+    expect(await outbox("inst-rogelio", "CASE_NOTICE")).toHaveLength(1);
+    expect((await outbox("inst-rogelio", "SAFETY_INSTRUCTION")).filter((message) => message.status === "SENT")).toHaveLength(1);
+    const again = wiring();
+    await handleSafety(again.deps, report());
+    expect(again.pipeline.sends).toEqual([]);
+    expect(await auditCount("CASE_NOTIFIED")).toBe(1);
+    expect(await waitsOfCase()).toHaveLength(1);
   });
 });

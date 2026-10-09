@@ -53,9 +53,10 @@ export const ONCE = { safety: "SAFETY", physicalAction: "PHYSICAL_ACTION" } as c
  * Runs the work unless a previous delivery of the event finished it, and marks it only AFTER it ran: a
  * Lambda that dies inside it (timeout, OOM) leaves no mark, so the redelivery runs it again and safety
  * never stops (ADR-0016). The work is idempotent on its own: the safety instruction has a deterministic
- * message id, the case opens once per order and reason, its audit row is written once per message
- * (safety/handler.ts) and the physical action's audit once per event; only a repeated report to the
- * simulated orchestrator remains possible, and only after a lost invocation.
+ * message id, the case opens once per order and reason and a second open finishes whatever the lost
+ * one left undone of its ladder and of the zone chief's email (cases/resume.ts), its audit row is
+ * written once per message (safety/handler.ts) and the physical action's audit once per event; only a
+ * repeated report to the simulated orchestrator remains possible, and only after a lost invocation.
  */
 async function untilDone(deps: InboundDeps, mark: string, eventId: string, run: () => Promise<void>): Promise<void> {
   const { runtime } = deps.turn.data;

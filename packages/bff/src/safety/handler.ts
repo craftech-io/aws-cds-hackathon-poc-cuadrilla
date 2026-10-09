@@ -7,8 +7,9 @@
 //      report of a message the lexicon already caught does not repeat it; sent again only when a lost
 //      invocation left it unconfirmed (a repeated instruction is acceptable, a missing one is not)
 //   2. in parallel, `open_case(SAFETY)`: the `alerta_seguridad` template to the supervisor on duty and
-//      the `ZONE_CHIEF_ALERT` email at the same time (`SAFE-PARALLEL`, cases/ladder.ts); a case a lost
-//      invocation created without running its ladder gets it on the redelivery (cases/open.ts)
+//      the `ZONE_CHIEF_ALERT` email at the same time (`SAFE-PARALLEL`, cases/ladder.ts); whatever a lost
+//      invocation left undone of that case (its ladder, the zone chief's email, a skipped rung's climb,
+//      a rung's wait or notice) is finished on the redelivery (cases/resume.ts)
 //   3. the order goes `onHoldSafety` until a supervisor closes the case (the agent guides no work on it)
 //
 // The model never writes the instruction. An installer with no order in progress still gets it; the

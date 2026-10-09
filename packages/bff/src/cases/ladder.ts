@@ -8,6 +8,7 @@
 //
 // SAFETY cases alert the zone chief by email from the start, in parallel with the first supervisor;
 // CERTIFICATE_UNDELIVERED cases live only in the console's inbox (no WhatsApp, `LAD-CONSOLE-ONLY`).
+// None of this is a single write: what a lost invocation left undone is finished by resume.ts.
 import { ConnectorError, Rung, type TimerFiredBy } from "@cuadrilla/shared";
 import { esMX } from "../copy/es-MX";
 import type { Case, LadderEntry } from "../domain/cases";
@@ -32,7 +33,7 @@ export interface LadderResult {
 
 const RUNGS = Rung.options;
 
-function rungIndex(rung: Rung): number {
+export function rungIndex(rung: Rung): number {
   return RUNGS.indexOf(rung);
 }
 
@@ -43,7 +44,7 @@ export function personOfCurrentRung(caseItem: Case): string | undefined {
   return undefined;
 }
 
-async function audit(deps: CaseDeps, caseItem: Case, atSim: string, action: string, ruleIds: string[], detail: Record<string, unknown> = {}, decision: "ACTION" | "DENY" = "ACTION"): Promise<void> {
+export async function audit(deps: CaseDeps, caseItem: Case, atSim: string, action: string, ruleIds: string[], detail: Record<string, unknown> = {}, decision: "ACTION" | "DENY" = "ACTION"): Promise<void> {
   await deps.connector.audit.append({
     ispId: caseItem.ispId,
     clockId: caseItem.clockId,
@@ -78,19 +79,52 @@ async function append(deps: CaseDeps, caseItem: Case, entry: LadderEntry): Promi
   return deps.connector.cases.advanceLadder(caseItem.caseId, entry, { rungVersion: caseItem.rungVersion, status: ["OPEN"] }, { rung: entry.rung });
 }
 
-function installerNoticeOf(caseItem: Case, rung: Rung, attempt: Extract<RungAttempt, { outcome: "NOTIFIED" }>, reassigned: boolean): string {
+function installerNoticeOf(caseItem: Case, rung: Rung, firstName: string, reassigned: boolean): string {
   if (rung === "ZONE_CHIEF") return esMX.caseToZoneChief;
   if (caseItem.kind === "SAFETY" && !reassigned) return esMX.safetyCaseOpened;
-  return reassigned ? esMX.caseReassigned(attempt.firstName) : esMX.caseOpened(attempt.firstName);
+  return reassigned ? esMX.caseReassigned(firstName) : esMX.caseOpened(firstName);
+}
+
+/** Tag of the installer's notice of a rung: the rung and the `rungVersion` its entry left. */
+export function rungNoticeTag(caseItem: Case, rung: Rung): string {
+  return `${rung}-${caseItem.rungVersion}`;
+}
+
+/** A rung was notified before this entry and did not answer: the backup gets `caso_reasignado`. */
+export function reassignedBefore(entries: readonly LadderEntry[]): boolean {
+  return entries.some((entry) => entry.outcome === "NOTIFIED" && entry.rung !== "ZONE_CHIEF");
+}
+
+/** The audit row of a notified rung (`LAD-NOTIFY`, `LAD-PLANB`, `LAD-ZONE-CHIEF`). */
+export async function auditNotified(deps: CaseDeps, caseItem: Case, rung: Rung, channel: LadderEntry["channel"], atSim: string): Promise<void> {
+  const ruleIds = rung === "ZONE_CHIEF" ? ["LAD-ZONE-CHIEF"] : channel === "INTERACTIVE" ? ["LAD-NOTIFY", "LAD-PLANB"] : ["LAD-NOTIFY"];
+  await audit(deps, caseItem, atSim, "CASE_NOTIFIED", ruleIds, { rung, ...(channel === undefined ? {} : { channel }) });
+}
+
+/** The wait of a notified supervisor's rung, under the `rungVersion` its entry left. */
+export async function armWaitOf(deps: CaseDeps, caseItem: Case, rung: Rung, notifiedAtSim: string): Promise<void> {
+  await armRungTimeout(deps, { caseId: caseItem.caseId, clockId: caseItem.clockId, ispId: caseItem.ispId, rung, rungVersion: caseItem.rungVersion, notifiedAtSim });
+}
+
+/** Tells the installer who has the case now. */
+export async function noticeOfRung(deps: CaseDeps, caseItem: Case, rung: Rung, firstName: string, reassigned: boolean, atSim: string): Promise<void> {
+  await noticeInstaller(deps, caseItem, installerNoticeOf(caseItem, rung, firstName, reassigned), atSim, rungNoticeTag(caseItem, rung));
+}
+
+/** `SAFE-PARALLEL`: the zone chief's safety email of a SAFETY case, and its audit row once it settled. */
+export async function alertZoneChiefOfHazard(deps: CaseDeps, ctx: Omit<RungContext, "reassigned">): Promise<RungAttempt> {
+  const alert = await alertZoneChief(deps, ctx, "SAFETY");
+  await audit(deps, ctx.caseItem, ctx.atSim, alert.outcome === "NOTIFIED" ? "SAFETY_ZONE_CHIEF_ALERT" : "SAFETY_ZONE_CHIEF_SKIPPED", ["SAFE-PARALLEL"], alert.outcome === "NOTIFIED" ? {} : { reason: alert.reason });
+  return alert;
 }
 
 /** Notifies rungs from `from` on until one is reached; skipped rungs stay on the ladder with their reason. */
-async function climb(deps: CaseDeps, start: Case, from: number, atSim: string): Promise<LadderResult> {
+export async function climb(deps: CaseDeps, start: Case, from: number, atSim: string): Promise<LadderResult> {
   let caseItem = start;
   const base = await rungContextBase(deps, caseItem);
   for (let index = from; index < RUNGS.length; index += 1) {
     const rung = RUNGS[index] as Rung;
-    const reassigned = caseItem.ladder.some((entry) => entry.outcome === "NOTIFIED" && entry.rung !== "ZONE_CHIEF");
+    const reassigned = reassignedBefore(caseItem.ladder);
     const ctx: RungContext = { caseItem, ...base, atSim, step: caseItem.ladder.length, reassigned };
     const attempt = await notifyRung(deps, ctx, rung);
     caseItem = await append(deps, caseItem, entryOf(rung, attempt, atSim));
@@ -98,10 +132,9 @@ async function climb(deps: CaseDeps, start: Case, from: number, atSim: string): 
       await audit(deps, caseItem, atSim, "CASE_SKIPPED", ["LAD-SKIP"], { rung, reason: attempt.reason, ...(attempt.detail === undefined ? {} : { policy: attempt.detail }) });
       continue;
     }
-    const planB = attempt.channel === "INTERACTIVE";
-    await audit(deps, caseItem, atSim, "CASE_NOTIFIED", rung === "ZONE_CHIEF" ? ["LAD-ZONE-CHIEF"] : planB ? ["LAD-NOTIFY", "LAD-PLANB"] : ["LAD-NOTIFY"], { rung, channel: attempt.channel });
-    if (rung !== "ZONE_CHIEF") await armRungTimeout(deps, { caseId: caseItem.caseId, clockId: caseItem.clockId, ispId: caseItem.ispId, rung, rungVersion: caseItem.rungVersion, notifiedAtSim: atSim });
-    await noticeInstaller(deps, caseItem, installerNoticeOf(caseItem, rung, attempt, reassigned), atSim, `${rung}-${caseItem.rungVersion}`);
+    await auditNotified(deps, caseItem, rung, attempt.channel, atSim);
+    if (rung !== "ZONE_CHIEF") await armWaitOf(deps, caseItem, rung, atSim);
+    await noticeOfRung(deps, caseItem, rung, attempt.firstName, reassigned, atSim);
     return { status: "MOVED", caseItem, notified: { rung, personId: attempt.personId, firstName: attempt.firstName } };
   }
   // Nobody reachable, not even by email: the case waits in the console's inbox.
@@ -115,7 +148,7 @@ async function stale(deps: CaseDeps, caseItem: Case, atSim: string, cause: Ladde
   return { status: "STALE", caseItem };
 }
 
-async function open(deps: CaseDeps, caseItem: Case, atSim: string): Promise<LadderResult> {
+export async function open(deps: CaseDeps, caseItem: Case, atSim: string): Promise<LadderResult> {
   if (caseItem.ladder.length > 0) return { status: "STALE", caseItem };
   if (caseItem.reason === "CERTIFICATE_UNDELIVERED") {
     const moved = await deps.connector.cases.advanceLadder(caseItem.caseId, { rung: "PRIMARY", outcome: "NOTIFIED", channel: "CONSOLE", reason: "CONSOLE_ONLY", atSim }, { rungVersion: caseItem.rungVersion, status: ["OPEN"] });
@@ -125,8 +158,7 @@ async function open(deps: CaseDeps, caseItem: Case, atSim: string): Promise<Ladd
   if (caseItem.kind !== "SAFETY") return climb(deps, caseItem, 0, atSim);
   // Safety: the first supervisor and the zone chief at once, without waiting for any timeout.
   const base = await rungContextBase(deps, caseItem);
-  const [result, alert] = await Promise.all([climb(deps, caseItem, 0, atSim), alertZoneChief(deps, { caseItem, ...base, atSim, step: 0 }, "SAFETY")]);
-  await audit(deps, result.caseItem, atSim, alert.outcome === "NOTIFIED" ? "SAFETY_ZONE_CHIEF_ALERT" : "SAFETY_ZONE_CHIEF_SKIPPED", ["SAFE-PARALLEL"], alert.outcome === "NOTIFIED" ? {} : { reason: alert.reason });
+  const [result] = await Promise.all([climb(deps, caseItem, 0, atSim), alertZoneChiefOfHazard(deps, { caseItem, ...base, atSim, step: 0 })]);
   return result;
 }
 
