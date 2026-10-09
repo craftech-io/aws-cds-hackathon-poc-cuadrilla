@@ -7,7 +7,9 @@ import { AuthError } from "../auth/errors";
 import { type TestContextDeps, createTestIssuer, testContextDeps } from "../auth/testing";
 import { type Connector, createMemoryConnector } from "../connector/index";
 import { signupUserId } from "../leads/testing";
+import { DEMO as DEMO_SPEC, GUEST_07 as GUEST_SPEC } from "../services/people/testing";
 import { type AccountPorts, createAccountRouter, deleteGuestOf, isSignupGuest, lambdaAccountPorts } from "./account";
+import { consoleTestWorld } from "./console-testing";
 import { createCallerFactory, createContextFactory, router } from "./trpc";
 
 const SIGNUP = { ispId: "isp-guest-s261001abcde", userId: signupUserId(1), sub: "sub-signup-0001" };
@@ -107,5 +109,32 @@ describe("the Lambda port of account.deleteGuest [FL-118]", () => {
     lambda.on(InvokeCommand).resolvesOnce({ StatusCode: 200, FunctionError: "Unhandled", Payload: new TextEncoder().encode("{}") as never }).resolvesOnce({ StatusCode: 200, Payload: new TextEncoder().encode('{"outcome":"MAYBE"}') as never });
     await expect(port().deleteGuestAccount({ userId: SIGNUP.userId })).rejects.toMatchObject({ code: "UNAVAILABLE" });
     await expect(port().deleteGuestAccount({ userId: SIGNUP.userId })).rejects.toMatchObject({ code: "UNAVAILABLE" });
+  });
+});
+
+describe("account.session, changePassword and mfa.setup", () => {
+  const GUEST_TEST = { ispId: "isp-guest-test", tag: "-gtest", installerBlock: "0299", supervisorBlock: "0299" };
+
+  it("a guest's world keeps one session: another active session gets the notice and no reset; the first keeps acting", async () => {
+    const t = await consoleTestWorld(GUEST_TEST);
+    const a = t.qa("GUEST", { sessionId: "session-a" });
+    const b = t.qa("GUEST", { sessionId: "session-b" });
+    expect(await a.account.session()).toMatchObject({ role: "GUEST", otherSession: false, canReset: true, canChangePassword: false, canSetupMfa: false, canDeleteAccount: false });
+    expect(await b.account.session()).toMatchObject({ otherSession: true, canReset: false });
+    expect(await a.account.session()).toMatchObject({ otherSession: false, canReset: true });
+    expect((await t.memory.connector.runtime.getClock(t.world.clockId))?.lastSession).toMatchObject({ sessionId: "session-a", userId: "usr-qa-guest" });
+  });
+
+  it("staff change their password and set up TOTP (the console asks first); a guest gets 403", async () => {
+    const demo = await consoleTestWorld(DEMO_SPEC);
+    const staff = await demo.as();
+    expect(await staff.account.session()).toMatchObject({ role: "SUPERVISOR", otherSession: false, canReset: true, canChangePassword: true });
+    expect(await staff.account.changePassword()).toEqual({ allowed: true });
+    expect(await staff.account.mfa.setup()).toEqual({ allowed: true });
+    expect((await demo.world.decisions()).map((row) => row.action)).toEqual(expect.arrayContaining(["PASSWORD_CHANGE_REQUESTED", "MFA_SETUP_REQUESTED"]));
+    const guest = await (await consoleTestWorld(GUEST_SPEC)).as();
+    expect(await reasonOf(guest.account.changePassword())).toEqual({ code: "FORBIDDEN", reason: "GUEST_ACCOUNT" });
+    expect(await reasonOf(guest.account.mfa.setup())).toEqual({ code: "FORBIDDEN", reason: "GUEST_ACCOUNT" });
+    expect((await (await demo.as("OPS", "usr-ops")).account.session()).canReset).toBe(false);
   });
 });

@@ -235,8 +235,9 @@ export const SIGNUP_ROLES = {
       invokeGuestWorlds,
     ],
   },
-  // The world factory, fenced to guest operators in the mocks' tables (WORLDS_LEADING_KEYS).
-  GuestWorlds: { capabilities: ["WORLDS", "WORLD_DATA"] },
+  // The world factory, fenced to guest operators in the mocks' tables (WORLDS_LEADING_KEYS), and the
+  // PDFs of the world's historical certificates (worlds/certificates.ts).
+  GuestWorlds: { capabilities: ["WORLDS", "WORLD_DATA"], grants: [g(["s3:PutObject"], ["{Evidence}/guest/*/certificates/*"])] },
   // Notifies Craftech, deletes the pending users of a confirmed or expired lead, sweeps UNCONFIRMED
   // users daily and hands an expired confirmed lead to the deletion.
   LeadStream: {

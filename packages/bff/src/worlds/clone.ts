@@ -106,14 +106,15 @@ function people(row: Item, input: CloneInput): Item {
   return row.entity === "Person" && phone !== undefined ? { ...row, phoneHash: input.phoneHash(phone) } : row;
 }
 
-function workOrders(row: Item, input: CloneInput, clockId: string): Item {
+/** A `WorkOrders` row of a template in a world: the epoch on orders and evidence, evidence under the world's key. */
+export function stampWorkOrderRow(row: Item, worldEpoch: number, clockId: string): Item {
   switch (row.entity) {
     case "WorkOrder":
-      return { ...row, worldEpoch: input.worldEpoch };
+      return { ...row, worldEpoch };
     case "Evidence": {
       const workOrderId = text(row, "workOrderId") ?? "";
-      const s3Key = evidencePhotoKey(clockId, input.worldEpoch, workOrderId, text(row, "item") ?? "", text(row, "evidenceId") ?? "");
-      return { ...row, worldEpoch: input.worldEpoch, s3Key };
+      const s3Key = evidencePhotoKey(clockId, worldEpoch, workOrderId, text(row, "item") ?? "", text(row, "evidenceId") ?? "");
+      return { ...row, worldEpoch, s3Key };
     }
     case "Certificate":
       return row.sha256 === undefined || row.s3Key === undefined ? { ...row, pdfPending: true } : row;
@@ -125,7 +126,7 @@ function workOrders(row: Item, input: CloneInput, clockId: string): Item {
 function adapt(table: string, row: Item, input: CloneInput, clockId: string): Item {
   if (table === "Isps") return isps(row, input);
   if (table === "People") return people(row, input);
-  if (table === "WorkOrders") return workOrders(row, input, clockId);
+  if (table === "WorkOrders") return stampWorkOrderRow(row, input.worldEpoch, clockId);
   return row;
 }
 

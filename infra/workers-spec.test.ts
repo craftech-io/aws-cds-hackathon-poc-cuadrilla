@@ -117,6 +117,7 @@ async function evaluate(owners: "built" | "stubs") {
   const buckets = Object.fromEntries(BUCKETS.map((name) => [name, rt.once("sst.aws.Bucket", name)]));
   vi.doMock("./storage-tables", () => ({ ...tables, tables }));
   vi.doMock("./storage-buckets", () => ({ buckets, mediaBucket: buckets.Media, evidenceBucket: buckets.Evidence, manualBucket: buckets.Manual, seedBucket: buckets.Seed }));
+  vi.doMock("./world-templates", () => ({ WorldTemplates: rt.linkable("WorldTemplates", []) }));
   vi.doMock("./guardrail", () => Object.fromEntries(["GuardrailG1", "GuardrailG2", "GuardrailG3"].map((name) => [name, rt.linkable(name, ["bedrock:ApplyGuardrail"])])));
   vi.doMock("./secrets", () => Object.fromEntries(SECRETS.map((name) => [name, rt.once("sst.Secret", name)])));
   const mockLinks = (fn: LambdaName) => (fn === "WorldJanitor" ? ["Dispatch", "Network"].map((name) => rt.once("sst.aws.Dynamo", name)) : [rt.linkable("NetworkMock", capabilityActions("MOCK_NETWORK"))]);
@@ -142,7 +143,7 @@ async function evaluate(owners: "built" | "stubs") {
     if (!entry) throw new Error(`no ${type} named ${name} was created`);
     return (await settle(entry.args)) as Record<string, unknown>;
   };
-  return { ...rt, workers, scheduler, args, mocked: ["./storage-tables", "./storage-buckets", "./guardrail", "./secrets", ...Object.keys(modules).map((owner) => `./${owner}`)] };
+  return { ...rt, workers, scheduler, args, mocked: ["./storage-tables", "./storage-buckets", "./world-templates", "./guardrail", "./secrets", ...Object.keys(modules).map((owner) => `./${owner}`)] };
 }
 
 const APP = "aws-cds-hackathon-poc-cuadrilla";
@@ -319,15 +320,14 @@ describe("timers: EventBridge Scheduler (ADR-0004)", () => {
 });
 
 describe("WorldJanitor", () => {
-  it("15 minutes; WORLDS: its tables, Seed and Media by name, the mocks' tables fenced to guest worlds, timers and Memory", async () => {
+  it("15 minutes; WORLDS: its tables, Seed, Media and the templates by name, guest certificates, the mocks' tables fenced to guest worlds, timers and Memory", async () => {
     const janitor = await fnArgs("WorldJanitor");
     expect(janitor).toMatchObject({ handler: "packages/bff/src/handlers/world-janitor.handler", timeout: "900 seconds", memory: "512 MB" });
-    expect(linkNames(janitor.link)).toEqual([...stored("WorldJanitor"), ...["Seed", "Media", "Scheduler", "SessionTokenKey", "SeedOverrides", "BrandConfig", "Memory", "Dispatch", "Network"]]);
+    expect(linkNames(janitor.link)).toEqual([...stored("WorldJanitor"), ...["Seed", "Media", "WorldTemplates", "Scheduler", "SessionTokenKey", "SeedOverrides", "BrandConfig", "Memory", "Dispatch", "Network"]]);
     expect(janitor.permissions).toEqual([
       ...storageStatements("WorldJanitor"),
-      { actions: ["s3:GetObject"], resources: ["Seed.arn/*"] },
-      { actions: ["s3:PutObject"], resources: ["Media.arn/sim/*"] },
-      ...mockTableStatement("WorldJanitor"),
+      ...[{ actions: ["s3:PutObject"], resources: ["Evidence.arn/guest/*/certificates/*"] }, { actions: ["s3:GetObject"], resources: ["Seed.arn/*"] }],
+      ...[{ actions: ["s3:PutObject"], resources: ["Media.arn/sim/*"] }, ...mockTableStatement("WorldJanitor")],
     ]);
     expect(JSON.stringify(mockTableStatement("WorldJanitor"))).toContain("isp-guest-");
   });

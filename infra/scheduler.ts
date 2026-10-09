@@ -58,6 +58,7 @@ import { lateLinks, links } from "./late-links";
 import { BrandConfig, SeedOverrides, SessionTokenKey } from "./secrets";
 import { mediaBucket, seedBucket, storageLinks, storagePermissions } from "./storage";
 import { InstallerEvents, conditionsOf, lateCall, lateModule, storageGrantPermissions } from "./workers";
+import { WorldTemplates } from "./world-templates";
 
 export const SCHEDULER_SERVICE = "scheduler.amazonaws.com";
 
@@ -196,14 +197,16 @@ export const worldJanitor = new sst.aws.Function(JANITOR, {
   timeout: `${WORLD_JANITOR.timeoutSeconds} seconds`,
   memory: `${WORLD_JANITOR.memoryMb} MB`,
   link: links(
-    // WORLDS: its tables, Seed (templates) and Media (simulator media) by name, the timers, the key that
-    // derives a new epoch's hashes, the live world it must never touch and the brand of the worlds.
-    [...storageLinks(JANITOR), seedBucket, mediaBucket, Scheduler, SessionTokenKey, SeedOverrides, BrandConfig],
+    // WORLDS: its tables, Seed (templates) and Media (simulator media) by name, the templates' keys and
+    // digests with the buckets' names (WorldTemplates), the timers, the key that derives a new epoch's
+    // hashes, the live world it must never touch and the brand of the worlds.
+    [...storageLinks(JANITOR), seedBucket, mediaBucket, WorldTemplates, Scheduler, SessionTokenKey, SeedOverrides, BrandConfig],
     lateLinks("scheduler", "agentcore", () => lateModule("agentcore"), JANITOR_LATE_LINKS.agentcore, "optional"),
     // The mocks' tables, by name only.
     lateCall("scheduler", "mocks", "mockLinks", JANITOR),
   ),
-  // Its tables, WORLDS's objects (Seed templates, simulator media) and the mocks' tables of guest worlds.
+  // Its tables, WORLDS's objects (Seed templates, simulator media), the guest worlds' certificates and the
+  // mocks' tables of guest worlds.
   permissions: $util
     .all([storagePermissions(JANITOR), storageGrantPermissions(JANITOR), lateCall("scheduler", "mocks", "mockPermissions", JANITOR)])
     .apply((parts) => parts.flat() as Array<{ actions: string[]; resources: string[] }>),

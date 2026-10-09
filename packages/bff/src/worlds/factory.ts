@@ -1,7 +1,8 @@
 // The minimal world factory of wave 2b (ADR-0025 §2, docs/build-plan.md WP-58): what `GuestWorlds` needs
-// to turn a guest's operator into a seeded world, from `Seed/worlds/guest.json`. WP-39 (wave 4) extends
-// it for the demo, QA and evaluation worlds, presets and scene jumps, and renders the historical
-// certificates this one leaves `pdfPending`.
+// to turn a guest's operator into a seeded world, from `Seed/worlds/guest.json`. Wave 4 (WP-39) builds
+// the demo, QA and evaluation worlds next to it (worlds/demo.ts, worlds/qa-world.ts), adds presets and
+// scene jumps (worlds/presets.ts, worlds/scenes.ts) and renders the historical certificates this one
+// leaves `pdfPending` when its caller can write them (`certificates`).
 //
 //   1. the clock: `PAUSED` at the template's 13/10 07:00 with a fresh epoch, created once; a clock that
 //      exists and belongs to another guest is a collision (the generation id was taken)
@@ -19,6 +20,7 @@ import type { Connector } from "../connector/ports";
 import type { TableClient } from "../connector/table-client";
 import { type WorldPolicy, defaultWorldPolicy } from "../connector/world";
 import { type BrandConfigValue, signupBrandMode } from "../lib/secret-schemas";
+import type { HistoricalCertificates } from "./certificates";
 import { type WorldRows, cloneWorld, rowCounts } from "./clone";
 import { GenerationCollisionError } from "./guest-lifecycle";
 import { GUEST_TEMPLATE, fillTemplate, markersFor } from "./template";
@@ -34,6 +36,8 @@ export interface FactoryDeps {
   readonly policy?: WorldPolicy;
   /** Real clock. */
   readonly now: () => Date;
+  /** Renders the historical certificates after the build; without it they stay `pdfPending`. */
+  readonly certificates?: HistoricalCertificates;
 }
 
 export interface BuildRequest {
@@ -92,7 +96,7 @@ async function worldClock(deps: FactoryDeps, request: BuildRequest, clockId: str
 }
 
 // The operator's rows go last: a world whose `SETTINGS` exist is complete (`worldExists`).
-async function write(deps: FactoryDeps, rows: WorldRows): Promise<void> {
+export async function writeWorldRows(deps: Pick<FactoryDeps, "connector" | "client">, rows: Pick<WorldRows, "domain" | "mocks">): Promise<void> {
   for (const [table, items] of rows.mocks) await deps.client.batchPut(table, items);
   for (const [table, items] of rows.domain) if (table !== "Isps") await deps.connector.seed.loadItems(table, items);
   const isps = rows.domain.get("Isps");
@@ -117,8 +121,19 @@ export async function buildWorld(deps: FactoryDeps, request: BuildRequest): Prom
     policy: deps.policy ?? defaultWorldPolicy,
     now: deps.now(),
   });
-  await write(deps, rows);
+  await writeWorldRows(deps, rows);
+  await renderPending(deps, { clockId, ispId: request.ispId });
   return { clockId, worldEpoch: clock.worldEpoch, counts: rowCounts(rows) };
+}
+
+/** A certificate that cannot be rendered stays `pdfPending`: the world is built anyway. */
+async function renderPending(deps: Pick<FactoryDeps, "certificates">, world: { readonly clockId: string; readonly ispId: string }): Promise<void> {
+  if (deps.certificates === undefined) return;
+  try {
+    await deps.certificates.render(world, "PENDING");
+  } catch {
+    // The next load (or reset) renders it; the world is complete without its PDFs.
+  }
 }
 
 /** Whether a guest's world is complete: its clock, and its operator's settings, written last. */

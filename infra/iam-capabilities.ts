@@ -133,7 +133,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityName, Capability>> = {
   MEMORY_ADMIN: {
     grants: [
       {
-        actions: ["bedrock-agentcore:ListEvents", "bedrock-agentcore:DeleteEvent", "bedrock-agentcore:ListMemoryRecords", "bedrock-agentcore:DeleteMemoryRecord", "bedrock-agentcore:RetrieveMemoryRecords"],
+        // ListSessions: the purge also reaches the sessions it cannot compute (worlds/memory-admin.ts).
+        actions: ["bedrock-agentcore:ListSessions", "bedrock-agentcore:ListEvents", "bedrock-agentcore:DeleteEvent", "bedrock-agentcore:ListMemoryRecords", "bedrock-agentcore:DeleteMemoryRecord", "bedrock-agentcore:RetrieveMemoryRecords"],
         resources: ["{Memory}"],
       },
     ],
@@ -181,6 +182,9 @@ const guardrailG1 = g(["bedrock:ApplyGuardrail"], ["{G1}"]);
 const invokeModels = (model: "HARNESS" | "PHOTO", actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]): Grant => g(actions, [`{model:${model}}`]);
 /** AgentCore and Bedrock resolve the app's inference profile before they call through it (ADR-0028). */
 const readModelProfile: Grant = { sid: "ModelProfileRead", ...g(["bedrock:GetInferenceProfile"], ["{model:PROFILE}"]) };
+/** The historical certificates' PDFs a world factory renders (worlds/certificates.ts): guest worlds, and every world. */
+const GUEST_CERTIFICATES = g(["s3:PutObject"], ["{Evidence}/guest/*/certificates/*"]);
+const WORLD_CERTIFICATES = g(["s3:PutObject"], ["{Evidence}/certificates/*", "{Evidence}/guest/*/certificates/*"]);
 const metrics = g(["cloudwatch:PutMetricData"], ["*"], [{ test: "StringEquals", variable: "cloudwatch:namespace", values: [METRICS_NAMESPACE] }]);
 
 export const LAMBDA_CAPABILITIES = {
@@ -232,21 +236,24 @@ export const LAMBDA_CAPABILITIES = {
   FeedEvents: { capabilities: [], tables: { WorkOrders: "write", Runtime: "write", AuditLog: "write" }, grants: [sqsSend()] },
   ScheduleDispatch: { capabilities: [], tables: { WorkOrders: "read", Cases: "read", People: "read", Runtime: "write" }, grants: [sqsSend()] },
   // Leads: only `signup.start`'s writes, fenced by key and attributes; retryWorld and deleteGuest invoke.
+  // Manual: `manual.section`. Evidence certificates: the historical PDFs of a world it resets (worlds/stage.ts).
   Bff: {
     capabilities: ["MOCK_NETWORK", "MOCK_DISPATCH", "WORLDS"],
     tables: { ...allAt(APP_TABLES, "write"), Reference: "read" },
-    buckets: { Evidence: "read", Media: "write" },
-    grants: [g(["s3:GetObject"], ["{Seed}/brand/*"]), sqsSend(), g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{GuestWorlds}", "{GuestAccountDeletion}"]), BFF_LEADS_GRANT],
+    buckets: { Evidence: "read", Media: "write", Manual: "read" },
+    grants: [g(["s3:GetObject"], ["{Seed}/brand/*"]), WORLD_CERTIFICATES, sqsSend(), g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{GuestWorlds}", "{GuestAccountDeletion}"]), BFF_LEADS_GRANT],
   },
   CostGuard: {
     capabilities: [],
     tables: { AuditLog: "write" },
     grants: [g(["dynamodb:PutItem"], ["{Runtime}"], [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#*"] }])],
   },
-  WorldJanitor: { capabilities: ["WORLDS", "WORLD_DATA"] },
+  // The historical certificates of the guest worlds it resets at night.
+  WorldJanitor: { capabilities: ["WORLDS", "WORLD_DATA"], grants: [GUEST_CERTIFICATES] },
+  // Runtime: the phone leases of messages sent by the live transport (policy/records.ts).
   PolicyAudit: {
     capabilities: [],
-    tables: { Conversations: "read", AuditLog: "write", WorkOrders: "read", Cases: "read", People: "read", Isps: "read", Reference: "read" },
+    tables: { Conversations: "read", AuditLog: "write", WorkOrders: "read", Cases: "read", People: "read", Isps: "read", Reference: "read", Runtime: "read" },
     grants: [g(["s3:GetObject"], ["{Evidence}/certificates/*", "{Evidence}/guest/*/certificates/*"])],
   },
   // Cognito pre token generation: the user row by GSI1 `SUB#<sub>` and one audit row per ignored attribute.

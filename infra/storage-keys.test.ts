@@ -343,18 +343,18 @@ describe("storage each Lambda links", () => {
     for (const table of needs.mockTables) expect(MOCK_TABLES).toContain(table);
   });
 
-  it("links every table to some Lambda and reaches every bucket but Manual by a link or a grant", () => {
+  it("links every table to some Lambda and reaches every bucket by a link or a grant", () => {
     const linked = LAMBDAS.map(storageFor);
     for (const table of STORAGE_TABLES) expect(linked.some((needs) => needs.tables.includes(table)), table).toBe(true);
     const granted = ROLES.flatMap((role) => expectedGrants(role).flatMap((grant) => grant.resources));
     const reached = STORAGE_BUCKETS.filter((bucket) => linked.some((needs) => needs.buckets.includes(bucket)) || granted.some((resource) => resource.startsWith(`{${bucket}}`)));
-    // Manual is read only by the Knowledge Base role (infra/storage-kb.ts) and written by the loader.
-    expect(reached.sort()).toEqual(["Evidence", "Media", "Seed"]);
+    // Manual: read by the Knowledge Base role (infra/storage-kb.ts) and the Bff (`manual.section`), written by the loader.
+    expect(reached.sort()).toEqual(["Evidence", "Manual", "Media", "Seed"]);
   });
 
   it("links a table only as data access: CostGuard reaches Runtime through its fenced grant alone", () => {
     expect(storageFor("CostGuard")).toEqual({ tables: ["AuditLog"], mockTables: [], buckets: [] });
-    expect(expectedBuckets("Bff")).toEqual(["Evidence", "Media"]);
+    expect(expectedBuckets("Bff")).toEqual(["Evidence", "Manual", "Media"]);
     expect(storageFor("WorldJanitor").mockTables).toEqual(["Dispatch", "Network"]);
   });
 });

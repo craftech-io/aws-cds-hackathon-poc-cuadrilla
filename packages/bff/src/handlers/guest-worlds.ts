@@ -22,6 +22,7 @@ import { brandConfig, subkey } from "../lib/secrets";
 import { type FactoryDeps, buildWorld, worldExists } from "../worlds/factory";
 import { GenerationCollisionError } from "../worlds/guest-lifecycle";
 import { s3TemplateSource } from "../worlds/sources";
+import { s3HistoricalCertificates } from "../worlds/stage";
 import { TemplateError, readTemplate } from "../worlds/template";
 
 export type GuestWorldsOutcome = "READY" | "ALREADY_READY" | "STALE" | "NO_SLOT" | "FAILED";
@@ -93,6 +94,7 @@ let factory: FactoryDeps | undefined;
 
 function defaultDeps(): GuestWorldsDeps {
   const source = s3TemplateSource();
+  const log = createLogger({ bindings: { service: "guest-worlds" } });
   factory ??= {
     connector: connector(),
     client: tableClient(),
@@ -100,8 +102,10 @@ function defaultDeps(): GuestWorldsDeps {
     brand: brandConfig,
     phoneHash: (phone) => phoneHash(subkey("phone-hash"), phone),
     now: () => new Date(),
+    // The historical certificates' PDFs, under the world's `guest/<seg>/certificates/` (READY without them on a failure).
+    certificates: s3HistoricalCertificates(log),
   };
-  return { client: tableClient(), factory, now: () => new Date(), log: createLogger({ bindings: { service: "guest-worlds" } }) };
+  return { client: tableClient(), factory, now: () => new Date(), log };
 }
 
 export async function handler(event: unknown): Promise<{ readonly outcome: GuestWorldsOutcome }> {

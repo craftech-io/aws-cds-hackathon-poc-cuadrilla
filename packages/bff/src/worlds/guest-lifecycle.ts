@@ -11,8 +11,9 @@
 // Destruction. `GuestAccountDeletion` destroys the current generation of a deleted account: every item
 // of its operator in the demo's tables (found from the partitions the template gives it and from its
 // cases), its objects under `guest/<seg>/` in `Media` and `Evidence` and, when a purger is given, its
-// Memory. Only that generation: a key that does not carry its ids is never touched, and destroying one
-// that is already gone is a no-op. The previous generations expire by TTL.
+// Memory (first, while its installers are still there to name its actors). Only that generation: a key
+// that does not carry its ids is never touched, and destroying one that is already gone is a no-op. The
+// previous generations expire by TTL (`WorldJanitor` purges their Memory at night).
 import { randomBytes } from "node:crypto";
 import { CaseStatus, ConnectorError, type IspId, ToolError, clockIdOfIsp, isSignupGuestIsp, ispIdOfClock, signupGenerationIspId } from "@cuadrilla/shared";
 import { worldObjectPrefix } from "@cuadrilla/shared/media/keys";
@@ -133,7 +134,7 @@ export interface DestroyDeps {
   readonly template: () => Promise<string>;
   readonly phoneHash: (phone: string) => string;
   readonly objects: ObjectStore;
-  /** Purges the Memory of the world's actors, when the stage has one (WP-39 wires the Memory purge). */
+  /** Purges the Memory of the world's actors of every epoch, when the stage has one (worlds/destroyer.ts). */
   readonly purgeMemory?: (clockId: string, epochs: readonly number[]) => Promise<void>;
   readonly now: () => Date;
 }
@@ -171,16 +172,17 @@ export async function destroyGeneration(deps: DestroyDeps, clockId: string): Pro
   const markers = markersFor(ispId);
   const partitions = worldPartitions(await deps.template(), markers, deps.phoneHash, deps.now());
   const cases = await casePartitions(deps, ispId);
+  const epoch = await deps.connector.runtime.currentEpoch(clockId);
+  const epochs = Array.from({ length: epoch + 1 }, (_unused, index) => index);
+  // Before the items go: the purge finds the world's installers and orders from them.
+  await deps.purgeMemory?.(clockId, epochs);
   let items = 0;
   for (const { table, partition } of partitions) items += await deletePartition(deps.client, table, partition);
   for (const key of cases) items += await deletePartition(deps.client, "Cases", key.PK);
-  const epoch = await deps.connector.runtime.currentEpoch(clockId);
-  const epochs = Array.from({ length: epoch + 1 }, (_unused, index) => index);
   let objects = 0;
   for (const bucket of ["Media", "Evidence"] as const) {
     for (const worldEpoch of epochs) objects += await deps.objects.deletePrefix(bucket, worldObjectPrefix(clockId, worldEpoch));
   }
-  await deps.purgeMemory?.(clockId, epochs);
   return { clockId, items, objects };
 }
 
