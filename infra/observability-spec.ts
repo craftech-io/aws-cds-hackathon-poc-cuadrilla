@@ -58,8 +58,8 @@ export const METRIC_FILTERS: readonly MetricFilterSpec[] = [
     readBy: "alarm",
     source: `${BFF}/ops/cost-caps.ts`,
   },
-  // The order's cost by the rate card, logged by the worker when it updates ConversationKpi.
-  { metric: "CostPerConversation", emitters: ["InstallerWorker"], pattern: '{ $.metric = "CostPerConversation" }', value: "$.value", unit: "None", readBy: "alarm", pendingIn: "WP-32" },
+  // The order's cost so far by the rate card, logged by the worker after each turn updates ConversationKpi.
+  { metric: "CostPerConversation", emitters: ["InstallerWorker"], pattern: '{ $.metric = "CostPerConversation" }', value: "$.value", unit: "None", readBy: "alarm", source: `${BFF}/turns/record.ts` },
   { metric: "OriginRejected", emitters: ["Bff"], pattern: '{ $.metric = "OriginRejected" }', value: "1", unit: "Count", readBy: "SMK/10", source: `${BFF}/routers/edge.ts` },
   // A spend refused by a kill switch (`KILL_SWITCH_ACTIVE`), never the operator's own on/off lines.
   {

@@ -4,9 +4,11 @@
 // copy/es-MX.ts; each send goes through the outbound pipeline (WorkerNoticeSender), so the contact
 // policy, the transport of the recipient and the audit log see it like any other `SYSTEM_NOTICE`.
 //
-// A notice is sent at most once per event and key (`IDEMP#NOTICE:<key>#<eventId>`), so an event that
-// goes back to the queue never repeats it, and a failed send is logged and never fails the event: a
-// notice must not make the worker run a turn again.
+// A notice is sent once per event and key: the mark (`IDEMP#NOTICE:<key>#<eventId>`) is written after the
+// send, so an event that goes back to the queue never repeats a notice that went out, and a Lambda that
+// died before sending it sends it on the redelivery (the pipeline replays a message id it already sent:
+// the notice's id derives from the event, outbound/adapters.ts). A failed send is logged and never fails
+// the event: a notice must not make the worker run a turn again.
 import type { RuntimePort } from "../connector/ports";
 import { esMX } from "../copy/es-MX";
 import type { WorkerContext, WorkerNoticeKey, WorkerNoticeSender } from "./ports";
@@ -38,7 +40,7 @@ export function noticeTargetOf(
 
 export interface NoticeDeps {
   readonly notices: WorkerNoticeSender;
-  readonly runtime: Pick<RuntimePort, "claimIdempotency" | "releaseIdempotency">;
+  readonly runtime: Pick<RuntimePort, "claimIdempotency" | "getIdempotency">;
 }
 
 export const NOTICE_TEXTS: Readonly<Record<WorkerNoticeKey, string>> = {
@@ -54,7 +56,7 @@ export const NOTICE_TEXTS: Readonly<Record<WorkerNoticeKey, string>> = {
 /** Sends the fixed notice once per event; `false` when it was already sent or could not be sent. */
 export async function sendWorkerNotice(deps: NoticeDeps, ctx: Pick<WorkerContext, "log">, target: NoticeTarget, notice: WorkerNoticeKey): Promise<boolean> {
   const source = `NOTICE:${notice}`;
-  if (!(await deps.runtime.claimIdempotency(source, target.eventId))) return false;
+  if ((await deps.runtime.getIdempotency(source, target.eventId)) !== undefined) return false;
   try {
     await deps.notices.send({
       clockId: target.clockId,
@@ -66,10 +68,10 @@ export async function sendWorkerNotice(deps: NoticeDeps, ctx: Pick<WorkerContext
       ...(target.workOrderId === undefined ? {} : { workOrderId: target.workOrderId }),
       ...(target.replyToMessageId === undefined ? {} : { replyToMessageId: target.replyToMessageId }),
     });
-    return true;
   } catch (error) {
-    await deps.runtime.releaseIdempotency(source, target.eventId).catch(() => undefined);
     ctx.log.error("worker.notice_failed", { notice, cause: error instanceof Error ? error.name : "unknown" });
     return false;
   }
+  await deps.runtime.claimIdempotency(source, target.eventId).catch((error: unknown) => ctx.log.warn("worker.notice_mark_failed", { notice, cause: error instanceof Error ? error.name : "unknown" }));
+  return true;
 }

@@ -94,6 +94,18 @@ describe("statuses of what we sent", () => {
     expect(actions).toMatchObject([{ action: "WINDOW_FALLBACK", messageId: relay.messageId, ruleIds: ["CP-WA-24H"], detail: { fallback: "respuesta_supervisor" } }]);
   });
 
+  it("[W3 review B3] a fallback whose send throws releases its claim, so the redelivered status sends it once", async () => {
+    const { w, rec, deps } = await setup();
+    const relay = await sent(w, "wamid.R-2", "RELAY");
+    const failure = { id: "wamid.R-2", status: "failed" as const, timestamp: T(REAL_NOW), errors: [{ code: 131047 }] };
+    const broken = { ...deps, fallback: { ...deps.fallback, sendTemplate: async () => Promise.reject(new Error("G3 config unavailable")) } };
+    await expect(applyStatuses([failure], broken)).rejects.toThrow("G3 config unavailable");
+    expect(await applyStatuses([failure], deps)).toEqual(["DUPLICATE"]);
+    await applyStatuses([failure], deps);
+    expect(rec.fallbacks).toEqual([{ messageId: relay.messageId, template: "respuesta_supervisor" }]);
+    expect(await w.connector.audit.listByDecision("isp-demo", "ACTION")).toMatchObject([{ action: "WINDOW_FALLBACK", messageId: relay.messageId }]);
+  });
+
   it("[FL-072] ORDERS_DETAIL falls back to ordenes_del_dia; other kinds wait for the next inbound; a template never falls back", async () => {
     const { w, rec, deps } = await setup();
     const orders = await sent(w, "wamid.O-1", "ORDERS_DETAIL");

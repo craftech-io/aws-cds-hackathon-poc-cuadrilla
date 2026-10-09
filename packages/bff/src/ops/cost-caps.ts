@@ -82,6 +82,8 @@ export interface CapCounter {
   readonly resetsAtReal: string;
   /** Inside the GLOBAL ledger of a sign-up world: the account's quota or the sub-ceiling of every sign-up world. */
   readonly tier?: CapTier;
+  /** The test scope of a `qa-*` world's `globalCapsOverride`: never the stage's ceiling, never its cut. */
+  readonly testScope?: true;
 }
 
 export type CapTier = "GUEST_ACCOUNT" | "GUEST_SIGNUP";
@@ -162,6 +164,7 @@ interface CounterSpec {
   readonly period: CapPeriod;
   readonly limit: number | undefined;
   readonly tier?: CapTier;
+  readonly testScope?: true;
 }
 
 /**
@@ -200,7 +203,7 @@ function ledgerSpecs(ledger: CapLedger, clockId: string, resource: CostResource,
       const { prefix, field } = GLOBAL_LEDGER[resource];
       const kind = ispKindOfClock(clockId);
       if (kind === "QA" && settings.globalCapsOverride !== undefined) {
-        return [{ ledger, period: "DAY", limit: settings.globalCapsOverride[field], key: (token) => `${prefix}#GLOBAL#${clockId}#${token}` }];
+        return [{ ledger, period: "DAY", limit: settings.globalCapsOverride[field], testScope: true, key: (token) => `${prefix}#GLOBAL#${clockId}#${token}` }];
       }
       if (kind === "QA" || kind === "EVAL") return [];
       const global: CounterSpec = { ledger, period: "DAY", limit: globalCaps[field], key: (token) => `${prefix}#GLOBAL#${token}` };
@@ -235,6 +238,7 @@ export function planCounters(request: ReserveCostRequest, globalCaps: GlobalCost
         expiresAt: Math.floor(period.endsAt.getTime() / 1000) + CAP_TTL_AFTER_PERIOD_SECONDS,
         resetsAtReal: period.endsAt.toISOString(),
         ...(spec.tier === undefined ? {} : { tier: spec.tier }),
+        ...(spec.testScope === undefined ? {} : { testScope: spec.testScope }),
       });
     }
   }
@@ -261,12 +265,16 @@ export interface CostCapsDeps {
   readonly logger?: Logger;
 }
 
+/** Scope of a QA world's test ceiling: the `TurnCapHits{scope=GLOBAL}` filter never counts it, so it never cuts the stage. */
+export const GLOBAL_TEST_SCOPE = "GLOBAL_TEST";
+
 // Metric names the log lines carry (docs/architecture.md §12, metric filters of WP-38).
-function capMetric(counter: CapCounter): { readonly metric: string; readonly scope?: string } {
+export function capMetric(counter: CapCounter): { readonly metric: string; readonly scope?: string } {
   if (counter.tier !== undefined) return { metric: "GuestSignupCapHits", scope: counter.tier };
   if (counter.ledger === "SIMULATOR") return { metric: "SimulatorCapHits" };
-  if (counter.resource === "turns") return { metric: "TurnCapHits", scope: counter.ledger };
-  return { metric: "GlobalCapHits", scope: counter.resource };
+  const scope = counter.testScope === true ? GLOBAL_TEST_SCOPE : counter.ledger;
+  if (counter.resource === "turns") return { metric: "TurnCapHits", scope };
+  return { metric: "GlobalCapHits", scope: counter.testScope === true ? `${counter.resource}_TEST` : counter.resource };
 }
 
 async function denied(deps: CostCapsDeps, outcome: Exclude<ReserveCostOutcome, { readonly ok: true }>, resource: CostResource, now: Date): Promise<ReserveCostOutcome> {

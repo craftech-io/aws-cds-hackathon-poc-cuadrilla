@@ -143,6 +143,12 @@ async function evaluate(scenario: Scenario) {
   vi.doMock("./workers", lateModule(scenario.late.workers, { InstallerEvents: queue, installerWorker: fn("InstallerWorker"), feedEvents: fn("FeedEvents") }));
   vi.doMock("./agent-tools", lateModule(scenario.late.tools, { ToolOrders: fn("ToolOrders"), toolEvidence: fn("ToolEvidence"), toolCases: fn("ToolCases") }));
   vi.doMock("./bff", lateModule(scenario.late.bff, { bff: fn("Bff"), qaDriver: fn("QaDriver") }));
+  // The Linkables of PIPELINE that InboundWhatsApp links, each carrying exactly its capability's grants.
+  const carrying = (name: string, grants: ReadonlyArray<{ actions: readonly string[] }>) =>
+    new runtime.sst.Linkable(name, { include: grants.map((grant) => ({ type: "aws.permission", actions: [...grant.actions], resources: [`arn:fake:${name}`] })) });
+  vi.doMock("./guardrail", () => ({ GuardrailG2: carrying("GuardrailG2", CAPABILITIES.PIPELINE.grants), GuardrailG3: carrying("GuardrailG3", CAPABILITIES.PIPELINE.grants) }));
+  vi.doMock("./messaging-email", () => ({ EmailChannel: carrying("EmailChannel", CAPABILITIES.SEND_EMAIL.grants) }));
+  vi.doMock("./scheduler", () => ({ Scheduler: carrying("Scheduler", CAPABILITIES.TIMERS.grants) }));
   const whatsapp = await import("./messaging-whatsapp");
   const mocks = await import("./mocks");
   const feeds = await import("./feeds");
@@ -158,7 +164,7 @@ async function evaluate(scenario: Scenario) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  for (const path of ["./storage-tables", "./storage-buckets", "./workers", "./agent-tools", "./bff"]) vi.doUnmock(path);
+  for (const path of ["./storage-tables", "./storage-buckets", "./workers", "./agent-tools", "./bff", "./guardrail", "./messaging-email", "./scheduler"]) vi.doUnmock(path);
 });
 
 type Statement = { actions: string[]; resources: string[]; conditions?: Array<{ test: string; variable: string; values: string[] }> };
@@ -274,12 +280,12 @@ describe("InboundWhatsApp IAM (docs/architecture.md §14)", () => {
     expect(await resolveDeep(pending.whatsapp.whatsappPermissions("InstallerWorker"))).toEqual([]);
   });
 
-  it("links its tables, Media, the secrets it reads, ChannelModes, the installer queue and the origin topic", async () => {
+  it("links its tables, Media, the secrets it reads, ChannelModes, the installer queue, the origin topic and the pipeline's G2, G3, EmailChannel and Scheduler", async () => {
     const { fn } = await granted(CONNECTED);
     const names = ((await resolveDeep(fn.args.link)) as Array<{ name?: unknown; secretName?: string }>).map((link) => link.secretName ?? link.name);
     const linked = await Promise.all(names.map((name) => resolveDeep(name)));
     expect(linked.sort()).toEqual(
-      ["AuditLog", "BrandConfig", "Cases", "ChannelModes", "Conversations", "InstallerEvents", "Isps", "Media", "People", "Runtime", "SeedOverrides", "SessionTokenKey", "WaInboundOrigin", "WhatsAppMetaPhoneNumberId", "WhatsAppPhoneNumberId", "WorkOrders"].sort(),
+      ["AuditLog", "BrandConfig", "Cases", "ChannelModes", "Conversations", "EmailChannel", "GuardrailG2", "GuardrailG3", "InstallerEvents", "Isps", "Media", "People", "Reference", "Runtime", "Scheduler", "SeedOverrides", "SessionTokenKey", "WaInboundOrigin", "WhatsAppMetaPhoneNumberId", "WhatsAppPhoneNumberId", "WorkOrders"].sort(),
     );
   });
 });

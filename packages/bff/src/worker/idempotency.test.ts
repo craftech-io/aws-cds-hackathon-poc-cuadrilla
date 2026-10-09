@@ -56,6 +56,21 @@ describe("worker: double idempotency [FL-093]", () => {
     expect((await actionsOf()).filter((action) => action === "GUARDRAIL_BLOCK")).toHaveLength(1);
   });
 
+  it("[W3 review flows B2] a delivery lost inside the safety handler (timeout, OOM) leaves no mark: the redelivery runs it", async () => {
+    const handle = kit.deps.ports.safety.handle;
+    Object.assign(kit.deps.ports.safety, { handle: () => new Promise<void>(() => undefined) });
+    const message = await inboundMessage(kit, { text: "El cable pelado está chispeando en la banqueta" });
+    void kit.run(inboundEvent(message));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(await kit.connector.runtime.getIdempotency("SAFETY", EVENT_ID)).toBeUndefined();
+    Object.assign(kit.deps.ports.safety, { handle });
+    await kit.run(inboundEvent(message), 2);
+    expect(kit.rec.safety).toHaveLength(1);
+    expect(await kit.connector.runtime.getIdempotency("SAFETY", EVENT_ID)).toBeDefined();
+    await kit.run(inboundEvent(message), 3);
+    expect(kit.rec.safety).toHaveLength(1);
+  });
+
   it("[FL-093] writes each of the worker's decisions once per event", async () => {
     await kit.connector.isps.updateSettings(ISP, { turnCaps: { perHour: 0, perDay: 0 } });
     const message = await inboundMessage(kit);

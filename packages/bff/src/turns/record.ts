@@ -6,18 +6,27 @@
 //   CuadrillaMetrics  the turn and its tokens on the order's KPI row, its latency, and the first-reply
 //                     latency: real ms from the inbound message to the first outbound of the turn
 //   log fields        `TurnLatency`, `TurnErrors`, `TurnMaxTokens`, `FirstReplyLatency` (logs only, ADR-0028)
+//   CostPerConversation  the order's conversation cost so far after the turn, by the verified rows of the
+//                     rate card (the Harness model's tokens until WP-49 verifies the rest): the metric
+//                     filter of the cost cut (ADR-0019) averages it per hour; QA and evaluation worlds,
+//                     with a budget per run, never log it
 //   answered          whether the installer got something from the turn: a message of the turn, or an
 //                     escalation or a safety report that answers by itself (`ALWAYS_ANSWER`)
 import { ConnectorError, ispKindOfClock } from "@cuadrilla/shared";
 import type { HarnessUsage } from "../agent/harness-client";
+import type { ConversationKpi } from "../domain/metrics";
 import type { Connector } from "../connector/ports";
 import type { Message } from "../domain/conversations";
 import type { AgentMode } from "../domain/metrics";
 import type { Logger } from "../lib/log";
 import { maskText } from "../lib/mask";
+import { DEFAULT_MODEL_ID, conversationCost } from "../services/ratecard/ratecard";
 import type { TurnRequest } from "./deps";
 
 export const TURN_LOG_METRICS = { latency: "TurnLatency", errors: "TurnErrors", maxTokens: "TurnMaxTokens", firstReply: "FirstReplyLatency" } as const;
+
+/** Read by the metric filter of the cost cut (infra/observability-spec.ts). */
+export const COST_PER_CONVERSATION_METRIC = "CostPerConversation";
 
 /** Fixed notes of the turns whose model text is not kept. */
 export const FIXED_NOTES = { guardrail: "GUARDRAIL_BLOCK", failed: "TURN_FAILED" } as const;
@@ -26,7 +35,7 @@ export const FIXED_NOTES = { guardrail: "GUARDRAIL_BLOCK", failed: "TURN_FAILED"
 export const ANSWERING_TOOLS = ["escalate_case", "report_safety_hazard"] as const;
 
 export interface TurnRecordDeps {
-  readonly data: Pick<Connector, "conversations" | "metrics" | "runtime">;
+  readonly data: Pick<Connector, "conversations" | "metrics" | "runtime" | "reference">;
   readonly agentMode: AgentMode;
   readonly log: Logger;
 }
@@ -67,7 +76,7 @@ export async function writeTurnNote(deps: TurnRecordDeps, input: NoteInput): Pro
 export async function recordTurnKpi(deps: TurnRecordDeps, request: TurnRequest, usage: HarnessUsage, latencyMs: number, firstReplyLatencyMs?: number): Promise<void> {
   if (request.workOrderId === undefined) return;
   const evaluation = ispKindOfClock(request.clockId) === "EVAL";
-  await deps.data.metrics.addToKpi(
+  const kpi = await deps.data.metrics.addToKpi(
     {
       ispId: request.ispId,
       source: evaluation ? "EVAL" : "WORLD",
@@ -82,6 +91,35 @@ export async function recordTurnKpi(deps: TurnRecordDeps, request: TurnRequest, 
       ...(firstReplyLatencyMs === undefined ? {} : { firstReplyLatencyMs }),
     },
   );
+  await logConversationCost(deps, request, kpi);
+}
+
+/** The conversation's cost in USD by the verified rate card rows, or `undefined` while a row it needs is not verified. */
+export function conversationCostUsd(kpi: Pick<ConversationKpi, "inputTokens" | "outputTokens">, rows: readonly unknown[]): number | undefined {
+  const usage = {
+    models: { [DEFAULT_MODEL_ID]: { input: kpi.inputTokens, output: kpi.outputTokens, cacheRead: 0, cacheWrite: 0 } },
+    embeddingTokens: 0,
+    agentCore: { gateway: 0, memoryEvents: 0, memoryRecords: 0, harness: 0 },
+    transcribeSeconds: 0,
+    emails: 0,
+    attachmentBytes: 0,
+    whatsapp: { utility: 0, service: 0 },
+  };
+  const cost = conversationCost(usage, rows, { whatsappSimulated: false });
+  return cost.status === "VERIFIED" ? cost.usd : undefined;
+}
+
+/** The `CostPerConversation` line; a rate card that cannot be read or priced only leaves a warning, never fails the turn. */
+async function logConversationCost(deps: TurnRecordDeps, request: TurnRequest, kpi: ConversationKpi): Promise<void> {
+  const kind = ispKindOfClock(request.clockId);
+  if (kind === "QA" || kind === "EVAL") return;
+  try {
+    const usd = conversationCostUsd(kpi, await deps.data.reference.listRateCard());
+    if (usd === undefined) deps.log.warn("turn.cost_unpriced", { workOrderId: kpi.workOrderId });
+    else deps.log.info("metric", { metric: COST_PER_CONVERSATION_METRIC, value: usd, workOrderId: kpi.workOrderId, turns: kpi.turns });
+  } catch (error) {
+    deps.log.warn("turn.cost_unavailable", { workOrderId: kpi.workOrderId, error });
+  }
 }
 
 /** The outbound messages of the turn to its installer, oldest first. */

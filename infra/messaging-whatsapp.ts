@@ -46,8 +46,10 @@
 //     → eventDestinations = this topic; phoneNumbers[].arn = whatsappPhoneArn(WhatsAppPhoneNumberId) (P-01 step 6)
 
 import { ChannelModes } from "./channel-modes";
-import { ACCOUNT_ID, APP, expectedGrants, whatsappPhoneArn, type RoleName } from "./iam-capabilities";
+import { GuardrailG2, GuardrailG3 } from "./guardrail";
+import { ACCOUNT_ID, APP, CAPABILITIES, expectedGrants, whatsappPhoneArn, type RoleName } from "./iam-capabilities";
 import { lateLinks, links } from "./late-links";
+import { EmailChannel } from "./messaging-email";
 import { grantStatement, lateFunction, type Statement } from "./mocks";
 import { BrandConfig, SeedOverrides, SessionTokenKey, WhatsAppMetaPhoneNumberId, WhatsAppPhoneNumberId } from "./secrets";
 import { storageLinks, storagePermissions, storageResource } from "./storage";
@@ -120,13 +122,20 @@ export const WaInbound = new sst.Linkable("WaInbound", {
 export const WaInboundOrigin = new sst.Linkable("WaInboundOrigin", { properties: { arn: waInboundTopic.arn } });
 
 /**
- * InboundWhatsApp's statements: its tables and Media, its grants on our number (none while it is not
- * connected), SEND_WHATSAPP's reads of certificates and photos and `cloudwatch:PutMetricData` in the
- * app's namespace. `sqs:SendMessage` comes with the linked `InstallerEvents` queue (infra/workers.ts
- * hands a linked queue its URL and that action only).
+ * Grants of PIPELINE that come with a link: G2 and G3 (`GuardrailG2`, `GuardrailG3`), SEND_EMAIL
+ * (`EmailChannel`, with the recipient fence) and TIMERS (`Scheduler`, infra/scheduler.ts, late).
+ */
+const PIPELINE_LINK_CARRIED = new Set([...CAPABILITIES.PIPELINE.grants, ...CAPABILITIES.SEND_EMAIL.grants, ...CAPABILITIES.TIMERS.grants]);
+
+/**
+ * InboundWhatsApp's statements: its tables, Media and the templates of Reference, its grants on our
+ * number (none while it is not connected), SEND_WHATSAPP's reads of certificates and photos and
+ * `cloudwatch:PutMetricData` in the app's namespace. `sqs:SendMessage` comes with the linked
+ * `InstallerEvents` queue (infra/workers.ts hands a linked queue its URL and that action only); the rest
+ * of PIPELINE (its fixed replies and the window fallback go through the outbound pipeline) with its links.
  */
 function inboundPermissions(): $util.Output<Statement[]> {
-  const rest = expectedGrants("InboundWhatsApp").filter((grant) => !grant.resources.includes(WHATSAPP_PHONE) && !grant.resources.includes("{InstallerEvents}"));
+  const rest = expectedGrants("InboundWhatsApp").filter((grant) => !PIPELINE_LINK_CARRIED.has(grant) && !grant.resources.includes(WHATSAPP_PHONE) && !grant.resources.includes("{InstallerEvents}"));
   const statements = rest.map((grant) =>
     grantStatement(grant, (resource) => {
       const resolved = storageResource(resource);
@@ -141,8 +150,10 @@ export const InboundWhatsApp = new sst.aws.Function("InboundWhatsApp", {
   description: "WhatsApp inbound (our WABA's topic and the phone simulator): number filter first, then world, identity and the installer queue.",
   handler: INBOUND_WHATSAPP_HANDLER,
   link: links(
-    [...storageLinks("InboundWhatsApp"), SessionTokenKey, WhatsAppPhoneNumberId, WhatsAppMetaPhoneNumberId, SeedOverrides, BrandConfig, ChannelModes, WaInboundOrigin],
+    [...storageLinks("InboundWhatsApp"), SessionTokenKey, WhatsAppPhoneNumberId, WhatsAppMetaPhoneNumberId, SeedOverrides, BrandConfig, ChannelModes, WaInboundOrigin, GuardrailG2, GuardrailG3, EmailChannel],
     lateLinks("messaging-whatsapp", "workers", () => import("./workers"), ["InstallerEvents"], "optional"),
+    // TIMERS of the pipeline (a deferred reply in quiet hours): infra/scheduler.ts imports infra/workers.ts.
+    lateLinks("messaging-whatsapp", "scheduler", () => import("./scheduler"), ["Scheduler"]),
   ),
   permissions: inboundPermissions(),
   timeout: "30 seconds",

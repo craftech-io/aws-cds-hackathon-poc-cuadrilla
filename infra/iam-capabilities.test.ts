@@ -72,6 +72,7 @@ describe("capabilities table", () => {
 
   it("gives WORLDS the world tables, the mock tables, the timers and the memory purge", () => {
     expect(resolveCapabilities(["WORLDS"])).toEqual(["MEMORY_ADMIN", "TIMERS", "WORLDS"]);
+    expect(Object.keys(CAPABILITIES.WORLDS.tables ?? {}).sort()).toEqual(["Dispatch", "Network", "Reference"]);
     expect(Object.keys(expectedTables("WorldJanitor")).sort()).toEqual(
       ["AuditLog", "Cases", "Conversations", "CuadrillaMetrics", "Dispatch", "Isps", "Network", "People", "Reference", "Runtime", "WorkOrders"].sort(),
     );
@@ -217,8 +218,9 @@ describe("QaDriver", () => {
   it("publishes only on the app's own WhatsApp topic and writes only the kill switch of QA worlds", () => {
     const grants = expectedGrants("QaDriver");
     expect(grants.find((grant) => grant.actions.includes("sns:Publish"))?.resources).toEqual(["arn:aws:sns:us-east-1:776805327629:aws-cds-hackathon-poc-cuadrilla-wa-inbound"]);
-    const kill = grants.find((grant) => grant.actions.includes("dynamodb:PutItem"));
-    expect(kill?.conditions?.[0]?.values).toEqual(["KILL#AGENT#qa-*"]);
+    const runtime = grants.filter((grant) => grant.actions.includes("dynamodb:PutItem") && grant.resources.includes("{Runtime}"));
+    expect(runtime).toHaveLength(1);
+    expect(runtime[0]?.conditions?.[0]?.values.filter((key) => key.startsWith("KILL#"))).toEqual(["KILL#AGENT#qa-*"]);
   });
 
   it("holds the QA seam of ADR-0025 §7 on the stage's pool, the leads read and the two web ACLs, never AdminDeleteUser", () => {
@@ -243,9 +245,9 @@ describe("least privilege", () => {
     expect(cost).toEqual([{ actions: ["dynamodb:PutItem"], resources: ["{Runtime}"], conditions: [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#*"] }] }]);
   });
 
-  it("[W2-B2] gives a BUTTON_ACTION's needs to the worker that runs it, never to InboundWhatsApp: PIPELINE (SES, G3, TIMERS), MOCK_NETWORK, CertificateWriter", () => {
+  it("[W2-B2] gives a BUTTON_ACTION's needs to the worker that runs it, never to InboundWhatsApp: MOCK_NETWORK, CertificateWriter", () => {
     const has = (role: RoleName, action: string, resource: string) => expectedGrants(role).some((grant) => grant.actions.includes(action) && grant.resources.includes(resource));
-    const needs = [["ses:SendEmail", "arn:aws:ses:us-east-1:776805327629:identity/cuadrilla.demo.craftech.io"], ["scheduler:CreateSchedule", "arn:aws:scheduler:us-east-1:776805327629:schedule/aws-cds-hackathon-poc-cuadrilla-poc-schedules/*"], ["bedrock:ApplyGuardrail", "{G3}"], ["lambda:InvokeFunctionUrl", "{NetworkMock}"], ["lambda:InvokeFunction", "{CertificateWriter}"]] as const;
+    const needs = [["lambda:InvokeFunctionUrl", "{NetworkMock}"], ["lambda:InvokeFunction", "{CertificateWriter}"]] as const;
     for (const [action, resource] of needs) {
       expect(has("InstallerWorker", action, resource), `${action} on InstallerWorker`).toBe(true);
       expect(has("InboundWhatsApp", action, resource), `${action} on InboundWhatsApp`).toBe(false);

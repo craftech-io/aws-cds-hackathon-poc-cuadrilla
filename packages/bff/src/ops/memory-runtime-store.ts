@@ -27,7 +27,8 @@ export function createMemoryRuntimeStore(): MemoryRuntimeStore {
         const used = usedOf(counter.key);
         if (used + Math.max(counter.amount, 1) > counter.limit) return items.has(counter.key) ? { ok: false, failedKey: counter.key, used } : { ok: false, failedKey: counter.key };
       }
-      for (const counter of counters) {
+      // A counter that is only checked (amount 0) is a ConditionCheck in DynamoDB: it writes nothing.
+      for (const counter of counters.filter((candidate) => candidate.amount > 0)) {
         const current = items.get(counter.key);
         items.set(counter.key, { ...current, used: usedOf(counter.key) + counter.amount, limit: counter.limit, expiresAt: current?.expiresAt ?? counter.expiresAt, updatedAt: options.nowIso });
       }

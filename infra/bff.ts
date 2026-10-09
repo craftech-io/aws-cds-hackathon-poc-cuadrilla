@@ -8,10 +8,11 @@
 //                name) and forwards `CloudFront-Viewer-Address` and the headers AWS WAF inserts
 //                (AllViewerExceptHostHeader, infra/web-spec.ts). `routers/handler.ts` answers 403 without a
 //                body, before parsing, to any request without the header or with another value.
-//   QaDriver     `<app>-<stage>-qa-driver`, no URL, invoked only by the bootstrap's `qa-runner` role: what
-//                the Bff has (it runs the real appRouter) with WORLDS fenced to QA, evaluation and the
-//                test guest, plus the channel entries, the tool targets, G1, the DLQ, the topic of our
-//                WABA, the pool's QA seam and the reads of the two web ACLs.
+//   QaDriver     `<app>-<stage>-qa-driver`, no URL, invoked only by the bootstrap's `qa-runner` role: it
+//                runs the real appRouter and reads every app table, but writes only by key and objects
+//                only by prefix of QA, evaluation and the test guest's worlds (infra/qa-driver-fence.ts;
+//                `Cases` fenced in code), plus the channel entries, the tool targets, G1, the DLQ, the
+//                topic of our WABA, the pool's QA seam and the reads of the two web ACLs.
 //   PolicyAudit  re-evaluates every sent message and every certificate (§12): daily and on demand.
 //
 // Least privilege (infra/iam-capabilities.ts, checked by infra/observability-spec.test.ts). Data by
@@ -20,7 +21,7 @@
 // Function grants InvokeFunction on it alone, the queues their one role, `Scheduler` TIMERS, `Memory`
 // MEMORY_ADMIN, `GuardrailG1` and `WaInbound` theirs. Every other grant of the role's row becomes a
 // statement here (`Leads` with the form's attributes, Cognito and WAF on the stage's own pool and ACLs,
-// the QA fences of `Runtime`, S3 and Scheduler); a placeholder nobody resolves fails the deploy.
+// the QaDriver's writes fenced by key and prefix, infra/qa-driver-fence.ts, and its Scheduler fence); a placeholder nobody resolves fails the deploy.
 //
 // Modules created before this one whose top level a test of this module cannot evaluate (the queues,
 // the scheduler, WhatsApp, the guardrails, the tool targets) are read late: sst.config.ts has already
@@ -34,7 +35,9 @@
 //   aws --profile craftech-demos iam simulate-principal-policy --policy-source-arn <QaDriver role ARN> \
 //     --action-names dynamodb:PutItem --resource-arns <Network ARN> --context-entries \
 //     ContextKeyName=dynamodb:LeadingKeys,ContextKeyValues=ONU#GLOBAL#isp-demo#X,ContextKeyType=stringList   → implicitDeny
-//   (and the same with KILL#AGENT, KILL#ALL on <Runtime ARN>, and with a table ARN of the other app → implicitDeny)
+//   (the same with KILL#ALL, KILL#AGENT, TURNCAP#GLOBAL#<day> and LIVEWORLD on <Runtime ARN>, WO#wo-24817 on
+//   <WorkOrders ARN>, PERSON#inst-rogelio on <People ARN> and a table ARN of the other app → implicitDeny;
+//   KILL#AGENT#qa-x on <Runtime ARN> → allowed; s3:DeleteObject on <Media ARN>/wa/x → implicitDeny)
 //   aws --profile craftech-demos events list-rule-names-by-target --target-arn <PolicyAudit ARN>   → the daily rule
 
 import { Memory } from "./agentcore";
@@ -43,7 +46,7 @@ import { ChannelModes } from "./channel-modes";
 import { CostCaps } from "./cost-caps";
 import { guestWorlds } from "./guest-worlds";
 import { LAMBDA_CAPABILITIES, resolveCapabilities, type LambdaName } from "./iam-capabilities";
-import { Leads, grantStatement, guestAccountDeletion, type Refs, type Statement } from "./leads";
+import { Leads, grantStatement, grantTableLinks, guestAccountDeletion, type Refs, type Statement } from "./leads";
 import { mockLinks, mockPermissions } from "./mocks";
 import {
   LINK_CARRIED_CAPABILITIES,
@@ -57,7 +60,7 @@ import {
   type LinkCarriedResource,
 } from "./observability-spec";
 import { BrandConfig, OriginVerifyKey, SeedOverrides, SessionTokenKey, WhatsAppMetaPhoneNumberId } from "./secrets";
-import { evidenceBucket, seedBucket, storageLinks, storagePermissions } from "./storage";
+import { evidenceBucket, mediaBucket, seedBucket, storageLinks, storagePermissions } from "./storage";
 import { authWebAcl, edgeWebAcl } from "./waf";
 import { API_PATH, EDGE_BUDGETS } from "./web-spec";
 import { router } from "./web";
@@ -170,7 +173,7 @@ interface RoleAccess {
 /** Everything a role of this module links and is granted, from its row and nothing else. */
 function roleAccess(fn: LambdaName, base: unknown[], local: Readonly<Partial<Record<LinkCarriedResource, unknown>>> = {}): RoleAccess {
   return {
-    link: [...storageLinks(fn), ...(namesLeads(fn) ? [Leads] : []), ...base, ...mockLinks(fn), ...capabilityLinks(fn), ...carriedResources(fn).map((resource) => carrier(resource, local))],
+    link: [...storageLinks(fn), ...grantTableLinks(fn), ...(namesLeads(fn) ? [Leads] : []), ...base, ...mockLinks(fn), ...capabilityLinks(fn), ...carriedResources(fn).map((resource) => carrier(resource, local))],
     permissions: $util
       .all([storagePermissions(fn), mockPermissions(fn), statementGrants(fn).map((grant) => grantStatement(grant, refs))])
       .apply((parts) => parts.flat() as Statement[]),
@@ -235,7 +238,8 @@ export const QaTargets = new sst.Linkable("QaTargets", {
   },
 });
 
-const qaAccess = roleAccess("QaDriver", [...routerLinks, QaTargets, WhatsAppMetaPhoneNumberId], { "{PolicyAudit}": policyAudit });
+// Media and Evidence by name only: its object grants are the prefixes of infra/qa-driver-fence.ts.
+const qaAccess = roleAccess("QaDriver", [...routerLinks, QaTargets, WhatsAppMetaPhoneNumberId, mediaBucket, evidenceBucket], { "{PolicyAudit}": policyAudit });
 
 export const qaDriver = new sst.aws.Function("QaDriver", {
   name: qaDriverFunctionName($app.name, $app.stage),

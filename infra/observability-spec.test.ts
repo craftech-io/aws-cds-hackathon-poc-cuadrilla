@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALARM_PREFIX, ALARM_SCOPES, BUDGET_SCOPES } from "../packages/bff/src/handlers/cost-guard";
+import { capMetric, planCounters } from "../packages/bff/src/ops/cost-caps";
 import { TOOL_LAMBDAS } from "./agentcore-spec";
 import { IAM_ARNS, LAMBDA_CAPABILITIES, QA_DRIVER_DLQ_ONLY_ACTIONS, expectedGrants, type LambdaName } from "./iam-capabilities";
 import {
@@ -60,9 +61,17 @@ describe("metric filters: only what a cutting alarm or a scenario step reads (AD
       expect(read(spec.source), spec.metric).toContain(`"${spec.metric}"`);
     }
     const caps = read("packages/bff/src/ops/cost-caps.ts");
-    expect(caps).toContain('return { metric: "TurnCapHits", scope: counter.ledger };');
+    expect(caps).toContain('if (counter.resource === "turns") return { metric: "TurnCapHits", scope };');
     expect(caps).toContain('action: "KILL_SWITCH_ACTIVE", metric: "KillSwitchActive"');
     expect(read("packages/bff/src/routers/edge.ts")).toContain('{ metric: "OriginRejected", value: 1 }');
+  });
+
+  it("[W3 review flows B1] never leaves a metric an alarm cuts with pending: the code writes every one of them today", () => {
+    for (const spec of METRIC_FILTERS.filter((filter) => filter.readBy === "alarm")) {
+      expect(spec.pendingIn, spec.metric).toBeUndefined();
+      expect(spec.source, spec.metric).toBeDefined();
+    }
+    expect(read("packages/bff/src/turns/record.ts")).toContain('deps.log.info("metric", { metric: COST_PER_CONVERSATION_METRIC, value: usd');
   });
 
   it("counts only the global ceiling of turns and only refused spends of a kill switch", () => {
@@ -70,6 +79,28 @@ describe("metric filters: only what a cutting alarm or a scenario step reads (AD
     expect(turnCaps).toMatchObject({ pattern: '{ $.metric = "TurnCapHits" && $.scope = "GLOBAL" }', dimensions: { scope: "$.scope" }, readBy: "alarm" });
     expect(METRIC_FILTERS.find((spec) => spec.metric === "KillSwitchActive")?.pattern).toContain('$.action = "KILL_SWITCH_ACTIVE"');
     expect(METRIC_FILTERS.find((spec) => spec.metric === "CostPerConversation")).toMatchObject({ value: "$.value", unit: "None" });
+  });
+});
+
+/** A CloudWatch JSON filter of the form `{ $.a = "x" && $.b = "y" }` applied to a log line. */
+function matchesFilter(pattern: string, line: Readonly<Record<string, unknown>>): boolean {
+  const terms = [...pattern.matchAll(/\$\.([A-Za-z]+) = "([^"]*)"/g)];
+  expect(terms.length, pattern).toBeGreaterThan(0);
+  return terms.every(([, field, value]) => line[field as string] === value);
+}
+
+describe("[W3 review B1] a QA world's test ceiling never counts as the stage's global ceiling", () => {
+  it("logs scope GLOBAL_TEST for a globalCapsOverride hit, which the TurnCapHits filter of the cut does not match", () => {
+    const pattern = METRIC_FILTERS.find((spec) => spec.metric === "TurnCapHits")?.pattern ?? "";
+    const caps = { turnsPerDay: 1500, validationsPerDay: 300, transcribeSecondsPerDay: 3600 };
+    const now = new Date("2026-10-20T15:00:00Z");
+    const plan = (clockId: string, settings: object) => planCounters({ world: { clockId, settings }, resource: "turns", amount: 1, reserve: ["GLOBAL"] }, caps, now);
+    const [test] = plan("qa-812-1-sc12-global", { globalCapsOverride: { turnsPerDay: 2 } });
+    const [real] = plan("GLOBAL#isp-demo", {});
+    expect(test?.key).toBe("TURNCAP#GLOBAL#qa-812-1-sc12-global#2026-10-20");
+    expect(test && matchesFilter(pattern, capMetric(test))).toBe(false);
+    expect(test && capMetric(test)).toEqual({ metric: "TurnCapHits", scope: "GLOBAL_TEST" });
+    expect(real && matchesFilter(pattern, capMetric(real))).toBe(true);
   });
 });
 

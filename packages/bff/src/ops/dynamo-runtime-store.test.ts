@@ -49,6 +49,23 @@ describe("DynamoDB runtime store: cap counters", () => {
     expect(global?.UpdateExpression).toContain("#expiresAt = if_not_exists(#expiresAt, :expiresAt)");
   });
 
+  it("[W3 review B1] checks a counter it only needs room in (amount 0) with a ConditionCheck, never a write", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    const checked = planCounters({ world: { clockId: "GUEST#isp-guest-test", settings: {} }, resource: "turns", amount: 1, reserve: [], check: ["GLOBAL"] }, GLOBAL, NOW);
+    expect(await store().reserve(checked, { nowIso: NOW_ISO })).toEqual({ ok: true });
+    const [item] = docMock.commandCalls(TransactWriteCommand)[0]?.args[0].input.TransactItems ?? [];
+    expect(item).toEqual({
+      ConditionCheck: {
+        TableName: "poc-Runtime",
+        Key: { PK: "TURNCAP#GLOBAL#2026-10-20", SK: "META" },
+        ConditionExpression: "attribute_not_exists(#used) OR #used <= :max",
+        ExpressionAttributeNames: { "#used": "used" },
+        ExpressionAttributeValues: { ":max": 1499 },
+        ReturnValuesOnConditionCheckFailure: "ALL_OLD",
+      },
+    });
+  });
+
   it("reports the counter whose condition failed, with the value it had", async () => {
     docMock.on(TransactWriteCommand).rejects(awsError("TransactionCanceledException", { CancellationReasons: [{ Code: "None" }, { Code: "ConditionalCheckFailed", Item: { used: { N: "1000" } } }, { Code: "None" }] }));
     expect(await store().reserve(COUNTERS, { nowIso: NOW_ISO })).toEqual({ ok: false, failedKey: "TURNCAP#isp-guest-07#2026-10-20", used: 1000 });

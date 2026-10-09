@@ -61,7 +61,26 @@ function usedFrom(item: Record<string, unknown> | undefined): number | undefined
   return undefined;
 }
 
+/**
+ * A counter that is only checked (`amount` 0, the simulator before it enqueues) is a ConditionCheck:
+ * the check writes nothing, so a role fenced away from a counter's key (the QaDriver and the stage's
+ * ceiling) can still read whether it has room.
+ */
+function checkItem(table: string, counter: CapCounter) {
+  return {
+    ConditionCheck: {
+      TableName: table,
+      Key: { PK: counter.key, SK: META },
+      ConditionExpression: "attribute_not_exists(#used) OR #used <= :max",
+      ExpressionAttributeNames: { "#used": "used" },
+      ExpressionAttributeValues: { ":max": counter.limit - 1 },
+      ReturnValuesOnConditionCheckFailure: "ALL_OLD" as const,
+    },
+  };
+}
+
 function reserveItem(table: string, counter: CapCounter, nowIso: string) {
+  if (counter.amount === 0) return checkItem(table, counter);
   return {
     Update: {
       TableName: table,

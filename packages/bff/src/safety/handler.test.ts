@@ -71,6 +71,15 @@ describe("[FL-067] the fixed instruction of the manual, at once", () => {
     expect(kit.outbound.emails).toHaveLength(1);
   });
 
+  it("[W3 review flows B2] runs again on a redelivered event without repeating the instruction, the alerts or the audit row", async () => {
+    const first = await report();
+    const again = await report();
+    expect(again).toMatchObject({ instructionSent: true, existingCase: true, caseId: first.caseId });
+    expect(sentKinds("inst-rogelio").filter((line) => line.startsWith("SAFETY_INSTRUCTION"))).toHaveLength(1);
+    expect(sentKinds("sup-adriana").filter((line) => line.startsWith("SAFETY_ALERT"))).toHaveLength(1);
+    expect((await kit.world.connector.audit.listByWorkOrder(ORDER)).filter((row) => row.action === "SAFETY_DETECTED")).toHaveLength(1);
+  });
+
   it("still instructs an installer with no order in progress, without a case", async () => {
     await kit.world.connector.workOrders.setStatus(ORDER, "CLOSED", { actor: "SYSTEM" });
     await kit.world.connector.workOrders.setStatus("wo-24818", "CLOSED", { actor: "SYSTEM" });

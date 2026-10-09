@@ -8,7 +8,8 @@
 //                          built by code, and the case opens all the same
 //   report_safety_hazard   the same handler as the lexicon (safety/handler.ts): the fixed instruction,
 //                          the SAFETY case with both alerts in parallel and the hold; exempt from the
-//                          kill switch (`LAM-KILL`), so physical safety is never cut
+//                          kill switch (`LAM-KILL`), so physical safety is never cut; the agent's
+//                          summary goes through the same `SummaryCheck` (never delaying the instruction)
 import { ToolError, fail } from "@cuadrilla/shared";
 import { esMX } from "../../copy/es-MX";
 import { openCase, openCaseOf } from "../../cases/open";
@@ -80,7 +81,9 @@ export const reportSafetyHazard = implementTool(reportSafetyHazardTool, async (a
     installerId: scope.installerId,
     category: args.category,
     detectedBy: "AGENT",
+    // Model text: checked by G2 and the fact check before it reaches the case or the zone chief.
     report: args.summary,
+    reportCheck: ctx.deps.summaries,
     atSim: turnAtSim(ctx),
     actor: ctx.actor,
     ...(scope.workOrderId === undefined ? {} : { workOrderId: scope.workOrderId }),

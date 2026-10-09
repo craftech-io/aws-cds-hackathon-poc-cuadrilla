@@ -236,7 +236,7 @@ export const SIGNUP_ROLES = {
     ],
   },
   // The world factory, fenced to guest operators in the mocks' tables (WORLDS_LEADING_KEYS).
-  GuestWorlds: { capabilities: ["WORLDS"] },
+  GuestWorlds: { capabilities: ["WORLDS", "WORLD_DATA"] },
   // Notifies Craftech, deletes the pending users of a confirmed or expired lead, sweeps UNCONFIRMED
   // users daily and hands an expired confirmed lead to the deletion.
   LeadStream: {
@@ -250,7 +250,7 @@ export const SIGNUP_ROLES = {
   },
   // Works with the `gst-*` user stored in the row or the lead, never a listing (no ListUsers).
   GuestAccountDeletion: {
-    capabilities: ["LEADS_WRITE", "WORLDS"],
+    capabilities: ["LEADS_WRITE", "WORLDS", "WORLD_DATA"],
     grants: [
       g(["cognito-idp:AdminGetUser", "cognito-idp:AdminDeleteUser"], ["{UserPool}"]),
       g(["s3:ListBucket"], ["{Media}", "{Evidence}"], [{ test: "StringLike", variable: "s3:prefix", values: ["guest/*"] }]),

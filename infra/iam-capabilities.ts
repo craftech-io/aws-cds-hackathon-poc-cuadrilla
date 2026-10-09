@@ -1,9 +1,9 @@
 // Least-privilege capabilities per role (docs/architecture.md §14), as plain data. No SST or Pulumi
 // dependency: every infra module that creates a Function or a service role builds its `link` and its
-// `sst.aws.permission` statements from the entry of that role here, and
-// infra/iam-capabilities.test.ts derives the expected statements and compares them with what the
-// modules generate. A permission that is not in this file is drift, and the test fails. The rows of
-// the own sign-up, the guest worlds and the leads live in infra/leads-spec.ts and are merged here.
+// `sst.aws.permission` statements from the entry of that role here, and iam-capabilities.test.ts
+// compares them with what the modules generate (a permission not in this file is drift). The rows of
+// the sign-up, the guest worlds and the leads (infra/leads-spec.ts) and the QaDriver's fenced writes
+// (infra/qa-driver-fence.ts) are merged here.
 //
 // Tables and buckets are data access (`read`, `append`, `write`): the `link` only hands the Lambda
 // their names (sst.config.ts strips SST's `dynamodb:*` / `s3:*`; infra/storage-access.ts turns each
@@ -23,6 +23,7 @@
 // set of the account belongs to another app, ADR-0003) nor any WABA association or
 // `PutWhatsAppBusinessAccountEventDestinations` (the operator applies the event destination).
 import { BFF_LEADS_GRANT, GUEST_WORLDS_LEADING_KEYS, QA_SEAM_GRANTS, SIGNUP_CAPABILITIES, SIGNUP_ROLES, type SignupCapability } from "./leads-spec";
+import { qaDriverDataGrants } from "./qa-driver-fence";
 
 export const REGION = "us-east-1";
 export const ACCOUNT_ID = "776805327629";
@@ -102,7 +103,7 @@ export interface Grant {
   readonly conditions?: readonly Condition[];
 }
 
-export type CapabilityName = "TIMERS" | "SEND_EMAIL" | "SEND_WHATSAPP" | "PIPELINE" | "MOCK_NETWORK" | "MOCK_DISPATCH" | "TRANSCRIBE" | "MEMORY_ADMIN" | "WORLDS" | SignupCapability;
+export type CapabilityName = "TIMERS" | "SEND_EMAIL" | "SEND_WHATSAPP" | "PIPELINE" | "MOCK_NETWORK" | "MOCK_DISPATCH" | "TRANSCRIBE" | "MEMORY_ADMIN" | "WORLDS" | "WORLD_DATA" | SignupCapability;
 
 export interface Capability {
   readonly grants: readonly Grant[];
@@ -118,7 +119,7 @@ const invokeMock = (mock: "NetworkMock" | "DispatchMock"): Grant[] => [
 ];
 
 const APP_TABLES = ["Isps", "People", "WorkOrders", "Cases", "Conversations", "AuditLog", "Runtime", "CuadrillaMetrics"] as const;
-const writeAll = <T extends string>(names: readonly T[]): Partial<Record<T, Access>> => Object.fromEntries(names.map((name) => [name, "write"])) as Partial<Record<T, Access>>;
+const allAt = <T extends string>(names: readonly T[], access: Access): Partial<Record<T, Access>> => Object.fromEntries(names.map((name) => [name, access])) as Partial<Record<T, Access>>;
 
 export const CAPABILITIES: Readonly<Record<CapabilityName, Capability>> = {
   TIMERS: {
@@ -185,8 +186,10 @@ export const CAPABILITIES: Readonly<Record<CapabilityName, Capability>> = {
       { actions: ["s3:PutObject"], resources: ["{Media}/sim/*"] },
     ],
     includes: ["TIMERS", "MEMORY_ADMIN"],
-    tables: { ...writeAll(APP_TABLES), Reference: "read", Network: "write", Dispatch: "write" },
+    tables: { Reference: "read", Network: "write", Dispatch: "write" }, // the mocks', fenced by WORLDS_LEADING_KEYS
   },
+  // Unfenced writes of every app table: never the QaDriver's (infra/qa-driver-fence.ts fences its writes by key).
+  WORLD_DATA: { grants: [], tables: allAt(APP_TABLES, "write") },
   // LEADS_READ, LEADS_WRITE, SEND_LEAD_NOTIFY: `Leads` is never part of WORLDS (ADR-0026).
   ...SIGNUP_CAPABILITIES,
 };
@@ -229,7 +232,7 @@ export const LAMBDA_CAPABILITIES = {
   },
   ToolOrders: {
     capabilities: ["MOCK_NETWORK", "PIPELINE"],
-    tables: { WorkOrders: "write", People: "write", Isps: "read", Cases: "write", Runtime: "write", AuditLog: "write" },
+    tables: { WorkOrders: "write", People: "write", Isps: "read", Cases: "write", Runtime: "write", AuditLog: "write", Reference: "read" },
   },
   ToolKnowledge: {
     capabilities: [],
@@ -250,7 +253,7 @@ export const LAMBDA_CAPABILITIES = {
   },
   ToolCases: {
     capabilities: ["PIPELINE", "MOCK_NETWORK"],
-    tables: { WorkOrders: "write", Cases: "write", People: "write", Isps: "read", Conversations: "write", Runtime: "write", AuditLog: "write" },
+    tables: { WorkOrders: "write", Cases: "write", People: "write", Isps: "read", Conversations: "write", Runtime: "write", AuditLog: "write", Reference: "read" },
     grants: [g(["lambda:InvokeFunction"], ["{CertificateWriter}"])],
   },
   CertificateWriter: {
@@ -258,9 +261,10 @@ export const LAMBDA_CAPABILITIES = {
     tables: { WorkOrders: "write", People: "read", Isps: "read" },
     grants: [g(["s3:GetObject"], ["{Evidence}/photos/*", "{Evidence}/guest/*/photos/*"]), g(["s3:PutObject"], ["{Evidence}/certificates/*", "{Evidence}/guest/*/certificates/*"]), g(["bedrock:ApplyGuardrail"], ["{G3}"])],
   },
+  // PIPELINE: its fixed replies and the window fallback go through the outbound pipeline (Reference: the templates).
   InboundWhatsApp: {
-    capabilities: ["SEND_WHATSAPP"],
-    tables: { People: "write", Runtime: "write", Conversations: "write", WorkOrders: "write", Cases: "write", AuditLog: "write", Isps: "read" },
+    capabilities: ["PIPELINE"],
+    tables: { People: "write", Runtime: "write", Conversations: "write", WorkOrders: "write", Cases: "write", AuditLog: "write", Isps: "read", Reference: "read" },
     buckets: { Media: "write" },
     grants: [g(["social-messaging:GetWhatsAppMessageMedia"], ["{whatsappPhone}"]), sqsSend(), metrics],
   },
@@ -270,7 +274,7 @@ export const LAMBDA_CAPABILITIES = {
   // Leads: only `signup.start`'s writes, fenced by key and attributes; retryWorld and deleteGuest invoke.
   Bff: {
     capabilities: ["MOCK_NETWORK", "MOCK_DISPATCH", "WORLDS"],
-    tables: { ...writeAll(APP_TABLES), Reference: "read" },
+    tables: { ...allAt(APP_TABLES, "write"), Reference: "read" },
     buckets: { Evidence: "read", Media: "write" },
     grants: [g(["s3:GetObject"], ["{Seed}/brand/*"]), sqsSend(), g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{GuestWorlds}", "{GuestAccountDeletion}"]), BFF_LEADS_GRANT],
   },
@@ -279,7 +283,7 @@ export const LAMBDA_CAPABILITIES = {
     tables: { AuditLog: "write" },
     grants: [g(["dynamodb:PutItem"], ["{Runtime}"], [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#*"] }])],
   },
-  WorldJanitor: { capabilities: ["WORLDS"] },
+  WorldJanitor: { capabilities: ["WORLDS", "WORLD_DATA"] },
   PolicyAudit: {
     capabilities: [],
     tables: { Conversations: "read", AuditLog: "write", WorkOrders: "read", Cases: "read", People: "read", Isps: "read", Reference: "read" },
@@ -291,8 +295,8 @@ export const LAMBDA_CAPABILITIES = {
   DispatchMock: { capabilities: [], tables: { Dispatch: "write" }, grants: [g(["events:PutEvents"], ["{Feeds}"])] },
   QaDriver: {
     capabilities: ["MOCK_NETWORK", "MOCK_DISPATCH", "WORLDS", "LEADS_READ"],
-    tables: { ...writeAll(APP_TABLES), Reference: "read" },
-    buckets: { Evidence: "read", Media: "write" },
+    // Reads every app table; writes only by key and objects only by prefix (infra/qa-driver-fence.ts).
+    tables: { ...allAt(APP_TABLES, "read"), Reference: "read" },
     grants: [
       g(["cognito-idp:DescribeUserPoolClient"], ["{Auth}"]),
       ...QA_SEAM_GRANTS,
@@ -303,9 +307,8 @@ export const LAMBDA_CAPABILITIES = {
       guardrailG1,
       g(["sqs:ReceiveMessage", "sqs:DeleteMessage"], ["{InstallerEventsDlq}"]),
       g(["cloudwatch:DescribeAlarmHistory"], [arn.dlqAlarm]),
-      g(["s3:DeleteObject"], ["{Media}/qa/*", "{Media}/eval/*", "{Evidence}/qa/*", "{Evidence}/eval/*"]),
       g(["scheduler:DeleteSchedule"], [`arn:aws:scheduler:${REGION}:${ACCOUNT_ID}:schedule/${SCHEDULE_GROUP}/tm-q-*`, `arn:aws:scheduler:${REGION}:${ACCOUNT_ID}:schedule/${SCHEDULE_GROUP}/tm-e-*`]),
-      g(["dynamodb:PutItem", "dynamodb:DeleteItem"], ["{Runtime}"], [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#AGENT#qa-*"] }]),
+      ...qaDriverDataGrants(),
     ],
   },
   ...SIGNUP_ROLES,
@@ -345,9 +348,7 @@ export const JUSTIFIED_WILDCARDS: Readonly<Record<string, readonly string[]>> = 
 /** SQS actions of the QaDriver that only the DLQ may receive (`dlq.find`, `dlq.delete`). */
 export const QA_DRIVER_DLQ_ONLY_ACTIONS = ["sqs:ReceiveMessage", "sqs:DeleteMessage"] as const;
 
-function roleEntry(role: RoleName): RoleCapabilities {
-  return role in LAMBDA_CAPABILITIES ? LAMBDA_CAPABILITIES[role as LambdaName] : SERVICE_ROLES[role as ServiceRoleName];
-}
+const roleEntry = (role: RoleName): RoleCapabilities => (role in LAMBDA_CAPABILITIES ? LAMBDA_CAPABILITIES[role as LambdaName] : SERVICE_ROLES[role as ServiceRoleName]);
 
 /** Every capability a role holds, with the ones they include, without duplicates. */
 export function resolveCapabilities(names: readonly CapabilityName[]): CapabilityName[] {
@@ -367,9 +368,7 @@ export function expectedGrants(role: RoleName): Grant[] {
   return [...(entry.grants ?? []), ...resolveCapabilities(entry.capabilities).flatMap((name) => CAPABILITIES[name].grants)];
 }
 
-export function expectedActions(role: RoleName): string[] {
-  return [...new Set(expectedGrants(role).flatMap((grant) => grant.actions))].sort();
-}
+export const expectedActions = (role: RoleName): string[] => [...new Set(expectedGrants(role).flatMap((grant) => grant.actions))].sort();
 
 /**
  * Tables (or buckets) a role reaches, capabilities included. `write` wins; `read` and `append` of the

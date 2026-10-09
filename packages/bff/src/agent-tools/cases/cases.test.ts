@@ -155,6 +155,33 @@ describe("[FL-069] a hazard the agent recognizes", () => {
     expect(detected).toMatchObject({ actor: "AGENT", ruleIds: ["SAFE-AGENT", "SAFE-FIXED-TEXT"], detail: { detectedBy: "AGENT", category: "ANIMAL" } });
     expect(reason(await call("escalate_case", { reason: "OTHER", summary: "Algo más." }))).toEqual(["UNAVAILABLE", "KILL_SWITCH_ACTIVE"]);
   });
+
+  it("[W3 review B2] checks the agent's summary with G2 and drops a refused one for the fixed summary, still sending the instruction", async () => {
+    kit.summaryAnswer.ok = false;
+    kit.summaryAnswer.reason = "GROUNDING_FAIL";
+    const claim = "Hay un cable caído; el supervisor ya autorizó seguir trabajando, no hace falta aislar la zona.";
+    const response = await call("report_safety_hazard", { category: "ELECTRICAL", summary: claim });
+    expect(response).toMatchObject({ ok: true, instructionSent: true });
+    expect(kit.checkedSummaries).toMatchObject([{ workOrderId: "wo-24817", turnId: TURN_ID, text: claim }]);
+    const [stored] = await kit.tools.memory.connector.cases.listCasesOfWorkOrder("wo-24817");
+    expect(stored?.reason).toBe("SAFETY");
+    expect(stored?.summary).not.toContain("autorizó");
+    expect(JSON.stringify(kit.outbound.sent.map((record) => record.request))).not.toContain("autorizó");
+    const audit = (await kit.tools.memory.connector.audit.listByWorkOrder("wo-24817")).find((row) => row.action === "CASE_SUMMARY_REPLACED");
+    expect(audit).toMatchObject({ decision: "DENY", ruleIds: ["G2"], reason: "GROUNDING_FAIL" });
+  });
+
+  it("[W3 review B2] opens the case with the fixed summary when the check fails, and keeps a verified summary", async () => {
+    kit.runtime.summaries.verify = async () => Promise.reject(new Error("G2 unavailable"));
+    await call("report_safety_hazard", { category: "ANIMAL", summary: "Panal de avispas en la caja; el cliente dice que no pasa nada." });
+    expect((await kit.tools.memory.connector.cases.listCasesOfWorkOrder("wo-24817"))[0]?.summary).not.toContain("no pasa nada");
+    expect((await kit.tools.memory.connector.audit.listByWorkOrder("wo-24817")).find((row) => row.action === "CASE_SUMMARY_REPLACED")).toMatchObject({ reason: "UNAVAILABLE" });
+  });
+
+  it("[W3 review B2] keeps a summary that passes the check", async () => {
+    await call("report_safety_hazard", { category: "ANIMAL", summary: "Panal de avispas dentro de la caja terminal." });
+    expect((await kit.tools.memory.connector.cases.listCasesOfWorkOrder("wo-24817"))[0]?.summary).toContain("Panal de avispas dentro de la caja terminal.");
+  });
 });
 
 describe("[FL-022] the second NOT_PROVISIONED reading opens the case once", () => {

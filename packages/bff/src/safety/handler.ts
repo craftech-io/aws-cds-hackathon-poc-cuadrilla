@@ -10,15 +10,21 @@
 //   3. the order goes `onHoldSafety` until a supervisor closes the case (the agent guides no work on it)
 //
 // The model never writes the instruction. An installer with no order in progress still gets it; the
-// case needs an order, so then only the instruction and the audit row remain.
+// case needs an order, so then only the instruction and the audit row remain. A report the model wrote
+// (`report_safety_hazard`) reaches the case and the zone chief's email only after G2 and the fact check
+// (`reportCheck`, the `SummaryCheck` of escalate_case), within `SAFETY_REPORT_CHECK_MS`: on a refusal,
+// a failure or the deadline it is dropped for the fixed summary and audited `CASE_SUMMARY_REPLACED`.
+// The instruction never waits on that check: it goes out in parallel with the case.
 import type { HazardCategory } from "@cuadrilla/shared";
 import { esMX } from "../copy/es-MX";
 import type { Actor } from "../domain/common";
 import type { WorkOrder } from "../domain/work-orders";
 import { sha256Hex } from "../lib/crypto";
 import { openCase } from "../cases/open";
-import type { CaseDeps } from "../cases/ports";
+import type { CaseDeps, SummaryCheck } from "../cases/ports";
+import type { DecisionInput } from "../connector/ports";
 import { cleanSummary, fixedSummary } from "../cases/summary";
+import { withDeadline } from "../lib/deadline";
 import { localDateOf } from "../services/business-hours/zoned-time";
 
 export type SafetyDetector = "LEXICON" | "AGENT";
@@ -39,6 +45,8 @@ export interface SafetyReport {
   readonly turnId?: string;
   /** What the installer reported (the agent's summary or the masked text); masked again here. */
   readonly report?: string;
+  /** G2 and the fact check of a report the model wrote; without it the report is the installer's own masked text. */
+  readonly reportCheck?: SummaryCheck;
   readonly atSim: string;
   readonly actor: Actor;
 }
@@ -94,8 +102,34 @@ async function sendInstruction(deps: CaseDeps, report: SafetyReport, workOrderId
   return sent.status !== "DENIED";
 }
 
+/** The longest the case waits for the check of a model-written report before it opens with the fixed summary. */
+export const SAFETY_REPORT_CHECK_MS = 4_000;
+
+/** The masked report, or `undefined` when a model-written one did not pass its check in time (audited). */
+async function checkedReport(deps: CaseDeps, report: SafetyReport, order: WorkOrder): Promise<string | undefined> {
+  const masked = report.report === undefined ? undefined : cleanSummary(report.report, 300);
+  if (masked === undefined || report.reportCheck === undefined) return masked;
+  const check = report.reportCheck;
+  const input = { ispId: report.ispId, clockId: report.clockId, workOrderId: order.workOrderId, text: masked, ...(report.turnId === undefined ? {} : { turnId: report.turnId }) };
+  const outcome = await withDeadline("safety.report_check", SAFETY_REPORT_CHECK_MS, () => check.verify(input)).catch(() => ({ ok: false, reason: "UNAVAILABLE" }));
+  if (outcome.ok) return masked;
+  deps.logger.info("case.summary.replaced", { workOrderId: order.workOrderId, reason: outcome.reason ?? "REFUSED" });
+  await deps.connector.audit.append({
+    ispId: report.ispId,
+    clockId: report.clockId,
+    atSim: report.atSim,
+    decision: "DENY",
+    action: "CASE_SUMMARY_REPLACED",
+    ruleIds: ["G2"],
+    actor: report.actor,
+    refs: { workOrderId: order.workOrderId, ...(report.turnId === undefined ? {} : { turnId: report.turnId }) },
+    ...(outcome.reason === undefined ? {} : { reason: outcome.reason }),
+  });
+  return undefined;
+}
+
 async function openSafetyCase(deps: CaseDeps, report: SafetyReport, order: WorkOrder): Promise<{ caseId: string; existing: boolean }> {
-  const reported = report.report === undefined ? undefined : cleanSummary(report.report, 300);
+  const reported = await checkedReport(deps, report, order);
   const summary = fixedSummary({ reason: "SAFETY", reasonText: esMX.hazard[report.category], workOrder: order, ...(reported === undefined ? {} : { report: reported }) });
   const opened = await openCase(deps, { workOrderId: order.workOrderId, reason: "SAFETY", summary, atSim: report.atSim, actor: report.actor, hazardCategory: report.category });
   return { caseId: opened.caseItem.caseId, existing: opened.existing };
@@ -111,7 +145,25 @@ export async function handleSafety(deps: CaseDeps, report: SafetyReport): Promis
   if (order !== undefined && !order.onHoldSafety) {
     await deps.connector.workOrders.setOnHoldSafety(order.workOrderId, true, { actor: report.actor, atSim: report.atSim, reason: `safety ${report.category}` });
   }
-  await deps.connector.audit.append({
+  // Once per message and detector: a redelivered event runs this handler again (worker/inbound.ts).
+  const auditMark = { source: "AUDIT:SAFETY_DETECTED", id: `${report.detectedBy}#${instructionId(report)}` };
+  if (await deps.connector.runtime.claimIdempotency(auditMark.source, auditMark.id)) {
+    await deps.connector.audit.append(detectedRow(report, instructionSent, order, opened)).catch(async (error: unknown) => {
+      await deps.connector.runtime.releaseIdempotency(auditMark.source, auditMark.id);
+      throw error;
+    });
+  }
+  return {
+    instructionSent,
+    existingCase: opened?.existing ?? false,
+    ...(opened === undefined ? {} : { caseId: opened.caseId }),
+    ...(order === undefined ? {} : { workOrderId: order.workOrderId }),
+  };
+}
+
+/** The `SAFETY_DETECTED` audit row of one report. */
+function detectedRow(report: SafetyReport, instructionSent: boolean, order: WorkOrder | undefined, opened: { readonly caseId: string } | undefined): DecisionInput {
+  return {
     ispId: report.ispId,
     clockId: report.clockId,
     atSim: report.atSim,
@@ -133,11 +185,5 @@ export async function handleSafety(deps: CaseDeps, report: SafetyReport): Promis
       ...(report.lexiconVersion === undefined ? {} : { lexiconVersion: report.lexiconVersion }),
       ...(order === undefined ? { noOrder: true } : {}),
     },
-  });
-  return {
-    instructionSent,
-    existingCase: opened?.existing ?? false,
-    ...(opened === undefined ? {} : { caseId: opened.caseId }),
-    ...(order === undefined ? {} : { workOrderId: order.workOrderId }),
   };
 }

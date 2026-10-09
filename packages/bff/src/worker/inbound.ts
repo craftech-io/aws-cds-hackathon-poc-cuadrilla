@@ -7,9 +7,9 @@
 //   2. the order the message is about (worker/active-order.ts, FL-013): with several pending and none
 //      active, the `ORDER_CHOICE` list goes out and no turn runs (the tap on a row brings the message back)
 //   3. the safety classifier over the text or the transcript, before G1 and the agent and never stopped by
-//      the kill switch: a match → `SAFETY_INSTRUCTION` + `open_case(SAFETY)` (safety/, once per event)
+//      the kill switch: a match → `SAFETY_INSTRUCTION` + `open_case(SAFETY)` (safety/, until done per event)
 //   4. the active order has a troubleshooting step `PENDING` → the simulated orchestrator learns that the
-//      installer acted (`POST /v1/onus/{serial}/physical-action {kind: INSTALLER_STEP}`, once per event)
+//      installer acted (`POST /v1/onus/{serial}/physical-action {kind: INSTALLER_STEP}`, until done per event)
 //   5. the active order has a case `TAKEN` → `relay_message` to the supervisor and the end (`CP-BRIDGE`)
 //   6. otherwise the agent's turn (`INSTALLER_MESSAGE`, turns/turn.ts)
 import type { NetworkClient } from "../network/client";
@@ -46,19 +46,22 @@ const VOICE_NOTICES: Readonly<Record<Exclude<TranscriptionOutcome["status"], "TR
   PAUSED: "servicePaused",
 };
 
-/** Marks of work done once per event (`IDEMP#<mark>#<eventId>`): a retried event never repeats it. */
-const ONCE = { safety: "SAFETY", physicalAction: "PHYSICAL_ACTION" } as const;
+/** Marks of work done per event (`IDEMP#<mark>#<eventId>`): a retried event that finished it never repeats it. */
+export const ONCE = { safety: "SAFETY", physicalAction: "PHYSICAL_ACTION" } as const;
 
-async function once(deps: InboundDeps, mark: string, eventId: string, run: () => Promise<void>): Promise<boolean> {
+/**
+ * Runs the work unless a previous delivery of the event finished it, and marks it only AFTER it ran: a
+ * Lambda that dies inside it (timeout, OOM) leaves no mark, so the redelivery runs it again and safety
+ * never stops (ADR-0016). The work is idempotent on its own: the safety instruction has a deterministic
+ * message id, the case opens once per order and reason, its audit row is written once per message
+ * (safety/handler.ts) and the physical action's audit once per event; only a repeated report to the
+ * simulated orchestrator remains possible, and only after a lost invocation.
+ */
+async function untilDone(deps: InboundDeps, mark: string, eventId: string, run: () => Promise<void>): Promise<void> {
   const { runtime } = deps.turn.data;
-  if (!(await runtime.claimIdempotency(mark, eventId))) return false;
-  try {
-    await run();
-  } catch (error) {
-    await runtime.releaseIdempotency(mark, eventId);
-    throw error;
-  }
-  return true;
+  if ((await runtime.getIdempotency(mark, eventId)) !== undefined) return;
+  await run();
+  await runtime.claimIdempotency(mark, eventId);
 }
 
 function targetOf(event: InboundMessageEvent, workOrderId: string | undefined): NoticeTarget {
@@ -87,7 +90,7 @@ async function orderOf(deps: InboundDeps, event: InboundMessageEvent, workOrderI
 async function reportPhysicalAction(deps: InboundDeps, ctx: WorkerContext, event: InboundMessageEvent, order: WorkOrder, atSim: string): Promise<void> {
   const steps = await deps.turn.data.workOrders.listSteps(order.workOrderId);
   if (!steps.some((step) => step.outcome === "PENDING")) return;
-  await once(deps, ONCE.physicalAction, event.eventId, async () => {
+  await untilDone(deps, ONCE.physicalAction, event.eventId, async () => {
     const outcome = await deps.network.reportPhysicalAction({ clockId: event.clockId, serial: order.onuSerial, caller: "WORKER", atSim, kind: "INSTALLER_STEP", logger: ctx.log });
     if (outcome.kind !== "OK") ctx.log.warn("worker.physical_action_failed", { outcome: outcome.kind, ...(outcome.kind === "UNAVAILABLE" ? { reason: outcome.reason } : {}) });
     await auditOnce(workerAudit(deps.turn.data), {
@@ -121,7 +124,7 @@ export async function handleInboundMessage(deps: InboundDeps, ctx: WorkerContext
   if (own.inbound !== undefined) {
     const safety = await deps.ports.safety.classify(own.inbound.text);
     if (safety.matched) {
-      await once(deps, ONCE.safety, event.eventId, () =>
+      await untilDone(deps, ONCE.safety, event.eventId, () =>
         deps.ports.safety.handle(
           { clockId: event.clockId, ispId: event.ispId, installerId: event.installerId, category: safety.category, lexiconVersion: safety.lexiconVersion, messageId: current.messageId, eventId: event.eventId, atSim: current.sentAtSim, ...(order === undefined ? {} : { workOrderId: order.workOrderId }) },
           ctx,

@@ -62,7 +62,7 @@ export interface WindowFallbackPort {
 
 export interface StatusDeps {
   readonly conversations: Pick<ConversationsPort, "findMessageByProviderId" | "updateMessage" | "appendMessageEvent">;
-  readonly runtime: Pick<RuntimePort, "claimIdempotency">;
+  readonly runtime: Pick<RuntimePort, "claimIdempotency" | "releaseIdempotency">;
   readonly audit: Pick<AuditPort, "append">;
   readonly metrics: MetricSink;
   readonly fallback: WindowFallbackPort;
@@ -79,12 +79,21 @@ function isReengagementFailure(status: StatusUpdate): boolean {
   return status.status === "failed" && (status.errors ?? []).some((error) => error.code === REENGAGEMENT_ERROR_CODE);
 }
 
+/**
+ * Once per failed message: the claim is released when the send (or the hold) throws, so the redelivery
+ * of the same status, which finds its `MessageEvent` already written, tries again.
+ */
 async function windowFallback(message: Message, deps: StatusDeps): Promise<void> {
   if (isTemplate(message)) return;
   if (!(await deps.runtime.claimIdempotency("wa-window-fallback", message.messageId))) return;
   const template = message.kind === undefined ? undefined : WINDOW_FALLBACK_TEMPLATE[message.kind];
-  if (template === undefined) await deps.fallback.holdForNextInbound(message);
-  else await deps.fallback.sendTemplate(message, template);
+  try {
+    if (template === undefined) await deps.fallback.holdForNextInbound(message);
+    else await deps.fallback.sendTemplate(message, template);
+  } catch (error) {
+    await deps.runtime.releaseIdempotency("wa-window-fallback", message.messageId);
+    throw error;
+  }
   deps.metrics.count("WhatsAppWindowFallback", { fallback: template ?? "HELD" });
   await deps.audit.append({
     ispId: message.ispId,
@@ -116,8 +125,10 @@ async function applyStatus(status: StatusUpdate, deps: StatusDeps): Promise<Stat
       ...(pricing === undefined ? {} : { pricing: { model: pricing.pricing_model, category: pricing.category, ...(pricing.billable === undefined ? {} : { billable: pricing.billable }) } }),
     });
   } catch (error) {
-    if (error instanceof ConnectorError && error.code === "CONFLICT") return "DUPLICATE";
-    throw error;
+    if (!(error instanceof ConnectorError && error.code === "CONFLICT")) throw error;
+    // A redelivery after a fallback that threw: the claim was released, so it is tried again.
+    if (isReengagementFailure(status)) await windowFallback(message, deps);
+    return "DUPLICATE";
   }
   if (pricing !== undefined && isTemplate(message) && pricing.category.toLowerCase() !== "utility") {
     deps.metrics.count("WhatsAppTemplateCategory", { category: pricing.category.toLowerCase() });
