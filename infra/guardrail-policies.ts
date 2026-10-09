@@ -1,14 +1,21 @@
-// Content of the three Bedrock Guardrails (docs/design-brief.md §5.5, docs/architecture.md §9.1 and
+// Content of the four Bedrock Guardrails (docs/design-brief.md §5.5, docs/architecture.md §9.1 and
 // §9.4), as plain data:
 //
 //   G1  the worker's pre-filter (`ApplyGuardrail`, source INPUT, over the text or transcript the
-//       normalizer already masked) and the Harness `guardrailConfig` (every model call, input and
-//       output): three denied topics, prompt attack HIGH, cards blocked, CURP/RFC/CLABE anonymized.
+//       normalizer already masked): three denied topics, prompt attack HIGH, cards blocked,
+//       CURP/RFC/CLABE anonymized.
 //   G2  the outbound pipeline (`ApplyGuardrail`, source OUTPUT) over every free text of the agent and
 //       the summary of a case: contextual grounding 0.75 against the turn's tool results, relevance
 //       0.5 (the pipeline passes a query on REPLY only) and G1's denied topics on the outbound text.
 //   G3  the certificate writer and the template parameters: PII only. Emails, phones, CURP, RFC and
 //       CLABE anonymized, cards blocked; nothing else, so an order fact is never rewritten.
+//   G4  the Harness `guardrailConfig` (every model call, input and output): G1 without its denied
+//       topics. A Harness call evaluates the whole conversation: the envelope's facts and preloaded
+//       reads, every tool result and the manual's passages. A topic classifier over that trusted text
+//       blocks ordinary turns (an active order's checklist with any installer message reads as
+//       ELECTRICAL_WORK; §SEG-01, §SEG-02 and §INS-04 as ELECTRICAL_WORK, §COM-03 as PRICING), and
+//       a blocked input makes the Harness rewrite its Memory event. The topics stay where the text is
+//       the installer's or the agent's own: G1 on the inbound text, G2 on the outbound text.
 //
 // G1 can only block on what the worker knows how to classify (docs/architecture.md §9.1): a denied
 // topic (case DENIED_TOPIC), PROMPT_ATTACK (case PROMPT_INJECTION) or a card number (case OTHER). So it
@@ -140,7 +147,7 @@ export const G2_LIMITS = {
 /** Tier of the topic and content policies; CLASSIC covers Spanish and English with no cross-region profile. */
 export const GUARDRAIL_TIER = "CLASSIC";
 
-export type GuardrailKey = "g1" | "g2" | "g3";
+export type GuardrailKey = "g1" | "g2" | "g3" | "g4";
 
 /**
  * What Bedrock returns instead of a blocked text. It never reaches a person: the worker, the pipeline
@@ -152,6 +159,7 @@ export const BLOCKED_MESSAGES: Readonly<Record<GuardrailKey, { readonly input: s
   g1: { input: "CUADRILLA_GUARDRAIL_G1_INPUT_BLOCKED", output: "CUADRILLA_GUARDRAIL_G1_OUTPUT_BLOCKED" },
   g2: { input: "CUADRILLA_GUARDRAIL_G2_INPUT_BLOCKED", output: "CUADRILLA_GUARDRAIL_G2_OUTPUT_BLOCKED" },
   g3: { input: "CUADRILLA_GUARDRAIL_G3_INPUT_BLOCKED", output: "CUADRILLA_GUARDRAIL_G3_OUTPUT_BLOCKED" },
+  g4: { input: "CUADRILLA_GUARDRAIL_G4_INPUT_BLOCKED", output: "CUADRILLA_GUARDRAIL_G4_OUTPUT_BLOCKED" },
 };
 
 // ---- Provider-shaped configuration (aws.bedrock.GuardrailArgs), built here so the test sees exactly
@@ -210,9 +218,8 @@ const side = (input: PiiAction, output: PiiAction, outputEnabled = true): Sensit
   outputEnabled,
 });
 
-/** G1: denied topics, prompt attack, cards blocked, CURP/RFC/CLABE anonymized on input, contacts left alone. */
-export const G1_POLICIES: GuardrailPolicyConfig = {
-  topicPolicyConfig,
+/** Prompt attack, cards blocked, CURP/RFC/CLABE anonymized on input, contacts left alone: G1's and G4's. */
+const UNTRUSTED_INPUT_POLICIES: Required<Pick<GuardrailPolicyConfig, "contentPolicyConfig" | "sensitiveInformationPolicyConfig">> = {
   contentPolicyConfig: {
     tierConfigs: [{ tierName: GUARDRAIL_TIER }],
     filtersConfigs: CONTENT_FILTERS.map((filter) => ({
@@ -231,6 +238,12 @@ export const G1_POLICIES: GuardrailPolicyConfig = {
   },
 };
 
+/** G1: denied topics, prompt attack, cards blocked, CURP/RFC/CLABE anonymized on input, contacts left alone. */
+export const G1_POLICIES: GuardrailPolicyConfig = { topicPolicyConfig, ...UNTRUSTED_INPUT_POLICIES };
+
+/** G4, the Harness's: G1's prompt attack and PII, the same objects, and no denied topic. */
+export const G4_POLICIES: GuardrailPolicyConfig = { ...UNTRUSTED_INPUT_POLICIES };
+
 /** G2: contextual grounding and relevance, plus G1's denied topics evaluated on the outbound text. */
 export const G2_POLICIES: GuardrailPolicyConfig = {
   topicPolicyConfig,
@@ -245,7 +258,7 @@ export const G3_POLICIES: GuardrailPolicyConfig = {
   },
 };
 
-export const GUARDRAIL_POLICIES: Readonly<Record<GuardrailKey, GuardrailPolicyConfig>> = { g1: G1_POLICIES, g2: G2_POLICIES, g3: G3_POLICIES };
+export const GUARDRAIL_POLICIES: Readonly<Record<GuardrailKey, GuardrailPolicyConfig>> = { g1: G1_POLICIES, g2: G2_POLICIES, g3: G3_POLICIES, g4: G4_POLICIES };
 
 /**
  * Digest of everything a guardrail's DRAFT holds (policies and blocked messages).

@@ -56,6 +56,7 @@ const OTHER_REFS: Readonly<Record<string, readonly string[]>> = {
   "{G1}": [arnOf("bedrock", `guardrail/${filler(12)}`)],
   "{G2}": [arnOf("bedrock", `guardrail/${filler(12)}`)],
   "{G3}": [arnOf("bedrock", `guardrail/${filler(12)}`)],
+  "{G4}": [arnOf("bedrock", `guardrail/${filler(12)}`)],
   "{Memory}": [arnOf("bedrock-agentcore", `memory/${filler(59)}`)],
   "{Harness}": [arnOf("bedrock-agentcore", `runtime/${filler(100)}`)],
   "{Gateway}": [arnOf("bedrock-agentcore", `gateway/${filler(100)}`)],

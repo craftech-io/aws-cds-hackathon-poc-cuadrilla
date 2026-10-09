@@ -10,7 +10,7 @@
 // level into its exact actions). Everything else is a `Grant`: actions, resources and the conditions
 // that fence them. Resources are ARNs or references to a component the module resolves at deploy time:
 //
-//   {Media}/transcripts/*   an object prefix of a bucket     {G1} {G2} {G3}  a guardrail
+//   {Media}/transcripts/*   an object prefix of a bucket     {G1} … {G4}     a guardrail
 //   {Memory} {Gateway}      AgentCore of the stage            {KnowledgeBase} the manual's KB
 //   {NetworkMock} …         a Lambda                          {Leads} {UserPool} the leads and the pool
 //   {model:HARNESS}         agentModelArns(HARNESS_MODEL_ID, …, the app's inference profile)
@@ -290,6 +290,14 @@ export const LAMBDA_CAPABILITIES = {
 
 export type LambdaName = keyof typeof LAMBDA_CAPABILITIES;
 
+/**
+ * What the Harness does on its Memory. The Strands session manager under it lists and appends the
+ * conversation's events and, after a guardrail blocks a model input, replaces the stored user message
+ * with the redacted one: a new event, then `DeleteEvent` on the old one (without it the turn fails with
+ * "Failed to update message: could not delete old event").
+ */
+export const HARNESS_MEMORY_ACTIONS = ["bedrock-agentcore:CreateEvent", "bedrock-agentcore:GetEvent", "bedrock-agentcore:ListEvents", "bedrock-agentcore:DeleteEvent", "bedrock-agentcore:RetrieveMemoryRecords"] as const;
+
 /** Execution roles of AgentCore (infra/agentcore-iam.ts), with the same shape as a Lambda's. */
 export const SERVICE_ROLES = {
   Harness: {
@@ -297,9 +305,9 @@ export const SERVICE_ROLES = {
     grants: [
       invokeModels("HARNESS"),
       readModelProfile,
-      guardrailG1,
+      g(["bedrock:ApplyGuardrail"], ["{G4}"]),
       g(["bedrock-agentcore:InvokeGateway"], ["{Gateway}"]),
-      g(["bedrock-agentcore:CreateEvent", "bedrock-agentcore:GetEvent", "bedrock-agentcore:ListEvents", "bedrock-agentcore:RetrieveMemoryRecords"], ["{Memory}"]),
+      g(HARNESS_MEMORY_ACTIONS, ["{Memory}"]),
     ],
   },
   // Runs the extraction model of the three Memory strategies with override (sid of the scaffolding).

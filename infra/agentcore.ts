@@ -1,7 +1,7 @@
 // Bedrock AgentCore: the agent as resources (docs/architecture.md §4, §9 and §12, docs/design-brief.md §5.3-§5.6,
 // ADR-0014, ADR-0020, docs/build-plan.md WP-26). Names, limits, strategies and verified service facts:
 // infra/agentcore-spec.ts; roles: infra/agentcore-iam.ts; tool Lambdas: infra/agent-tools.ts; schemas:
-// infra/agent-tool-schemas.ts; Cedar: infra/policy.ts; G1: infra/guardrail.ts.
+// infra/agent-tool-schemas.ts; Cedar: infra/policy.ts; G4: infra/guardrail.ts.
 //
 //   Memory      `aws_cds_hackathon_poc_cuadrilla_poc`, events 30 days, three custom strategies with the same
 //               exclusion rules: `installerTips` (semantic override), `installerPreferences` (userPreference
@@ -19,7 +19,7 @@
 //               ignoreChanges (GATEWAY_SCHEMA_ROLLOUT says how a schema change ships).
 //   Policies    the Cedar statements CED-* of WP-08, attached after the LAST target: the engine validates each
 //               statement against the Gateway's tool schemas.
-//   Harness     HARNESS_MODEL_ID (the profile's ARN) over converse_stream with G1 in the model parameters; maxIterations 10,
+//   Harness     HARNESS_MODEL_ID (the profile's ARN) over converse_stream with G4 in the model parameters; maxIterations 10,
 //               maxTokens 4096, timeout 90 s, sliding window 40; tools = the Gateway only
 //               (`@cuadrilla-tools/*`), so no shell, file or code tools; the static system prompt of
 //               packages/bff/src/agent/system-prompt.ts; public network, idle microVMs stopped after 5
@@ -171,7 +171,7 @@ export const gatewayPolicies = attachGatewayPolicies({
 
 const harnessRolePolicy = agentRolePolicy("Harness", {
   ...modelRefs,
-  "{G1}": one(guardrailArns.g1),
+  "{G4}": one(guardrailArns.g4),
   "{Gateway}": one(gateway.gatewayArn),
   [MEMORY_REF]: one(memory.memoryArn),
 });
@@ -181,7 +181,7 @@ export const harness = new awsnative.bedrockagentcore.Harness(
   {
     harnessName: harnessName($app.name, $app.stage),
     executionRoleArn: roles.Harness.arn,
-    // G1 on every model call (infra/guardrail.ts); nothing sends a model, a system prompt or tools from the edge.
+    // G4 on every model call (infra/guardrail.ts); nothing sends a model, a system prompt or tools from the edge.
     model: { bedrockModelConfig: harnessBedrockModelConfig(modelProfile.arn, harnessGuardrailConfig) },
     systemPrompt: [{ text: SYSTEM_PROMPT }],
     environment: {

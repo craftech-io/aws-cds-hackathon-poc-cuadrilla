@@ -5,7 +5,7 @@
 //
 //   <app>-<stage>-harness  the Harness execution role: exactly SERVICE_ROLES.Harness of
 //                          infra/iam-capabilities.ts (the model through the app's inference profile,
-//                          agentModelArns(HARNESS_MODEL_ID, …, profile), GetInferenceProfile on it, G1,
+//                          agentModelArns(HARNESS_MODEL_ID, …, profile), GetInferenceProfile on it, G4,
 //                          InvokeGateway, the Memory events and retrieval) plus what its runtime needs to run:
 //                          workload identity, its own runtime log groups, X-Ray, the `bedrock-agentcore`
 //                          metrics and the pull of the managed image (the "logs del runtime, X-Ray" of §14).
@@ -60,7 +60,7 @@ export const AGENTCORE_PRINCIPAL = "bedrock-agentcore.amazonaws.com";
 export const AGENT_ROLE_WILDCARD_SIDS = ["Traces", "Metrics", "ManagedImagePull", "ManagedImageBearer"] as const;
 
 /**
- * ARNs each placeholder of SERVICE_ROLES stands for (`{G1}`, `{Gateway}`, `{Memory}`, `{model:PROFILE}`,
+ * ARNs each placeholder of SERVICE_ROLES stands for (`{G4}`, `{Gateway}`, `{Memory}`, `{model:PROFILE}`,
  * `{ToolOrders}`, …) plus `{PolicyEngine}` for the Gateway's Cedar actions; `{model:*}` is resolved here.
  */
 export type AgentRefs = Readonly<Record<string, readonly string[]>>;
@@ -68,7 +68,7 @@ export type AgentRefs = Readonly<Record<string, readonly string[]>>;
 const SID_BY_REF: Readonly<Record<string, string>> = {
   "{model:HARNESS}": "Model",
   "{model:PHOTO}": "Model",
-  "{G1}": "GuardrailG1",
+  "{G4}": "GuardrailG4",
   "{Gateway}": "Gateway",
   "{Memory}": "Memory",
   "{ToolOrders}": "InvokeToolTargets",

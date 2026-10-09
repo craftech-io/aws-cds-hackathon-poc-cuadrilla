@@ -14,6 +14,7 @@ import {
   G2_POLICIES,
   G3_PII_ENTITIES,
   G3_POLICIES,
+  G4_POLICIES,
   GROUNDING_FILTERS,
   GUARDRAIL_POLICIES,
   GUARDRAIL_TIER,
@@ -26,7 +27,7 @@ const read = (path: string): string => readFileSync(resolve(ROOT, path), "utf8")
 
 // Bedrock limits of a denied topic (CLASSIC tier) and of a custom regex.
 const NAME = /^[0-9a-zA-Z-_ !?.]+$/;
-const KEYS: readonly GuardrailKey[] = ["g1", "g2", "g3"];
+const KEYS: readonly GuardrailKey[] = ["g1", "g2", "g3", "g4"];
 
 /** The quoted texts of every "Disparador" line of docs/flows-catalog.md (what an installer or a supervisor writes). */
 function catalogTexts(flowId?: string): string[] {
@@ -136,6 +137,27 @@ describe("G1 blocks only what the worker can classify (docs/architecture.md §9.
     ];
     expect([...new Set(blocking)].sort()).toEqual(["CREDIT_DEBIT_CARD_NUMBER", "PROMPT_ATTACK", "TOPIC"]);
     expect(Object.keys(G1_POLICIES).sort()).toEqual(["contentPolicyConfig", "sensitiveInformationPolicyConfig", "topicPolicyConfig"]);
+  });
+});
+
+describe("G4: the Harness's guardrail is G1 without the denied topics", () => {
+  // Regression (deploy smoke SC-00/5): a Harness call evaluates the whole conversation, so G1's topics
+  // blocked the first turn of an active order (its envelope with the checklist read as ELECTRICAL_WORK)
+  // and every turn that reads §SEG-01, §SEG-02, §INS-04 or §COM-03 from the manual.
+  it("keeps G1's prompt attack and PII, the same objects, and carries no topic policy", () => {
+    expect(Object.keys(G4_POLICIES).sort()).toEqual(["contentPolicyConfig", "sensitiveInformationPolicyConfig"]);
+    expect(G4_POLICIES.topicPolicyConfig).toBeUndefined();
+    expect(G4_POLICIES.contentPolicyConfig).toBe(G1_POLICIES.contentPolicyConfig);
+    expect(G4_POLICIES.sensitiveInformationPolicyConfig).toBe(G1_POLICIES.sensitiveInformationPolicyConfig);
+  });
+
+  it("is the guardrail of every Harness model call; the topics stay on the pre-filter (G1) and the outbound text (G2)", () => {
+    const guardrail = read("infra/guardrail.ts");
+    expect(guardrail).toMatch(/export const harnessGuardrailConfig = \{\s+guardrailConfig: \{\s+guardrailIdentifier: g4\.guardrail\.guardrailId,\s+guardrailVersion: g4\.version\.version,/);
+    expect(guardrail).toContain('const g4 = publishedGuardrail("g4", G4_POLICIES);');
+    expect(read("infra/agentcore.ts")).toContain('"{G4}": one(guardrailArns.g4),');
+    expect(G1_POLICIES.topicPolicyConfig?.topicsConfigs.map((topic) => topic.name)).toEqual(DENIED_TOPICS.map((topic) => topic.name));
+    expect(G2_POLICIES.topicPolicyConfig).toBe(G1_POLICIES.topicPolicyConfig);
   });
 });
 
@@ -250,7 +272,7 @@ describe("versions and blocked messages", () => {
   it("publishes a new version whenever a policy or a blocked message changes", () => {
     const digests = KEYS.map((key) => guardrailDigest(GUARDRAIL_POLICIES[key], BLOCKED_MESSAGES[key]));
     for (const digest of digests) expect(digest).toMatch(/^[0-9a-f]{16}$/);
-    expect(new Set(digests).size).toBe(3);
+    expect(new Set(digests).size).toBe(4);
     expect(guardrailDigest(structuredClone(G2_POLICIES), BLOCKED_MESSAGES.g2)).toBe(digests[1]);
     const changed = { ...G2_POLICIES, contextualGroundingPolicyConfig: { filtersConfigs: [{ type: "GROUNDING", threshold: 0.7 }] } };
     expect(guardrailDigest(changed, BLOCKED_MESSAGES.g2)).not.toBe(digests[1]);
@@ -259,7 +281,7 @@ describe("versions and blocked messages", () => {
 
   it("uses sentinels that name their guardrail and could never pass the outbound language check", () => {
     const messages = KEYS.flatMap((key) => [BLOCKED_MESSAGES[key].input, BLOCKED_MESSAGES[key].output]);
-    expect(new Set(messages).size).toBe(6);
+    expect(new Set(messages).size).toBe(8);
     for (const key of KEYS) for (const message of Object.values(BLOCKED_MESSAGES[key])) expect(message).toContain(`_${key.toUpperCase()}_`);
     for (const message of messages) {
       expect(message.length).toBeLessThanOrEqual(500);

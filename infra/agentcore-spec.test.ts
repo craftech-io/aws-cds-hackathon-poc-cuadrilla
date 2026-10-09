@@ -14,7 +14,7 @@ import { gatewayToolSchemas } from "./agent-tool-schemas";
 import { AGENT_ROLE_WILDCARD_SIDS, agentCoreTrustPolicy, agentRoleStatements, capabilityStatements, modelRefArns, policyDocument, trustSourcePattern, type AgentRole, type AgentStatement } from "./agentcore-iam";
 import * as spec from "./agentcore-spec";
 import { boundaryAllows, template } from "./bootstrap/template-text";
-import { CAPABILITIES, LAMBDA_CAPABILITIES, SERVICE_ROLES, agentModelArns, expectedGrants, resolveCapabilities, type Grant, type LambdaName, type RoleName } from "./iam-capabilities";
+import { CAPABILITIES, HARNESS_MEMORY_ACTIONS, LAMBDA_CAPABILITIES, SERVICE_ROLES, agentModelArns, expectedGrants, resolveCapabilities, type Grant, type LambdaName, type RoleName } from "./iam-capabilities";
 import { GATEWAY_TARGETS, GATEWAY_TOOLS, actionId, cedarPolicies, inputSchemasByAction, schemaProblems, type GatewayTarget } from "./policy-rules";
 
 const APP = "aws-cds-hackathon-poc-cuadrilla";
@@ -311,7 +311,7 @@ describe("the app's inference profile (ADR-0028)", () => {
 describe("IAM of the agent roles (docs/architecture.md §14)", () => {
   const functionArns = TOOL_FUNCTIONS.map((fn) => `arn:aws:lambda:us-east-1:${PLACE.account}:function:${fn}`);
   const refs = {
-    "{G1}": ["arn:g1"],
+    "{G4}": ["arn:g4"],
     "{Gateway}": ["arn:gateway"],
     "{Memory}": ["arn:memory"],
     "{PolicyEngine}": ["arn:engine"],
@@ -328,9 +328,9 @@ describe("IAM of the agent roles (docs/architecture.md §14)", () => {
     }
     expect(bySid("Harness", "Model")?.resources).toEqual(agentModelArns(spec.HARNESS_MODEL_ID, PLACE.region, PLACE.account, PROFILE));
     expect(bySid("Harness", "ModelProfileRead")).toEqual({ sid: "ModelProfileRead", actions: ["bedrock:GetInferenceProfile"], resources: [PROFILE] });
-    expect(bySid("Harness", "GuardrailG1")?.resources).toEqual(["arn:g1"]);
+    expect(bySid("Harness", "GuardrailG4")).toEqual({ sid: "GuardrailG4", actions: ["bedrock:ApplyGuardrail"], resources: ["arn:g4"] });
     expect(bySid("Harness", "Gateway")?.resources).toEqual(["arn:gateway"]);
-    expect(bySid("Harness", "Memory")?.resources).toEqual(["arn:memory"]);
+    expect(bySid("Harness", "Memory")).toEqual({ sid: "Memory", actions: [...HARNESS_MEMORY_ACTIONS], resources: ["arn:memory"] });
     expect(statements("Memory")).toEqual([
       { sid: "ExtractionModel", actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"], resources: agentModelArns(spec.HARNESS_MODEL_ID, PLACE.region, PLACE.account, PROFILE) },
       { sid: "ModelProfileRead", actions: ["bedrock:GetInferenceProfile"], resources: [PROFILE] },
@@ -338,9 +338,9 @@ describe("IAM of the agent roles (docs/architecture.md §14)", () => {
     expect(() => agentRoleStatements("Harness", {}, PLACE, APP, STAGE)).toThrow(/needs the ARN/);
   });
 
-  it("lets the Harness run and never invoke, delete or write anything of the app", () => {
+  it("lets the Harness run and never invoke, delete or write anything of the app but its own Memory events", () => {
     const actions = statements("Harness").flatMap((statement) => statement.actions);
-    expect(actions.filter((action) => /Invoke(Harness|AgentRuntime|Function)|Delete|Put(Item|Object)/.test(action))).toEqual([]);
+    expect(actions.filter((action) => /Invoke(Harness|AgentRuntime|Function)|Delete|Put(Item|Object)/.test(action))).toEqual(["bedrock-agentcore:DeleteEvent"]);
     expect(actions.filter((action) => !/^(bedrock|bedrock-agentcore|logs|xray|cloudwatch|ecr-public|sts):/.test(action))).toEqual([]);
     for (const statement of statements("Harness")) if (statement.resources.includes("*")) expect(AGENT_ROLE_WILDCARD_SIDS, statement.sid).toContain(statement.sid);
     expect(bySid("Harness", "Metrics")?.condition).toEqual({ StringEquals: { "cloudwatch:namespace": "bedrock-agentcore" } });
@@ -371,7 +371,7 @@ describe("IAM of the agent roles (docs/architecture.md §14)", () => {
   it("stays inside the permissions boundary of the CI bootstrap, untagged resources by name", () => {
     const boundary = boundaryAllows();
     // The app's inference profile carries `sst:app` (the provider's default tags): GetInferenceProfile rides TaggedAppResources.
-    const tagged = new Set(["GuardrailG1", "Gateway", "Memory", "InvokeToolTargets", "PolicyEngineConfiguration", "PolicyEngineAuthorization", "ModelProfileRead"]);
+    const tagged = new Set(["GuardrailG4", "Gateway", "Memory", "InvokeToolTargets", "PolicyEngineConfiguration", "PolicyEngineAuthorization", "ModelProfileRead"]);
     for (const role of ["Harness", "Gateway", "Memory"] as const) {
       for (const statement of statements(role)) {
         for (const action of statement.actions) {
