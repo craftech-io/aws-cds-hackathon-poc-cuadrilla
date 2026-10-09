@@ -205,7 +205,7 @@ describe("Transcribe vocabulary cuadrilla-poc-ftth-es-mx", () => {
 // ---- TRANSCRIBE -------------------------------------------------------------------------------------
 
 describe("TRANSCRIBE capability through the Transcribe link", () => {
-  it("carries the two Transcribe statements: Start on * fenced by the Media bucket and transcripts/*, Get/Delete by job ARN", async () => {
+  it("carries the Transcribe statements: Start on * fenced by the Media bucket and transcripts/*, Get/Delete by job ARN, the job's Project tag", async () => {
     const { only } = await evaluate();
     const include = (await resolveDeep(only("sst.Linkable").args.include)) as Array<Record<string, unknown>>;
     const transcribe = include.filter((statement) => (statement.actions as string[]).some((action) => action.startsWith("transcribe:")));
@@ -224,6 +224,15 @@ describe("TRANSCRIBE capability through the Transcribe link", () => {
         actions: ["transcribe:GetTranscriptionJob", "transcribe:DeleteTranscriptionJob"],
         resources: [`arn:aws:transcribe:us-east-1:${ACCOUNT}:transcription-job/cuadrilla-poc-*`],
       },
+      {
+        type: "aws.permission",
+        actions: ["transcribe:TagResource"],
+        resources: [`arn:aws:transcribe:us-east-1:${ACCOUNT}:transcription-job/cuadrilla-poc-*`],
+        conditions: [
+          { test: "StringEquals", variable: "aws:RequestTag/Project", values: ["aws-cds-hackathon-poc-cuadrilla"] },
+          { test: "ForAllValues:StringEquals", variable: "aws:TagKeys", values: ["Project"] },
+        ],
+      },
     ]);
     expect(IAM_ARNS.transcriptionJobs).toBe(`arn:aws:transcribe:us-east-1:${ACCOUNT}:transcription-job/${TRANSCRIBE_PREFIX}*`);
   });
@@ -237,7 +246,7 @@ describe("TRANSCRIBE capability through the Transcribe link", () => {
     ]);
     expect(include).toHaveLength(CAPABILITIES.TRANSCRIBE.grants.length);
     const actions = include.flatMap((statement) => statement.actions as string[]);
-    expect(actions.some((action) => /Vocabulary|TagResource|\*/.test(action))).toBe(false);
+    expect(actions.some((action) => /Vocabulary|UntagResource|\*/.test(action))).toBe(false);
   });
 
   it("hands the worker the vocabulary, the language, the job prefix, the output location and the job tags", async () => {

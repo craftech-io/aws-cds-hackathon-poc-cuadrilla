@@ -62,8 +62,10 @@ async function queueForInstaller(record: EmailEventRecord, installerId: string, 
   const eventId = sesEventId(record.providerMessageId, record.type, record.atReal);
   if ((await deps.connector.runtime.getIdempotency(SES_EVENT_QUEUED, eventId)) !== undefined) return "DUPLICATE";
   await deps.queue.enqueue({ type: "EMAIL_EVENT", eventId, clockId: record.clockId, ispId: record.ispId, installerId, record });
-  await deps.connector.worlds.closePendingMail(record.clockId, record.mailId, record.type);
+  // Claimed before anything else can fail: a retry that enqueued again would mark the event in flight
+  // after the worker cleared it, and FIFO deduplication would drop that copy (the world never settles).
   await deps.connector.runtime.claimIdempotency(SES_EVENT_QUEUED, eventId);
+  await deps.connector.worlds.closePendingMail(record.clockId, record.mailId, record.type);
   return "QUEUED";
 }
 

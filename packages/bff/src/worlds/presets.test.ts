@@ -9,6 +9,7 @@ import { INSTALLER_BUTTONS } from "../channels/whatsapp/keywords";
 import { resolveNonce } from "../channels/whatsapp/nonces";
 import type { WorkOrderActions } from "../channels/whatsapp/ports";
 import type { CaseDeps } from "../cases/ports";
+import { candidateIdOf } from "../evidence/candidate";
 import { fakeNetwork, memoryTimers, policyOutbound, type World } from "../cases/testing";
 import { createLogger } from "../lib/log";
 import { factoryDepsOf } from "./deps";
@@ -121,6 +122,7 @@ describe("other presets of an operation", () => {
     expect((await harness.connector.worlds.getInstallerState(installerId))?.activeWorkOrderId).toBe(workOrderId);
     const inbound = (await harness.connector.conversations.listMessages(installerId)).filter((message) => message.direction === "IN");
     expect(inbound.map((message) => [message.content, message.media?.sha256])).toEqual([["IMAGE", PHOTO_INDEX.photo("ph-meter-02").sha256]]);
+    expect(world.presets.find((preset) => preset.workOrderId === workOrderId)?.candidates).toEqual(inbound.map((message) => candidateIdOf(message.messageId)));
     expect([...harness.media.values()]).toEqual(["ph-meter-02"]);
     expect((await harness.connector.people.getProfile(installerId))?.rejects).toEqual({ GLARE: 2 });
   });

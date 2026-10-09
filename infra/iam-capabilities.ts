@@ -126,6 +126,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityName, Capability>> = {
         ],
       },
       { sid: "TranscriptionJobsOfThisApp", actions: ["transcribe:GetTranscriptionJob", "transcribe:DeleteTranscriptionJob"], resources: [arn.transcriptionJobs] },
+      // StartTranscriptionJob with `Tags` (infra/media.ts `jobTags`) also authorizes TagResource on the job.
+      { sid: "TagTranscriptionJobsOfThisApp", actions: ["transcribe:TagResource"], resources: [arn.transcriptionJobs], conditions: [{ test: "StringEquals", variable: "aws:RequestTag/Project", values: [APP] }, { test: "ForAllValues:StringEquals", variable: "aws:TagKeys", values: ["Project"] }] },
       { actions: ["s3:GetObject", "s3:DeleteObject"], resources: ["{Media}/wa/*", "{Media}/sim/*", "{Media}/guest/*/sim/*"] },
       { actions: ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"], resources: ["{Media}/transcripts/*"] },
     ],

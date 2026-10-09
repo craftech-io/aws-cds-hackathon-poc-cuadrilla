@@ -27,6 +27,8 @@ import {
 } from "./repo";
 
 const TABLE = "Runtime";
+// Reads and writes of a pending mail mark before a version conflict is final.
+const CLOSE_PENDING_ATTEMPTS = 3;
 
 /** Attributes a set-update default never writes: the key, the stamp of each call and the sets. */
 const ROW_OWNED = new Set(["PK", "SK", "updatedAt", "inFlight", "phoneLeases"]);
@@ -96,10 +98,18 @@ export function worldRuntimeRepo(ctx: RepoContext): WorldRuntimePort {
       if (current.status === "OPEN" && !isExpired(ctx, current.expiresAt)) return current;
       return patchEntity(ctx, PendingMail, "PendingMail", current, { status: "OPEN", sentAtReal: nowIso(ctx), closedAtReal: null, eventType: null, [TTL_ATTRIBUTE]: expiresIn(ctx, RUNTIME_TTL_SECONDS.pending) });
     },
+    // The event feed (ChannelEvents) and the worker's EMAIL_EVENT both close the mark: the one that
+    // loses the version race reads it again and finds it closed.
     async closePendingMail(clockId, mailId, eventType) {
-      const current = await getEntity(ctx, PendingMail, "PendingMail", { clockId, mailId });
-      if (current === undefined || current.status === "CLOSED") return current;
-      return patchEntity(ctx, PendingMail, "PendingMail", current, { status: "CLOSED", closedAtReal: nowIso(ctx), eventType });
+      for (let attempt = 1; ; attempt += 1) {
+        const current = await getEntity(ctx, PendingMail, "PendingMail", { clockId, mailId });
+        if (current === undefined || current.status === "CLOSED") return current;
+        try {
+          return await patchEntity(ctx, PendingMail, "PendingMail", current, { status: "CLOSED", closedAtReal: nowIso(ctx), eventType });
+        } catch (error) {
+          if (!isConflict(error) || attempt >= CLOSE_PENDING_ATTEMPTS) throw error;
+        }
+      }
     },
     async listPendingMail(clockId) {
       const open = (await listPrefix(ctx, TABLE, PendingMail, pendingPartition(clockId), MAIL_PREFIX)).filter((mail) => mail.status === "OPEN" && !isExpired(ctx, mail.expiresAt));

@@ -136,6 +136,13 @@ describe("world runtime state over the memory connector", () => {
     expect(await world.connector.worlds.closePendingMail(CLOCK, "mail-9", "DELIVERY")).toBeUndefined();
   });
 
+  it("closes a pending email once when the event feed and the worker close it at the same time", async () => {
+    await world.connector.worlds.addPendingMail(CLOCK, "mail-1");
+    const closed = await Promise.all([world.connector.worlds.closePendingMail(CLOCK, "mail-1", "DELIVERY"), world.connector.worlds.closePendingMail(CLOCK, "mail-1", "DELIVERY")]);
+    expect(closed.map((mail) => mail?.status)).toEqual(["CLOSED", "CLOSED"]);
+    expect((await world.connector.worlds.listPendingMail(CLOCK)).open).toEqual([]);
+  });
+
   it("leases numbers to one run at a time until they expire", async () => {
     expect(await world.connector.worlds.acquireLease("PHONE", 1, "run-a")).toBe(true);
     expect(await world.connector.worlds.acquireLease("PHONE", 1, "run-a")).toBe(true);

@@ -29,6 +29,7 @@ import { storedPayload } from "../channels/whatsapp/transport";
 import { sha256Hex, ulid } from "../lib/crypto";
 import { renderWhatsApp } from "../outbound/render/whatsapp";
 import { WhatsAppSendRequest } from "../outbound/types";
+import { candidateIdOf } from "../evidence/candidate";
 import { MAIN_STORY } from "../story/main-story";
 import type { PhotoIndex, RenderAllocator } from "./photo-catalog";
 import { type SeededPhoto, seedChecklist } from "./presets-checklist";
@@ -76,6 +77,7 @@ export interface AppliedPreset {
   readonly photos: readonly SeededPhoto[];
   readonly offers: ReadonlyArray<{ readonly action: OfferPreset["action"]; readonly messageId: string; readonly nonces: readonly string[] }>;
   readonly caseId?: string;
+  /** The candidate id (`ec_…`, `candidateIdOf`) of each photo, what `validate_install_photo` takes. */
   readonly candidates: readonly string[];
 }
 
@@ -167,7 +169,7 @@ async function seedOffer(deps: PresetDeps, target: PresetTarget, offer: OfferPre
 async function seedCandidates(deps: PresetDeps, target: PresetTarget, photoIds: readonly string[]): Promise<string[]> {
   const media = need(deps.media, "candidate photos");
   const { installer, order } = target;
-  const messages: string[] = [];
+  const candidates: string[] = [];
   for (const [index, photoId] of photoIds.entries()) {
     const photo = deps.photos.photo(photoId);
     const messageId = `msg-${ulid(deps.now().getTime())}`;
@@ -192,9 +194,9 @@ async function seedCandidates(deps: PresetDeps, target: PresetTarget, photoIds: 
       refs: { seeded: true, photoId },
       seeded: true,
     });
-    messages.push(messageId);
+    candidates.push(candidateIdOf(messageId));
   }
-  return messages;
+  return candidates;
 }
 
 /** Applies every preset of one operation, in the order of the header. */
