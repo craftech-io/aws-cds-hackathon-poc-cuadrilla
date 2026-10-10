@@ -3,8 +3,10 @@
 //   TurnNote          the final text of the Harness (ADR-0014: an internal note, never sent), with its
 //                     `stopReason` and tokens, or a fixed code when its text must not be kept (a guardrail's
 //                     sentinel, a failed turn)
-//   CuadrillaMetrics  the turn and its tokens on the order's KPI row, its latency, and the first-reply
-//                     latency: real ms from the inbound message to the first outbound of the turn
+//   CuadrillaMetrics  the turn and its tokens on the order's KPI row, its latency, the first-reply
+//                     latency (real ms from the inbound message to the first outbound of the turn) and
+//                     the turn's cost by the verified rate card (`costUsd`, the metrics' cost per
+//                     conversation; absent while a model row is not verified)
 //   log fields        `TurnLatency`, `TurnErrors`, `TurnMaxTokens`, `FirstReplyLatency` (logs only, ADR-0028)
 //   AgentSpendUsd     the turn's OWN spend, by the verified rows of the rate card (WP-49), only in the
 //                     demo and live worlds: the alarm of the cost cut (ADR-0019) sums it per hour against
@@ -73,13 +75,22 @@ export async function writeTurnNote(deps: TurnRecordDeps, input: NoteInput): Pro
   }
 }
 
-/** The turn, its tokens and its latency on the order's KPI row (`EVAL` in an evaluation world). */
+/** The turn, its tokens, its latency and its priced cost on the order's KPI row (`EVAL` in an evaluation world). */
 export async function recordTurnKpi(deps: TurnRecordDeps, request: TurnRequest, usage: HarnessUsage, latencyMs: number, firstReplyLatencyMs?: number): Promise<void> {
-  if (request.workOrderId !== undefined) await addTurnToKpi(deps, { ...request, workOrderId: request.workOrderId }, usage, latencyMs, firstReplyLatencyMs);
-  await logAgentSpend(deps, request, usage);
+  const order = request.workOrderId === undefined ? {} : { workOrderId: request.workOrderId };
+  const usd = await turnCostUsd(deps, usage, order);
+  if (request.workOrderId !== undefined) await addTurnToKpi(deps, { ...request, workOrderId: request.workOrderId }, { usage, latencyMs, firstReplyLatencyMs, costUsd: usd });
+  if (usd !== undefined && agentSpendCounts(request.clockId)) deps.log.info("metric", { metric: AGENT_SPEND_METRIC, value: usd, ...order });
 }
 
-async function addTurnToKpi(deps: TurnRecordDeps, request: TurnRequest & { readonly workOrderId: string }, usage: HarnessUsage, latencyMs: number, firstReplyLatencyMs?: number): Promise<void> {
+interface TurnKpiDelta {
+  readonly usage: HarnessUsage;
+  readonly latencyMs: number;
+  readonly firstReplyLatencyMs: number | undefined;
+  readonly costUsd: number | undefined;
+}
+
+async function addTurnToKpi(deps: TurnRecordDeps, request: TurnRequest & { readonly workOrderId: string }, turn: TurnKpiDelta): Promise<void> {
   const evaluation = ispKindOfClock(request.clockId) === "EVAL";
   await deps.data.metrics.addToKpi(
     {
@@ -91,9 +102,10 @@ async function addTurnToKpi(deps: TurnRecordDeps, request: TurnRequest & { reado
       ...(evaluation ? { runId: request.clockId.slice("eval-".length) } : {}),
     },
     {
-      counters: { turns: 1, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
-      turnLatencyMs: Math.max(0, Math.round(latencyMs)),
-      ...(firstReplyLatencyMs === undefined ? {} : { firstReplyLatencyMs }),
+      counters: { turns: 1, inputTokens: turn.usage.inputTokens, outputTokens: turn.usage.outputTokens },
+      turnLatencyMs: Math.max(0, Math.round(turn.latencyMs)),
+      ...(turn.firstReplyLatencyMs === undefined ? {} : { firstReplyLatencyMs: turn.firstReplyLatencyMs }),
+      ...(turn.costUsd === undefined ? {} : { costUsd: turn.costUsd }),
     },
   );
 }
@@ -116,16 +128,15 @@ export function tokensCostUsd(tokens: Pick<HarnessUsage, "inputTokens" | "output
 /** The worlds whose spend the stage-wide cut sums: the demo and the live world, never a guest's, QA's or an evaluation's. */
 export const agentSpendCounts = (clockId: string): boolean => ispKindOfClock(clockId) === "DEMO";
 
-/** The `AgentSpendUsd` line of one turn; a rate card that cannot be read or priced only leaves a warning, never fails the turn. */
-async function logAgentSpend(deps: TurnRecordDeps, request: TurnRequest, usage: HarnessUsage): Promise<void> {
-  if (!agentSpendCounts(request.clockId)) return;
-  const order = request.workOrderId === undefined ? {} : { workOrderId: request.workOrderId };
+/** The turn's own cost by the verified rate card; a rate card that cannot be read or priced only leaves a warning, never fails the turn. */
+async function turnCostUsd(deps: TurnRecordDeps, usage: HarnessUsage, order: { readonly workOrderId?: string }): Promise<number | undefined> {
   try {
     const usd = tokensCostUsd(usage, await deps.data.reference.listRateCard());
     if (usd === undefined) deps.log.warn("turn.cost_unpriced", order);
-    else deps.log.info("metric", { metric: AGENT_SPEND_METRIC, value: usd, ...order });
+    return usd;
   } catch (error) {
     deps.log.warn("turn.cost_unavailable", { ...order, error });
+    return undefined;
   }
 }
 

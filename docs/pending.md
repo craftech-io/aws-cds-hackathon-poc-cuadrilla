@@ -119,7 +119,7 @@ Dueño: CTO. Verificación: `npx sst secret list --stage poc` (sin compartir val
 
 WP-49 verificó las 15 filas de `RATECARD` el 2026-10-10 (`scripts/seed/generate/ratecard.ts`). Camino feliz de una orden (12 turnos, 5 fotos, WhatsApp cobrado como vivo, sin caché): USD 1,15-1,87. Propuesta: **USD 2,90** (el techo más la mitad). La alarma `AgentSpendHourly` de USD 20 por hora (`infra/observability-spec.ts`) equivale a 149-270 turnos en una hora; el presupuesto del proyecto es de USD 300 por mes. Los dos siguen provisionales hasta que el CTO los confirme.
 
-Mientras ningún mundo siembre `costBudgetUsdPerConversation`, la métrica nunca marca un exceso y el check de `docs/test-plan.md` §7 solo avisa. Dueño: CTO; luego `seed-generator` lo siembra en las plantillas `demo` y `guest` y regenera el seed.
+Cada turno deja su costo (tokens del agente por las filas verificadas) en la fila `WORLD` de su orden (`turns/record.ts`), y Métricas compara cada conversación con `costBudgetUsdPerConversation` del mundo (KPI "Conversaciones sobre el umbral de costo", meta 0). Mientras ningún mundo siembre el umbral, ese KPI dice "sin umbral fijado" y el check de `docs/test-plan.md` §7 solo avisa. El costo registrado todavía no suma fotos, voz ni mensajes (la nota del KPI lo dice). Dueño: CTO; luego `seed-generator` lo siembra en las plantillas `demo` y `guest` y regenera el seed.
 
 ## 8. Operación de CI (P-08)
 

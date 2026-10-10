@@ -640,9 +640,9 @@ Convenciones:
 ### FL-087 · Métricas con rótulos y evaluación
 - Actores: invitado, supervisor · Canal: consola · Disparador: `/app/metrics`.
 - Pasos: pestañas Este mundo, Evaluación del manual, Evaluación de fotos, Latencia y costo, Política; cada KPI con N, fuente y rótulo; exportar CSV.
-- Estado esperado: los valores de `EV-01`/`EV-02` iguales a su reporte; "sin tarifa verificada" mientras `RateCard` sea provisional.
+- Estado esperado: los valores de `EV-01`/`EV-02` iguales a su reporte; "sin tarifa verificada" mientras `RateCard` sea provisional; con tarifas verificadas, el costo por conversación sale del `costUsd` que cada turno deja en la fila de su orden (rótulo supuesto y "sin costo registrado" si ninguna lo tiene) y "Conversaciones sobre el umbral de costo" compara con `IspSettings.costBudgetUsdPerConversation` ("sin umbral fijado" si falta).
 - Reglas: `docs/design-brief.md` §8.
-- Prueba: U `metrics/kpis.test.ts`, `metrics/eval-score.test.ts` · UI `metrics.spec.ts` · SR `SC-16/4`, `SC-18/13`, `EV-01/3`, `EV-02/3`.
+- Prueba: U `metrics/kpis.test.ts`, `metrics/eval-score.test.ts`, `turns/record.test.ts` · UI `metrics.spec.ts` · SR `SC-16/4`, `SC-18/13`, `EV-01/3`, `EV-02/3`.
 
 ### FL-088 · Bitácora
 - Actores: supervisor, invitado · Canal: consola · Disparador: `/app/audit`.

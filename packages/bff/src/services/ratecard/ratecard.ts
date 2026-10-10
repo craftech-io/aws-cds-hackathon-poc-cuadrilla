@@ -168,9 +168,10 @@ export function conversationCost(usage: ConversationUsage, rows: readonly unknow
   return { status: "VERIFIED", usd: roundUsd(lines.reduce((sum, line) => sum + line.usd, 0)), lines, whatsappPricedAsLive };
 }
 
-/** Whether a verified cost passes the operator's threshold (`IspSettings.costBudgetUsdPerConversation`). */
-export function exceedsBudget(cost: ConversationCost, budgetUsd: number | undefined): boolean {
-  return cost.status === "VERIFIED" && budgetUsd !== undefined && cost.usd > budgetUsd;
+/** Whether a verified cost (or a priced KPI row's `costUsd`) passes the operator's threshold (`IspSettings.costBudgetUsdPerConversation`). */
+export function exceedsBudget(cost: ConversationCost | number, budgetUsd: number | undefined): boolean {
+  const usd = typeof cost === "number" ? cost : cost.status === "VERIFIED" ? cost.usd : undefined;
+  return usd !== undefined && budgetUsd !== undefined && usd > budgetUsd;
 }
 
 /** True while any row is provisional: the metrics view labels every cost "sin tarifa verificada". */

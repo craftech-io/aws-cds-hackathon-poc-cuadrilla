@@ -24,6 +24,8 @@ describe("metrics model [FL-087]", () => {
     expect(kpiTone(kpi({ id: "violations", value: 0 }))).toBe("success");
     expect(kpiTone(kpi({ id: "violations", value: 2 }))).toBe("danger");
     expect(kpiTone(kpi({ id: "killSwitch", value: 1 }))).toBe("danger");
+    expect(kpiTone(kpi({ id: "conversationsOverBudget", value: 1 }))).toBe("danger");
+    expect(kpiTone(kpi({ id: "conversationsOverBudget", value: 0 }))).toBe("success");
     expect(kpiTone(kpi({ id: "globalCap.turns", unit: "RATIO", value: 0.95 }))).toBe("danger");
     expect(kpiTone(kpi({ id: "globalCap.turns", unit: "RATIO", value: 0.75 }))).toBe("warning");
     expect(kpiTone(kpi({ id: "turns", value: 9 }))).toBe("neutral");

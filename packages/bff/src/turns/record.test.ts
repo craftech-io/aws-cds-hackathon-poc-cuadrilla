@@ -48,6 +48,21 @@ describe("[W3R1 N1] AgentSpendUsd", () => {
     expect(tokensCostUsd({ inputTokens: 1_000_000, outputTokens: 0 }, [])).toBeUndefined();
   });
 
+  it("[W6R1 B1] [FL-087] leaves the turn's priced cost on the order's KPI row of every world, summed per conversation", async () => {
+    const { deps } = await setup();
+    await recordTurnKpi(deps, request("GLOBAL#isp-demo", "isp-demo"), USAGE, 1_200);
+    await recordTurnKpi(deps, request("GLOBAL#isp-demo", "isp-demo"), USAGE, 1_400);
+    await recordTurnKpi(deps, request("GUEST#isp-guest-07", "isp-guest-07"), USAGE, 1_000);
+    const row = (ispId: string, clockId: string) => deps.data.metrics.getKpi({ ispId, source: "WORLD", clockId, workOrderId: "wo-24817" });
+    expect(await row("isp-demo", "GLOBAL#isp-demo")).toMatchObject({ turns: 2, costUsd: 1.8 });
+    expect(await row("isp-guest-07", "GUEST#isp-guest-07")).toMatchObject({ turns: 1, costUsd: 0.9 });
+    const unverified = await setup(false);
+    await recordTurnKpi(unverified.deps, request("GLOBAL#isp-demo", "isp-demo"), USAGE, 1_000);
+    const unpriced = await unverified.deps.data.metrics.getKpi({ ispId: "isp-demo", source: "WORLD", clockId: "GLOBAL#isp-demo", workOrderId: "wo-24817" });
+    expect(unpriced?.turns).toBe(1);
+    expect(unpriced?.costUsd).toBeUndefined();
+  });
+
   it("logs nothing for guest (sign-up included), QA and evaluation worlds, and only a warning while the model rows are not verified", async () => {
     const { deps, lines } = await setup();
     await recordTurnKpi(deps, request("qa-812-1-sc-02", "isp-qa-812-1-sc-02"), USAGE, 1_000);

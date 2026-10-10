@@ -8,6 +8,7 @@
 // "Política" (ADR-0023: what the product measures is a "medición"; the internal run ids never show).
 // Pure: routers/metrics.ts reads the rows and hands them here.
 import type { ConversationKpi } from "../domain/metrics";
+import { exceedsBudget } from "../services/ratecard/ratecard";
 import { type PhotoScore, type QuestionScore, type Ratio, PHOTO_TARGETS, QUESTION_TARGETS } from "./eval-score";
 
 export type KpiKind = "MEASURED" | "SCRIPTED" | "ASSUMED";
@@ -47,6 +48,9 @@ export const TAB_TITLES: Readonly<Record<MetricsTabId, Bilingual>> = {
 };
 
 const NO_RATE: Bilingual = { es: "sin tarifa verificada", en: "no verified rate" };
+const NO_COST: Bilingual = { es: "sin costo registrado", en: "no cost recorded" };
+const NO_BUDGET: Bilingual = { es: "sin umbral fijado", en: "no threshold set" };
+const AGENT_TOKENS: Bilingual = { es: "tokens del agente; fotos, voz y mensajes sin sumar", en: "agent tokens; photos, voice and messages not added" };
 const NOT_RUN: Bilingual = { es: "todavía sin corrida publicada", en: "no published run yet" };
 
 /** Nearest-rank percentile; `null` for no samples. */
@@ -67,23 +71,49 @@ const WORLD_SOURCE: Bilingual = { es: "este mundo (CuadrillaMetrics)", en: "this
 export interface WorldInput {
   readonly kpis: readonly ConversationKpi[];
   readonly provisionalRates: boolean;
+  /** `IspSettings.costBudgetUsdPerConversation`: the operator's threshold, absent until it is set. */
+  readonly budgetUsd?: number;
 }
 
-function costPerConversation(input: WorldInput): Kpi {
+const COST_SOURCE: Bilingual = { es: "CuadrillaMetrics × tarifas", en: "CuadrillaMetrics × rate card" };
+
+/**
+ * Cost per conversation and the conversations over the operator's threshold. Only the conversations whose
+ * turns were priced (`costUsd`, turns/record.ts) count; with no priced conversation the cost is an
+ * assumption with no value, never a measured zero.
+ */
+function costKpis(input: WorldInput): Kpi[] {
   const priced = input.kpis.filter((kpi) => kpi.costUsd !== undefined);
   const total = priced.reduce((sum, kpi) => sum + (kpi.costUsd ?? 0), 0);
-  const value = input.provisionalRates || priced.length === 0 ? null : total / priced.length;
-  return {
-    id: "costPerConversation",
-    label: { es: "Costo por conversación", en: "Cost per conversation" },
-    value,
-    unit: "USD",
-    n: priced.length,
-    source: { es: "CuadrillaMetrics × tarifas", en: "CuadrillaMetrics × rate card" },
-    kind: input.provisionalRates ? "ASSUMED" : kindOf(input.kpis),
-    target: "≤ umbral del piloto",
-    ...(input.provisionalRates ? { note: NO_RATE } : {}),
-  };
+  const unpriced = input.provisionalRates || priced.length === 0;
+  const kind: KpiKind = unpriced ? "ASSUMED" : kindOf(priced);
+  const costNote = input.provisionalRates ? NO_RATE : priced.length === 0 ? NO_COST : AGENT_TOKENS;
+  const budget = input.budgetUsd;
+  const over = priced.filter((kpi) => exceedsBudget(kpi.costUsd ?? 0, budget)).length;
+  return [
+    {
+      id: "costPerConversation",
+      label: { es: "Costo por conversación", en: "Cost per conversation" },
+      value: unpriced ? null : total / priced.length,
+      unit: "USD",
+      n: unpriced ? 0 : priced.length,
+      source: COST_SOURCE,
+      kind,
+      target: budget === undefined ? "≤ umbral del piloto" : `≤ USD ${budget.toFixed(2)}`,
+      note: costNote,
+    },
+    {
+      id: "conversationsOverBudget",
+      label: { es: "Conversaciones sobre el umbral de costo", en: "Conversations over the cost threshold" },
+      value: unpriced || budget === undefined ? null : over,
+      unit: "COUNT",
+      n: unpriced ? 0 : priced.length,
+      source: COST_SOURCE,
+      kind,
+      target: "0",
+      ...(unpriced ? { note: costNote } : budget === undefined ? { note: NO_BUDGET } : {}),
+    },
+  ];
 }
 
 function latencyKpis(kpis: readonly ConversationKpi[], prefix: string, label: Bilingual, samplesOf: (kpi: ConversationKpi) => readonly number[], target?: string): Kpi[] {
@@ -115,7 +145,7 @@ export function worldTab(input: WorldInput): MetricsTab {
       count("whatsappMessages", { es: "Mensajes de WhatsApp", en: "WhatsApp messages" }, sum("whatsappMessages")),
       count("emails", { es: "Emails", en: "Emails" }, sum("emails")),
       ...latencyKpis(kpis, "firstReply", { es: "Tiempo a primera respuesta", en: "Time to first reply" }, (kpi) => kpi.firstReplyLatenciesMs, "< 30 s texto, < 45 s voz"),
-      costPerConversation(input),
+      ...costKpis(input),
     ],
   };
 }
@@ -181,7 +211,7 @@ export function latencyCostTab(input: LatencyCostInput): MetricsTab {
     kpis: [
       ...latencyKpis(input.kpis, "firstReply", { es: "Tiempo a primera respuesta", en: "Time to first reply" }, (kpi) => kpi.firstReplyLatenciesMs, "< 30 s texto, < 45 s voz"),
       ...latencyKpis(input.kpis, "turn", { es: "Duración del turno", en: "Turn duration" }, (kpi) => kpi.turnLatenciesMs),
-      costPerConversation(input),
+      ...costKpis(input),
       ...input.capUsage.map((usage): Kpi => ({
         id: `globalCap.${usage.resource}`,
         label: { es: `Consumo del techo global (${usage.resource})`, en: `Global ceiling usage (${usage.resource})` },

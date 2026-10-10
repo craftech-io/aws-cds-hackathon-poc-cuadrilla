@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { ConversationKpi } from "../domain/metrics";
 import { consoleTestWorld } from "../routers/console-testing";
 import { DEMO } from "../services/people/testing";
+import { createLogger } from "../lib/log";
+import { MODEL_RATES, bedrockRateKey } from "../services/ratecard/ratecard";
+import { recordTurnKpi } from "../turns/record";
 import { publishEvalRun } from "./eval-runs";
 import { scorePhotos, scoreQuestions } from "./eval-score";
 import { TAB_TITLES, latencyCostTab, manualTab, metricsCsv, percentile, photosTab, policyTab, worldTab } from "./kpis";
@@ -52,6 +55,25 @@ describe("metrics with labels [FL-087]", () => {
     expect(provisional).toMatchObject({ value: null, kind: "ASSUMED", note: { es: "sin tarifa verificada" } });
     const verified = worldTab({ kpis: priced, provisionalRates: false }).kpis.find((item) => item.id === "costPerConversation");
     expect(verified?.value).toBeCloseTo(0.3);
+    expect(verified).toMatchObject({ kind: "MEASURED", n: 2, note: { es: "tokens del agente; fotos, voz y mensajes sin sumar" } });
+  });
+
+  it("[W6R1 B1] with verified rates and conversations that carry no cost, the cost stays an assumption with a note, never a measured blank", () => {
+    const tabs = [worldTab({ kpis: [kpi("wo-1"), kpi("wo-2")], provisionalRates: false }), latencyCostTab({ kpis: [kpi("wo-1")], provisionalRates: false, capUsage: [], killed: { agent: false, simulator: false, all: false } })];
+    for (const tab of tabs) {
+      expect(tab.kpis.find((item) => item.id === "costPerConversation")).toMatchObject({ value: null, n: 0, kind: "ASSUMED", note: { es: "sin costo registrado" } });
+      expect(tab.kpis.find((item) => item.id === "conversationsOverBudget")).toMatchObject({ value: null, kind: "ASSUMED", note: { es: "sin costo registrado" } });
+    }
+  });
+
+  it("[W6R1 B1] the operator's threshold flags the priced conversations over it, and says so while it is not set", () => {
+    const priced = [kpi("wo-1", { costUsd: 3.4 }), kpi("wo-2", { costUsd: 1.2 }), kpi("wo-3")];
+    const over = (budgetUsd?: number) => worldTab({ kpis: priced, provisionalRates: false, ...(budgetUsd === undefined ? {} : { budgetUsd }) }).kpis;
+    expect(over(2.9).find((item) => item.id === "conversationsOverBudget")).toMatchObject({ value: 1, n: 2, kind: "MEASURED", target: "0" });
+    expect(over(2.9).find((item) => item.id === "costPerConversation")).toMatchObject({ target: "≤ USD 2.90", n: 2 });
+    expect(over(5).find((item) => item.id === "conversationsOverBudget")?.value).toBe(0);
+    expect(over().find((item) => item.id === "conversationsOverBudget")).toMatchObject({ value: null, note: { es: "sin umbral fijado" } });
+    expect(over().find((item) => item.id === "costPerConversation")?.target).toBe("≤ umbral del piloto");
   });
 
   it("[FL-087] the tabs are called measurements: no internal run id and no word of ADR-0023 in what the console shows", () => {
@@ -101,5 +123,20 @@ describe("metrics with labels [FL-087]", () => {
     const csv = await (await t.as()).metrics.export({ tab: "PHOTOS" });
     expect(csv).toMatchObject({ contentType: "text/csv", fileName: "metricas-photos.csv" });
     expect(csv.csv.split("\n")[1]).toContain("Medición de fotos,accuracy");
+  });
+
+  it("[W6R1 B1] a real turn of this world prices the conversation on metrics.summary, against the world's threshold", async () => {
+    const t = await consoleTestWorld(DEMO);
+    const { reference, isps } = t.memory.connector;
+    for (const kind of ["input", "output"] as const) await reference.put("RateCard", { key: bedrockRateKey(kind), price: MODEL_RATES.prices[kind], unit: "PER_1M_TOKENS", provisional: false, source: MODEL_RATES.source, asOf: MODEL_RATES.asOf });
+    await isps.updateSettings(t.world.ispId, { costBudgetUsdPerConversation: 1.5 });
+    const deps = { data: t.memory.connector, agentMode: "REAL" as const, log: createLogger({ level: "error", sink: () => undefined }) };
+    const turn = { trigger: "INSTALLER_MESSAGE" as const, eventId: "evt-1", clockId: t.world.clockId, ispId: t.world.ispId, installerId: t.world.ids.rogelio, workOrderId: t.world.ids.order, eventAtSim: "2026-10-13T09:15:00-06:00" };
+    // 0.2 M input and 0.05 M output tokens: USD 0.9 a turn, USD 1.8 for the conversation.
+    for (const latencyMs of [1_200, 1_400]) await recordTurnKpi(deps, turn, { inputTokens: 200_000, outputTokens: 50_000, cacheReadTokens: 0, cacheWriteTokens: 0 }, latencyMs);
+    const summary = await (await t.as("OPS", "usr-ops")).metrics.summary({ tab: "WORLD" });
+    const value = (id: string) => summary.tabs[0]?.kpis.find((item) => item.id === id);
+    expect(value("costPerConversation")).toMatchObject({ value: 1.8, n: 1, kind: "MEASURED", target: "≤ USD 1.50" });
+    expect(value("conversationsOverBudget")).toMatchObject({ value: 1, n: 1, kind: "MEASURED" });
   });
 });

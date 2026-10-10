@@ -41,9 +41,11 @@ export function kpiHint(kpi: Kpi): string {
   return parts.join(" · ");
 }
 
-/** Policy violations and an active cut are the figures that must read 0; anything else is neutral. */
+const MUST_READ_ZERO: readonly string[] = ["violations", "killSwitch", "outOfRangeAccepted", "adversarialAccepted", "conversationsOverBudget"];
+
+/** Policy violations, an active cut and conversations over the cost threshold are the figures that must read 0; anything else is neutral. */
 export function kpiTone(kpi: Kpi): StatTone {
-  if (kpi.id === "violations" || kpi.id === "killSwitch" || kpi.id === "outOfRangeAccepted" || kpi.id === "adversarialAccepted") {
+  if (MUST_READ_ZERO.includes(kpi.id)) {
     if (kpi.value === null) return "neutral";
     return kpi.value === 0 ? "success" : "danger";
   }

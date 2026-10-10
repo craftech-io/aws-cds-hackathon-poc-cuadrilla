@@ -2,7 +2,8 @@
 //
 //   summary   the five tabs of metrics/kpis.ts for the principal's world: its conversations, the latest
 //             published runs of the manual's and the photos' measurement (the same rows their report
-//             reads), latencies p50/p95 and cost, the day's use of the stage's ceiling and the cut, and
+//             reads), latencies p50/p95, the cost per conversation against the world's threshold
+//             (`IspSettings.costBudgetUsdPerConversation`), the day's use of the stage's ceiling and the cut, and
 //             the policy (violations next to DENY/DEFER per rule)
 //   export    the same as CSV ("Exportar CSV")
 import { z } from "zod";
@@ -35,9 +36,10 @@ export async function metricsTabs(ctx: Ctx): Promise<{ readonly tabs: MetricsTab
   const { ports } = consoleCall(ctx);
   const data = ctx.deps.connector;
   const month = (await worldToday(ctx)).day.slice(0, 7);
-  const [kpis, rates, questions, photos, capUsage, kill, decisions, violations] = await Promise.all([
+  const [kpis, rates, settings, questions, photos, capUsage, kill, decisions, violations] = await Promise.all([
     data.metrics.listKpis(ctx.world.ispId, "WORLD").then((rows) => rows.filter((row) => row.clockId === ctx.world.clockId)),
     data.reference.listRateCard(),
+    data.isps.getSettings(ctx.world.ispId),
     questionScore(ctx, ports),
     photoScore(ctx, ports),
     globalCapUsage({ ...ports.costCaps, realClock: ports.services.realClock }),
@@ -45,7 +47,8 @@ export async function metricsTabs(ctx: Ctx): Promise<{ readonly tabs: MetricsTab
     data.audit.listByMonth(ctx.world.ispId, month).then((rows) => rows.filter((row) => row.clockId === undefined || row.clockId === ctx.world.clockId)),
     data.audit.listByDecision(ctx.world.ispId, "VIOLATION").then((rows) => rows.filter((row) => row.clockId === undefined || row.clockId === ctx.world.clockId)),
   ]);
-  const world = { kpis, provisionalRates: provisional(rates) };
+  const budgetUsd = settings?.costBudgetUsdPerConversation;
+  const world = { kpis, provisionalRates: provisional(rates), ...(budgetUsd === undefined ? {} : { budgetUsd }) };
   const tabs = [
     worldTab(world),
     manualTab(questions.score),

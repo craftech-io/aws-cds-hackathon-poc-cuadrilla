@@ -136,7 +136,7 @@ Generada desde las líneas "Prueba" de `docs/flows-catalog.md`; `npm run flows:c
 | FL-084 | Reloj de demo y controles | `clock/advance.test.ts`, `routers/clock.test.ts`, `worlds/worlds.test.ts` | — | `clock.spec.ts` | `SC-18/2`, `SC-18/8`, `SC-18/10`, `SC-18/12`, `SC-19/2`, `SC-06/9` | — | — |
 | FL-085 | Mundo ocupado | `worker/settle.test.ts`, `clock/advance.test.ts` | — | `clock.spec.ts` | `SC-18/4.a` | — | — |
 | FL-086 | Reiniciar la demo | `clock/reset.test.ts`, `worlds/memory-purge.test.ts`, `routers/clock.test.ts` | — | `clock.spec.ts` | `SC-15/3`, `SC-19/4` | — | — |
-| FL-087 | Métricas con rótulos y evaluación | `metrics/kpis.test.ts`, `metrics/eval-score.test.ts` | — | `metrics.spec.ts` | `SC-16/4`, `SC-18/13`, `EV-01/3`, `EV-02/3` | — | — |
+| FL-087 | Métricas con rótulos y evaluación | `metrics/kpis.test.ts`, `metrics/eval-score.test.ts`, `turns/record.test.ts` | — | `metrics.spec.ts` | `SC-16/4`, `SC-18/13`, `EV-01/3`, `EV-02/3` | — | — |
 | FL-088 | Bitácora | `routers/audit.test.ts` | — | `audit.spec.ts` | `SC-16/5` | — | — |
 | FL-089 | Landing comercial, `/join` y legales | `views/landing/landing.test.ts`, `views/landing/manifest.test.ts` | — | `landing.spec.ts`, `landing-motion.spec.ts` | — | `SMK/1` | `landing.spec.ts` y `landing-motion.spec.ts` corren en 390×844 y 1440×900, es y en, con y sin movimiento reducido; `landing.spec.ts` suma el barrido de anchos 360, 768 y 1024 (`scrollWidth ≤ clientWidth`) y el CTA principal en la primera pantalla a 360×640; `landing-motion.spec.ts` asierta la pausa del loop del hero con su control y el póster estático con movimiento reducido; la verificación desplegada con capturas y la revisión de diseño van en `docs/test-plan.md` §6.1 |
 | FL-090 | Buzón de salida y visor del manual | `routers/outbox.test.ts`, `routers/manual.test.ts` | — | `outbox.spec.ts`, `manual.spec.ts` | `SC-05/3` | — | — |
@@ -453,7 +453,7 @@ Las capturas (cada página en los dos viewports, es y en, con y sin movimiento r
 | Validación de foto (p95) | ≤ 15 s | `PhotoValidationLatency` |
 | Alerta de seguridad (p95) | < 60 s | `SafetyAlertLatency` |
 | Turnos por orden en el camino feliz | ≤ 12 | `CuadrillaMetrics` de `SC-18` |
-| Costo por conversación (camino feliz, tarifas verificadas) | Umbral del CTO en `IspSettings.costBudgetUsdPerConversation` | `CuadrillaMetrics` de `SC-18`; con tarifas provisionales, `warn` |
+| Costo por conversación (camino feliz, tarifas verificadas) | Umbral del CTO en `IspSettings.costBudgetUsdPerConversation` | `costUsd` de la fila `WORLD` de `SC-18` (tokens del agente, `turns/record.ts`) y el KPI "Conversaciones sobre el umbral de costo" en 0; con tarifas provisionales o sin umbral sembrado, `warn` |
 | Costo fijo del anti abuso | ≈ USD 30 por mes | Dos web ACL con 10 reglas, la suscripción de Bot Control y los pedidos del volumen de demo (ADR-0025 §4); se revisa en la factura del mes |
 | Invitados de alta propia | Sub-techo diario de 600 turnos, 150 validaciones y 1.800 s de transcripción dentro del techo global | `TurnCapHits{scope=GUESTSIGNUP}` y el consumo del techo en métricas (ADR-0025 §3) |
 | Carga liviana | 20 instaladores QA con 3 mensajes cada uno: sin DLQ, orden por instalador preservado, sin turnos duplicados | `scripts/scenarios/load-light.ts` (a pedido) |
