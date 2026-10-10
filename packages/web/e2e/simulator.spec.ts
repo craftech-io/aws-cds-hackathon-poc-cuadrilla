@@ -256,8 +256,11 @@ test.describe("phone simulator", () => {
 
   test("@webkit [FL-082] WebKit records the voice note as MP4", async ({ page, ui, browserName }) => {
     test.skip(browserName !== "webkit", "WebKit only");
-    // A synthetic microphone, and only MP4 offered, as Safari records. The Linux WebKit of CI may have no
-    // `mediaDevices` at all: the fake is defined then, and the recorder is always WebKit's own.
+    // A synthetic microphone, and only MP4 offered, as Safari records. Playwright's WebKit for Linux (the one
+    // CI installs) ships without `MediaRecorder` and may lack `mediaDevices`: there, an MP4-only stand-in
+    // recorder hands over an MP4 header, so the spec still proves the app's MP4 path in the WebKit engine
+    // (the type it picks, the upload's content type, the note entering as a voice note); where WebKit has its
+    // own recorder (macOS) that one records. The annotation says which one ran.
     await page.addInitScript(() => {
       const getUserMedia = async () => {
         const context = new AudioContext();
@@ -270,17 +273,46 @@ test.describe("phone simulator", () => {
       };
       if (navigator.mediaDevices === undefined) Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
       else navigator.mediaDevices.getUserMedia = getUserMedia;
-      if (typeof MediaRecorder === "undefined") return;
+      if (typeof MediaRecorder === "undefined") {
+        const MP4_HEADER = [0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x4d, 0x34, 0x41, 0x20, 0, 0, 0, 0, 0x4d, 0x34, 0x41, 0x20, 0x69, 0x73, 0x6f, 0x6d];
+        class Mp4StandIn {
+          static isTypeSupported(type: string): boolean {
+            return type.startsWith("audio/mp4");
+          }
+          state: "inactive" | "recording" = "inactive";
+          ondataavailable: ((event: { data: Blob }) => void) | null = null;
+          onstop: (() => void) | null = null;
+          readonly mimeType: string;
+          constructor(_stream: MediaStream, options?: { mimeType?: string }) {
+            this.mimeType = options?.mimeType ?? "audio/mp4";
+          }
+          start(): void {
+            this.state = "recording";
+          }
+          stop(): void {
+            if (this.state !== "recording") return;
+            this.state = "inactive";
+            setTimeout(() => {
+              this.ondataavailable?.({ data: new Blob([new Uint8Array(MP4_HEADER)], { type: this.mimeType }) });
+              this.onstop?.();
+            }, 0);
+          }
+        }
+        Object.defineProperty(globalThis, "MediaRecorder", { configurable: true, writable: true, value: Mp4StandIn });
+        Object.defineProperty(globalThis, "__voiceRecorder", { configurable: true, value: "stand-in" });
+        return;
+      }
       const supported = MediaRecorder.isTypeSupported.bind(MediaRecorder);
       MediaRecorder.isTypeSupported = (type: string) => type.startsWith("audio/mp4") && supported(type);
     });
     await openSimulator(page, ui);
     const offered = await page.evaluate(() => ({
-      recorder: typeof MediaRecorder,
-      mp4: typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/mp4"),
-      streamDestination: typeof AudioContext !== "undefined" && typeof AudioContext.prototype.createMediaStreamDestination,
+      recorder: (globalThis as { __voiceRecorder?: string }).__voiceRecorder ?? "webkit",
+      mp4: MediaRecorder.isTypeSupported("audio/mp4"),
+      otherTypes: ["audio/ogg;codecs=opus", "audio/webm;codecs=opus"].some((type) => MediaRecorder.isTypeSupported(type)),
     }));
-    expect(offered, "what this WebKit offers to record a voice note").toEqual({ recorder: "function", mp4: true, streamDestination: "function" });
+    test.info().annotations.push({ type: "recorder", description: offered.recorder === "webkit" ? "WebKit's own MediaRecorder" : "MP4-only stand-in (this WebKit has no MediaRecorder)" });
+    expect({ mp4: offered.mp4, otherTypes: offered.otherTypes }, "this WebKit is offered MP4 only").toEqual({ mp4: true, otherTypes: false });
     const before = storedAudio(ui).length;
     await page.getByRole("button", { name: copy.composer.voice, exact: true }).click();
     await page.getByRole("button", { name: copy.voice.record }).click();
