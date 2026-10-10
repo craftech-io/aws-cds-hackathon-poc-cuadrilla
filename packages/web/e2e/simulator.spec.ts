@@ -274,7 +274,7 @@ test.describe("phone simulator", () => {
         }
       };
       const own = { configurable: true, writable: true, value: getUserMedia };
-      if (typeof MediaDevices !== "undefined") Object.defineProperty(MediaDevices.prototype, "getUserMedia", own);
+      if (typeof MediaDevices !== "undefined") Object.defineProperty(MediaDevices.prototype, "getUserMedia", own); // WebKit's own refuses here
       if (navigator.mediaDevices === undefined) Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
       else Object.defineProperty(navigator.mediaDevices, "getUserMedia", own);
       if (typeof MediaRecorder === "undefined") {
@@ -293,7 +293,7 @@ test.describe("phone simulator", () => {
           start(): void { this.state = "recording"; }
           stop(): void {
             if (this.state !== "recording") return;
-            this.state = "inactive"; // then the data and the stop, as a browser hands them over
+            this.state = "inactive";
             setTimeout(() => {
               this.ondataavailable?.({ data: new Blob([new Uint8Array(MP4_HEADER)], { type: this.mimeType }) });
               this.onstop?.();
@@ -312,7 +312,7 @@ test.describe("phone simulator", () => {
       recorder: (globalThis as { __voiceRecorder?: string }).__voiceRecorder ?? "webkit",
       mp4: MediaRecorder.isTypeSupported("audio/mp4"),
       otherTypes: ["audio/ogg;codecs=opus", "audio/webm;codecs=opus"].some((type) => MediaRecorder.isTypeSupported(type)),
-      microphone: await Promise.race([navigator.mediaDevices.getUserMedia({ audio: true }).then(() => "stream", (error: unknown) => `error ${String((error as Error).name)}: ${String((error as Error).message)}; fake ${String(navigator.mediaDevices.getUserMedia.toString().includes("createOscillator"))}`), new Promise<string>((done) => setTimeout(() => done("no answer in 5 s"), 5_000))]),
+      microphone: await Promise.race([navigator.mediaDevices.getUserMedia({ audio: true }).then(() => "stream", (error: unknown) => `error ${String((error as Error).name)}`), new Promise<string>((done) => setTimeout(() => done("no answer in 5 s"), 5_000))]),
     }));
     test.info().annotations.push({ type: "recorder", description: offered.recorder === "webkit" ? "WebKit's own MediaRecorder" : "MP4-only stand-in (this WebKit has no MediaRecorder)" });
     expect({ mp4: offered.mp4, otherTypes: offered.otherTypes, microphone: offered.microphone }, "MP4 only, and the synthetic microphone").toEqual({ mp4: true, otherTypes: false, microphone: "stream" });
