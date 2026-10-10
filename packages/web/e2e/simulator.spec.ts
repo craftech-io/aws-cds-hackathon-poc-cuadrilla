@@ -256,20 +256,22 @@ test.describe("phone simulator", () => {
 
   test("@webkit [FL-082] WebKit records the voice note as MP4", async ({ page, ui, browserName }) => {
     test.skip(browserName !== "webkit", "WebKit only");
-    // A synthetic microphone, and only MP4 offered, as Safari records. Playwright's WebKit for Linux (the one
-    // CI installs) ships without `MediaRecorder` and may lack `mediaDevices`: there, an MP4-only stand-in
-    // recorder hands over an MP4 header, so the spec still proves the app's MP4 path in the WebKit engine
-    // (the type it picks, the upload's content type, the note entering as a voice note); where WebKit has its
-    // own recorder (macOS) that one records. The annotation says which one ran.
+    // A synthetic microphone, and only MP4 offered, as Safari records. Playwright's Linux WebKit (CI's) has no
+    // `MediaRecorder`: an MP4-only stand-in then proves the app's MP4 path in WebKit (type, upload, voice note);
+    // a WebKit with its own recorder (macOS) records for real. The annotation says which one ran.
     await page.addInitScript(() => {
       const getUserMedia = async () => {
-        const context = new AudioContext();
-        await context.resume();
-        const oscillator = context.createOscillator();
-        const destination = context.createMediaStreamDestination();
-        oscillator.connect(destination);
-        oscillator.start();
-        return destination.stream;
+        try {
+          const context = new AudioContext();
+          const oscillator = context.createOscillator();
+          const destination = context.createMediaStreamDestination();
+          oscillator.connect(destination);
+          oscillator.start();
+          void context.resume().catch(() => undefined); // never awaited: a runner without audio may never resume
+          return destination.stream;
+        } catch {
+          return new MediaStream();
+        }
       };
       if (navigator.mediaDevices === undefined) Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
       else navigator.mediaDevices.getUserMedia = getUserMedia;
