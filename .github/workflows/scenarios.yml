@@ -22,8 +22,13 @@
 #
 # Only `main` can assume qa-runner (its trust binds this file on main): dispatch from main. The jobs declare
 # no `environment:` (it would change the OIDC `sub` the trust expects). The role's session lasts
-# QA_RUNNER_SESSION_SECONDS (repository variable; 3600 when unset). The bootstrap allows 7200
-# (MaxSessionDuration of qa-runner): set the variable to 7200 once the operator has reapplied it.
+# QA_RUNNER_SESSION_SECONDS (repository variable; 3600 when unset), never more than the MaxSessionDuration
+# of qa-runner in infra/bootstrap/ci-role.yaml (7200): the preflight fails fast otherwise.
+#
+# A suite never runs during a deploy: the preflight fails while a run of deploy.yml is queued or running,
+# and the suite jobs share deploy.yml's concurrency group (`poc-stage`), so a deploy pushed during a suite
+# waits for it. The preflight keeps a dispatch from replacing a deploy that is already waiting in the group
+# (GitHub keeps one pending run per group).
 #
 # Reports (no PII: ids, codes, counts, latencies and the estimated cost) go to the run summary and are
 # kept as artifacts, pass or fail, never committed. A scenario report is renamed
@@ -56,10 +61,7 @@ on:
 permissions:
   id-token: write
   contents: read
-
-concurrency:
-  group: scenarios-poc
-  cancel-in-progress: false
+  actions: read
 
 env:
   CI: "true"
@@ -68,11 +70,58 @@ env:
   REPORT_DIR: test-results/scenarios
 
 jobs:
+  preflight:
+    name: Preflight (session length, no deploy in progress)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the bootstrap template
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          sparse-checkout: infra/bootstrap
+          sparse-checkout-cone-mode: true
+
+      - name: The qa-runner session fits the role's MaxSessionDuration
+        env:
+          QA_RUNNER_SESSION_SECONDS: ${{ vars.QA_RUNNER_SESSION_SECONDS }}
+          BOOTSTRAP_TEMPLATE: infra/bootstrap/ci-role.yaml
+        run: |
+          seconds="${QA_RUNNER_SESSION_SECONDS:-3600}"
+          max="$(awk '/^  QaRunnerRole:/ { found = 1 } found && /MaxSessionDuration:/ { print $2; exit }' "${BOOTSTRAP_TEMPLATE}")"
+          if ! [[ "${max}" =~ ^[0-9]+$ ]]; then
+            echo "::error::Cannot read the MaxSessionDuration of QaRunnerRole from ${BOOTSTRAP_TEMPLATE}."
+            exit 1
+          fi
+          if ! [[ "${seconds}" =~ ^[0-9]+$ ]] || (( seconds < 900 )); then
+            echo "::error::QA_RUNNER_SESSION_SECONDS must be a whole number of seconds, at least 900 (it is '${seconds}')."
+            exit 1
+          fi
+          if (( seconds > max )); then
+            echo "::error::QA_RUNNER_SESSION_SECONDS is ${seconds} s, more than the qa-runner role's MaxSessionDuration (${max} s in ${BOOTSTRAP_TEMPLATE}): AssumeRoleWithWebIdentity would fail. Lower the repository variable, or raise MaxSessionDuration in the template and have the operator reapply the bootstrap."
+            exit 1
+          fi
+          echo "qa-runner session: ${seconds} s (role maximum ${max} s)."
+
+      - name: No deploy of poc is queued or running
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          active="$(gh run list -R "${GITHUB_REPOSITORY}" --workflow deploy.yml --limit 20 --json status --jq '[.[] | select(.status != "completed")] | length')"
+          if [ "${active}" != "0" ]; then
+            echo "::error::A run of deploy.yml is queued or running: dispatch the suite again once it finishes (a suite never runs during a deploy)."
+            exit 1
+          fi
+
   scenarios:
     name: Scenario suite (${{ inputs.suite }})
+    needs: preflight
     if: ${{ inputs.suite != 'eval' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    # Shared with deploy.yml: a deploy pushed during the suite waits for it.
+    concurrency:
+      group: poc-stage
+      cancel-in-progress: false
     steps:
       - name: Only from main (the qa-runner trust accepts nothing else)
         if: ${{ github.ref != 'refs/heads/main' }}
@@ -150,9 +199,14 @@ jobs:
 
   measurements:
     name: Measurement ${{ matrix.measurement }}
+    needs: preflight
     if: ${{ inputs.suite == 'eval' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    # Shared with deploy.yml: a deploy pushed during a measurement waits for it.
+    concurrency:
+      group: poc-stage
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       max-parallel: 1

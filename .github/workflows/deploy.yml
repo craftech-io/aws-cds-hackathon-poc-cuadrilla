@@ -35,9 +35,11 @@ permissions:
   id-token: write
   contents: read
 
-# One deploy at a time; a queued run waits instead of racing the previous one for the SST lock.
+# One run against stage `poc` at a time: this group is shared with the suite jobs of scenarios.yml, so a
+# deploy never starts while a suite runs (it waits) and a suite never starts during a deploy. A queued run
+# waits instead of racing the previous one for the SST lock.
 concurrency:
-  group: deploy-poc
+  group: poc-stage
   cancel-in-progress: false
 
 env:
@@ -51,7 +53,10 @@ jobs:
   deploy:
     name: Checks, then sst deploy --stage poc
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Room for the checks, two sst deploys (the retry below), the seed and the smoke (a run takes about
+    # 15 minutes): a job timeout must never cancel sst deploy and leave the SST lock held. Only the steps
+    # after the deploy have their own timeouts.
+    timeout-minutes: 90
     steps:
       - name: Checkout (full history, the commit messages are checked too)
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -128,14 +133,32 @@ jobs:
         run: aws sts get-caller-identity
 
       # A deploy that changes the agent's model can fail once on the AgentCore Memory update while IAM
-      # propagates the new grants; the same deploy run again succeeds. One retry after a minute, never more.
+      # propagates the new grants; the same deploy run again succeeds. One retry after a minute, never more,
+      # with a fresh session of the deploy role (its sessions last one hour). No step timeout on sst deploy:
+      # killing it would leave the SST lock held.
       - name: Deploy stage poc
-        id: sst
+        id: sst_first
+        continue-on-error: true
+        run: npx sst deploy --stage poc
+
+      - name: Fresh deploy-role session for the retry
+        if: ${{ steps.sst_first.outcome == 'failure' }}
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN || 'arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy' }}
+          role-session-name: github-deploy-retry-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Deploy stage poc (one retry, IAM propagation)
+        if: ${{ steps.sst_first.outcome == 'failure' }}
         run: |
-          if npx sst deploy --stage poc; then exit 0; fi
           echo "::warning::sst deploy failed; retrying once in 60 s (IAM propagation after a model or grant change)."
           sleep 60
           npx sst deploy --stage poc
+
+      - name: Stage poc deployed
+        id: sst
+        run: echo "sst deploy succeeded."
 
       - name: Publish the deployed URL in the run summary
         run: |
@@ -146,10 +169,20 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # A fresh deploy-role session, so a long deploy never leaves the seed with an expiring one.
+      - name: Fresh deploy-role session for the seed
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN || 'arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy' }}
+          role-session-name: github-seed-${{ github.run_id }}
+          aws-region: us-east-1
+
       - name: Load the synthetic seed and the manual into poc (idempotent, ingests the Knowledge Base on change)
+        timeout-minutes: 30
         run: npm run seed:load
 
       - name: The Bff's Function URL for SMK/10 (this app's SST state, masked)
+        timeout-minutes: 5
         run: npx tsx scripts/qa/bff-url.ts
 
       # scenarios.yml cannot read the SST state (qa-runner has no access to it), so SC-00 of the full suite
@@ -177,6 +210,7 @@ jobs:
         run: aws sts get-caller-identity --query Arn --output text | grep -q -- '-qa-runner/' || { echo "::error::the smoke is not running as qa-runner"; exit 1; }
 
       - name: Smoke scenarios (SC-00, SMK/9 and SMK/10 from this runner)
+        timeout-minutes: 20
         run: npm run scenarios -- --suite smoke --base-url "${APP_URL}" --bff-url "${BFF_URL}" --report-dir "${SMOKE_REPORT_DIR}"
 
       - name: Smoke report in the run summary

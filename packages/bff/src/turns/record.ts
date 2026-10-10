@@ -8,12 +8,13 @@
 //                     the turn's cost by the verified rate card (`costUsd`, the metrics' cost per
 //                     conversation; absent while a model row is not verified)
 //   log fields        `TurnLatency`, `TurnErrors`, `TurnMaxTokens`, `FirstReplyLatency` (logs only, ADR-0028)
-//   AgentSpendUsd     the turn's OWN spend, by the verified rows of the rate card (WP-49), only in the
-//                     demo and live worlds: the alarm of the cost cut (ADR-0019) sums it per hour against
-//                     the stage's hourly budget, so a conversation adds what each turn spends, never its
-//                     running total again. Guest worlds
-//                     (sign-up ones included) are capped by their own ceilings and never log it; QA and
-//                     evaluation worlds have a budget per run
+//   AgentSpendUsd     the turn's OWN model tokens only (the Harness's input and output tokens priced by
+//                     the verified Bedrock rows of the rate card, WP-49; never photo validations,
+//                     Transcribe, AgentCore meters, email or WhatsApp), only in the demo and live worlds:
+//                     the alarm of the cost cut (ADR-0019) sums it per hour against the stage's hourly
+//                     budget, so a conversation adds what each turn spends, never its running total
+//                     again. Guest worlds (sign-up ones included) are capped by their own ceilings and
+//                     never log it; QA and evaluation worlds have a budget per run
 //   answered          whether the installer got something from the turn: a message of the turn, or an
 //                     escalation or a safety report that answers by itself (`ALWAYS_ANSWER`)
 import { ConnectorError, ispKindOfClock } from "@cuadrilla/shared";

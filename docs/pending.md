@@ -11,7 +11,7 @@ Solo lo que depende de alguien fuera del equipo de agentes (el CTO, Meta, AWS Pa
 | P-05 | Marca pública, display name de WhatsApp y nombre de la submission | CTO | Cerrado el 2026-09-26 por el CTO (modo `cobrand`; display name "Craftech"; submission "Cuadrilla") | — (§5 registra la decisión y la carga) |
 | P-06 | Datos del responsable, vía de contacto de privacidad, destinatario del aviso de lead, validación legal del aviso de privacidad y los términos (con la eventual inscripción de la base ante la autoridad de control, Ley 25.326) y procedimiento de borrado fuera de la tabla | CTO (legal de Craftech) | Abierto · ítems 1, 2 y 4 cerrados el 2026-10-06 por el CTO (ADR-0027: Craftech, Ciudad Autónoma de Buenos Aires, sales@craftech.io; aviso a la casilla del CTO en `LeadConfig`); ítems 3 y 5 abiertos, sin bloquear | §6 |
 | P-07 | Umbral de costo por conversación (`IspSettings.costBudgetUsdPerConversation`) y confirmación de la alarma `AgentSpendHourly` (USD 20 por hora) y del presupuesto del proyecto (USD 300 por mes) | CTO; `seed-generator` siembra el umbral en las plantillas `demo` y `guest` | Abierto · tarifas verificadas por WP-49 el 2026-10-10; propuesta USD 2,90 | §7 |
-| P-08 | Reaplicar el bootstrap de CI (`qa-runner` con sesiones de hasta 7200 s), fijar la variable `QA_RUNNER_SESSION_SECONDS=7200` y cargar el secreto `BFF_FUNCTION_URL` | Operador con su profile | Abierto | §8 |
+| P-08 | Reaplicar el bootstrap de CI (`qa-runner` con sesiones de hasta 7200 s), fijar la variable `QA_RUNNER_SESSION_SECONDS=7200` y cargar el secreto `BFF_FUNCTION_URL` | Operador con su profile | Cerrado el 2026-10-10 por el operador (bootstrap reaplicado, `qa-runner` con `MaxSessionDuration` 7200 verificado con `get-role`; variable en 7200; secreto `BFF_FUNCTION_URL` cargado desde el estado de SST del app) | — (§8 registra los pasos) |
 
 ## 1. Conectar WhatsApp (P-01)
 
@@ -121,7 +121,9 @@ WP-49 verificó las 15 filas de `RATECARD` el 2026-10-10 (`scripts/seed/generate
 
 Cada turno deja su costo (tokens del agente por las filas verificadas) en la fila `WORLD` de su orden (`turns/record.ts`), y Métricas compara cada conversación con `costBudgetUsdPerConversation` del mundo (KPI "Conversaciones sobre el umbral de costo", meta 0). Mientras ningún mundo siembre el umbral, ese KPI dice "sin umbral fijado" y el check de `docs/test-plan.md` §7 solo avisa. El costo registrado todavía no suma fotos, voz ni mensajes (la nota del KPI lo dice). Dueño: CTO; luego `seed-generator` lo siembra en las plantillas `demo` y `guest` y regenera el seed.
 
-## 8. Operación de CI (P-08)
+## 8. Operación de CI (P-08) · cerrado
+
+Cerrado el 2026-10-10 por el operador con los tres pasos de abajo. `scenarios.yml` falla al empezar si la variable supera el `MaxSessionDuration` de `qa-runner` del template; el secreto se vuelve a cargar con el paso 3 si `deploy.yml` avisa que quedó viejo.
 
 1. **Bootstrap.** `infra/bootstrap/ci-role.yaml` sube `MaxSessionDuration` de `qa-runner` a 7200 s: una medición de `scenarios.yml` que pasa la hora ya no pierde las credenciales. El operador lo reaplica (`infra/bootstrap/README.md`) y verifica con `aws --profile craftech-demos iam get-role --role-name aws-cds-hackathon-poc-cuadrilla-qa-runner`.
 2. **Variable.** Después del paso 1: `gh variable set QA_RUNNER_SESSION_SECONDS --body 7200`.
