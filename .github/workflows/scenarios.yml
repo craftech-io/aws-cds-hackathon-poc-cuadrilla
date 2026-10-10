@@ -1,24 +1,57 @@
-# Scenario suite against the deployed stage `poc` (docs/test-plan.md §4), on demand. The runner
-# drives every flow through the QA driver Lambda with the qa-runner role of the bootstrap
-# (ADR-0007); no human credentials and no password in any secret. The one exception is SC-20 (suite
-# `full`): it starts its sign-ups through the public path like a visitor, from a headless Chromium on
-# `/signup` that solves the edge's AWS WAF challenge (scripts/scenarios/lib/public-signup.ts), so the
-# job installs Playwright's Chromium on this runner first. Its starts spend this runner's per-IP room of
-# the clock hour: dispatch the full suite at most once per hour. Only `main` can assume the role, so
-# dispatch it from main. `eval` runs the agent evaluation set (EV-01 questions, EV-02 photos).
+# Scenario suites against the deployed stage `poc` (docs/test-plan.md §4-§5), on demand and only with the
+# CTO's OK: every suite but `smoke` spends Bedrock.
+#
+#   full   SC-00 … SC-20 (SC-18 and SC-19, the guest's walkthrough and world, and SC-20, the own sign-up,
+#          included) before every delivery; three runs on the same commit for "100 % probada"
+#   eval   the measurements EV-01 (the manual's questions) and EV-02 (the photos), one job each, one after
+#          the other, so each has its own session and the latencies are measured without the other's load
+#   smoke  SC-00 alone (deploy.yml runs it on every deploy)
+#
+# The runner drives every flow through the QA driver Lambda with the qa-runner role of the bootstrap
+# (ADR-0007): IAM only, no user secret and no password anywhere in this file. The one public path is
+# SC-20's: it starts its sign-ups like a visitor, from a headless Chromium on `/signup` that solves the
+# edge's AWS WAF challenge (scripts/scenarios/lib/public-signup.ts), so its job installs Chromium first.
+# Those starts spend this runner's per-IP room of the clock hour: dispatch the full suite at most once per
+# clock hour (each dispatch gets a fresh VM).
+#
+# SMK/10 (SC-00 step 10) calls the Bff's Function URL directly. qa-runner cannot read the SST state, so the
+# URL comes from the BFF_FUNCTION_URL repository secret (masked; deploy.yml warns when it is missing or
+# stale). Without it that step is BLOCKED, never passed. To set or refresh it with the operator's profile,
+# without printing it:
+#   AWS_PROFILE=craftech-demos npx tsx --eval 'import("./scripts/qa/inventory.ts").then(async (m) => process.stdout.write((await m.loadInventory()).bffUrl))' | gh secret set BFF_FUNCTION_URL
+#
+# Only `main` can assume qa-runner (its trust binds this file on main): dispatch from main. The jobs declare
+# no `environment:` (it would change the OIDC `sub` the trust expects). The role's session lasts
+# QA_RUNNER_SESSION_SECONDS (repository variable; 3600 when unset). The bootstrap allows 7200
+# (MaxSessionDuration of qa-runner): set the variable to 7200 once the operator has reapplied it.
+#
+# Reports (no PII: ids, codes, counts, latencies and the estimated cost) go to the run summary and are
+# kept as artifacts, pass or fail, never committed. A scenario report is renamed
+# `scenario-report-<suite>-<run>-<attempt>.json` so the three runs of the gate can sit in one folder:
+# `npm run scenarios -- --aggregate <folder>`. The measurement reports are `EV-0n-<runId>.json` and `.md`.
 name: Scenarios poc
 
 on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Suite to run (full, eval or smoke)
+        description: "Suite to run (full, eval or smoke). Every suite but smoke spends Bedrock: only with the CTO's OK."
         type: choice
         options:
           - full
           - eval
           - smoke
         default: full
+      only:
+        description: "Optional comma-separated ids to run alone (SC-04,SC-05 for full or smoke; EV-01 or EV-02 for eval). Empty runs the whole suite."
+        type: string
+        required: false
+        default: ""
+      max_cost_usd:
+        description: "Optional cost ceiling of the run in USD (needs verified rates). Empty uses only the turn and validation budgets."
+        type: string
+        required: false
+        default: ""
 
 permissions:
   id-token: write
@@ -31,13 +64,22 @@ concurrency:
 env:
   CI: "true"
   AWS_REGION: us-east-1
+  APP_URL: https://cuadrilla.demo.craftech.io
+  REPORT_DIR: test-results/scenarios
 
 jobs:
   scenarios:
-    name: Scenario suite
+    name: Scenario suite (${{ inputs.suite }})
+    if: ${{ inputs.suite != 'eval' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
+      - name: Only from main (the qa-runner trust accepts nothing else)
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Dispatch this workflow from main: the qa-runner role trusts only scenarios.yml on main."
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
@@ -51,7 +93,7 @@ jobs:
         run: npm ci
 
       - name: Chromium for SC-20's public sign-up (this runner only)
-        if: inputs.suite == 'full'
+        if: ${{ inputs.suite == 'full' && (inputs.only == '' || contains(inputs.only, 'SC-20')) }}
         run: npx playwright install --with-deps chromium
 
       - name: Assume the qa-runner role (OIDC, no access keys)
@@ -59,14 +101,144 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_QA_RUNNER_ROLE_ARN || 'arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-qa-runner' }}
           role-session-name: github-scenarios-${{ github.run_id }}
+          role-duration-seconds: ${{ vars.QA_RUNNER_SESSION_SECONDS || 3600 }}
           aws-region: us-east-1
 
       - name: Run the suite
         env:
           SUITE: ${{ inputs.suite }}
+          ONLY: ${{ inputs.only }}
+          MAX_COST_USD: ${{ inputs.max_cost_usd }}
+          BFF_URL: ${{ secrets.BFF_FUNCTION_URL }}
         run: |
-          if [ ! -f scripts/scenarios/run.ts ]; then
-            echo "::notice::scenarios skipped: scripts/scenarios/run.ts is not in the repository yet (WP-45)."
-            exit 0
+          args=(--suite "${SUITE}" --base-url "${APP_URL}" --report-dir "${REPORT_DIR}")
+          if [ -n "${ONLY}" ]; then args+=(--only "${ONLY}"); fi
+          if [ -n "${MAX_COST_USD}" ]; then args+=(--max-cost-usd "${MAX_COST_USD}"); fi
+          if [ -n "${BFF_URL}" ]; then
+            args+=(--bff-url "${BFF_URL}")
+          elif [ -z "${ONLY}" ] || [[ "${ONLY^^}" == *SC-00* ]]; then
+            echo "::warning::The BFF_FUNCTION_URL secret is not set: SC-00 step 10 (SMK/10) will be BLOCKED."
           fi
-          npm run scenarios -- --suite "${SUITE}"
+          npm run scenarios -- "${args[@]}"
+
+      - name: Name the report after the run (the gate reads scenario-report*.json from one folder)
+        if: ${{ !cancelled() }}
+        env:
+          SUITE: ${{ inputs.suite }}
+        run: |
+          for extension in json md; do
+            source="${REPORT_DIR}/scenario-report.${extension}"
+            if [ -f "$source" ]; then mv "$source" "${REPORT_DIR}/scenario-report-${SUITE}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.${extension}"; fi
+          done
+
+      - name: Report in the run summary
+        if: ${{ !cancelled() }}
+        env:
+          SUITE: ${{ inputs.suite }}
+        run: |
+          report="${REPORT_DIR}/scenario-report-${SUITE}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          if [ -f "$report" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; else echo "::warning::The suite wrote no report."; fi
+
+      - name: Keep the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scenario-report-${{ inputs.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_DIR }}/
+          if-no-files-found: warn
+          retention-days: 90
+
+  measurements:
+    name: Measurement ${{ matrix.measurement }}
+    if: ${{ inputs.suite == 'eval' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        measurement:
+          - EV-01
+          - EV-02
+    steps:
+      - name: Only from main (the qa-runner trust accepts nothing else)
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Dispatch this workflow from main: the qa-runner role trusts only scenarios.yml on main."
+          exit 1
+
+      - name: Is this measurement asked for
+        id: plan
+        env:
+          ONLY: ${{ inputs.only }}
+          MEASUREMENT: ${{ matrix.measurement }}
+        run: |
+          ids="${ONLY^^}"
+          ids="${ids// /}"
+          if [ -z "${ids}" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          IFS=, read -r -a asked <<< "${ids}"
+          for id in "${asked[@]}"; do
+            case "${id}" in
+              EV-01 | EV-02 | "") ;;
+              *) echo "::error::'only' names ${id}, which is not a measurement (EV-01, EV-02)."; exit 1 ;;
+            esac
+          done
+          if [[ ",${ids}," == *",${MEASUREMENT},"* ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${MEASUREMENT} is not in 'only': skipped."
+          fi
+
+      - name: Checkout
+        if: ${{ steps.plan.outputs.run == 'true' }}
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Set up Node
+        if: ${{ steps.plan.outputs.run == 'true' }}
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        if: ${{ steps.plan.outputs.run == 'true' }}
+        run: npm ci
+
+      - name: Assume the qa-runner role (OIDC, no access keys)
+        if: ${{ steps.plan.outputs.run == 'true' }}
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_QA_RUNNER_ROLE_ARN || 'arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-qa-runner' }}
+          role-session-name: github-measure-${{ github.run_id }}
+          role-duration-seconds: ${{ vars.QA_RUNNER_SESSION_SECONDS || 3600 }}
+          aws-region: us-east-1
+
+      - name: Run the measurement
+        if: ${{ steps.plan.outputs.run == 'true' }}
+        env:
+          MEASUREMENT: ${{ matrix.measurement }}
+          MAX_COST_USD: ${{ inputs.max_cost_usd }}
+        run: |
+          args=(--suite eval --only "${MEASUREMENT}" --report-dir "${REPORT_DIR}")
+          if [ -n "${MAX_COST_USD}" ]; then args+=(--max-cost-usd "${MAX_COST_USD}"); fi
+          npm run scenarios -- "${args[@]}"
+
+      - name: Report in the run summary
+        if: ${{ !cancelled() && steps.plan.outputs.run == 'true' }}
+        env:
+          MEASUREMENT: ${{ matrix.measurement }}
+        run: |
+          shopt -s nullglob
+          reports=("${REPORT_DIR}/${MEASUREMENT}"-*.md)
+          if [ "${#reports[@]}" -eq 0 ]; then echo "::warning::${MEASUREMENT} wrote no report."; exit 0; fi
+          cat "${reports[@]}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the report
+        if: ${{ !cancelled() && steps.plan.outputs.run == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: measurement-${{ matrix.measurement }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_DIR }}/
+          if-no-files-found: warn
+          retention-days: 90

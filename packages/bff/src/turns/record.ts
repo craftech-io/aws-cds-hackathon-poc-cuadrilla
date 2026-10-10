@@ -6,10 +6,10 @@
 //   CuadrillaMetrics  the turn and its tokens on the order's KPI row, its latency, and the first-reply
 //                     latency: real ms from the inbound message to the first outbound of the turn
 //   log fields        `TurnLatency`, `TurnErrors`, `TurnMaxTokens`, `FirstReplyLatency` (logs only, ADR-0028)
-//   AgentSpendUsd     the turn's OWN spend, by the verified rows of the rate card (the Harness model's
-//                     tokens until WP-49 verifies the rest), only in the demo and live worlds: the alarm of
-//                     the cost cut (ADR-0019) sums it per hour against the stage's hourly budget, so a
-//                     conversation adds what each turn spends, never its running total again. Guest worlds
+//   AgentSpendUsd     the turn's OWN spend, by the verified rows of the rate card (WP-49), only in the
+//                     demo and live worlds: the alarm of the cost cut (ADR-0019) sums it per hour against
+//                     the stage's hourly budget, so a conversation adds what each turn spends, never its
+//                     running total again. Guest worlds
 //                     (sign-up ones included) are capped by their own ceilings and never log it; QA and
 //                     evaluation worlds have a budget per run
 //   answered          whether the installer got something from the turn: a message of the turn, or an

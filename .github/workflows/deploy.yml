@@ -13,9 +13,17 @@
 # Order (docs/architecture.md §15 step 5): the checks of ci.yml (the forbidden terms and the neutral
 # public surfaces of ADR-0023 included, on the sources and on the web build), then assume the deploy
 # role, prove who we are, deploy, load the seed (idempotent: uploads the manual and ingests the
-# Knowledge Base only when its fingerprint changed), smoke. This app never receives email, so there is no SES
-# receipt rule set to check (ADR-0003). Steps whose script is not in the repository yet print a
-# notice and pass (never the forbidden terms).
+# Knowledge Base only when its fingerprint changed), read the Bff's Function URL from this app's SST
+# state, then assume qa-runner and run the smoke suite: SC-00 through the QA driver (docs/test-plan.md
+# §6), with SMK/9 (the edge's AWS WAF challenge to a sign-up without a token, also in a batch) and
+# SMK/10 (the Function URL called directly answers 403) sent from this runner. A first deploy's DKIM
+# still PENDING makes SMK/6 a warning; any other failure turns the run red. The smoke spends a single
+# agent turn and a single photo validation; the full suite and the measurements never run here
+# (scenarios.yml, by hand, with the CTO's OK). The smoke report (ids, codes and counts; no PII) goes to
+# the run summary and is kept as an artifact, pass or fail. This app never receives email, so there is
+# no SES receipt rule set to check (ADR-0003). Steps whose script is not in the repository yet print a
+# notice and pass (never the forbidden terms, never the smoke).
+
 name: Deploy poc
 
 on:
@@ -37,6 +45,7 @@ env:
   SST_TELEMETRY_DISABLED: "1"
   AWS_REGION: us-east-1
   APP_URL: https://cuadrilla.demo.craftech.io
+  SMOKE_REPORT_DIR: test-results/smoke
 
 jobs:
   deploy:
@@ -118,8 +127,15 @@ jobs:
       - name: Who am I (proves the role was assumed without access keys)
         run: aws sts get-caller-identity
 
+      # A deploy that changes the agent's model can fail once on the AgentCore Memory update while IAM
+      # propagates the new grants; the same deploy run again succeeds. One retry after a minute, never more.
       - name: Deploy stage poc
-        run: npx sst deploy --stage poc
+        id: sst
+        run: |
+          if npx sst deploy --stage poc; then exit 0; fi
+          echo "::warning::sst deploy failed; retrying once in 60 s (IAM propagation after a model or grant change)."
+          sleep 60
+          npx sst deploy --stage poc
 
       - name: Publish the deployed URL in the run summary
         run: |
@@ -131,29 +147,49 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Load the synthetic seed and the manual into poc (idempotent, ingests the Knowledge Base on change)
-        run: |
-          if [ ! -f scripts/seed/load.ts ]; then
-            echo "::notice::seed:load skipped: scripts/seed/load.ts is not in the repository yet (WP-39)."
-            exit 0
-          fi
-          npm run seed:load
+        run: npm run seed:load
 
-      - name: Interim smoke (until SC-00 exists)
-        if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') == '' }}
-        run: npx tsx scripts/smoke/interim.ts --base-url "${APP_URL}" --aws
-
-      - name: The Bff's Function URL for the smoke (this app's SST state, masked)
-        if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') != '' }}
+      - name: The Bff's Function URL for SMK/10 (this app's SST state, masked)
         run: npx tsx scripts/qa/bff-url.ts
 
+      # scenarios.yml cannot read the SST state (qa-runner has no access to it), so SC-00 of the full suite
+      # takes the URL from the BFF_FUNCTION_URL repository secret. Compared here, never printed.
+      - name: The Bff URL kept for scenarios.yml is current
+        env:
+          KEPT_BFF_URL: ${{ secrets.BFF_FUNCTION_URL }}
+        run: |
+          if [ -z "${KEPT_BFF_URL}" ]; then
+            echo "::warning::The BFF_FUNCTION_URL secret is not set: SMK/10 of the full suite (scenarios.yml) will be BLOCKED."
+          elif [ "${KEPT_BFF_URL%/}" != "${BFF_URL%/}" ]; then
+            echo "::warning::The BFF_FUNCTION_URL secret differs from the deployed Bff's Function URL: update it before the next full suite."
+          else
+            echo "BFF_FUNCTION_URL matches the deployed Bff."
+          fi
+
       - name: Assume the qa-runner role (OIDC)
-        if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') != '' }}
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_QA_RUNNER_ROLE_ARN || 'arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-qa-runner' }}
           role-session-name: github-qa-${{ github.run_id }}
           aws-region: us-east-1
 
-      - name: Smoke scenarios (SC-00)
-        if: ${{ hashFiles('scripts/scenarios/sc-00-smoke.ts') != '' }}
-        run: npm run scenarios -- --suite smoke --bff-url "${BFF_URL}"
+      - name: Who am I (the smoke runs as qa-runner, never as the deploy role)
+        run: aws sts get-caller-identity --query Arn --output text | grep -q -- '-qa-runner/' || { echo "::error::the smoke is not running as qa-runner"; exit 1; }
+
+      - name: Smoke scenarios (SC-00, SMK/9 and SMK/10 from this runner)
+        run: npm run scenarios -- --suite smoke --base-url "${APP_URL}" --bff-url "${BFF_URL}" --report-dir "${SMOKE_REPORT_DIR}"
+
+      - name: Smoke report in the run summary
+        if: ${{ !cancelled() && steps.sst.outcome == 'success' }}
+        run: |
+          report="${SMOKE_REPORT_DIR}/scenario-report.md"
+          if [ -f "$report" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; else echo "::warning::The smoke wrote no report."; fi
+
+      - name: Keep the smoke report
+        if: ${{ !cancelled() && steps.sst.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SMOKE_REPORT_DIR }}/
+          if-no-files-found: warn
+          retention-days: 30

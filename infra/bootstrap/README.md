@@ -10,6 +10,9 @@
   managed policies `<app>-ci-deploy-{sst-home,app-resources,named,edge,dns-and-iam}`.
 - Role `<app>-qa-runner`, assumed by `deploy.yml` (smoke) and `scenarios.yml` (full suite and
   evaluation) on `main`: it can only invoke `function:<app>-poc-qa-driver` and read the app's logs.
+  Its sessions last up to two hours (`MaxSessionDuration: 7200`); `scenarios.yml` asks for
+  `QA_RUNNER_SESSION_SECONDS` (repository variable, 3600 when unset): set it to 7200 after applying
+  this template.
 - Key-value store `<app>-poc-router`, the routing table of the Router (`infra/web.ts`).
 - Response headers policy `<app>-poc-console` (CSP, HSTS, `X-Frame-Options DENY`, nosniff,
   referrer), which the deploy role cannot change. Its CSP is `CONSOLE_CSP` of `infra/ci-spec.ts`:

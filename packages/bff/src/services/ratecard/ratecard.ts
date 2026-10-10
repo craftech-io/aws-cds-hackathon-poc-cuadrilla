@@ -1,10 +1,9 @@
 // Cost per conversation (docs/design-brief.md §8, CONTEXT.md "Costo por conversación"): Bedrock
 // (Harness turns and photo validations), the query embeddings of the manual, AgentCore, Transcribe,
 // WhatsApp and SES of one work order, priced with the `RATECARD` rows of `Reference`
-// (docs/seed-spec.md §12). A row carries its price, unit, official source and date. The token rows of
-// DEFAULT_MODEL_ID ship verified (MODEL_RATES, ADR-0028); the rest ship `provisional` with no price until
-// WP-49 loads verified prices, and until then the metric says it has no verified rate instead of
-// showing a number. WhatsApp in `simulated` mode is priced as if
+// (docs/seed-spec.md §12). A row carries its price, unit, official source and date; every row ships
+// verified (WP-49, invariant 13), and a row that is still `provisional` makes the metric say it has no
+// verified rate instead of showing a number. WhatsApp in `simulated` mode is priced as if
 // it were live (Meta charges templates, and from 2026-10-01 also messages inside the window,
 // ADR-0019), and the result says so. The same rows price a QA run's budget (docs/test-plan.md §4.4).
 import { z } from "zod";
@@ -14,14 +13,14 @@ import { CalendarDate } from "@cuadrilla/shared";
 export const DEFAULT_MODEL_ID = "global.anthropic.claude-sonnet-5-5";
 /**
  * Verified prices of DEFAULT_MODEL_ID in USD per million tokens (ADR-0028): the "Standard, Global" lines
- * of the AWS Price List for us-east-1 (offer AmazonBedrockFoundationModels, 5-minute cache writes).
- * The seed's `RATECARD` rows take them from here.
+ * of the AWS Price List for us-east-1 (offer AmazonBedrockFoundationModels, 5-minute cache writes; cache
+ * reads halved from 2026-10-07). The seed's `RATECARD` rows take them from here.
  */
 export const MODEL_RATES = {
   modelId: DEFAULT_MODEL_ID,
-  prices: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  prices: { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 },
   source: "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrockFoundationModels/current/us-east-1/index.json",
-  asOf: "2026-10-05",
+  asOf: "2026-10-10",
 } as const;
 /** Embeddings of the Knowledge Base; `Retrieve` embeds each query. */
 export const EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2";

@@ -105,6 +105,11 @@ describe("qa-runner", () => {
     expect(refs.join("\n")).toContain("scenarios.yml@refs/heads/${DeployBranch}");
     expect(refs.filter((line) => line.includes(".github/workflows/"))).toHaveLength(2);
   });
+
+  it("lasts two hours, so one measurement of scenarios.yml keeps its credentials; the deploy role, one", () => {
+    expect(role).toContain("MaxSessionDuration: 7200");
+    expect(block(template, "  DeployRole:", "AssumeRolePolicyDocument:")).toContain("MaxSessionDuration: 3600");
+  });
 });
 
 describe("services this app adds to the scaffolding", () => {

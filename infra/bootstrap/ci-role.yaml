@@ -1089,7 +1089,7 @@ Resources:
     Properties:
       RoleName: !Sub "${AppName}-qa-runner"
       Description: Assumed by deploy.yml and scenarios.yml on main to run the scenarios through the QA driver.
-      MaxSessionDuration: 3600
+      MaxSessionDuration: 7200
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:

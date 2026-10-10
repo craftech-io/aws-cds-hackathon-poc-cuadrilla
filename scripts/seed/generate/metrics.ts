@@ -1,7 +1,7 @@
 // `CuadrillaMetrics` of a world (docs/seed-spec.md §7): one KPI row per order closed on 12/10, so the
 // "Este mundo" tab has history before the first turn of the demo. They are labelled `SCRIPTED`: they
 // were not measured with the real agent, and the console never mixes them with measured ones
-// (docs/design-brief.md §8). No cost: the rate card is provisional until WP-49.
+// (docs/design-brief.md §8). No cost: a scripted row has no measured tokens to price.
 import type { SeedItem } from "../lib/tables";
 import { rngFor, row } from "./context";
 import { isClosedHistory } from "./orders";

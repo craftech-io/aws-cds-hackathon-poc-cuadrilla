@@ -10,6 +10,8 @@ Solo lo que depende de alguien fuera del equipo de agentes (el CTO, Meta, AWS Pa
 | P-04 | Video de 3 minutos | CTO | Abierto | §4 |
 | P-05 | Marca pública, display name de WhatsApp y nombre de la submission | CTO | Cerrado el 2026-09-26 por el CTO (modo `cobrand`; display name "Craftech"; submission "Cuadrilla") | — (§5 registra la decisión y la carga) |
 | P-06 | Datos del responsable, vía de contacto de privacidad, destinatario del aviso de lead, validación legal del aviso de privacidad y los términos (con la eventual inscripción de la base ante la autoridad de control, Ley 25.326) y procedimiento de borrado fuera de la tabla | CTO (legal de Craftech) | Abierto · ítems 1, 2 y 4 cerrados el 2026-10-06 por el CTO (ADR-0027: Craftech, Ciudad Autónoma de Buenos Aires, sales@craftech.io; aviso a la casilla del CTO en `LeadConfig`); ítems 3 y 5 abiertos, sin bloquear | §6 |
+| P-07 | Umbral de costo por conversación (`IspSettings.costBudgetUsdPerConversation`) y confirmación de la alarma `AgentSpendHourly` (USD 20 por hora) y del presupuesto del proyecto (USD 300 por mes) | CTO; `seed-generator` siembra el umbral en las plantillas `demo` y `guest` | Abierto · tarifas verificadas por WP-49 el 2026-10-10; propuesta USD 2,90 | §7 |
+| P-08 | Reaplicar el bootstrap de CI (`qa-runner` con sesiones de hasta 7200 s), fijar la variable `QA_RUNNER_SESSION_SECONDS=7200` y cargar el secreto `BFF_FUNCTION_URL` | Operador con su profile | Abierto | §8 |
 
 ## 1. Conectar WhatsApp (P-01)
 
@@ -112,3 +114,15 @@ El alta registra leads reales (ADR-0026). Ítems 1, 2 y 4 cerrados el 2026-10-06
 5. **Procedimiento de borrado fuera de la tabla**: quién borra, en la casilla que recibe los avisos, el aviso de un lead borrado o vencido (por su `leadId`) y cómo se destruyen los CSV exportados (a más tardar a los 30 días; ADR-0026). · Abierto, sin bloquear; mientras tanto rige lo que fija ADR-0026.
 
 Dueño: CTO. Verificación: `npx sst secret list --stage poc` (sin compartir valores); el aviso de prueba recibido; las páginas legales con la versión de ADR-0027.
+
+## 7. Umbral de costo por conversación (P-07)
+
+WP-49 verificó las 15 filas de `RATECARD` el 2026-10-10 (`scripts/seed/generate/ratecard.ts`). Camino feliz de una orden (12 turnos, 5 fotos, WhatsApp cobrado como vivo, sin caché): USD 1,15-1,87. Propuesta: **USD 2,90** (el techo más la mitad). La alarma `AgentSpendHourly` de USD 20 por hora (`infra/observability-spec.ts`) equivale a 149-270 turnos en una hora; el presupuesto del proyecto es de USD 300 por mes. Los dos siguen provisionales hasta que el CTO los confirme.
+
+Mientras ningún mundo siembre `costBudgetUsdPerConversation`, la métrica nunca marca un exceso y el check de `docs/test-plan.md` §7 solo avisa. Dueño: CTO; luego `seed-generator` lo siembra en las plantillas `demo` y `guest` y regenera el seed.
+
+## 8. Operación de CI (P-08)
+
+1. **Bootstrap.** `infra/bootstrap/ci-role.yaml` sube `MaxSessionDuration` de `qa-runner` a 7200 s: una medición de `scenarios.yml` que pasa la hora ya no pierde las credenciales. El operador lo reaplica (`infra/bootstrap/README.md`) y verifica con `aws --profile craftech-demos iam get-role --role-name aws-cds-hackathon-poc-cuadrilla-qa-runner`.
+2. **Variable.** Después del paso 1: `gh variable set QA_RUNNER_SESSION_SECONDS --body 7200`.
+3. **Secreto `BFF_FUNCTION_URL`** (lo usa `SMK/10`; `deploy.yml` avisa si falta o quedó viejo), después del próximo deploy y sin imprimirlo: `AWS_PROFILE=craftech-demos npx tsx --eval 'import("./scripts/qa/inventory.ts").then(async (m) => process.stdout.write((await m.loadInventory()).bffUrl))' | gh secret set BFF_FUNCTION_URL`.

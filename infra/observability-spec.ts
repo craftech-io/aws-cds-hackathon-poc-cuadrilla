@@ -98,8 +98,8 @@ export interface CostAlarmSpec {
  * repeat once per turn), so it measures the spend rate. Guest worlds, sign-up ones included, never log
  * it: their own ceilings (per world, per account and the global one) cap them, and a visitor can never
  * cut the agent of every other world. One long conversation at a normal turn cost (40 turns at about
- * USD 0.15) spends about USD 6, well under it. Provisional until WP-49 fixes it with the CTO from the
- * verified rate card; the cost per conversation the product shows (`IspSettings.costBudgetUsdPerConversation`)
+ * USD 0.15) spends about USD 6, well under it. With the rate card verified by WP-49 it is 149-270 turns
+ * in an hour; provisional until the CTO confirms it (docs/pending.md P-07). The cost per conversation the product shows (`IspSettings.costBudgetUsdPerConversation`)
  * comes from `CuadrillaMetrics`, not from this alarm.
  */
 export const AGENT_SPEND_ALARM_USD_PER_HOUR = 20;
@@ -135,7 +135,7 @@ export function costAlarmName(suffix: string, app: string = APP, stage: string =
 
 /**
  * Monthly budget of the project by the cost allocation tag `Project` (docs/architecture.md §12 and §17
- * item 8). The amount is provisional (no doc fixes it): the CTO confirms it with WP-49. Notices at 50,
+ * item 8). The amount is provisional until the CTO confirms it (docs/pending.md P-07). Notices at 50,
  * 80 and 100 % of the actual cost to `SeedOverrides.operatorEmail`; at 100 % also CostAlerts, which
  * CostGuard turns into KILL#AGENT.
  */
