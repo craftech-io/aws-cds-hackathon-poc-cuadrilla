@@ -233,7 +233,7 @@ Reglas: `INSTALLED` exige checklist completo, ONU `ONLINE` en rango en los últi
 | `write_certificate` | `ToolCases` (vía `CertificateWriter`) | PDF, G3, `sha256`, entregas | `CERT`, S3 | `CERTIFICATE_ISSUED` |
 | `apply_email_event` | `worker` | Entregas del acta y de alertas; `CERTIFICATE_UNDELIVERED` | `Conversations`, `CERT` | `ACTION` |
 | `apply_dispatch_event` | `worker` | Reprogramación, reasignación, cancelación | `WorkOrders` | `ACTION` / `DISPATCH_AFTER_CLOSE` |
-| `handle_guardrail_block` | `worker` | Bloqueo de G1: respuesta fija (salvo instrucción de seguridad previa), caso, `sessionEpoch + 1` si vino del Harness | `Cases`, `Conversations` | `GUARDRAIL_BLOCK` / `GUARDRAIL_MASK` |
+| `handle_guardrail_block` | `worker` | Bloqueo de G1 (pre-filtro) o de G4 (Harness): respuesta fija (salvo instrucción de seguridad previa), caso, `sessionEpoch + 1` si vino del Harness | `Cases`, `Conversations` | `GUARDRAIL_BLOCK` / `GUARDRAIL_MASK` |
 | `fire_timer`, `deferred_send` | `worker`, `scheduler` | Despacho por `kind`, versiones viejas ignoradas | `TIMER#` | `TIMER_FIRED` / `SKIPPED` |
 | `advance_clock`, `force_case_timeout` | `console`, `qa` | `advance`, `advanceTo`, `advanceToNext`, `setMode`; vencimiento forzado; `WORLD_BUSY` desde la consola | `CLOCK#`, `TIMER#`, Scheduler | `CLOCK_ADVANCED` / `CLOCK_FORCED` |
 | `set_template_status`, `set_onu_behaviour`, `dispatch_control` | `console` (controles de demo), `qa` | Estado simulado de plantillas; comportamiento de una ONU; reprogramar/reasignar/cancelar por `DispatchMock` | `Isps/SETTINGS`, `Network`, `Dispatch` | `ACTION DEMO_CONTROL` |

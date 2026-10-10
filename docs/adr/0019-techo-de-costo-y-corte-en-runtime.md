@@ -22,7 +22,7 @@ Cada mundo de invitado tiene topes propios (turnos, validaciones, minutos de tra
 ## Estado
 
 - **2026-09-26:** verificado que Meta cobra también los mensajes dentro de la ventana desde el 2026-10-01; se agrega el punto 5 (sin contador nuevo) y WP-49 carga `whatsapp:MX:service` con precio, fuente y fecha.
-- **2026-10-09:** la alarma `CostPerConversation` (promedio por hora del costo acumulado de la orden, una muestra por turno y por todos los mundos) se reemplaza por `AgentSpendHourly`: el worker registra el gasto propio de cada turno (`AgentSpendUsd`) solo en el mundo de demo y el vivo, y la alarma lo **suma** por hora contra un presupuesto horario del stage (USD 20, provisional hasta WP-49). Con el promedio de acumulados, una conversación larga de un invitado del alta alcanzaba el umbral y cortaba el agente de todos los mundos; los invitados quedan acotados por sus topes y el techo global de turnos.
+- **2026-10-09:** la alarma `CostPerConversation` (promedio por hora del costo acumulado de la orden, una muestra por turno y por todos los mundos) se reemplaza por `AgentSpendHourly`: el worker registra el gasto propio de cada turno (`AgentSpendUsd`: solo los tokens de entrada y salida del modelo del Harness, por las filas verificadas de `RateCard`; Transcribe, la validación de fotos, Memory, Gateway, email y WhatsApp quedan acotados por sus propios topes) solo en el mundo de demo y el vivo, y la alarma lo **suma** por hora contra un presupuesto horario del stage (USD 20, provisional hasta WP-49). Con el promedio de acumulados, una conversación larga de un invitado del alta alcanzaba el umbral y cortaba el agente de todos los mundos; los invitados quedan acotados por sus topes y el techo global de turnos.
 
 ## Consequences
 

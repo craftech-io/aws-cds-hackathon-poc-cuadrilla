@@ -1,41 +1,125 @@
 # Cuadrilla · Powered by Craftech
 
-A field copilot on WhatsApp for fiber (FTTH) installers of a Latin American ISP.
+**A field copilot on WhatsApp for fiber (FTTH) installers of a Latin American ISP.**
 
-> This README is a skeleton while the product is being built. Each section is completed as the
-> build closes (`docs/build-plan.md`, wave 6); the structure below is final.
+**Live product:** https://cuadrilla.demo.craftech.io · Demo video: (coming soon)
 
-## What it does
+![AWS architecture of Cuadrilla](docs/assets/architecture.png)
 
-A fiber installer works alone at the customer's home with busy hands. With Cuadrilla they send a
-text or a voice note on WhatsApp: Amazon Transcribe (es-MX) turns the voice note into text, an
-Amazon Bedrock AgentCore agent reads the work order and the ONU status from the network
-orchestrator, guides the diagnosis with the operator's procedures manual in a Bedrock Knowledge
-Base (always citing the section, never inventing), validates every evidence photo in an isolated
-multimodal call with deterministic checks, escalates through a supervisor ladder with WhatsApp
-templates and timeouts (and an Amazon SES email to the zone chief), sends the manual's fixed safety
-instruction the moment a hazard is reported, and issues the installation certificate PDF by SES and
-WhatsApp. Supervisors and operations follow every order, case and decision in a web console.
+A fiber installer works alone at the customer's home, on a ladder or under a desk, with busy hands.
+When the ONU does not light up, a photo is missing or something looks dangerous, today they call a
+supervisor who may not answer, guess from memory, or leave and come back another day. Cuadrilla sits
+in the chat the installer already uses: they write or send a voice note on **WhatsApp**, and an AI
+agent reads their work order and the equipment status, walks them through the operator's procedures
+manual (always citing the section), checks every evidence photo, escalates to the right supervisor
+when it cannot help, gives the manual's fixed safety instruction the moment a hazard is reported and,
+at the end, issues the installation certificate. Supervisors and operations follow every order, case
+and decision in a web console.
 
-Who it is for: ISPs and field-service contractors that install fiber at scale and lose time and
-repeat visits to incomplete evidence, questions nobody answers on site and escalations that stall.
+## Who it is for
+
+- **ISPs and field-service contractors that install fiber at scale** and lose time and repeat visits
+  to incomplete evidence, questions nobody answers on site and escalations that stall.
+- **Installers**, who get answers in Spanish on WhatsApp, by text or voice, without installing
+  anything new.
+- **Supervisors and zone chiefs**, who keep every decision: the agent proposes and escalates, a
+  person takes the case, and a person validates evidence by hand when it comes to that.
+
+## How it works
+
+1. **Start of the day.** At 07:30 each installer gets the orders-of-the-day template with a "Ver
+   órdenes" (view orders) button; the day's schedule comes from the dispatch system.
+2. **Voice or text on site.** "La ONU no prende la luz PON" (the ONU's PON light is off): the voice
+   note is transcribed (Amazon Transcribe, `es-MX`, with an FTTH vocabulary), the message is marked
+   read with WhatsApp's typing indicator right away, and the agent reads the work order and the ONU's
+   optical power from the network orchestrator.
+3. **Guidance from the manual, cited.** Every procedure or policy answer comes from the operator's
+   manual in a Bedrock Knowledge Base and cites its section (for example §DIAG-02). What the manual
+   does not cover is said plainly and offered as an escalation; the agent never invents a policy.
+4. **Every photo checked.** Each evidence photo (meter, ONU label, rosette) is validated in an
+   isolated multimodal call plus deterministic checks; the installer gets ✅ or 🔁 with an actionable
+   reason (glare, out of focus, wrong item). The checklist only advances with a passing validation.
+5. **Escalation ladder.** When the agent cannot solve it (three troubleshooting steps without
+   success, a topic outside the manual), it opens a case: the supervisor on duty gets a WhatsApp
+   template with "Tomar caso" (take the case); if nobody takes it in time, the case moves to the
+   backup supervisor and then to the zone chief by email. A supervisor's reply reaches the installer
+   over a bridge, and the agent resumes afterwards.
+6. **Safety first, deterministic.** "Cable pelado en el poste" (bare cable on the pole) triggers a
+   lexical classifier before any guardrail or model: the installer receives the manual's fixed
+   instruction (§SEG-01, never written by the model), and the supervisor and the zone chief are
+   alerted in parallel.
+7. **Installation certificate.** "Cerrar instalación" (close installation) produces the certificate
+   PDF, sent by email to the customer and to the operations mailbox and by WhatsApp to the installer.
+
+Guarantees enforced in code, not in the prompt: a contact policy (rules `CP-*`: allow list and
+opt-in, quiet hours, the shift roster, the 24-hour WhatsApp window, approved templates, cited answers,
+no foreign links, no request for sensitive data) decides every outgoing message; the agent speaks
+only to the installer of its session; identity always comes from the registered phone, never from the
+model; every incoming message is treated as hostile (masked, delimited and filtered before the model
+sees it); every outgoing text is grounded against what the agent read in that turn; every decision is
+audited.
+
+## How it uses AWS Communication Developer Services
+
+| Service | What Cuadrilla does with it at runtime |
+|---|---|
+| **AWS End User Messaging Social** (WhatsApp) | The single client is `packages/bff/src/channels/whatsapp/client.ts` (`@aws-sdk/client-socialmessaging`). `SendWhatsAppMessage` sends `UTILITY` message templates in `es_MX` with quick-reply buttons (orders of the day, escalated and reassigned case, safety alert, supervisor reply, certificate with a document header), free-text replies inside the 24-hour window, interactive buttons and lists, reactions (✅ / 🔁 on a photo) and the read receipt with the typing indicator (`channels/whatsapp/ack.ts`). `PostWhatsAppMessageMedia` uploads the certificate PDF and case photos from S3; `GetWhatsAppMessageMedia` downloads inbound voice notes (Ogg/Opus) and photos into S3 (metadata first, then the object). Inbound messages and delivery statuses arrive from the WhatsApp Business account's event destination through an Amazon SNS topic (not a Communication Developer Service) to `packages/bff/src/handlers/inbound-whatsapp.ts`, which discards any event that is not for our number. Templates are created as code with `CreateWhatsAppMessageTemplate` (`scripts/channels/whatsapp-templates.ts`). The adapter is implemented and fixture-tested; the phone simulator works in every demo world, and live WhatsApp is enabled once the WhatsApp Business Account is connected. |
+| **Amazon SES v2** | Outbound only, from the product's own domain with Easy DKIM, a custom MAIL FROM and DMARC `p=reject`. `SendEmail` (`packages/bff/src/channels/email/outbound.ts`, input built in `channels/email/request.ts`) sends the installation certificate with the PDF as an attachment (`Content.Simple.Attachments`) to the customer and to the operations mailbox, and the safety or escalation alert to the zone chief; every send names the app's configuration set and carries `EmailTags`. Configuration-set events (send, delivery, bounce, complaint, reject, delay) arrive through Amazon EventBridge at `packages/bff/src/handlers/channel-events.ts` and move the outbox status (a certificate that bounces opens a case; a complaint stops all email to that address). Amazon Cognito's sign-up and recovery emails and the lead notice to Craftech (`packages/bff/src/leads/notify.ts`) go through the same identity. A recipient fence inside the client only lets demo worlds write to the SES mailbox simulator. |
+
+## The agent
+
+- **Amazon Bedrock AgentCore Harness** with **Claude Sonnet 5.5** (`global.anthropic.claude-sonnet-5-5`,
+  through a tagged application inference profile), one turn per installer event, invoked by
+  `InvokeHarness` (`packages/bff/src/agent/harness-client.ts`) from a worker that reads an SQS FIFO
+  queue with one message group per installer.
+- **AgentCore Gateway** (MCP, IAM auth) with five AWS Lambda tool targets and 12 tools: `orders`
+  (`get_work_orders`, `get_work_order`, `get_onu_status`), `knowledge` (`search_procedures`),
+  `evidence` (`get_checklist`, `validate_install_photo`, `update_checklist`), `messaging`
+  (`send_whatsapp`) and `cases` (`record_troubleshooting_step`, `escalate_case`,
+  `report_safety_hazard`, `close_installation`). Every id a tool uses comes from a signed,
+  short-lived session token, never from the model, and every input is validated strictly.
+- **AgentCore Policy** (Cedar, `ENFORCE`) checks every tool call; there is no tool that validates
+  evidence by hand, takes, rejects or closes a case: those decisions are human.
+- **AgentCore Memory** keeps tips per installer (mistakes that repeat and what solved them), their
+  preferences and a summary per work order to resume after a bridge or a block; nothing about the
+  customer.
+- **Amazon Bedrock Guardrails**, four published versions: **G1** on input, as the worker's
+  pre-filter (denied topics such as pricing, customer compensation and electrical work; prompt
+  attacks; cards blocked, Mexican tax and bank ids anonymized); **G2** on every outgoing text
+  (contextual grounding against the turn's tool results and the manual passages, relevance to the
+  installer's question); **G3** on the certificate text and template parameters (PII only); **G4**
+  on every Harness model call (G1 without the denied topics, so the manual's own safety and pricing
+  sections never trip it).
+- **Fast turns**: before invoking the model, the worker runs the reads every turn needs (the work
+  order in progress, its checklist and, for an installer's message, their last ten orders) with the
+  turn's token and injects them as escaped tool results, so a reply needs fewer model round trips.
+  A prompt rule makes sure every installer message gets an answer, a greeting included.
+- **Photos never reach the agent.** Only `validate_install_photo` sees an image, in an isolated
+  Bedrock `Converse` call whose only tool records the verdict; deterministic checks (file type and
+  size, repeated photos, then what the model read against the order it never saw: 1490 nm wavelength,
+  the zone's acceptance range, the ONU serial, ±3 dB from the orchestrator's reading) can only make
+  the verdict stricter.
+- The agent speaks only through `send_whatsapp`; every send goes through one outbound pipeline
+  (contact policy, G2, deterministic checks, recipient fence, transport).
 
 ## Try it
 
-1. Open the demo and choose **Try the demo**.
-2. Create your account with your email (you receive a verification code), confirm it and sign in.
-   Your own isolated demo world, with a synthetic crew, work orders and manual, is prepared for
-   you; it lasts 7 days and is recreated the next time you sign in.
-3. Follow the guided tour: the express track takes about 5 minutes (enabled in stages; your world shows what is available).
+Open **https://cuadrilla.demo.craftech.io**, choose **Try the demo** and create an account with your
+email (you receive a verification code). Your account gets its own isolated world of synthetic data:
+a fictitious operator, a crew with an installer (Rogelio) and two supervisors (Adriana and Héctor),
+three work orders and the procedures manual, with a simulated clock paused at 07:00 that only moves
+with the console's controls. You play the installer and the supervisors on the console's phone
+simulator; the emails the product sends from your world go to the Amazon SES mailbox simulator and
+are visible in the console outbox. Your world lasts 7 days and is recreated the next time you sign
+in; **Delete my account** in the console deletes your account and your data. Terms and privacy:
+`https://cuadrilla.demo.craftech.io/legal/terms.html` and `/legal/privacy.html`.
 
-Everything you operate is synthetic: the installers, customers and phone numbers are invented,
-and the emails the product sends from your world go to the Amazon SES mailbox simulator, visible in
-the console outbox. To delete your account and your data, use **Delete my account** in the console.
+## Guided tours
 
-## Guided tour
-
-The console's guided tour walks your demo world with the steps below (the expected simulated hours
-are those of a fresh world; every step can also be reached with "Jump to scene").
+The console's guided tour walks your demo world with the steps below (the simulated hours are those of
+a fresh world; every step can also be reached with "Jump to scene"). The table is generated from the
+same source as the console (`packages/web/src/views/tour/`) and `npm run tour:check` fails if they
+differ.
 
 <!-- TOUR:START -->
 ### Express tour (~5 min)
@@ -68,53 +152,143 @@ are those of a fresh world; every step can also be reached with "Jump to scene")
 
 ## What is real and what is simulated
 
-To be completed at the end of the build: which AWS services run for real in every interaction,
-which systems are simulated (the network orchestrator, the dispatch system, the phone simulator
-while live WhatsApp is not connected), and which figures are pilot goals rather than measurements.
-Every policy, procedure, work order, installer and customer is invented. The deployed demo is
-co-branded with a design partner ("Cuadrilla for <design partner> · Powered by Craftech") with a
-visible disclaimer: the manual, policies, prices and data are a synthetic demo and are not the
-partner's real policies. The brand is runtime configuration and never part of this repository.
+| Piece | In this proof of concept |
+|---|---|
+| Operator, installers, supervisors, customers, addresses, equipment | **Synthetic.** Every name is fictitious and checked; phone numbers come from a synthetic block per world. |
+| Procedures manual, policies and prices | **Synthetic**, written from scratch for this product; the deployed demo is co-branded with a design partner ("Cuadrilla for <design partner> · Powered by Craftech") and every surface says that the manual, policies, prices and data are an invented demo, not the partner's real policies. The brand is runtime configuration and never part of this repository. |
+| Evidence photos and voice notes | **Synthetic**: generated photos and Amazon Polly voices, each with its source in a data sheet. You can also record your own voice note in the browser or upload a photo. |
+| AI agent | **Real.** Amazon Bedrock AgentCore (Harness, Gateway with five tool targets, Policy, Memory) with four Bedrock Guardrails, a real Knowledge Base and real photo validation. |
+| Voice transcription | **Real**, Amazon Transcribe `es-MX` with a custom FTTH vocabulary. |
+| Email (certificate, zone-chief alert) | **Real end to end** through Amazon SES; in demo worlds the recipients are SES mailbox-simulator addresses, so you see delivery events without anyone receiving mail. |
+| WhatsApp | **Implemented, in simulated mode.** The End User Messaging Social adapter is built and fixture-tested; in demo worlds the phone simulator enters through the same envelope, normalizer, policy and agent, and live WhatsApp is enabled once the WhatsApp Business Account is connected. |
+| Network orchestrator (ONU status) and dispatch system (orders of the day) | **Mocks behind real contracts**: an OpenAPI contract (`packages/network-contract`) with a mock implementation, and a dispatch mock that publishes events to an Amazon EventBridge bus like a real system would. |
+| Clock | **Simulated per world**, paused by default; every timer is an Amazon EventBridge Scheduler schedule the clock knows how to advance. |
+| Account emails (sign-up code, password recovery) | **Real**, sent by Amazon Cognito through Amazon SES. |
+| Figures on the landing page | **Goals and one pilot assumption**, labelled as such (for example a first reply in under 30 s for text); never production results. |
 
 ## Architecture
 
-SST v4 on AWS (`us-east-1`): Amazon Bedrock AgentCore (Harness, Gateway, Memory, Policy), Amazon
-Bedrock (Claude, Guardrails, Knowledge Bases on Amazon S3 Vectors), Amazon Transcribe, Amazon SES,
-AWS End User Messaging Social, Amazon EventBridge Scheduler and event bus, Amazon SQS, Amazon
-DynamoDB, Amazon S3, Amazon Cognito (self sign-up with email verification), AWS WAF, Amazon
-CloudFront. TypeScript monorepo (npm workspaces): React 19 + Vite + Tailwind v4 console and landing,
-tRPC v11 BFF on Lambda, vitest and Playwright.
+The diagram at the top is generated from `docs/assets/architecture/architecture.html`
+(`npm run diagram:architecture`).
 
-Diagram, WhatsApp usage and latency table: to be completed at the end of the build.
+- **Serverless only**, infrastructure as code with SST v4 on AWS (`us-east-1`), a single stage
+  (`poc`) deployed only by CI. The inference profile, the guardrails, the Knowledge Base on Amazon S3
+  Vectors, the Transcribe vocabulary, the WAF web ACLs and the SES identity are declared in code too.
+- **One ordered queue per installer**: inbound messages, voice transcription, agent turns, ladder
+  timeouts and supervisor replies for the same installer are processed one at a time, in order,
+  without duplicates.
+- **Identity never comes from the model**: a person is identified by a phone registered in their
+  world, after opt-in; tools take every id from the session token.
+- **Each account's world is isolated** by operator and clock; demo worlds are capped, expire and have
+  per-world usage limits inside a stage-wide cost ceiling with a runtime cut.
+- **Observability is logs only**: JSON logs with a correlation id and no personal data, kept 30 days;
+  no dashboards; the only alarms are the ones that switch a cost or sign-up cut on.
 
-## Privacy
+Design documents (in Spanish): `docs/design-brief.md`, `docs/architecture.md`,
+`docs/architecture-integrations.md`, `docs/adr/`, `docs/flows-catalog.md`, `docs/tool-catalog.md`,
+`docs/test-plan.md`; glossary in `CONTEXT.md`. Serve them with
+`python3 -m http.server 8099 --bind 127.0.0.1` and open `http://localhost:8099/docs/viewer.html`.
 
-Signing up stores your email, the optional name, company and role you give, your consents, your
-language and how you arrived (campaign tags and the referring site), and the dates of sign-up and
-last sign-in, so that you can use the demo and, only if you agree, so that Craftech can contact you
-about this solution. What you type, record or upload in your demo world is kept for a limited time,
-stated in the privacy notice. See the privacy notice in the demo (`/legal/privacy.html`).
+## Repository layout
+
+| Path | What |
+|---|---|
+| `infra/` | SST v4 infrastructure (one module per capability) and the CI bootstrap template |
+| `packages/shared` | Enums, ids, errors and contracts shared by every package |
+| `packages/bff` | tRPC BFF, agent tools, turns and worker, outbound pipeline, contact policy, channels, cases and ladder, photo validator, certificate |
+| `packages/web` | Landing page, sign-up and sign-in, operator console and phone simulator (React 19, Vite, Tailwind v4) |
+| `packages/network-contract`, `packages/network-mock` | Network orchestrator contract (OpenAPI 3.1 + zod) and its mock |
+| `packages/dispatch-mock` | Dispatch system mock |
+| `scripts/` | Seed generator and loader, scenario runner, lint guards, operator scripts, architecture diagram |
+| `tests/` | Local flow tests, the local UI server for Playwright, test cases |
 
 ## Development
 
+Requirements: Node 22 (version in `.nvmrc`) and npm.
+
 ```bash
 npm ci
-npm run lint && npm run lint:duplicates && npm run lint:neutral-surfaces && npm run typecheck && npm test
+npm run typecheck
+npm run lint && npm run lint:duplicates && npm run lint:wp-ownership
+npm test                                    # unit and local flow tests (vitest)
+npm run flows:check && npm run tour:check   # flow catalog and guided tour stay in step with the code
+npm run seed:validate && npm run manual:check && npm run network:contract
 npm run build -w packages/web
+npm run test:ui                             # Playwright against the local UI server
+npm run lint:neutral-surfaces               # visible texts stay neutral (also with -- --dist)
+FORBIDDEN_TERMS="…" npm run lint:forbidden  # the operator's list lives outside the repository
 ```
 
-There is a single stage, `poc`, deployed only by CI (`.github/workflows/deploy.yml`) on a push to
-`main`. The CI roles are created once by `infra/bootstrap/ci-role.yaml` (see its README).
+There is no local stage: everything is tested locally with unit, local-flow and UI tests, and in
+`poc` by CI. Never `sst dev` or a local `sst deploy`.
+
+## Deploy from scratch
+
+1. **Prechecks** (read-only): SES out of the sandbox, the GitHub OIDC provider, SST's bootstrap in the
+   account, Claude Sonnet 5.5 and Titan Text Embeddings v2 active with enough quota, the `Project`
+   cost allocation tag active.
+2. **CI bootstrap**, once and whenever the template changes: `aws cloudformation deploy` of
+   `infra/bootstrap/ci-role.yaml` (deploy role, scenario-runner role, permissions boundary, CloudFront
+   policies); see `infra/bootstrap/README.md`.
+3. **Secrets** of the `poc` stage with `npx sst secret set … --stage poc`: the session key, the
+   WhatsApp ids (`not-connected` until the WhatsApp Business Account is linked), the seed overrides,
+   the origin key, the lead notice configuration and the brand configuration (`docs/architecture.md`
+   §3).
+4. **Push to `main`.** `.github/workflows/deploy.yml` runs every check above, deploys with
+   `sst deploy --stage poc` (retried once after a minute when IAM is still propagating a new grant),
+   loads the seed and the manual into the Knowledge Base, and runs the smoke scenarios.
+5. **Post-deploy checks and accounts**: DKIM and DMARC, Knowledge Base and vocabulary ready, Harness
+   and targets ready, runtime cut off; internal console accounts with `npm run console:invite`.
+6. **WhatsApp live** (optional): link the WhatsApp Business Account in the End User Messaging Social
+   console, load its ids as secrets, then `npm run channels:whatsapp-templates`,
+   `channels:waba-event-destination` and `channels:waba-check`.
+
+Operator scripts: `npm run seed:load`, `npm run ops:kill` (runtime cut), and the lead scripts
+`leads:export`, `leads:unsubscribe` and `leads:delete` (confirmed sign-ups; see the privacy policy).
+
+## Privacy
+
+Sign-up asks for an email and a password; name, company and role are optional. Two separate,
+unchecked consents are recorded with their date and text version: the terms and privacy policy
+(required) and being contacted by Craftech about this solution (optional); the account and the lead
+exist only once the email has been verified with the code. Craftech (Ciudad Autónoma de Buenos Aires,
+Argentina) is the data controller; lead data is kept 24 months after the last sign-in or until
+deletion is requested at sales@craftech.io, and the privacy policy explains every right and how to
+exercise it. Emails never reach logs, audit trails or demo exports. Everything typed, recorded or
+uploaded inside a demo world is synthetic-only, stays in that world and is deleted with it.
+
+## License
+
+Copyright 2026 Craftech. All rights reserved.
 
 ## Submission notes
 
-This repository is Craftech's submission to the AWS CDS Agentic AI Partner Hackathon (category and
-WhatsApp usage, ACE opportunity id and test instructions are completed at the end of the build).
-Credentials for the evaluation accounts are given only in the private testing instructions of the
-submission form; anyone can also create an account with the sign-up.
+This repository is Craftech's entry to the AWS CDS Agentic AI Partner Hackathon (overall ranking and
+Best of WhatsApp). Nothing in the published product mentions the contest: it is presented as a
+product for a customer.
 
-**Scaffolding.** The repository skeleton (SST and CI setup, CI bootstrap template, lint and
-traceability scripts, console shell and shared components, own Cognito login, tRPC base, logging,
-retry and crypto helpers, Knowledge Base and Transcribe infrastructure patterns, landing gallery,
-scenario-runner pattern, agent definitions in `.claude/`) was reused from internal Craftech
-scaffolding created during the hackathon period. Everything specific to this product is new.
+- **AWS Communication Developer Services used at runtime**: Amazon SES (sending, with configuration-set
+  events) and AWS End User Messaging Social (WhatsApp), see
+  [How it uses AWS Communication Developer Services](#how-it-uses-aws-communication-developer-services).
+  Live WhatsApp runs on a number and WhatsApp Business Account of its own, linked at the end of the
+  build; until then every world uses the phone simulator through the same adapter, and the materials
+  say so. Amazon SNS only carries WhatsApp events and is not presented as a CDS service.
+- **ACE opportunity**: `O28893592`.
+- **Design partner**: the deployed demo is co-branded with a Latin American ISP that acts as design
+  partner; its name is runtime configuration, never part of this repository, and every policy,
+  person and figure in the product is synthetic.
+- **Access for testing**: anyone can create an account at `https://cuadrilla.demo.craftech.io/signup`.
+  Reserved guest accounts are listed only in the private testing instructions of the submission form.
+- **Pre-existing code**: the repository skeleton (SST and CI setup, the CI bootstrap template, lint
+  and traceability scripts, the console shell and shared components, the own Cognito sign-in, the
+  tRPC base, logging, retry and crypto helpers, the Knowledge Base and Transcribe infrastructure
+  patterns, the landing gallery, the scenario-runner pattern and the agent definitions in `.claude/`)
+  was reused from internal Craftech scaffolding created during the contest period. Everything
+  specific to this product is new.
+- **Third-party pre-existing code**: the process skills in `.claude/skills/` (`grill-with-docs`,
+  `grilling`, `domain-modeling`) come from [mattpocock/skills](https://github.com/mattpocock/skills)
+  (`skills/engineering/` and `skills/productivity/`); `grill-with-docs` is an expanded version that
+  works standalone. They are development tooling, not product code (see `.claude/skills/README.md`).
+  The AWS architecture icons in `docs/assets/architecture/icons/` come from the MIT-licensed
+  `aws-icons` package (`LICENSE-aws-icons`).
+- Submission materials are in English; the intellectual property is Craftech's.

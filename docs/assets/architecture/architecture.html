@@ -1,0 +1,159 @@
+<!doctype html>
+<!-- Source of docs/assets/architecture.png (README). Render it with `npm run diagram:architecture`
+     (scripts/diagram/render-architecture.ts). Icons: AWS Architecture Icons from the MIT `aws-icons`
+     package (icons/LICENSE-aws-icons). Every name and number here must match the code.
+     Layout: boxes on a fixed grid; every connector is horizontal or vertical and never crosses a box. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cuadrilla · AWS architecture</title>
+<style>
+  :root { --ink: #16191f; --muted: #4b535c; --line: #3d4650; --cds: #c7157b; --flow: #d45b07; --agent: #01806d; --out: #c42b3c; --data: #3b48cc; --ai: #7a3ee0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #fff; font-family: "Helvetica Neue", Arial, sans-serif; color: var(--ink); }
+  #canvas { position: relative; width: 1920px; height: 1400px; background: #fff; }
+  h1 { position: absolute; left: 40px; top: 22px; margin: 0; font-size: 32px; letter-spacing: -.01em; }
+  .sub { position: absolute; left: 42px; top: 66px; font-size: 17px; color: var(--muted); }
+  .group { position: absolute; border: 2px dashed var(--c); border-radius: 12px; background: color-mix(in srgb, var(--c) 5%, white); }
+  .group > .label { position: absolute; top: -12px; left: 16px; background: #fff; padding: 0 8px; font-size: 14px; font-weight: 700; color: var(--c); letter-spacing: .04em; text-transform: uppercase; line-height: 22px; white-space: nowrap; }
+  .box { position: absolute; border: 1.5px solid #c9d1d9; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; }
+  .box img { width: 56px; height: 56px; flex: none; }
+  .box .t { font-weight: 700; font-size: 17px; line-height: 1.2; }
+  .box .d { font-size: 13.5px; color: var(--muted); line-height: 1.38; margin-top: 4px; }
+  .box.col { flex-direction: column; gap: 8px; }
+  .party { background: #f1f3f5; border-color: #9aa5b1; align-items: center; }
+  .glyph { width: 52px; height: 52px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 22px; flex: none; }
+  .step { position: absolute; border-radius: 8px; padding: 10px 12px; background: #fff; border: 1.5px solid color-mix(in srgb, var(--out) 55%, white); }
+  .step .n { font-size: 12px; font-weight: 700; color: var(--out); letter-spacing: .04em; text-transform: uppercase; }
+  .step .t { font-weight: 700; font-size: 16px; margin-top: 2px; }
+  .step .d { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+  .badge { position: absolute; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 700; font-size: 15px; display: grid; place-items: center; border: 3px solid #fff; box-sizing: content-box; }
+  .tag { position: absolute; font-size: 13px; color: var(--muted); background: #fff; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+  .legend { position: absolute; left: 40px; top: 1300px; width: 1840px; font-size: 14.5px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 28px; }
+  .legend b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 12px; margin-right: 8px; }
+  .cds { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--cds); border-radius: 4px; padding: 1px 5px; vertical-align: middle; letter-spacing: .04em; }
+  svg { position: absolute; left: 0; top: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="canvas">
+  <h1>Cuadrilla · AWS architecture</h1>
+  <div class="sub">Serverless on AWS (us-east-1), all infrastructure as code with SST v4 · one ordered queue per installer · the agent decides, code enforces the rules · <span class="cds">CDS</span> = AWS Communication Developer Services</div>
+
+  <!-- Column 1: people and the console -->
+  <div class="box party" style="left:40px; top:150px; width:260px; height:100px"><div class="glyph">🔧</div><div><div class="t">Fiber installer</div><div class="d">Text, voice notes and photos</div></div></div>
+  <div class="box party" style="left:40px; top:270px; width:260px; height:100px"><div class="glyph">👥</div><div><div class="t">Supervisors</div><div class="d">Templates with buttons; take a case</div></div></div>
+  <div class="box" style="left:40px; top:420px; width:260px; height:180px"><img src="icons/AmazonCloudFront.svg" alt=""><div><div class="t">Console and landing</div><div class="d">CloudFront, AWS WAF, Amazon Cognito sign-up; tRPC BFF on Lambda; phone simulator</div></div></div>
+  <div class="box party" style="left:40px; top:625px; width:260px; height:100px"><div class="glyph">✉</div><div><div class="t">Email recipients</div><div class="d">Customer, operations mailbox, zone chief</div></div></div>
+
+  <!-- Column 2: channels -->
+  <div class="group" style="--c: var(--cds); left:340px; top:120px; width:380px; height:650px"><div class="label">Channels</div></div>
+  <div class="box" style="left:360px; top:150px; width:340px; height:170px"><img src="icons/AWSEndUserMessaging.svg" alt=""><div><div class="t">AWS End User Messaging Social <span class="cds">CDS</span></div><div class="d">WhatsApp: UTILITY templates with buttons, free text, media, reactions, read receipt and typing indicator</div></div></div>
+  <div class="box" style="left:360px; top:345px; width:340px; height:84px"><img src="icons/AmazonSimpleNotificationService.svg" alt=""><div><div class="t">Amazon SNS topic</div><div class="d">WhatsApp events (not a CDS service)</div></div></div>
+  <div class="box" style="left:360px; top:455px; width:340px; height:90px; align-items:center"><div class="glyph">📱</div><div><div class="t">Phone simulator</div><div class="d">Demo worlds; the same signed envelope</div></div></div>
+  <div class="box" style="left:360px; top:575px; width:340px; height:175px"><img src="icons/AmazonSimpleEmailService.svg" alt=""><div><div class="t">Amazon SES v2 <span class="cds">CDS</span></div><div class="d">SendEmail: certificate PDF attached, zone-chief alert; DKIM, DMARC p=reject; events → EventBridge</div></div></div>
+
+  <!-- Column 3: orchestration -->
+  <div class="group" style="--c: var(--flow); left:760px; top:120px; width:560px; height:620px"><div class="label">Orchestration</div></div>
+  <div class="box" style="left:780px; top:170px; width:250px; height:390px"><img src="icons/AWSLambda.svg" alt=""><div><div class="t">Inbound Lambda</div><div class="d">Drops events of any other number.<br><br>Identity by the phone registered in the world, after opt-in.<br><br>Sensitive data masked before anything is stored; hostile text delimited.</div></div></div>
+  <div class="box" style="left:780px; top:600px; width:250px; height:115px"><img src="icons/AmazonTranscribe.svg" alt=""><div><div class="t">Amazon Transcribe</div><div class="d">Voice notes, es-MX, FTTH vocabulary</div></div></div>
+  <div class="box" style="left:1060px; top:150px; width:240px; height:100px"><img src="icons/AmazonEventBridge.svg" alt=""><div><div class="t">EventBridge</div><div class="d">Scheduler timers; dispatch bus</div></div></div>
+  <div class="box" style="left:1060px; top:290px; width:240px; height:100px"><img src="icons/AmazonSimpleQueueService.svg" alt=""><div><div class="t">Amazon SQS FIFO</div><div class="d">One group per installer</div></div></div>
+  <div class="box" style="left:1060px; top:430px; width:240px; height:285px"><img src="icons/AWSLambda.svg" alt=""><div><div class="t">Installer worker</div><div class="d">Safety classifier first; cost caps and runtime cut; G1 pre-filter; preloads the order, its checklist and the last ten orders; invokes the Harness</div></div></div>
+
+  <!-- Column 4: Amazon Bedrock AgentCore -->
+  <div class="group" style="--c: var(--agent); left:1360px; top:120px; width:520px; height:640px"><div class="label">Amazon Bedrock AgentCore</div></div>
+  <div class="box" style="left:1380px; top:150px; width:230px; height:125px"><img src="icons/AmazonBedrockAgentCore.svg" alt=""><div><div class="t">Memory</div><div class="d">Tips and preferences per installer</div></div></div>
+  <div class="box" style="left:1630px; top:150px; width:230px; height:125px"><img src="icons/AmazonBedrock.svg" alt=""><div><div class="t">Guardrails</div><div class="d">G1 input, G2 output, G3 PDF, G4 Harness</div></div></div>
+  <div class="box" style="left:1500px; top:310px; width:240px; height:100px"><img src="icons/AmazonBedrock.svg" alt=""><div><div class="t">Claude Sonnet 5.5</div><div class="d">Tagged inference profile</div></div></div>
+  <div class="box" style="left:1380px; top:455px; width:480px; height:100px"><img src="icons/AmazonBedrockAgentCore.svg" alt=""><div><div class="t">Harness</div><div class="d">One turn per installer event; speaks only through send_whatsapp</div></div></div>
+  <div class="box" style="left:1380px; top:600px; width:300px; height:140px"><img src="icons/AmazonBedrockAgentCore.svg" alt=""><div><div class="t">Gateway + tools</div><div class="d">MCP with IAM; 12 tools on 5 Lambda targets; ids from a signed session token</div></div></div>
+  <div class="box col" style="left:1700px; top:600px; width:160px; height:140px"><img src="icons/AmazonBedrockAgentCore.svg" alt="" style="width:44px;height:44px"><div><div class="t">Policy</div><div class="d">Cedar on every tool call</div></div></div>
+
+  <!-- Called by the tools (label between the two connectors) -->
+  <div class="group" style="--c: var(--ai); left:1450px; top:790px; width:430px; height:270px"><div class="label" style="left:140px">Tool calls</div></div>
+  <div class="box col" style="left:1470px; top:820px; width:185px; height:220px"><img src="icons/AmazonBedrock.svg" alt=""><div><div class="t">Knowledge Base</div><div class="d">Procedures manual on S3 Vectors; every answer cites its section</div></div></div>
+  <div class="box col" style="left:1675px; top:820px; width:185px; height:220px"><img src="icons/AmazonBedrock.svg" alt=""><div><div class="t">Photo validator</div><div class="d">Isolated Converse call; checks can only make it stricter</div></div></div>
+
+  <!-- Outbound pipeline: right to left -->
+  <div class="group" style="--c: var(--out); left:340px; top:880px; width:1090px; height:180px"><div class="label" style="left:200px">Outbound pipeline (code)</div></div>
+  <div class="step" style="left:1226px; top:910px; width:184px; height:130px"><div class="n">Step 1</div><div class="t">Contact policy</div><div class="d">Opt-in, roster, quiet hours, 24-hour window</div></div>
+  <div class="step" style="left:1012px; top:910px; width:184px; height:130px"><div class="n">Step 2</div><div class="t">Guardrail G2</div><div class="d">Grounded in this turn's tool results</div></div>
+  <div class="step" style="left:798px; top:910px; width:184px; height:130px"><div class="n">Step 3</div><div class="t">Deterministic checks</div><div class="d">Figures from tools, cited section, no links</div></div>
+  <div class="step" style="left:584px; top:910px; width:184px; height:130px"><div class="n">Step 4</div><div class="t">Recipient fence</div><div class="d">Only the world's registered people</div></div>
+  <div class="step" style="left:370px; top:910px; width:184px; height:130px; border-color: var(--cds)"><div class="n" style="color:var(--cds)">Step 5</div><div class="t">Send and audit</div><div class="d">WhatsApp or SES; every decision audited</div></div>
+
+  <!-- Data and the operator's systems -->
+  <div class="group" style="--c: var(--data); left:40px; top:1100px; width:1840px; height:170px"><div class="label">Data and the operator's systems</div></div>
+  <div class="box" style="left:60px; top:1130px; width:285px; height:120px"><img src="icons/AmazonDynamoDB.svg" alt=""><div><div class="t">Amazon DynamoDB</div><div class="d">A table per aggregate; audit log; leads apart</div></div></div>
+  <div class="box" style="left:363px; top:1130px; width:285px; height:120px"><img src="icons/AmazonSimpleStorageService.svg" alt=""><div><div class="t">Amazon S3</div><div class="d">Media, evidence, certificates, manual</div></div></div>
+  <div class="box" style="left:666px; top:1130px; width:285px; height:120px"><img src="icons/AmazonCloudWatch.svg" alt=""><div><div class="t">CloudWatch Logs</div><div class="d">Masked JSON logs, 30 days; cost-cut alarms only</div></div></div>
+  <div class="box" style="left:969px; top:1130px; width:285px; height:120px"><img src="icons/AWSLambda.svg" alt=""><div><div class="t">Certificate writer</div><div class="d">Installation certificate PDF; G3 on its text</div></div></div>
+  <div class="box" style="left:1272px; top:1130px; width:285px; height:120px"><img src="icons/AWSLambda.svg" alt=""><div><div class="t">Network orchestrator</div><div class="d">ONU status by OpenAPI contract (mock)</div></div></div>
+  <div class="box" style="left:1575px; top:1130px; width:285px; height:120px"><img src="icons/AWSLambda.svg" alt=""><div><div class="t">Dispatch system</div><div class="d">Orders of the day; events to a bus (mock)</div></div></div>
+
+  <svg width="1920" height="1400" viewBox="0 0 1920 1400">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3d4650"/></marker>
+    </defs>
+    <g stroke="#3d4650" stroke-width="2.2" fill="none">
+      <!-- people ⇄ channels -->
+      <path d="M300,200 L360,200" marker-start="url(#a)" marker-end="url(#a)"/>
+      <path d="M300,300 L360,300" marker-start="url(#a)" marker-end="url(#a)"/>
+      <path d="M300,500 L360,500" marker-start="url(#a)" marker-end="url(#a)"/>
+      <path d="M360,675 L300,675" marker-end="url(#a)"/>
+      <!-- End User Messaging Social → SNS → inbound; simulator → inbound -->
+      <path d="M530,320 L530,345" marker-end="url(#a)"/>
+      <path d="M700,387 L780,387" marker-end="url(#a)"/>
+      <path d="M700,500 L780,500" marker-end="url(#a)"/>
+      <!-- inbound → SQS; timers → SQS; SQS → worker; worker → Transcribe; worker → Harness -->
+      <path d="M1030,340 L1060,340" marker-end="url(#a)"/>
+      <path d="M1180,250 L1180,290" marker-end="url(#a)"/>
+      <path d="M1180,390 L1180,430" marker-end="url(#a)"/>
+      <path d="M1060,655 L1030,655" marker-end="url(#a)"/>
+      <path d="M1300,505 L1380,505" marker-end="url(#a)"/>
+      <!-- Harness ⇄ Memory, Harness → Guardrails, Harness → model, Harness → Gateway → Policy -->
+      <path d="M1440,455 L1440,275" marker-start="url(#a)" marker-end="url(#a)"/>
+      <path d="M1800,455 L1800,275" marker-end="url(#a)"/>
+      <path d="M1620,455 L1620,410" marker-end="url(#a)"/>
+      <path d="M1530,555 L1530,600" marker-end="url(#a)"/>
+      <path d="M1680,670 L1700,670" marker-end="url(#a)"/>
+      <!-- tools → Knowledge Base and photo validator -->
+      <path d="M1560,740 L1560,820" marker-end="url(#a)"/>
+      <path d="M1665,740 L1665,775 L1765,775 L1765,820" marker-end="url(#a)"/>
+      <!-- tools and the worker's fixed texts → pipeline, right to left -->
+      <path d="M1400,740 L1400,910" marker-end="url(#a)"/>
+      <path d="M1250,715 L1250,910" marker-end="url(#a)"/>
+      <path d="M1226,975 L1196,975" marker-end="url(#a)"/>
+      <path d="M1012,975 L982,975" marker-end="url(#a)"/>
+      <path d="M798,975 L768,975" marker-end="url(#a)"/>
+      <path d="M584,975 L554,975" marker-end="url(#a)"/>
+      <!-- send → back out through the channels -->
+      <path d="M462,910 L462,770" marker-end="url(#a)"/>
+    </g>
+  </svg>
+
+  <div class="tag" style="left:1288px; top:808px">send_whatsapp</div>
+  <div class="tag" style="left:1052px; top:808px">safety instruction, notices</div>
+  <div class="tag" style="left:474px; top:828px">out through the same channels</div>
+
+  <div class="badge" style="left:303px; top:155px">1</div>
+  <div class="badge" style="left:722px; top:345px">2</div>
+  <div class="badge" style="left:1192px; top:396px">3</div>
+  <div class="badge" style="left:1318px; top:460px">4</div>
+  <div class="badge" style="left:1545px; top:560px">5</div>
+  <div class="badge" style="left:1260px; top:745px">6</div>
+  <div class="badge" style="left:474px; top:790px">7</div>
+
+  <div class="legend">
+    <div><b>1</b>The installer and supervisors on WhatsApp; in demo worlds, on the phone simulator.</div>
+    <div><b>2</b>The inbound Lambda filters our number, identifies the person and masks sensitive data.</div>
+    <div><b>3</b>One FIFO group per installer keeps their events in order.</div>
+    <div><b>4</b>The worker transcribes voice, classifies safety, pre-filters with G1, preloads reads and invokes the Harness.</div>
+    <div><b>5</b>The agent decides with 12 tools behind Gateway and Cedar; images only reach the validator.</div>
+    <div><b>6</b>Safety is deterministic: the manual's fixed instruction, never written by the model.</div>
+    <div><b>7</b>Every message passes the contact policy, G2 and the fence before it leaves.</div>
+  </div>
+</div>
+</body>
+</html>

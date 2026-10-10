@@ -91,7 +91,7 @@ Vocabulario en `CONTEXT.md`; diseño en `docs/design-brief.md`; landing, alta y 
 | Capa | Elección |
 |---|---|
 | Monorepo | npm workspaces: `packages/{shared,bff,web,network-contract,network-mock,dispatch-mock}`, `infra/`, `scripts/`, `tests/` |
-| Agente | Bedrock AgentCore Harness (Claude Sonnet 5.5, `global.anthropic.claude-sonnet-5-5`, por el perfil de inferencia de la app con tags; ADR-0028; endpoint `live`), Gateway MCP `AWS_IAM` con 5 targets Lambda y 12 tools, Memory (consejos por instalador), Policy Cedar, Guardrails G1/G2/G3 |
+| Agente | Bedrock AgentCore Harness (Claude Sonnet 5.5, `global.anthropic.claude-sonnet-5-5`, por el perfil de inferencia de la app con tags; ADR-0028; endpoint `live`), Gateway MCP `AWS_IAM` con 5 targets Lambda y 12 tools, Memory (consejos por instalador), Policy Cedar, Guardrails G1/G2/G3/G4 (G4 en el Harness) |
 | Conocimiento | Bedrock Knowledge Base sobre S3 Vectors (vector bucket `kb-…`), Titan Text Embeddings v2 |
 | Voz y visión | Amazon Transcribe `es-MX` con vocabulario FTTH; Bedrock `Converse` multimodal aislado para validar fotos (Sonnet 5.5 por el mismo perfil; vuelve a Opus 5 solo si la medición de fotos muestra una regresión, ADR-0028) |
 | Orquestación | SQS FIFO `InstallerEvents.fifo` por instalador; temporizadores `TIMER#` con EventBridge Scheduler; relojes de mundo en pausa; bus `Feeds` |

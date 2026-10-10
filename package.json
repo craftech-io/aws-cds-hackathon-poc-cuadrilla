@@ -29,6 +29,7 @@
     "tour:check": "tsx scripts/tour/check.ts",
     "landing:check": "tsx scripts/landing/manifest-check.ts",
     "landing:capture": "tsx scripts/landing/capture-console.ts",
+    "diagram:architecture": "tsx scripts/diagram/render-architecture.ts",
     "network:contract": "tsx scripts/network/contract-check.ts",
     "manual:check": "tsx scripts/manual/check.ts",
     "tools:build-schemas": "tsx packages/bff/src/agent-tools/common/build-schemas.ts",
