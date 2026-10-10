@@ -270,7 +270,7 @@ test.describe("phone simulator", () => {
           void context.resume().catch(() => undefined); // never awaited: a runner without audio may never resume
           return destination.stream;
         } catch {
-          return new MediaStream();
+          return { getTracks: () => [] } as unknown as MediaStream; // this WebKit allows no stream at all: the stand-in needs none
         }
       };
       // Defined, not assigned: WebKit's own `getUserMedia` would wait for a permission nobody answers.
