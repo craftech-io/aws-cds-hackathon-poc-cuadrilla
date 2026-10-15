@@ -231,14 +231,6 @@ export const GATE_WORKLOAD: Workload = {
   transcribeSeconds: GATE.suites * GATE.transcribeSecondsPerSuite,
 };
 
-/**
- * Proposed threshold of the cost per conversation (`IspSettings.costBudgetUsdPerConversation`,
- * docs/test-plan.md §7): the happy path at its ceiling, plus half, rounded up to 10 cents. The CTO fixes it.
- */
-export function proposedConversationBudgetUsd(): number {
-  return Math.ceil(costOf(HAPPY_PATH_WORKLOAD).max * 1.5 * 10) / 10;
-}
-
 export interface DailyCeiling {
   readonly turnsPerDay: number;
   readonly validationsPerDay: number;
@@ -248,12 +240,6 @@ export interface DailyCeiling {
 /** The most a real day can spend inside the stage's global ceiling (ADR-0019): every cap used up. */
 export function ceilingDayCost(caps: DailyCeiling): Range {
   return costOf({ turns: caps.turnsPerDay, validations: caps.validationsPerDay, transcribeSeconds: caps.transcribeSecondsPerDay });
-}
-
-/** How many turns an hour reach the hourly agent-spend alarm, at the cheap and at the expensive end. */
-export function turnsPerHourToAlarm(alarmUsdPerHour: number): Range {
-  const turn = costOf({ turns: 1, validations: 0, transcribeSeconds: 0 });
-  return { min: Math.floor(alarmUsdPerHour / turn.max), max: Math.floor(alarmUsdPerHour / turn.min) };
 }
 
 // ---- Drift and CLI ----------------------------------------------------------------------------------
@@ -276,22 +262,19 @@ export function rateCardDrift(referenceItems: readonly SeedItem[]): string[] {
 const usd = (value: number): string => `USD ${value.toFixed(2)}`;
 const span = (value: Range): string => `${usd(value.min)} - ${usd(value.max)}`;
 
-export function report(options: { readonly ceiling: DailyCeiling; readonly alarmUsdPerHour: number; readonly projectBudgetUsdPerMonth: number }): string[] {
+/** The estimates of the verified card. No cost threshold, spend alarm or project budget (P-07, closed by the CTO on 2026-10-14). */
+export function report(options: { readonly ceiling: DailyCeiling }): string[] {
   const turn = costOf({ turns: 1, validations: 0, transcribeSeconds: 0 });
   const validation = costOf({ turns: 0, validations: 1, transcribeSeconds: 0 });
-  const alarm = turnsPerHourToAlarm(options.alarmUsdPerHour);
   return [
     `rate card verified on ${RATE_CARD_AS_OF} (AWS Price List for us-east-1 and the pages each row names):`,
     ...VERIFIED_RATES.map((verified) => `  ${verified.key.padEnd(52)} ${String(priceOf(verified)).padStart(10)} USD ${verified.unit}`),
     `turn (${TURN.inputTokens.min}-${TURN.inputTokens.max} input + ${TURN.outputTokens.min}-${TURN.outputTokens.max} output tokens, uncached): USD ${turn.min.toFixed(4)} - ${turn.max.toFixed(4)}`,
     `photo validation: USD ${validation.max.toFixed(4)}`,
     `happy-path conversation (${HAPPY_PATH.turns} turns, ${HAPPY_PATH.validations} photos, WhatsApp priced as live): ${span(costOf(HAPPY_PATH_WORKLOAD))}`,
-    `proposed costBudgetUsdPerConversation (for the CTO): ${usd(proposedConversationBudgetUsd())}`,
     `"100 % probada" gate (${GATE_WORKLOAD.turns} turns, ${GATE_WORKLOAD.validations} validations, ${GATE_WORKLOAD.transcribeSeconds / 60} min of audio): ${span(costOf(GATE_WORKLOAD))}`,
     `  one more full suite: ${span(costOf({ turns: GATE.turnsPerSuite, validations: 0, transcribeSeconds: GATE.transcribeSecondsPerSuite }))}`,
     `global ceiling, a day with every cap used up (${options.ceiling.turnsPerDay} turns, ${options.ceiling.validationsPerDay} validations, ${options.ceiling.transcribeSecondsPerDay} s): ${span(ceilingDayCost(options.ceiling))}`,
-    `AgentSpendHourly alarm at ${usd(options.alarmUsdPerHour)} per hour: ${alarm.min} - ${alarm.max} turns in an hour`,
-    `project budget: ${usd(options.projectBudgetUsdPerMonth)} per month`,
   ];
 }
 
@@ -305,8 +288,7 @@ async function main(): Promise<void> {
   const scope = globalThis as { sst?: unknown };
   scope.sst ??= { Linkable: class {} };
   const { costCaps } = CostCapsModule.parse(await import(pathToFileURL(fromRoot("infra/cost-caps.ts")).href));
-  const { AGENT_SPEND_ALARM_USD_PER_HOUR, PROJECT_BUDGET } = await import("../../../infra/observability-spec");
-  for (const text of report({ ceiling: costCaps, alarmUsdPerHour: AGENT_SPEND_ALARM_USD_PER_HOUR, projectBudgetUsdPerMonth: PROJECT_BUDGET.limitUsdPerMonth })) console.log(text);
+  for (const text of report({ ceiling: costCaps })) console.log(text);
   const reference = JSON.parse(readFileSync(fromRoot(DATA_DIR, tableFile("Reference")), "utf8")) as { items: SeedItem[] };
   const drift = rateCardDrift(reference.items);
   if (drift.length > 0) {

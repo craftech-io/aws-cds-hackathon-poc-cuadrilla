@@ -182,7 +182,8 @@ The diagram at the top is generated from `docs/assets/architecture/architecture.
 - **Each account's world is isolated** by operator and clock; demo worlds are capped, expire and have
   per-world usage limits inside a stage-wide cost ceiling with a runtime cut.
 - **Observability is logs only**: JSON logs with a correlation id and no personal data, kept 30 days;
-  no dashboards; the only alarms are the ones that switch a cost or sign-up cut on.
+  no dashboards, alarms or budgets; spend is capped before it happens and the operator switches a
+  runtime cut on or off.
 
 Design documents (in Spanish): `docs/design-brief.md`, `docs/architecture.md`,
 `docs/architecture-integrations.md`, `docs/adr/`, `docs/flows-catalog.md`, `docs/tool-catalog.md`,

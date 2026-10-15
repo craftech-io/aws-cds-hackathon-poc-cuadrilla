@@ -309,7 +309,6 @@ describe("infra/messaging-email.ts on a recording SST runtime", () => {
       [
         "aws.sesv2.ConfigurationSet",
         "aws.sesv2.ConfigurationSetEventDestination",
-        "aws.sesv2.ConfigurationSetEventDestination",
         "aws.sesv2.EmailIdentity",
         "aws.sesv2.EmailIdentityMailFromAttributes",
         ...Array<string>(6).fill("dns.createRecord"),
@@ -345,7 +344,7 @@ describe("infra/messaging-email.ts on a recording SST runtime", () => {
   it("sends the seven types to the default bus and subscribes ChannelEvents there with the configuration set's tag", async () => {
     const { only, created } = await evaluate();
     const destinations = created.filter((entry) => entry.type === "aws.sesv2.ConfigurationSetEventDestination");
-    expect(destinations.map((entry) => entry.name).sort()).toEqual(["EmailAuthMetrics", "EmailEventDestination"]);
+    expect(destinations.map((entry) => entry.name)).toEqual(["EmailEventDestination"]);
     expect(await resolveDeep(destinations.find((entry) => entry.name === "EmailEventDestination")?.args)).toEqual({
       configurationSetName: CONFIGURATION_SET_NAME,
       eventDestinationName: "channel-events",
@@ -357,16 +356,6 @@ describe("infra/messaging-email.ts on a recording SST runtime", () => {
       busArn: defaultEventBusArn("us-east-1", ACCOUNT),
       subscriber: `arn:aws:lambda:us-east-1:${ACCOUNT}:function:ChannelEvents`,
       args: { pattern: emailEventPattern() },
-    });
-  });
-
-  it("measures Send, Bounce and Complaint in CloudWatch by the message's kind, AUTH by default [FL-112]", async () => {
-    const { created } = await evaluate();
-    const metrics = created.find((entry) => entry.name === "EmailAuthMetrics");
-    expect(await resolveDeep(metrics?.args)).toEqual({
-      configurationSetName: CONFIGURATION_SET_NAME,
-      eventDestinationName: "auth-metrics",
-      eventDestination: { enabled: true, matchingEventTypes: ["SEND", "BOUNCE", "COMPLAINT"], cloudWatchDestination: { dimensionConfigurations: [{ dimensionName: "kind", dimensionValueSource: "MESSAGE_TAG", defaultDimensionValue: "AUTH" }] } },
     });
   });
 

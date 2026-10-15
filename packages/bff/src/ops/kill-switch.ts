@@ -11,9 +11,9 @@
 // The BFF, the worker, `InboundWhatsApp`, `createToolHandler` and the sign-up triggers read it
 // through a reader that caches each item for at most 30 seconds. Physical safety is never cut: the classifier, the fixed
 // §SEG-01 instruction and the alerts use no model and never ask this module (`report_safety_hazard`
-// is exempt from the tool gate). The operator (`npm run ops:kill`) turns it on and off; `CostGuard`
-// may only turn it on; the QaDriver only the switch of a `qa-*` world. Cedar's `CED-KILL-SWITCH`
-// is the second layer and needs a deploy.
+// is exempt from the tool gate). The operator (`npm run ops:kill`) turns it on and off (no alarm nor
+// budget turns it on: P-07, closed by the CTO on 2026-10-14); the QaDriver only the switch of a `qa-*`
+// world. Cedar's `CED-KILL-SWITCH` is the second layer and needs a deploy.
 import { z } from "zod";
 import { ClockId, IsoInstant, KillScope, type ToolFailure, ToolError, fail, ispKindOfClock } from "@cuadrilla/shared";
 import { type Clock, systemClock } from "../lib/clock";
@@ -29,8 +29,8 @@ export const WORLD_KILL_TTL_SECONDS = 48 * 3_600;
 export const KillState = z.enum(["on", "off"]);
 export type KillState = z.infer<typeof KillState>;
 
-/** Who may flip it: the operator's script, the budget Lambda (on only) and the scenario runner. */
-export const KillActor = z.enum(["OPERATOR", "COST_GUARD", "QA"]);
+/** Who may flip it: the operator's script and the scenario runner. */
+export const KillActor = z.enum(["OPERATOR", "QA"]);
 export type KillActor = z.infer<typeof KillActor>;
 
 export const KillSwitchRecord = z
@@ -59,7 +59,7 @@ export function killSwitchKey(scope: KillScope, clockId?: string): string {
 export interface KillSwitchStore {
   /** The stored items by key; a key without an item is absent from the map. */
   read(keys: readonly string[]): Promise<ReadonlyMap<string, unknown>>;
-  /** Writes the whole item (a `PutItem`, the only write `CostGuard` is allowed), with its TTL if any. */
+  /** Writes the whole item (a `PutItem`), with its TTL if any. */
   write(key: string, record: KillSwitchRecord, expiresAt?: number): Promise<void>;
 }
 
@@ -188,10 +188,6 @@ function forbidden(message: string): ToolError {
 
 function checkActor(request: SetKillSwitchRequest): void {
   if (request.clockId !== undefined && request.scope !== "AGENT") throw forbidden("only the AGENT switch exists per world");
-  if (request.actor === "COST_GUARD") {
-    if (!request.on) throw forbidden("CostGuard may only turn the kill switch on");
-    if (request.clockId !== undefined) throw forbidden("CostGuard acts on the global switches only");
-  }
   if (request.actor === "QA" && (request.clockId === undefined || ispKindOfClock(request.clockId) !== "QA")) {
     throw forbidden("the QaDriver may only flip the AGENT switch of a qa-* world");
   }

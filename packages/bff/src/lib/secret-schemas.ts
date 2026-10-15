@@ -96,6 +96,7 @@ export const SeedOverridesValue = z
     opsMailbox: Email.optional(),
     zoneChiefEmails: z.record(z.string(), Email).optional(),
     personPhones: z.record(z.string(), E164).optional(),
+    /** Unused since P-07 (closed by the CTO on 2026-10-14: no project budget); still accepted so a loaded secret keeps parsing. */
     operatorEmail: Email.optional(),
   })
   .strict();

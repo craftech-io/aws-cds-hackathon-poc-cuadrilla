@@ -124,7 +124,6 @@ export default $config({
     const { appUrl } = await import("./infra/dns");
     await import("./infra/web"); // WP-04
     await import("./infra/observability"); // WP-38
-    await import("./infra/cost-guard"); // WP-56 (cut of the sign-up), WP-38
 
     return {
       stage: $app.stage,

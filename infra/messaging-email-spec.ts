@@ -148,24 +148,6 @@ export function emailEventPattern(configurationSetName: string = CONFIGURATION_S
   };
 }
 
-// ---- Metrics of the authentication emails (ADR-0025 §4) --------------------------------------------
-
-/**
- * Second destination of the configuration set: CloudWatch metrics with the dimension `kind` taken from
- * the message tag. Product emails and the lead notice tag their `kind`; Cognito's emails (sign-up
- * code, resend, recovery, invitation) carry no tag, so they fall on the default `AUTH`.
- */
-export const AUTH_METRICS_DESTINATION_NAME = "auth-metrics";
-export const METRIC_EVENT_TYPES = ["SEND", "BOUNCE", "COMPLAINT"] as const;
-export const KIND_DIMENSION = { dimensionName: "kind", dimensionValueSource: "MESSAGE_TAG", defaultDimensionValue: "AUTH" } as const;
-
-/** `Send`, `Bounce` and `Complaint` of `AWS/SES` with `kind = AUTH` (docs/architecture.md §12). */
-export const AUTH_EMAIL_METRICS = {
-  AuthEmailSends: { namespace: "AWS/SES", metricName: "Send", dimensions: { kind: "AUTH" } },
-  AuthEmailBounces: { namespace: "AWS/SES", metricName: "Bounce", dimensions: { kind: "AUTH" } },
-  AuthEmailComplaints: { namespace: "AWS/SES", metricName: "Complaint", dimensions: { kind: "AUTH" } },
-} as const;
-
 // ---- Sending permission --------------------------------------------------------------------------
 
 export const SIMULATOR_DOMAIN = "simulator.amazonses.com";

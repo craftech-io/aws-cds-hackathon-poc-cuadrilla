@@ -49,7 +49,6 @@ export const TAB_TITLES: Readonly<Record<MetricsTabId, Bilingual>> = {
 
 const NO_RATE: Bilingual = { es: "sin tarifa verificada", en: "no verified rate" };
 const NO_COST: Bilingual = { es: "sin costo registrado", en: "no cost recorded" };
-const NO_BUDGET: Bilingual = { es: "sin umbral fijado", en: "no threshold set" };
 const AGENT_TOKENS: Bilingual = { es: "tokens del agente; fotos, voz y mensajes sin sumar", en: "agent tokens; photos, voice and messages not added" };
 const NOT_RUN: Bilingual = { es: "todavía sin corrida publicada", en: "no published run yet" };
 
@@ -71,16 +70,20 @@ const WORLD_SOURCE: Bilingual = { es: "este mundo (CuadrillaMetrics)", en: "this
 export interface WorldInput {
   readonly kpis: readonly ConversationKpi[];
   readonly provisionalRates: boolean;
-  /** `IspSettings.costBudgetUsdPerConversation`: the operator's threshold, absent until it is set. */
+  /**
+   * `IspSettings.costBudgetUsdPerConversation`: an optional threshold, unset by default (P-07, closed by
+   * the CTO on 2026-10-14: no threshold). Without it the cost is shown with no target and the KPI of the
+   * conversations over the threshold does not exist.
+   */
   readonly budgetUsd?: number;
 }
 
 const COST_SOURCE: Bilingual = { es: "CuadrillaMetrics × tarifas", en: "CuadrillaMetrics × rate card" };
 
 /**
- * Cost per conversation and the conversations over the operator's threshold. Only the conversations whose
- * turns were priced (`costUsd`, turns/record.ts) count; with no priced conversation the cost is an
- * assumption with no value, never a measured zero.
+ * Cost per conversation and, only when a world sets a threshold, the conversations over it. Only the
+ * conversations whose turns were priced (`costUsd`, turns/record.ts) count; with no priced conversation
+ * the cost is an assumption with no value, never a measured zero.
  */
 function costKpis(input: WorldInput): Kpi[] {
   const priced = input.kpis.filter((kpi) => kpi.costUsd !== undefined);
@@ -89,29 +92,30 @@ function costKpis(input: WorldInput): Kpi[] {
   const kind: KpiKind = unpriced ? "ASSUMED" : kindOf(priced);
   const costNote = input.provisionalRates ? NO_RATE : priced.length === 0 ? NO_COST : AGENT_TOKENS;
   const budget = input.budgetUsd;
-  const over = priced.filter((kpi) => exceedsBudget(kpi.costUsd ?? 0, budget)).length;
+  const cost: Kpi = {
+    id: "costPerConversation",
+    label: { es: "Costo por conversación", en: "Cost per conversation" },
+    value: unpriced ? null : total / priced.length,
+    unit: "USD",
+    n: unpriced ? 0 : priced.length,
+    source: COST_SOURCE,
+    kind,
+    ...(budget === undefined ? {} : { target: `≤ USD ${budget.toFixed(2)}` }),
+    note: costNote,
+  };
+  if (budget === undefined) return [cost];
   return [
-    {
-      id: "costPerConversation",
-      label: { es: "Costo por conversación", en: "Cost per conversation" },
-      value: unpriced ? null : total / priced.length,
-      unit: "USD",
-      n: unpriced ? 0 : priced.length,
-      source: COST_SOURCE,
-      kind,
-      target: budget === undefined ? "≤ umbral del piloto" : `≤ USD ${budget.toFixed(2)}`,
-      note: costNote,
-    },
+    cost,
     {
       id: "conversationsOverBudget",
       label: { es: "Conversaciones sobre el umbral de costo", en: "Conversations over the cost threshold" },
-      value: unpriced || budget === undefined ? null : over,
+      value: unpriced ? null : priced.filter((kpi) => exceedsBudget(kpi.costUsd ?? 0, budget)).length,
       unit: "COUNT",
       n: unpriced ? 0 : priced.length,
       source: COST_SOURCE,
       kind,
       target: "0",
-      ...(unpriced ? { note: costNote } : budget === undefined ? { note: NO_BUDGET } : {}),
+      ...(unpriced ? { note: costNote } : {}),
     },
   ];
 }

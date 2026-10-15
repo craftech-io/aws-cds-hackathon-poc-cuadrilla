@@ -56,7 +56,7 @@ Si el modelo pide dos veces el mismo envío en un turno (mismo canal y mismo tex
 ### 6. Observabilidad: solo logs, 30 días, sin tableros
 
 - La observabilidad son los **logs JSON** (`lib/log.ts`, enmascarados) con **30 días** de retención en todo grupo: las Lambdas (`$transform`), el runtime `-live` del Harness (IaC), el runtime **`-DEFAULT`** que AgentCore crea solo y sin retención (si ningún provider pinneado lo modela, configuración manual declarada en `docs/architecture.md` §17 ítem 15, con su comando de verificación) y `aws/spans` (configuración de la cuenta, §17 ítem 2).
-- **Sin tableros** (`aws.cloudwatch.Dashboard`) ni alarmas sin acción. Una alarma existe solo si publica en `CostAlerts` y enciende un corte (`CostGuard`: el de costo de ADR-0019 y el del alta de ADR-0025 §4). Un metric filter existe solo si lo lee una de esas alarmas o un paso `SR`/`SMK` que lo asierta. Todo lo demás que `docs/architecture.md` §12 llama indicador es un campo de las líneas de log, que se consulta con CloudWatch Logs Insights; las cifras que muestra el producto (latencias, costo por conversación, medición) salen de sus tablas (`CuadrillaMetrics`, `EvalResult`) y de los reportes del ejecutor, no de CloudWatch.
+- **Sin tableros** (`aws.cloudwatch.Dashboard`) ni alarmas sin acción. ~~Una alarma existe solo si publica en `CostAlerts` y enciende un corte (`CostGuard`: el de costo de ADR-0019 y el del alta de ADR-0025 §4).~~ Desde el 2026-10-14 (P-07, cerrado por el CTO: sin umbral de costo, sin alarma de gasto y sin presupuesto del proyecto) **no hay ninguna alarma ni presupuesto**: cuestan todos los meses aunque nunca se disparen; los cortes los enciende el operador. Un metric filter existe solo si lo lee un paso `SR`/`SMK` que lo asierta. Todo lo demás que `docs/architecture.md` §12 llama indicador es un campo de las líneas de log, que se consulta con CloudWatch Logs Insights; las cifras que muestra el producto (latencias, costo por conversación, medición) salen de sus tablas (`CuadrillaMetrics`, `EvalResult`) y de los reportes del ejecutor, no de CloudWatch.
 - Nada con costo fijo que no se use: lo que se crea "por si acaso" (tableros, alarmas que solo avisan, métricas que nadie lee) se quita.
 
 ### 7. Landing y diagrama
@@ -76,7 +76,7 @@ Si el modelo pide dos veces el mismo envío en un turno (mismo canal y mismo tex
 - **Claude Haiku 4.5**: el producto hermano lo probó; contestó rápido pero siguió su propia nota equivocada antes que la regla. Con dos llamadas por turno, la diferencia de velocidad con Sonnet es chica.
 - **Una regla de prompt "lee todo en un paso"** (`READ_FIRST`): ahorra una vuelta al modelo, no el tiempo de las lecturas, porque el Harness las ejecuta en serie.
 - **Bajar el umbral de relevancia de G2**: afloja el control para todas las respuestas para arreglar los saludos.
-- **Tableros y alarmas de aviso**: cuestan todos los meses y nadie los mira en una demo; los cortes que importan ya son automáticos.
+- **Tableros y alarmas de aviso**: cuestan todos los meses y nadie los mira en una demo. Desde P-07 (2026-10-14) tampoco quedan las alarmas de corte: el gasto lo acotan los topes reservados antes de gastar (ADR-0019) y los cortes los enciende el operador.
 - **Las lecciones portadas** (elegida).
 
 ## Consequences

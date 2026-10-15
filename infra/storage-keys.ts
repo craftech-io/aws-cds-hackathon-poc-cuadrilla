@@ -281,7 +281,7 @@ const isMockTable = (name: string): name is MockTable => (MOCK_TABLES as readonl
 
 /**
  * What a function links from storage, exactly as iam-capabilities.ts declares its data access. A
- * table or bucket a role reaches only through a fenced grant (`{Runtime}` of CostGuard, `{Seed}/*`
+ * table or bucket a role reaches only through a fenced grant (`{Runtime}` of the sign-up roles, `{Seed}/*`
  * of WORLDS) is not here: `storageResource` in infra/storage.ts resolves those grants.
  */
 export function storageFor(fn: LambdaName): StorageNeeds {

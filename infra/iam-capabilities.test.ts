@@ -240,10 +240,10 @@ describe("least privilege", () => {
     expect(expectedActions("Bff").some((action) => /^(ses|social-messaging|bedrock):/.test(action))).toBe(false);
   });
 
-  it("lets only the worker invoke the Harness and only CostGuard turn the global kill switch on", () => {
+  it("lets only the worker invoke the Harness and gives no role a fenced write of a global kill switch (the operator turns them on, P-07)", () => {
     expect(ROLES.filter((role) => expectedActions(role).includes("bedrock-agentcore:InvokeHarness"))).toEqual(["InstallerWorker"]);
-    const cost = expectedGrants("CostGuard");
-    expect(cost).toEqual([{ actions: ["dynamodb:PutItem"], resources: ["{Runtime}"], conditions: [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#*"] }] }]);
+    const killWrite = (grant: Grant) => grant.actions.some((action) => /^dynamodb:(Put|Update|Delete|BatchWrite)Item$/.test(action)) && (grant.conditions ?? []).some((condition) => condition.values.some((value) => /^KILL#(?!AGENT#)/.test(value)));
+    expect(ROLES.filter((role) => expectedGrants(role).some((grant) => grant.resources.includes("{Runtime}") && killWrite(grant)))).toEqual([]);
   });
 
   it("[W2-B2] gives a BUTTON_ACTION's needs to the worker that runs it, never to InboundWhatsApp: MOCK_NETWORK, CertificateWriter", () => {

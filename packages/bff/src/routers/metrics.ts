@@ -2,8 +2,9 @@
 //
 //   summary   the five tabs of metrics/kpis.ts for the principal's world: its conversations, the latest
 //             published runs of the manual's and the photos' measurement (the same rows their report
-//             reads), latencies p50/p95, the cost per conversation against the world's threshold
-//             (`IspSettings.costBudgetUsdPerConversation`), the day's use of the stage's ceiling and the cut, and
+//             reads), latencies p50/p95, the cost per conversation (against a threshold only when the
+//             world sets `IspSettings.costBudgetUsdPerConversation`, unset by default: P-07), the day's
+//             use of the stage's ceiling and the cut, and
 //             the policy (violations next to DENY/DEFER per rule)
 //   export    the same as CSV ("Exportar CSV")
 import { z } from "zod";

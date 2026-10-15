@@ -4,6 +4,7 @@ import type { Clock } from "../lib/clock";
 import { createLogger } from "../lib/log";
 import {
   KILL_CACHE_TTL_MS,
+  KillActor,
   type KillStatus,
   type KillSwitchAuditEvent,
   type KillSwitchStore,
@@ -180,12 +181,11 @@ describe("the sign-up switch [FL-112]", () => {
     expect(blockingScope(status, "AGENT")).toBeUndefined();
   });
 
-  it("[FL-112] CostGuard turns KILL#SIGNUP on but never off; only the operator turns it off, audited", async () => {
+  it("[FL-112] only the operator turns KILL#SIGNUP on and off, audited; the QaDriver never", async () => {
     const memory = createMemoryRuntimeStore();
     const events: KillSwitchAuditEvent[] = [];
     const audit = async (event: KillSwitchAuditEvent) => void events.push(event);
-    await expect(setKillSwitch({ store: memory, audit }, { scope: "SIGNUP", on: true, actor: "COST_GUARD", reason: "alarm AuthEmailBounces" })).resolves.toMatchObject({ scope: "SIGNUP", state: "on", setBy: "COST_GUARD" });
-    await expect(setKillSwitch({ store: memory, audit }, { scope: "SIGNUP", on: false, actor: "COST_GUARD" })).rejects.toBeInstanceOf(ToolError);
+    await expect(setKillSwitch({ store: memory, audit }, { scope: "SIGNUP", on: true, actor: "OPERATOR", reason: "bounces of the authentication emails" })).resolves.toMatchObject({ scope: "SIGNUP", state: "on", setBy: "OPERATOR" });
     await expect(setKillSwitch({ store: memory, audit }, { scope: "SIGNUP", on: true, actor: "QA" })).rejects.toBeInstanceOf(ToolError);
     expect(memory.items.get("KILL#SIGNUP")?.state).toBe("on");
     await setKillSwitch({ store: memory, audit }, { scope: "SIGNUP", on: false, actor: "OPERATOR" });
@@ -204,18 +204,14 @@ describe("set_kill_switch", () => {
   it("[FL-100] audits KILL_SWITCH_SET with who set it and when, in real time", async () => {
     const memory = createMemoryRuntimeStore();
     const events: KillSwitchAuditEvent[] = [];
-    const record = await setKillSwitch({ store: memory, realClock: movableClock(), audit: async (event) => void events.push(event) }, { scope: "AGENT", on: true, actor: "OPERATOR", reason: "budget at 100 %" });
-    expect(record).toEqual({ scope: "AGENT", state: "on", setBy: "OPERATOR", setAtReal: "2026-10-20T15:00:00.000Z", reason: "budget at 100 %" });
+    const record = await setKillSwitch({ store: memory, realClock: movableClock(), audit: async (event) => void events.push(event) }, { scope: "AGENT", on: true, actor: "OPERATOR", reason: "unexpected spend" });
+    expect(record).toEqual({ scope: "AGENT", state: "on", setBy: "OPERATOR", setAtReal: "2026-10-20T15:00:00.000Z", reason: "unexpected spend" });
     expect(events).toEqual([{ action: "KILL_SWITCH_SET", record }]);
     expect(memory.items.get("KILL#AGENT")).toEqual(record);
   });
 
-  it("[FL-100] CostGuard only turns the global switches on, never off", async () => {
-    const memory = createMemoryRuntimeStore();
-    await expect(setKillSwitch({ store: memory }, { scope: "ALL", on: true, actor: "COST_GUARD" })).resolves.toMatchObject({ state: "on", setBy: "COST_GUARD" });
-    await expect(setKillSwitch({ store: memory }, { scope: "ALL", on: false, actor: "COST_GUARD" })).rejects.toBeInstanceOf(ToolError);
-    await expect(setKillSwitch({ store: memory }, { scope: "AGENT", clockId: QA_WORLD, on: true, actor: "COST_GUARD" })).rejects.toThrow(/global/);
-    expect(memory.items.get("KILL#ALL")?.state).toBe("on");
+  it("[FL-100] no automatic actor exists: only the operator and the QaDriver may flip a switch (P-07)", () => {
+    expect(KillActor.options).toEqual(["OPERATOR", "QA"]);
   });
 
   it("[FL-100] the QaDriver flips only the AGENT switch of a qa-* world, which expires with the world", async () => {

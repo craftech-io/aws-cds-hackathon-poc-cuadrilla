@@ -352,8 +352,7 @@ describe("storage each Lambda links", () => {
     expect(reached.sort()).toEqual(["Evidence", "Manual", "Media", "Seed"]);
   });
 
-  it("links a table only as data access: CostGuard reaches Runtime through its fenced grant alone", () => {
-    expect(storageFor("CostGuard")).toEqual({ tables: ["AuditLog"], mockTables: [], buckets: [] });
+  it("links a table only as data access", () => {
     expect(expectedBuckets("Bff")).toEqual(["Evidence", "Manual", "Media"]);
     expect(storageFor("WorldJanitor").mockTables).toEqual(["Dispatch", "Network"]);
   });

@@ -214,7 +214,7 @@ Reglas: `INSTALLED` exige checklist completo, ONU `ONLINE` en rango en los últi
 | `bind_phone_lease` | `channel` ("ALTA <código>" desde un teléfono real) | Consume `JOINCODE#` (un uso, 30 min) y crea `PHONELEASE#<phoneHash>` con `attribute_not_exists`; rechaza teléfonos del mundo vivo | `Runtime` | `PHONE_LEASE_CREATED` / `DENY LEASE_CONFLICT` |
 | `acknowledge_inbound` | `channel` | Marca leído con indicador de escritura el mensaje encolado (`READ_ACK`) | Ninguno en tablas de negocio | — |
 | `reserve_cost` | `worker`, `console` (simulador), `ToolEvidence` | Reserva condicional en `SIMCAP#`, `TURNCAP#` y el techo global (`…#GLOBAL#<realDay>`) antes de gastar; lee `KILL#` | `Runtime` | `CAP_REACHED` / `KILL_SWITCH_ACTIVE` |
-| `set_kill_switch` | Operador (`scripts/ops/kill.ts`), `CostGuard` (solo encender), `qa` (solo `KILL#AGENT#qa-*`) | Enciende o apaga el corte | `Runtime/KILL#` | `KILL_SWITCH_SET` |
+| `set_kill_switch` | Operador (`scripts/ops/kill.ts`), `qa` (solo `KILL#AGENT#qa-*`) | Enciende o apaga el corte | `Runtime/KILL#` | `KILL_SWITCH_SET` |
 | `report_physical_action` | `worker`, `console` (mensajes rápidos del recorrido), `qa` (`network.fix`) | Avisa al orquestador simulado que el instalador actuó o que el supervisor indicó el arreglo (`docs/architecture-integrations.md` §6) | `Network` | `ACTION` |
 | `record_consent` / `revoke_consent` | `channel` (ALTA/BAJA), `console`, `qa` | Opt-in con medio y versión del texto; baja con confirmación | `CONSENT#WHATSAPP` (historia) | `CONSENT_GRANTED` / `CONSENT_REVOKED` |
 | `register_shift` | `channel` (TURNO) | Ventana de turno del supervisor (plan B) | `People/SHIFTWINDOW` | `SHIFT_REGISTERED` |

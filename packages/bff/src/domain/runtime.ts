@@ -164,14 +164,14 @@ export type CapCounter = z.infer<typeof CapCounter>;
 
 /**
  * The runtime kill switch as ops/kill-switch.ts writes it (ADR-0019): `KILL#<ALL|SIMULATOR|AGENT>`
- * or `KILL#AGENT#<clockId>`, a whole-item `PutItem` (the only write `CostGuard` has), no `version`.
+ * or `KILL#AGENT#<clockId>`, a whole-item `PutItem`, no `version`.
  */
 export const KillSwitch = z.object({
   entity: z.literal("KillSwitch"),
   scope: KillScope,
   clockId: ClockId.optional(),
   state: z.enum(["on", "off"]),
-  setBy: z.enum(["OPERATOR", "COST_GUARD", "QA"]),
+  setBy: z.enum(["OPERATOR", "QA"]),
   setAtReal: IsoInstant,
   reason: z.string().trim().min(1).max(200).optional(),
   updatedAt: IsoInstant.optional(),

@@ -1,32 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ALARM_PREFIX, ALARM_SCOPES, BUDGET_SCOPES } from "../packages/bff/src/handlers/cost-guard";
-import { testConnector } from "../packages/bff/src/connector/testing";
-import { createLogger } from "../packages/bff/src/lib/log";
-import { capMetric, planCounters } from "../packages/bff/src/ops/cost-caps";
-import { MODEL_RATES, bedrockRateKey } from "../packages/bff/src/services/ratecard/ratecard";
-import { recordTurnKpi } from "../packages/bff/src/turns/record";
 import { TOOL_LAMBDAS } from "./agentcore-spec";
 import { IAM_ARNS, LAMBDA_CAPABILITIES, QA_DRIVER_DLQ_ONLY_ACTIONS, expectedGrants, managedPolicies, type LambdaName } from "./iam-capabilities";
 import {
-  AGENT_SPEND_ALARM_USD_PER_HOUR,
   CERTIFICATE_WRITER,
-  COST_ALARMS,
   LINK_CARRIED_RESOURCES,
   METRIC_FILTERS,
   POLICY_AUDIT,
-  PROJECT_BUDGET,
   QA_DRIVER,
   RESERVED_CONCURRENCY,
   STATEMENT_REFS,
   WP38_HANDLERS,
-  budgetCostFilter,
-  budgetName,
-  budgetNotifications,
-  budgetSubscribers,
   carriedResources,
-  costAlarmName,
   linkCarried,
   metricFilterName,
   qaDriverFunctionName,
@@ -41,12 +27,11 @@ const architecture = read("docs/architecture.md");
 const section12 = architecture.slice(architecture.indexOf("## 12."), architecture.indexOf("## 13."));
 const bullet = (label: string) => section12.split("\n").find((line) => line.startsWith(`- **${label}`)) ?? "";
 
-describe("metric filters: only what a cutting alarm or a scenario step reads (ADR-0028, §12)", () => {
-  it("are exactly the ones §12 lists, SignupStarted being the sign-up cut's (infra/cost-guard.ts)", () => {
+describe("metric filters: only what a scenario step reads (ADR-0028, §12)", () => {
+  it("are exactly the ones §12 lists", () => {
     const sentence = bullet("Metric filters").split(". Las cifras")[0] ?? "";
     const listed = [...sentence.matchAll(/`([A-Z][a-z][A-Za-z]+)(?:\{[^}]*\})?`/g)].map((match) => match[1]);
-    expect([...METRIC_FILTERS.map((spec) => spec.metric), "SignupStarted"].sort()).toEqual([...new Set(listed)].sort());
-    expect(read("infra/cost-guard.ts")).toContain('pattern: `{ $.metric = "${SIGNUP_STARTED_METRIC}" }`');
+    expect(METRIC_FILTERS.map((spec) => spec.metric).sort()).toEqual([...new Set(listed)].sort());
   });
 
   it("each one names Lambdas of infra/iam-capabilities.ts and a unique filter per log group", () => {
@@ -65,157 +50,28 @@ describe("metric filters: only what a cutting alarm or a scenario step reads (AD
       expect(existsSync(resolve(process.cwd(), spec.source)), spec.source).toBe(true);
       expect(read(spec.source), spec.metric).toContain(`"${spec.metric}"`);
     }
-    const caps = read("packages/bff/src/ops/cost-caps.ts");
-    expect(caps).toContain('if (counter.resource === "turns") return { metric: "TurnCapHits", scope };');
-    expect(caps).toContain('action: "KILL_SWITCH_ACTIVE", metric: "KillSwitchActive"');
+    expect(read("packages/bff/src/ops/cost-caps.ts")).toContain('action: "KILL_SWITCH_ACTIVE", metric: "KillSwitchActive"');
     expect(read("packages/bff/src/routers/edge.ts")).toContain('{ metric: "OriginRejected", value: 1 }');
   });
 
-  it("[W3 review flows B1] never leaves a metric an alarm cuts with pending: the code writes every one of them today", () => {
-    for (const spec of METRIC_FILTERS.filter((filter) => filter.readBy === "alarm")) {
-      expect(spec.pendingIn, spec.metric).toBeUndefined();
-      expect(spec.source, spec.metric).toBeDefined();
-    }
-    expect(read("packages/bff/src/turns/record.ts")).toContain('deps.log.info("metric", { metric: AGENT_SPEND_METRIC, value: usd');
-  });
-
-  it("counts only the global ceiling of turns and only refused spends of a kill switch", () => {
-    const turnCaps = METRIC_FILTERS.find((spec) => spec.metric === "TurnCapHits");
-    expect(turnCaps).toMatchObject({ pattern: '{ $.metric = "TurnCapHits" && $.scope = "GLOBAL" }', dimensions: { scope: "$.scope" }, readBy: "alarm" });
+  it("counts only refused spends of a kill switch", () => {
     expect(METRIC_FILTERS.find((spec) => spec.metric === "KillSwitchActive")?.pattern).toContain('$.action = "KILL_SWITCH_ACTIVE"');
-    expect(METRIC_FILTERS.find((spec) => spec.metric === "AgentSpendUsd")).toMatchObject({ value: "$.value", unit: "None" });
   });
 });
 
-/** A CloudWatch JSON filter of the form `{ $.a = "x" && $.b = "y" }` applied to a log line. */
-function matchesFilter(pattern: string, line: Readonly<Record<string, unknown>>): boolean {
-  const terms = [...pattern.matchAll(/\$\.([A-Za-z]+) = "([^"]*)"/g)];
-  expect(terms.length, pattern).toBeGreaterThan(0);
-  return terms.every(([, field, value]) => line[field as string] === value);
-}
+describe("P-07 (closed by the CTO on 2026-10-14): no cost threshold, no spend alarm, no project budget", () => {
+  const observability = read("infra/observability.ts");
 
-describe("[W3 review B1] a QA world's test ceiling never counts as the stage's global ceiling", () => {
-  it("logs scope GLOBAL_TEST for a globalCapsOverride hit, which the TurnCapHits filter of the cut does not match", () => {
-    const pattern = METRIC_FILTERS.find((spec) => spec.metric === "TurnCapHits")?.pattern ?? "";
-    const caps = { turnsPerDay: 1500, validationsPerDay: 300, transcribeSecondsPerDay: 3600 };
-    const now = new Date("2026-10-20T15:00:00Z");
-    const plan = (clockId: string, settings: object) => planCounters({ world: { clockId, settings }, resource: "turns", amount: 1, reserve: ["GLOBAL"] }, caps, now);
-    const [test] = plan("qa-812-1-sc12-global", { globalCapsOverride: { turnsPerDay: 2 } });
-    const [real] = plan("GLOBAL#isp-demo", {});
-    expect(test?.key).toBe("TURNCAP#GLOBAL#qa-812-1-sc12-global#2026-10-20");
-    expect(test && matchesFilter(pattern, capMetric(test))).toBe(false);
-    expect(test && capMetric(test)).toEqual({ metric: "TurnCapHits", scope: "GLOBAL_TEST" });
-    expect(real && matchesFilter(pattern, capMetric(real))).toBe(true);
-  });
-});
-
-/** Every metric line of a log stream, as JSON. */
-async function spendLines(turns: ReadonlyArray<readonly [clockId: string, ispId: string]>, usage = NORMAL_TURN): Promise<Array<Record<string, unknown>>> {
-  const world = testConnector();
-  for (const kind of ["input", "output"] as const) {
-    await world.connector.reference.put("RateCard", { key: bedrockRateKey(kind), price: MODEL_RATES.prices[kind], unit: "PER_1M_TOKENS", provisional: false, source: MODEL_RATES.source, asOf: MODEL_RATES.asOf });
-  }
-  const lines: Array<Record<string, unknown>> = [];
-  const log = createLogger({ level: "info", sink: (line) => void lines.push(JSON.parse(line) as Record<string, unknown>) });
-  for (const [clockId, ispId] of turns) {
-    const request = { trigger: "INSTALLER_MESSAGE" as const, eventId: "evt", clockId, ispId, installerId: "inst-rogelio", workOrderId: "wo-24817", eventAtSim: "2026-10-13T09:15:00-06:00" };
-    await recordTurnKpi({ data: world.connector, agentMode: "REAL", log }, request, usage, 1_000);
-  }
-  return lines;
-}
-
-/** The cost alarm's statistic over one period's lines, and whether it breaches. */
-function costAlarmBreaches(lines: ReadonlyArray<Record<string, unknown>>): { readonly value: number; readonly breaches: boolean } {
-  const alarm = COST_ALARMS.find((spec) => spec.suffix === "AgentSpendHourly");
-  const filter = METRIC_FILTERS.find((spec) => spec.metric === alarm?.metric);
-  if (alarm === undefined || filter === undefined) throw new Error("the cost alarm or its filter is missing");
-  const samples = lines.filter((line) => matchesFilter(filter.pattern, line)).map((line) => Number(line[filter.value.slice(2)]));
-  const value = alarm.statistic === "Sum" ? samples.reduce((sum, sample) => sum + sample, 0) : samples.reduce((sum, sample) => sum + sample, 0) / Math.max(1, samples.length);
-  return { value, breaches: value > alarm.threshold };
-}
-
-/** 50 k input and 2 k output tokens: USD 0.12 at USD 2/10 per M, a long Harness turn with its preloads. */
-const NORMAL_TURN = { inputTokens: 50_000, outputTokens: 2_000, cacheReadTokens: 0, cacheWriteTokens: 0 };
-const times = <T,>(count: number, value: T): T[] => Array.from({ length: count }, () => value);
-
-describe("[W3R1 N1] the hourly spend cut: one conversation never cuts the agent of the stage", () => {
-  it("sums each turn's own spend, so the alarm is the spend rate and never a running total repeated per turn", () => {
-    const alarm = COST_ALARMS.find((spec) => spec.metric === "AgentSpendUsd");
-    expect(alarm).toMatchObject({ statistic: "Sum", periodSeconds: 3600, threshold: AGENT_SPEND_ALARM_USD_PER_HOUR });
-    expect(ALARM_SCOPES[alarm?.suffix ?? ""]).toBe("AGENT");
+  it("infra/observability.ts builds only the metric filters: no alarm, no dashboard, no budget", () => {
+    expect(observability).not.toMatch(/cloudwatch\.(MetricAlarm|CompositeAlarm|Dashboard)|budgets\.Budget/);
+    for (const file of ["infra/bff.ts", "infra/certificates.ts"]) expect(read(file)).not.toMatch(/cloudwatch\.(MetricAlarm|Dashboard)|budgets\.Budget/);
+    expect(observability).toContain("created.nodes.logGroup.apply");
   });
 
-  it("a 40-turn guest conversation (sign-up world or invited) logs no spend sample and never trips it, however costly its turns", async () => {
-    const heavy = { ...NORMAL_TURN, inputTokens: 400_000, outputTokens: 40_000 };
-    for (const world of [["GUEST#isp-guest-s261009abcde", "isp-guest-s261009abcde"], ["GUEST#isp-guest-07", "isp-guest-07"]] as const) {
-      const lines = await spendLines(times(40, world), heavy);
-      expect(costAlarmBreaches(lines)).toEqual({ value: 0, breaches: false });
-    }
-  });
-
-  it("a 40-turn conversation of the demo world at a normal turn cost stays under the budget; a sustained overspend trips it", async () => {
-    const long = costAlarmBreaches(await spendLines(times(40, ["GLOBAL#isp-demo", "isp-demo"] as const)));
-    expect(long.value).toBeCloseTo(40 * 0.12, 6);
-    expect(long.breaches).toBe(false);
-    const runaway = costAlarmBreaches(await spendLines(times(200, ["GLOBAL#isp-demo", "isp-demo"] as const)));
-    expect(runaway.breaches).toBe(true);
-  });
-});
-
-describe("alarms: only the cost cut, all on CostAlerts and in CostGuard's closed table (ADR-0019) [FL-100]", () => {
-  it("every metric an alarm reads has its alarm, and every alarm watches a filtered metric", () => {
-    const byAlarm = METRIC_FILTERS.filter((spec) => spec.readBy === "alarm").map((spec) => spec.metric);
-    expect(COST_ALARMS.map((alarm) => alarm.metric).sort()).toEqual(byAlarm.sort());
-    const global = COST_ALARMS.find((alarm) => alarm.metric === "TurnCapHits");
-    expect(global).toMatchObject({ suffix: "TurnCapHitsGlobal", dimensions: { scope: "GLOBAL" }, threshold: 0, comparison: "GreaterThanThreshold" });
-  });
-
-  it("CostGuard turns KILL#AGENT on for each cost alarm and for the budget, by the same names", () => {
-    for (const alarm of COST_ALARMS) expect(ALARM_SCOPES[alarm.suffix], alarm.suffix).toBe("AGENT");
-    expect(BUDGET_SCOPES[PROJECT_BUDGET.suffix]).toBe("AGENT");
-    expect(costAlarmName("")).toBe(ALARM_PREFIX);
-    expect(budgetName()).toBe(`${ALARM_PREFIX}${PROJECT_BUDGET.suffix}`);
-  });
-
-  it("infra/observability.ts builds no dashboard and every alarm publishes on CostAlerts", () => {
-    const source = read("infra/observability.ts");
-    expect(source).not.toMatch(/cloudwatch\.Dashboard/);
-    const blocks = source.split("new aws.cloudwatch.MetricAlarm(").slice(1);
-    expect(blocks).toHaveLength(1);
-    for (const block of blocks) expect(block.slice(0, block.indexOf("});"))).toContain("alarmActions: [costAlerts.arn],");
-    expect(source).toContain("created.nodes.logGroup.apply");
-    for (const file of ["infra/bff.ts", "infra/certificates.ts"]) expect(read(file)).not.toMatch(/cloudwatch\.(MetricAlarm|Dashboard)/);
-  });
-});
-
-describe("project budget (§12, ADR-0019)", () => {
-  it("is inside the CI role's budget fence and filters by the cost allocation tag Project", () => {
-    expect(budgetName("aws-cds-hackathon-poc-cuadrilla", "poc")).toBe("aws-cds-hackathon-poc-cuadrilla-poc-monthly");
-    expect(read("infra/bootstrap/ci-role.yaml")).toContain('budget/${AppName}-*"');
-    expect(budgetCostFilter("aws-cds-hackathon-poc-cuadrilla")).toEqual({ name: "TagKeyValue", values: ["user:Project$aws-cds-hackathon-poc-cuadrilla"] });
-  });
-
-  it("notifies the operator at 50, 80 and 100 % and CostAlerts only at 100 %", () => {
-    const notices = budgetNotifications(["ops@example.org"], "topic");
-    expect(notices.map((notice) => [notice.threshold, notice.subscriberEmailAddresses, notice.subscriberSnsTopicArns])).toEqual([
-      [50, ["ops@example.org"], undefined],
-      [80, ["ops@example.org"], undefined],
-      [100, ["ops@example.org"], ["topic"]],
-    ]);
-    for (const notice of notices) expect(notice).toMatchObject({ notificationType: "ACTUAL", thresholdType: "PERCENTAGE", comparisonOperator: "GREATER_THAN" });
-    expect(budgetNotifications([], "topic")).toEqual([{ comparisonOperator: "GREATER_THAN", notificationType: "ACTUAL", threshold: 100, thresholdType: "PERCENTAGE", subscriberSnsTopicArns: ["topic"] }]);
-  });
-
-  it("reads operatorEmail from SeedOverrides and never echoes the secret", () => {
-    expect(budgetSubscribers("{}")).toEqual([]);
-    expect(budgetSubscribers('{"operatorEmail":"Success+Op@Simulator.AmazonSES.com"}')).toEqual(["success+op@simulator.amazonses.com"]);
-    expect(() => budgetSubscribers("not json secret-value")).toThrow(/value not shown/);
-    expect(() => budgetSubscribers('{"operatorEmail":"secret-value"}')).toThrow(/value not shown/);
-    try {
-      budgetSubscribers('{"operatorEmail":"secret-value"}');
-    } catch (error) {
-      expect(String(error)).not.toContain("secret-value");
-    }
+  it("the spec exports no spend alarm, budget nor cut topic", () => {
+    const spec = read("infra/observability-spec.ts");
+    for (const name of ["AGENT_SPEND_ALARM_USD_PER_HOUR", "PROJECT_BUDGET", "COST_ALARMS", "CostAlerts", "AgentSpendUsd", "TurnCapHits"]) expect(spec, name).not.toContain(name);
+    expect(existsSync(resolve(process.cwd(), "infra/cost-guard.ts"))).toBe(false);
   });
 });
 
@@ -256,7 +112,6 @@ describe("the functions of infra/bff.ts and infra/certificates.ts", () => {
     expect(TOOL_LAMBDAS.evidence.reservedConcurrency).toBe(RESERVED_CONCURRENCY.ToolEvidence);
     expect(CERTIFICATE_WRITER.reservedConcurrency).toBe(RESERVED_CONCURRENCY.CertificateWriter);
     expect(read("infra/messaging-whatsapp.ts")).toContain(`concurrency: { reserved: ${RESERVED_CONCURRENCY.InboundWhatsApp} }`);
-    expect(read("infra/cost-guard.ts")).toContain(`concurrency: { reserved: ${RESERVED_CONCURRENCY.CostGuard} }`);
   });
 });
 

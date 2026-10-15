@@ -1,7 +1,7 @@
 // `Runtime` in DynamoDB for the cap counters and the kill switch (docs/architecture.md §5: `PK` +
 // `SK = META`, TTL `expiresAt` in epoch seconds). A reservation is one `TransactWriteItems` of
 // conditional `ADD`s, so the counters of a spend move together or not at all; the switch is written
-// with `PutItem`, the only write `CostGuard`'s role has (`dynamodb:LeadingKeys = KILL#*`). Reads are
+// whole with `PutItem` (the operator's script and the QaDriver's `KILL#AGENT#qa-*`). Reads are
 // strongly consistent. Timeouts come from lib/clients.ts; throttling and transaction conflicts are
 // retried with backoff (lib/retry.ts), a timed-out reservation only when it carries an idempotency
 // token (DynamoDB then applies it at most once).

@@ -10,7 +10,7 @@ Solo lo que depende de alguien fuera del equipo de agentes (el CTO, Meta, AWS Pa
 | P-04 | Video de 3 minutos | CTO | Abierto | §4 |
 | P-05 | Marca pública, display name de WhatsApp y nombre de la submission | CTO | Cerrado el 2026-09-26 por el CTO (modo `cobrand`; display name "Craftech"; submission "Cuadrilla") | — (§5 registra la decisión y la carga) |
 | P-06 | Datos del responsable, vía de contacto de privacidad, destinatario del aviso de lead, validación legal del aviso de privacidad y los términos (con la eventual inscripción de la base ante la autoridad de control, Ley 25.326) y procedimiento de borrado fuera de la tabla | CTO (legal de Craftech) | Abierto · ítems 1, 2 y 4 cerrados el 2026-10-06 por el CTO (ADR-0027: Craftech, Ciudad Autónoma de Buenos Aires, sales@craftech.io; aviso a la casilla del CTO en `LeadConfig`); ítems 3 y 5 abiertos, sin bloquear | §6 |
-| P-07 | Umbral de costo por conversación (`IspSettings.costBudgetUsdPerConversation`) y confirmación de la alarma `AgentSpendHourly` (USD 20 por hora) y del presupuesto del proyecto (USD 300 por mes) | CTO; `seed-generator` siembra el umbral en las plantillas `demo` y `guest` | Abierto · tarifas verificadas por WP-49 el 2026-10-10; propuesta USD 2,90 | §7 |
+| P-07 | Umbral de costo por conversación (`IspSettings.costBudgetUsdPerConversation`) y confirmación de la alarma `AgentSpendHourly` (USD 20 por hora) y del presupuesto del proyecto (USD 300 por mes) | CTO | Cerrado el 2026-10-14 por el CTO: sin umbral (sin umbral de costo por conversación, sin alarma de gasto del agente y sin presupuesto del proyecto) | — (§7 registra la decisión y lo que cambió) |
 | P-08 | Reaplicar el bootstrap de CI (`qa-runner` con sesiones de hasta 7200 s), fijar la variable `QA_RUNNER_SESSION_SECONDS=7200` y cargar el secreto `BFF_FUNCTION_URL` | Operador con su profile | Cerrado el 2026-10-10 por el operador (bootstrap reaplicado, `qa-runner` con `MaxSessionDuration` 7200 verificado con `get-role`; variable en 7200; secreto `BFF_FUNCTION_URL` cargado desde el estado de SST del app) | — (§8 registra los pasos) |
 
 ## 1. Conectar WhatsApp (P-01)
@@ -115,11 +115,15 @@ El alta registra leads reales (ADR-0026). Ítems 1, 2 y 4 cerrados el 2026-10-06
 
 Dueño: CTO. Verificación: `npx sst secret list --stage poc` (sin compartir valores); el aviso de prueba recibido; las páginas legales con la versión de ADR-0027.
 
-## 7. Umbral de costo por conversación (P-07)
+## 7. Umbral de costo por conversación (P-07) · cerrado
 
-WP-49 verificó las 15 filas de `RATECARD` el 2026-10-10 (`scripts/seed/generate/ratecard.ts`). Camino feliz de una orden (12 turnos, 5 fotos, WhatsApp cobrado como vivo, sin caché): USD 1,15-1,87. Propuesta: **USD 2,90** (el techo más la mitad). La alarma `AgentSpendHourly` de USD 20 por hora (`infra/observability-spec.ts`) equivale a 149-270 turnos en una hora; el presupuesto del proyecto es de USD 300 por mes. Los dos siguen provisionales hasta que el CTO los confirme.
+Cerrado el 2026-10-14 por el CTO: **sin umbral**. No hay umbral de costo por conversación, ni alarma de gasto del agente, ni presupuesto del proyecto. Lo que cambió:
 
-Cada turno deja su costo (tokens del agente por las filas verificadas) en la fila `WORLD` de su orden (`turns/record.ts`), y Métricas compara cada conversación con `costBudgetUsdPerConversation` del mundo (KPI "Conversaciones sobre el umbral de costo", meta 0). Mientras ningún mundo siembre el umbral, ese KPI dice "sin umbral fijado" y el check de `docs/test-plan.md` §7 solo avisa. El costo registrado todavía no suma fotos, voz ni mensajes (la nota del KPI lo dice). Dueño: CTO; luego `seed-generator` lo siembra en las plantillas `demo` y `guest` y regenera el seed.
+- `IspSettings.costBudgetUsdPerConversation` queda opcional y ningún mundo lo siembra; sin él, Métricas muestra el costo por conversación sin meta y el KPI "Conversaciones sobre el umbral de costo" no existe (`metrics/kpis.ts`). El check de costo de `docs/test-plan.md` §7 informa el costo y nunca da `warn` por falta de umbral.
+- Se quitan de la IaC la alarma `AgentSpendHourly` y su métrica `AgentSpendUsd`, el presupuesto `aws-cds-hackathon-poc-cuadrilla-poc-monthly` y, por la regla de solo logs (ADR-0028: una alarma cuesta todos los meses aunque nunca se dispare), las otras cinco alarmas (`TurnCapHitsGlobal` y las cuatro del alta), el destino de CloudWatch del configuration set, el topic `CostAlerts` y la Lambda `CostGuard`, que se quedaban sin uso. El gasto lo siguen acotando los topes de ADR-0019, reservados antes de gastar; los cortes `KILL#*` los enciende y los apaga solo el operador (`npm run ops:kill`).
+- El próximo deploy de `main` borra esos recursos; el rol de deploy conserva el permiso sobre `budget/<app>-*` del bootstrap para poder borrar el presupuesto. `SeedOverrides.operatorEmail` ya no se usa; el esquema lo sigue aceptando para que el secreto cargado no falle.
+
+Las tarifas verificadas por WP-49 el 2026-10-10 siguen en `scripts/seed/generate/ratecard.ts` (camino feliz de una orden USD 1,15-1,87), solo como información.
 
 ## 8. Operación de CI (P-08) · cerrado
 

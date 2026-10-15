@@ -23,12 +23,10 @@ import {
   ceilingDayCost,
   costOf,
   priceOf,
-  proposedConversationBudgetUsd,
   rateCardDrift,
   rateCardItems,
   rateCardRows,
   report,
-  turnsPerHourToAlarm,
 } from "./ratecard";
 
 const committed = readDataDir(fromRoot(DATA_DIR));
@@ -100,12 +98,10 @@ describe("estimates priced with the verified card", () => {
     expect(turn.max).toBeCloseTo(0.1 + 0.03 + 0.003955, 5);
   });
 
-  it("prices the happy path and proposes a threshold above it for the CTO", () => {
+  it("prices the happy path", () => {
     const happy = costOf(HAPPY_PATH_WORKLOAD);
     expect(happy.min).toBeGreaterThan(1);
     expect(happy.max).toBeLessThan(2);
-    expect(proposedConversationBudgetUsd()).toBeGreaterThan(happy.max);
-    expect(proposedConversationBudgetUsd()).toBe(2.9);
   });
 
   it("prices the gate of docs/test-plan.md §7 inside its order of magnitude", () => {
@@ -115,17 +111,15 @@ describe("estimates priced with the verified card", () => {
     expect(gate.max).toBeLessThan(240);
   });
 
-  it("prices a day of the global ceiling and the turns an hour that reach the hourly alarm", () => {
+  it("prices a day of the global ceiling", () => {
     const day = ceilingDayCost({ turnsPerDay: 1_500, validationsPerDay: 400, transcribeSecondsPerDay: 5_400 });
     expect(day.max - day.min).toBeCloseTo(1_500 * 0.06, 5);
-    const alarm = turnsPerHourToAlarm(20);
-    expect(alarm.min).toBeLessThan(alarm.max);
-    expect(alarm.min).toBeGreaterThan(100);
   });
 
   it("reports every row and every estimate", () => {
-    const lines = report({ ceiling: { turnsPerDay: 1_500, validationsPerDay: 400, transcribeSecondsPerDay: 5_400 }, alarmUsdPerHour: 20, projectBudgetUsdPerMonth: 300 });
+    const lines = report({ ceiling: { turnsPerDay: 1_500, validationsPerDay: 400, transcribeSecondsPerDay: 5_400 } });
     for (const key of RATE_CARD_KEYS) expect(lines.some((text) => text.includes(key)), key).toBe(true);
-    expect(lines.join("\n")).toMatch(/proposed costBudgetUsdPerConversation \(for the CTO\): USD 2\.90/);
+    // P-07 (closed by the CTO on 2026-10-14): no threshold, no spend alarm, no project budget.
+    expect(lines.join("\n")).not.toMatch(/costBudgetUsdPerConversation|AgentSpendHourly|project budget/);
   });
 });

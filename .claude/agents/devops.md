@@ -45,7 +45,7 @@ Para la infraestructura de la landing, el alta y los leads aplica la skill `poc-
     un lote de tRPC esquiva) (≈ USD 20 por mes; sin CAPTCHA: las IP anónimas se etiquetan;
     Bot Control y Account Creation Fraud Prevention solo con un ADR nuevo); los comodines de AWS WAF en
     la CSP del bootstrap; métricas por regla, sin logs completos (guardarían IP). **Corte del alta**:
-    alarmas de los emails `kind = AUTH` y de ráfaga → `CostAlerts` → `CostGuard` → `KILL#SIGNUP`.
+    `KILL#SIGNUP` por el operador (`npm run ops:kill`); sin alarmas, `CostAlerts` ni `CostGuard` (P-07, 2026-10-14).
 11. **Leads** (ADR-0026): tabla `Leads` separada de la demo (nunca en la capacidad `WORLDS`), stream
     con filtros hacia `LeadStream` y su DLQ con alarma, `GuestAccountDeletion` con nombre fijo y sin `ListUsers`; `Leads` con protección contra borrado y
     PITR apagado (excepción declarada a `remove`); el `Bff` sobre `Leads` solo con los atributos del

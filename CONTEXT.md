@@ -321,7 +321,7 @@ Hash de una forma reducida del email (sin etiqueta `+…` ni puntos de Gmail) co
 _Avoid_: email normalizado (suelto)
 
 **Corte del alta** (`KILL#SIGNUP`):
-Alcance del corte de emergencia (ADR-0019) que frena las altas nuevas y el envío de códigos cuando los emails de autenticación rebotan o reciben quejas, o ante una ráfaga de altas; lo enciende `CostGuard` y solo lo apaga el operador. Protege la reputación de SES de la cuenta compartida.
+Alcance del corte de emergencia (ADR-0019) que frena las altas nuevas y el envío de códigos cuando los emails de autenticación rebotan o reciben quejas, o ante una ráfaga de altas; lo enciende y lo apaga el operador (`npm run ops:kill`; sin alarmas desde P-07). Protege la reputación de SES de la cuenta compartida.
 _Avoid_: bloqueo, mantenimiento
 
 **Mundo de invitado** y **generación** (`isp-guest-s<yymmdd><5>`):

@@ -1,7 +1,8 @@
 // Observability is logs only (ADR-0028, docs/architecture.md §12): JSON logs kept 30 days in every group,
-// no dashboard, and an alarm only where it trips a cut (it publishes to `CostAlerts`, which `CostGuard`
-// turns into a kill switch). Anything that costs every month and that nobody reads fails here. The infra
-// modules are read as text: the scan needs no Pulumi program and no AWS account.
+// no dashboard, no alarm and no budget (an alarm bills every month even when it never fires; P-07, closed
+// by the CTO on 2026-10-14: no cost threshold, no agent spend alarm, no project budget). Anything that
+// costs every month and that nobody reads fails here. The infra modules are read as text: the scan needs
+// no Pulumi program and no AWS account.
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -36,48 +37,22 @@ function calls(text: string, constructor: RegExp): string[] {
   return [...text.matchAll(new RegExp(`new ${constructor.source}\\(`, "g"))].map((match) => balanced(text, (match.index ?? 0) + match[0].length - 1));
 }
 
-const ALARM = /(?:aws|awsnative)\.cloudwatch\.(?:MetricAlarm|CompositeAlarm|Alarm)/;
-const ALARM_ACTIONS = /alarmActions: \[([^\]]*)\]/;
-
-/** The `alarmActions` of an alarm: written in its arguments, or in an object spread into them (`...common`). */
-function alarmActions(text: string, args: string): string | undefined {
-  const inline = ALARM_ACTIONS.exec(args)?.[1];
-  if (inline !== undefined) return inline;
-  for (const [, name] of args.matchAll(/\.\.\.(\w+)\b/g)) {
-    const declaration = new RegExp(`const ${name ?? ""}\\b[^=]*= \\{`).exec(text);
-    if (declaration === null) continue;
-    const spread = ALARM_ACTIONS.exec(balanced(text, declaration.index + declaration[0].length - 1, "{", "}"))?.[1];
-    if (spread !== undefined) return spread;
-  }
-  return undefined;
-}
+/** Every resource that bills by the month whether or not it is used: alarms, dashboards and budgets. */
+const FIXED_COST = /\b(?:aws|awsnative)\.(?:cloudwatch\.(?:MetricAlarm|CompositeAlarm|Alarm|Dashboard)|budgets\.Budget)\b|\bsst\.aws\.Dashboard\b/;
 
 describe("logs only (ADR-0028, docs/architecture.md §12)", () => {
   it("scans every infra module", () => {
-    expect(SOURCES.map(({ file }) => file)).toEqual(expect.arrayContaining(["infra/agentcore.ts", "infra/cost-guard.ts", "infra/leads.ts", "infra/observability.ts", "sst.config.ts"]));
+    expect(SOURCES.map(({ file }) => file)).toEqual(expect.arrayContaining(["infra/agentcore.ts", "infra/leads.ts", "infra/observability.ts", "sst.config.ts"]));
   });
 
-  it("creates no dashboard", () => {
-    for (const { file, text } of SOURCES) expect(text, file).not.toMatch(/\b(?:aws|awsnative)\.cloudwatch\.Dashboard\b|sst\.aws\.Dashboard\b/);
+  it("creates no alarm, no dashboard and no budget", () => {
+    for (const { file, text } of SOURCES) expect(text, file).not.toMatch(FIXED_COST);
   });
 
-  it("creates an alarm only when it publishes to CostAlerts, which CostGuard turns into a cut", () => {
-    const alarms = SOURCES.flatMap(({ file, text }) => calls(text, ALARM).map((args) => ({ file, name: /^\("(\w+)"/.exec(args)?.[1] ?? "?", actions: alarmActions(text, args) })));
-    // The four alarms of the sign-up cut (ADR-0025 §4) exist since wave 2b: the scan is not empty.
-    expect(alarms.filter(({ file }) => file === "infra/cost-guard.ts").length).toBeGreaterThanOrEqual(4);
-    for (const { file, name, actions } of alarms) {
-      expect(actions, `${file} ${name} has no alarmActions`).toBeDefined();
-      expect(actions, `${file} ${name}`).toMatch(/^\s*costAlerts\.arn\s*$/);
+  it("finds an alarm, a dashboard or a budget wherever a module would create one", () => {
+    for (const text of ['new aws.cloudwatch.MetricAlarm("A", {});', 'new awsnative.cloudwatch.Alarm("B", {});', 'new aws.cloudwatch.Dashboard("C", {});', 'new aws.budgets.Budget("D", {});', 'new sst.aws.Dashboard("E");']) {
+      expect(text).toMatch(FIXED_COST);
     }
-    expect(read("infra/cost-guard.ts")).toMatch(/new sst\.aws\.SnsTopic\("CostAlerts"/);
-  });
-
-  it("finds an alarm with no action, inline or behind a spread", () => {
-    const text = 'const common = { evaluationPeriods: 1 };\nnew aws.cloudwatch.MetricAlarm("A", { ...common, threshold: 0 });\nnew aws.cloudwatch.MetricAlarm("B", { alarmActions: [costAlerts.arn] });';
-    const found = calls(text, ALARM).map((args) => alarmActions(text, args));
-    expect(found).toEqual([undefined, "costAlerts.arn"]);
-    const spread = 'const common = {\n  alarmActions: [costAlerts.arn],\n  evaluationPeriods: 1,\n};\nnew aws.cloudwatch.MetricAlarm("C", { ...common });';
-    expect(calls(spread, ALARM).map((args) => alarmActions(spread, args))).toEqual(["costAlerts.arn"]);
   });
 
   it("keeps every log group 30 days: the functions by $transform, the live runtime group by the IaC", () => {

@@ -247,11 +247,6 @@ export const LAMBDA_CAPABILITIES = {
     buckets: { Evidence: "read", Media: "write", Manual: "read" },
     grants: [g(["s3:GetObject"], ["{Seed}/brand/*"]), WORLD_EVIDENCE_PHOTOS, sqsSend(), g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{GuestWorlds}", "{GuestAccountDeletion}"]), BFF_LEADS_GRANT],
   },
-  CostGuard: {
-    capabilities: [],
-    tables: { AuditLog: "write" },
-    grants: [g(["dynamodb:PutItem"], ["{Runtime}"], [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["KILL#*"] }])],
-  },
   // The historical certificates of the guest worlds it resets at night and of every world the Bff reloads
   // (`RENDER_CERTIFICATES`: guest and demo).
   WorldJanitor: { capabilities: ["WORLDS", "WORLD_DATA"], grants: [WORLD_CERTIFICATES] },

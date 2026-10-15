@@ -123,12 +123,12 @@ describe("DynamoDB runtime store: cap counters", () => {
 describe("DynamoDB runtime store: kill switch", () => {
   beforeEach(() => docMock.reset());
 
-  it("writes the whole switch with PutItem, the only write CostGuard's role has", async () => {
+  it("writes the whole switch with PutItem", async () => {
     docMock.on(PutCommand).resolves({});
-    await store().write("KILL#ALL", { scope: "ALL", state: "on", setBy: "COST_GUARD", setAtReal: NOW_ISO }, undefined);
+    await store().write("KILL#ALL", { scope: "ALL", state: "on", setBy: "OPERATOR", setAtReal: NOW_ISO }, undefined);
     await store().write("KILL#AGENT#qa-812-1-sc-14", { scope: "AGENT", clockId: "qa-812-1-sc-14", state: "on", setBy: "QA", setAtReal: NOW_ISO }, 1_793_000_000);
     const [global, world] = docMock.commandCalls(PutCommand).map((call) => call.args[0].input);
-    expect(global).toEqual({ TableName: "poc-Runtime", Item: { PK: "KILL#ALL", SK: "META", entity: "KillSwitch", scope: "ALL", state: "on", setBy: "COST_GUARD", setAtReal: NOW_ISO, updatedAt: NOW_ISO } });
+    expect(global).toEqual({ TableName: "poc-Runtime", Item: { PK: "KILL#ALL", SK: "META", entity: "KillSwitch", scope: "ALL", state: "on", setBy: "OPERATOR", setAtReal: NOW_ISO, updatedAt: NOW_ISO } });
     expect(world?.Item).toMatchObject({ PK: "KILL#AGENT#qa-812-1-sc-14", expiresAt: 1_793_000_000 });
     expect(docMock.commandCalls(UpdateCommand)).toHaveLength(0);
   });

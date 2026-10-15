@@ -7,14 +7,8 @@
 //                     latency (real ms from the inbound message to the first outbound of the turn) and
 //                     the turn's cost by the verified rate card (`costUsd`, the metrics' cost per
 //                     conversation; absent while a model row is not verified)
-//   log fields        `TurnLatency`, `TurnErrors`, `TurnMaxTokens`, `FirstReplyLatency` (logs only, ADR-0028)
-//   AgentSpendUsd     the turn's OWN model tokens only (the Harness's input and output tokens priced by
-//                     the verified Bedrock rows of the rate card, WP-49; never photo validations,
-//                     Transcribe, AgentCore meters, email or WhatsApp), only in the demo and live worlds:
-//                     the alarm of the cost cut (ADR-0019) sums it per hour against the stage's hourly
-//                     budget, so a conversation adds what each turn spends, never its running total
-//                     again. Guest worlds (sign-up ones included) are capped by their own ceilings and
-//                     never log it; QA and evaluation worlds have a budget per run
+//   log fields        `TurnLatency`, `TurnErrors`, `TurnMaxTokens`, `FirstReplyLatency` (logs only, ADR-0028;
+//                     no spend alarm reads the turn's cost: P-07, closed by the CTO on 2026-10-14)
 //   answered          whether the installer got something from the turn: a message of the turn, or an
 //                     escalation or a safety report that answers by itself (`ALWAYS_ANSWER`)
 import { ConnectorError, ispKindOfClock } from "@cuadrilla/shared";
@@ -28,9 +22,6 @@ import { DEFAULT_MODEL_ID, conversationCost } from "../services/ratecard/ratecar
 import type { TurnRequest } from "./deps";
 
 export const TURN_LOG_METRICS = { latency: "TurnLatency", errors: "TurnErrors", maxTokens: "TurnMaxTokens", firstReply: "FirstReplyLatency" } as const;
-
-/** Read by the metric filter of the cost cut (infra/observability-spec.ts). */
-export const AGENT_SPEND_METRIC = "AgentSpendUsd";
 
 /** Fixed notes of the turns whose model text is not kept. */
 export const FIXED_NOTES = { guardrail: "GUARDRAIL_BLOCK", failed: "TURN_FAILED" } as const;
@@ -81,7 +72,6 @@ export async function recordTurnKpi(deps: TurnRecordDeps, request: TurnRequest, 
   const order = request.workOrderId === undefined ? {} : { workOrderId: request.workOrderId };
   const usd = await turnCostUsd(deps, usage, order);
   if (request.workOrderId !== undefined) await addTurnToKpi(deps, { ...request, workOrderId: request.workOrderId }, { usage, latencyMs, firstReplyLatencyMs, costUsd: usd });
-  if (usd !== undefined && agentSpendCounts(request.clockId)) deps.log.info("metric", { metric: AGENT_SPEND_METRIC, value: usd, ...order });
 }
 
 interface TurnKpiDelta {
@@ -125,9 +115,6 @@ export function tokensCostUsd(tokens: Pick<HarnessUsage, "inputTokens" | "output
   const cost = conversationCost(usage, rows, { whatsappSimulated: false });
   return cost.status === "VERIFIED" ? cost.usd : undefined;
 }
-
-/** The worlds whose spend the stage-wide cut sums: the demo and the live world, never a guest's, QA's or an evaluation's. */
-export const agentSpendCounts = (clockId: string): boolean => ispKindOfClock(clockId) === "DEMO";
 
 /** The turn's own cost by the verified rate card; a rate card that cannot be read or priced only leaves a warning, never fails the turn. */
 async function turnCostUsd(deps: TurnRecordDeps, usage: HarnessUsage, order: { readonly workOrderId?: string }): Promise<number | undefined> {

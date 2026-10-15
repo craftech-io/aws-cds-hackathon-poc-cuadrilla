@@ -1,8 +1,8 @@
 // The operator's kill switch (ADR-0019, ADR-0025 §4, docs/architecture.md §17 item 12): turns a
 // `Runtime/KILL#<scope>` on or off without a deploy, and audits it (`KILL_SWITCH_SET`, actor OPERATOR).
 // It runs with the operator's profile through `sst shell` (the links name `Runtime` and `AuditLog`),
-// never in CI and never by a guest. `CostGuard` may only turn a switch on; turning one off is always
-// this script.
+// never in CI and never by a guest. It is the only way to turn a global switch on or off: no alarm nor
+// budget turns one on (P-07, closed by the CTO on 2026-10-14).
 //
 //   ALL        the agent, the simulator, every console write and the sign-up
 //   SIMULATOR  the phone simulator
@@ -14,15 +14,14 @@
 //   npm run ops:kill -- --scope SIGNUP --off
 //   npm run ops:kill -- --status          (reads the four global switches; writes nothing)
 //
-// `CostGuard` turns AGENT on for the cost cut (the global ceiling of turns, the hourly agent spend,
-// the project budget at 100 %) and SIGNUP for the sign-up's cut; the operator reads why with --status
-// and turns it off here once the cause is understood.
+// The operator reads who turned a switch on and why with --status and turns it off here once the
+// cause is understood.
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ClockId, KillScope } from "@cuadrilla/shared";
-import { auditKillSwitch } from "../../packages/bff/src/handlers/cost-guard";
 import { createLogger } from "../../packages/bff/src/lib/log";
 import { createDynamoRuntimeStore } from "../../packages/bff/src/ops/dynamo-runtime-store";
+import { auditKillSwitch } from "../../packages/bff/src/ops/kill-audit";
 import { type KillSwitchAuditEvent, KillSwitchRecord, type KillSwitchStore, killSwitchKey, setKillSwitch } from "../../packages/bff/src/ops/kill-switch";
 import { parseFlags } from "../channels/cli-args";
 

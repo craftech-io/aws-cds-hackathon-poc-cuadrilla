@@ -62,18 +62,21 @@ describe("metrics with labels [FL-087]", () => {
     const tabs = [worldTab({ kpis: [kpi("wo-1"), kpi("wo-2")], provisionalRates: false }), latencyCostTab({ kpis: [kpi("wo-1")], provisionalRates: false, capUsage: [], killed: { agent: false, simulator: false, all: false } })];
     for (const tab of tabs) {
       expect(tab.kpis.find((item) => item.id === "costPerConversation")).toMatchObject({ value: null, n: 0, kind: "ASSUMED", note: { es: "sin costo registrado" } });
-      expect(tab.kpis.find((item) => item.id === "conversationsOverBudget")).toMatchObject({ value: null, kind: "ASSUMED", note: { es: "sin costo registrado" } });
+      expect(tab.kpis.find((item) => item.id === "conversationsOverBudget")).toBeUndefined();
     }
+    const withThreshold = worldTab({ kpis: [kpi("wo-1")], provisionalRates: false, budgetUsd: 2 });
+    expect(withThreshold.kpis.find((item) => item.id === "conversationsOverBudget")).toMatchObject({ value: null, kind: "ASSUMED", note: { es: "sin costo registrado" } });
   });
 
-  it("[W6R1 B1] the operator's threshold flags the priced conversations over it, and says so while it is not set", () => {
+  it("[W6R1 B1] a threshold, when a world sets one, flags the priced conversations over it; unset (P-07) the feature is off", () => {
     const priced = [kpi("wo-1", { costUsd: 3.4 }), kpi("wo-2", { costUsd: 1.2 }), kpi("wo-3")];
     const over = (budgetUsd?: number) => worldTab({ kpis: priced, provisionalRates: false, ...(budgetUsd === undefined ? {} : { budgetUsd }) }).kpis;
     expect(over(2.9).find((item) => item.id === "conversationsOverBudget")).toMatchObject({ value: 1, n: 2, kind: "MEASURED", target: "0" });
     expect(over(2.9).find((item) => item.id === "costPerConversation")).toMatchObject({ target: "≤ USD 2.90", n: 2 });
     expect(over(5).find((item) => item.id === "conversationsOverBudget")?.value).toBe(0);
-    expect(over().find((item) => item.id === "conversationsOverBudget")).toMatchObject({ value: null, note: { es: "sin umbral fijado" } });
-    expect(over().find((item) => item.id === "costPerConversation")?.target).toBe("≤ umbral del piloto");
+    expect(over().find((item) => item.id === "conversationsOverBudget")).toBeUndefined();
+    expect(over().find((item) => item.id === "costPerConversation")).not.toHaveProperty("target");
+    expect(JSON.stringify(over())).not.toMatch(/umbral/);
   });
 
   it("[FL-087] the tabs are called measurements: no internal run id and no word of ADR-0023 in what the console shows", () => {
