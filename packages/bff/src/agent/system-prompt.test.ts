@@ -75,6 +75,25 @@ describe("the system prompt (docs/design-brief.md §5.11)", () => {
     expect(SYSTEM_PROMPT.indexOf(line)).toBeLessThan(SYSTEM_PROMPT.indexOf("# How you speak"));
   });
 
+  it("never lets the agent guess the item of a photo it cannot see: it asks with CHOOSE_ITEM buttons (FL-046)", () => {
+    const evidence = between(SYSTEM_PROMPT, "# Evidence and closing", "\n# ");
+    expect(evidence).toContain("You never see a photo, so its item comes from the installer");
+    expect(evidence).toContain("the one item your last message asked for");
+    expect(evidence).toContain("never guess: ask which item with CHOOSE_ITEM buttons for the pending photo items");
+    expect(evidence).toContain("when they answer, validate that same candidateId with the item they chose");
+    expect(evidence.indexOf("never guess")).toBeLessThan(evidence.indexOf("call validate_install_photo"));
+  });
+
+  it("treats the rubric get_checklist brings as manual §EVI-01, searched and cited in the turn (FL-035)", () => {
+    const evidence = between(SYSTEM_PROMPT, "# Evidence and closing", "\n# ");
+    expect(evidence).toContain("(the rubricHint of get_checklist) is manual §EVI-01");
+    expect(evidence).toContain("search_procedures for the evidence photos in this turn and cite it");
+  });
+
+  it("names the one recipient send_whatsapp takes, which the Gateway requires and Cedar checks", () => {
+    expect(SYSTEM_PROMPT).toContain("send_whatsapp, to the installer of this session (recipientRole INSTALLER in every call)");
+  });
+
   it("names only real Gateway tools, real error codes and the real turn triggers, and no tool that decides", () => {
     const tools = new Set(catalogTools().map((tool) => tool.name));
     const named = new Set(SYSTEM_PROMPT.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? []);

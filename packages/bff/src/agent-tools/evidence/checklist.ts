@@ -17,6 +17,8 @@ import type { EvidenceToolRuntime } from "./runtime";
 import { getChecklistTool, updateChecklistTool } from "./schema";
 
 export const EVIDENCE_RULE = "LAM-EVIDENCE";
+/** The manual section the rubric hints come from: stating them is citing it (`CP-CITATION`). */
+export const RUBRIC_SECTION_ID: "EVI-01" = "EVI-01";
 export const CHECKLIST_UPDATED_ACTION = "CHECKLIST_UPDATED";
 
 const DONE: ReadonlySet<ChecklistItemStatus> = new Set<ChecklistItemStatus>(["PASSED", "OVERRIDDEN"]);
@@ -64,6 +66,7 @@ export const getChecklist = implementTool(getChecklistTool, async (_args, ctx: C
       ];
     }),
     complete: isChecklistComplete(entries),
+    ...(hints.size === 0 ? {} : { rubricSectionId: RUBRIC_SECTION_ID }),
   };
 });
 

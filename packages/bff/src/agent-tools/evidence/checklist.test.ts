@@ -34,7 +34,7 @@ describe("[FL-035] get_checklist: what is missing, with the rubric to ask for ea
   it("lists the five items in the order of §EVI-01 with status, attempts, last reason and the rubric hint", async () => {
     await kit.gateway("validate_install_photo", { candidateId: await kit.sendPhoto(setPhoto("ph-label-06").bytes), item: "ONU_LABEL_PHOTO" });
     const response = await kit.gateway("get_checklist", {});
-    expect(response).toMatchObject({ ok: true, complete: false });
+    expect(response).toMatchObject({ ok: true, complete: false, rubricSectionId: "EVI-01" });
     const items = response.items as Array<Record<string, unknown>>;
     expect(items.map((entry) => entry.item)).toEqual(["ONU_ONLINE", "POWER_READING_PHOTO", "ONU_LABEL_PHOTO", "ROSETTE_PHOTO", "CUSTOMER_OK"]);
     expect(items[2]).toEqual({ item: "ONU_LABEL_PHOTO", label: "La foto de la etiqueta de la ONU", status: "REJECTED", attempts: 1, lastRejectReason: "GLARE", rubricHint: "La etiqueta completa de la ONU; El serial completo, legible de principio a fin" });

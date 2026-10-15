@@ -7,6 +7,7 @@ import { candidateIdOf } from "../../evidence/candidate";
 import { isMetadataMarker, stripJpegMetadata } from "../../evidence/strip-metadata";
 import { gradient, setPhoto, writePng } from "../../evidence/testing";
 import { TURN_ID } from "../common/testing";
+import { validateInstallPhotoTool } from "./schema";
 import { type EvidenceKit, demoSettings, evidenceKit } from "./testing";
 
 let kit: EvidenceKit;
@@ -111,6 +112,12 @@ describe("LAM-CANDIDATE: only a photo the installer of the session sent on the o
     const asRosette = await kit.gateway("validate_install_photo", { candidateId, item: "ROSETTE_PHOTO" });
     expect(asRosette.ok).toBe(true);
     expect(await kit.memory.connector.workOrders.listValidations("wo-24817")).toHaveLength(2);
+  });
+
+  it("tells the model the item is the installer's to name, never a guess, and that an earlier photo is validated once they choose (FL-046)", () => {
+    expect(validateInstallPhotoTool.description).toContain("the <attachment/> of this turn, or the earlier photo whose item the installer just chose");
+    expect(validateInstallPhotoTool.args.shape.candidateId.description).toContain("or the earlier one whose item the installer just chose");
+    expect(validateInstallPhotoTool.args.shape.item.description).toBe("Checklist item the photo is for, as the installer named or chose it; never a guess");
   });
 });
 

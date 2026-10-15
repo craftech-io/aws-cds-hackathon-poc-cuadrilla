@@ -19,6 +19,7 @@ import { SYSTEM_PROMPT } from "../../../packages/bff/src/agent/system-prompt";
 import type { LocalGateway } from "../../flows/support/gateway";
 import { createFlowWorld, type FlowWorld } from "../../flows/support/world";
 import { LOCAL_HARNESS } from "../../flows/support/worker";
+import { withLocalRetries } from "./local-model";
 
 /**
  * What a local model may take for one turn before the product's Harness client gives up. The stage's 90 s
@@ -78,7 +79,7 @@ export function useAgentWorld(): { open(): Promise<AgentWorld> } {
       const flow = await createFlowWorld({
         harness: (gateway) => {
           agent = createLocalHarness({
-            model: env.model,
+            model: withLocalRetries(env.model),
             systemPrompt: SYSTEM_PROMPT,
             tools: AGENT_TOOLS,
             callTool: gatewayCaller(gateway),

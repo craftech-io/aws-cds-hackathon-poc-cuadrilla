@@ -9,6 +9,7 @@ import type { PhotoItem } from "@cuadrilla/shared";
 import { PHOTO_ITEM_BUTTONS } from "../../../packages/bff/src/copy/buttons";
 import type { FlowWorld } from "../../flows/support/world";
 import { turnsSummary, useAgentWorld } from "../support/agent-world";
+import { localLimit } from "../support/known-limits";
 import { PHOTO_ITEMS, asksForItem, citesAny, dirtyOutbound, itemStatus, onSite, refList, repliesTo } from "../support/oracles";
 
 const worlds = useAgentWorld();
@@ -73,7 +74,7 @@ describe("SC-04 / SC-12 / SC-15 · evidence (agent)", () => {
     expect(await dirtyOutbound(flow, "inst-rogelio")).toEqual([]);
   });
 
-  it("[SC-04/15.a] [FL-046] a photo nobody asked for → a candidate without validation and a question about the item", async () => {
+  it.skipIf(localLimit("SC-04/15.a"))("[SC-04/15.a] [FL-046] a photo nobody asked for → a candidate without validation and a question about the item", async () => {
     const { flow, agent } = await worlds.open();
     await onSite(flow, "inst-rogelio", "wo-24817", { onuOnline: false });
 

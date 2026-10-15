@@ -11,7 +11,7 @@ export const getChecklistTool = defineTool({
   target: "evidence",
   name: "get_checklist",
   description:
-    "Returns the closing checklist of the active work order: each item with its label, status, rejected attempts, last rejection reason and the rubric hint to ask for the photo well, and whether the checklist is complete.",
+    "Returns the closing checklist of the active work order: each item with its label, status, rejected attempts, last rejection reason and the rubric hint to ask for the photo well, and whether the checklist is complete. The rubric hints are manual text of the section rubricSectionId: stating them is citing that section, from a search_procedures of the same turn.",
   principals: ["HARNESS", "CONSOLE"],
   args: z.strictObject({}),
   output: z.strictObject({
@@ -26,6 +26,7 @@ export const getChecklistTool = defineTool({
       }),
     ),
     complete: z.boolean(),
+    rubricSectionId: z.literal("EVI-01").optional(),
   }),
 });
 
@@ -33,11 +34,11 @@ export const validateInstallPhotoTool = defineTool({
   target: "evidence",
   name: "validate_install_photo",
   description:
-    "Validates a photo the installer sent for a checklist item, in an isolated check you never see: verdict PASS, REJECT or UNSURE with an actionable reason text, the readings it found and the attempts so far. Use the candidateId of the <attachment/> of this turn. A third rejection of the same item opens a case by itself. UNSURE goes to human review: ask for another photo.",
+    "Validates a photo the installer sent for a checklist item, in an isolated check you never see: verdict PASS, REJECT or UNSURE with an actionable reason text, the readings it found and the attempts so far. Use the candidateId of the photo: the <attachment/> of this turn, or the earlier photo whose item the installer just chose. A third rejection of the same item opens a case by itself. UNSURE goes to human review: ask for another photo.",
   principals: ["HARNESS", "QA"],
   args: z.strictObject({
-    candidateId: z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/).describe("candidateId of the <attachment kind=\"IMAGE\"/> of this turn"),
-    item: PhotoItem.describe("Checklist item the photo is for"),
+    candidateId: z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/).describe("candidateId of the photo's <attachment kind=\"IMAGE\"/>: this turn's, or the earlier one whose item the installer just chose"),
+    item: PhotoItem.describe("Checklist item the photo is for, as the installer named or chose it; never a guess"),
   }),
   output: z.strictObject({
     validationId: ValidationId,
