@@ -44,7 +44,7 @@ import { type LocalQueue, localQueue } from "./queue";
 import { type Plan, type PlanSource, type ScriptedHarness, createScriptedHarness } from "./scripted-harness";
 import { type Stage, LOCAL_EMAIL_CONFIG, createStage } from "./stage";
 import { type Targets, createTargets } from "./targets";
-import { type LocalWorker, createLocalWorker } from "./worker";
+import { type LocalHarnessSeam, type LocalWorker, createLocalWorker } from "./worker";
 import { defaultAgent } from "./agent";
 
 /** Real instant of a fresh world: 07:00 of the demo day in Mexico City. */
@@ -63,6 +63,11 @@ const REFERENCE_FILE = join(import.meta.dirname, "../../../scripts/seed/data/Ref
 export interface FlowWorldOptions {
   /** The plans of every turn no test queued (`harness.next`); the default agent otherwise (agent.ts). */
   readonly agent?: PlanSource;
+  /**
+   * A Harness in place of the scripted one (tests/agent: the kit's model behind the same Gateway); the
+   * scripted Harness still exists, unused.
+   */
+  readonly harness?: (gateway: LocalGateway) => LocalHarnessSeam;
   /** Cedar with the kill switch statement (`CED-KILL-SWITCH`). */
   readonly cedarKillSwitch?: boolean;
   /** The stage has the live transport too (P-01 closed): an EUM Social stand-in records what it sends. */
@@ -172,7 +177,7 @@ export async function createFlowWorld(options: FlowWorldOptions = {}): Promise<F
   const targets = createTargets(stage, knowledge);
   const gateway = createLocalGateway(targets, { policies: localPolicies({ killSwitchActive: options.cedarKillSwitch ?? false }) });
   const harness = createScriptedHarness({ gateway, plans: options.agent ?? defaultAgent });
-  const worker = createLocalWorker(stage, targets, harness, transcribe);
+  const worker = createLocalWorker(stage, targets, options.harness?.(gateway) ?? { send: (input) => harness.send(input) }, transcribe);
   const base = memoryWorlds({ ...memory, now }, { queue: stage.sink, phoneHash: stage.hashPhone });
   const certificates = historicalCertificates({ connector: data, objects: { putPdf: async (key, bytes) => objects.put("Evidence", key, bytes, "application/pdf") }, photo: async (photoId) => photoBytes(photoId), brand: () => ({ mode: "neutral" }), logger: log });
   const worlds: WorldsDeps = {

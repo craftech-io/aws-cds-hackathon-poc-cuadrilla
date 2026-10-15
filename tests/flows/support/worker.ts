@@ -4,8 +4,8 @@
 // notices and the order choice through the pipeline, the timers and their handlers (`fire_day_start`,
 // `advance_ladder(TIMEOUT)`, deferred sends, `CERT_RETRY`), the dispatcher's and SES's events, the
 // installer's buttons, and the turn through the product's Harness client (answered by the scripted
-// Harness) and G1 over the guardrail fake. The reads the worker preloads run on the in-process targets.
-import { createHarnessClient } from "../../../packages/bff/src/agent/harness-client";
+// Harness, or by the model-backed one tests/agent inject) and G1 over the guardrail fake. The reads the worker preloads run on the in-process targets.
+import { type HarnessLink, type HarnessSend, createHarnessClient } from "../../../packages/bff/src/agent/harness-client";
 import { onCaseTimeout } from "../../../packages/bff/src/cases/events";
 import { openCase } from "../../../packages/bff/src/cases/open";
 import { fixedSummary } from "../../../packages/bff/src/cases/summary";
@@ -23,12 +23,12 @@ import { pipelineDayStartSender, pipelineOrderChoice, pipelineWorkerNotices, sen
 import { fireDeferredSend } from "../../../packages/bff/src/outbound/pipeline";
 import { customerOkAction } from "../../../packages/bff/src/services/evidence-override/customer-ok";
 import { createG1Prefilter } from "../../../packages/bff/src/turns/prefilter";
+import type { AgentMode } from "../../../packages/bff/src/domain/metrics";
 import type { EmailEventEvent } from "../../../packages/bff/src/worker/events";
 import type { EventHandlers, WorkerContext, WorkerPorts } from "../../../packages/bff/src/worker/ports";
 import { type InstallerWorker, type WorkerDeps, createInstallerWorker } from "../../../packages/bff/src/worker/worker";
 import type { FakeTranscribe } from "../../../packages/bff/src/media/testing";
 import { LOCAL_G1, LOCAL_TRANSCRIBE_CONFIG } from "./aws";
-import type { ScriptedHarness } from "./scripted-harness";
 import { LOCAL_BUCKETS } from "./objects";
 import type { Stage } from "./stage";
 import type { Targets } from "./targets";
@@ -108,17 +108,25 @@ export interface LocalWorker {
   readonly run: InstallerWorker;
 }
 
-export function createLocalWorker(stage: Stage, targets: Targets, harness: ScriptedHarness, transcribe: FakeTranscribe): LocalWorker {
+/** The Harness behind the worker: the scripted one by default; a model-backed one (tests/agent) with its link and mode. */
+export interface LocalHarnessSeam {
+  readonly send: HarnessSend;
+  readonly link?: HarnessLink;
+  readonly agentMode?: AgentMode;
+}
+
+export function createLocalWorker(stage: Stage, targets: Targets, harness: LocalHarnessSeam, transcribe: FakeTranscribe): LocalWorker {
   const data = stage.memory.connector;
+  const link = harness.link ?? LOCAL_HARNESS;
   const deps: WorkerDeps = {
     data,
     turn: {
-      harness: createHarnessClient({ link: () => LOCAL_HARNESS, send: (input) => harness.send(input), nowMs: () => stage.now().getTime(), sleep: async () => undefined }),
+      harness: createHarnessClient({ link: () => link, send: harness.send, nowMs: () => stage.now().getTime(), sleep: async () => undefined }),
       prefilter: createG1Prefilter({ link: () => LOCAL_G1, send: (input) => stage.guardrails.send({ input }) }),
       budget: { kill: stage.kill, costCaps: stage.costs },
       sessionKey: () => stage.key("session"),
       runtimeSessionKey: () => stage.key("runtime-session"),
-      agentMode: "SCRIPTED",
+      agentMode: harness.agentMode ?? "SCRIPTED",
       reads: { orders: targets.orders, evidence: targets.evidence },
     },
     ports: workerPorts(stage, targets, transcribe),

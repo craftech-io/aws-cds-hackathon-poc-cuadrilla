@@ -1,0 +1,11 @@
+{
+  "name": "aws-cds-hackathon-poc-cuadrilla",
+  "defaultSuite": "smoke",
+  "suites": {
+    "smoke": { "command": "npx vitest run --config tests/agent/vitest.config.ts tests/agent/smoke.agent.test.ts", "description": "Short installer turns: a greeting (ALWAYS_ANSWER), a voice note, an arrival and an ONU question." },
+    "scenarios": { "command": "npx vitest run --config tests/agent/vitest.config.ts tests/agent/scenarios", "description": "The agent steps of SC-01..SC-16 on the local world." },
+    "eval": { "command": "npx vitest run --config tests/agent/vitest.config.ts tests/agent/eval", "description": "EV-01: the 50 questions of the manual, scored by the measurement's own scorer." },
+    "all": { "command": "npx vitest run --config tests/agent/vitest.config.ts", "description": "Every agent scenario of tests/agent." }
+  },
+  "outDir": "test-results/agent-test"
+}
