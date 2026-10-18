@@ -16,12 +16,14 @@ const SECTIONS = [
 
 let kit: ToolTestKit;
 let answer: RetrieveOutcome;
+/** Answers of the next calls, in order, before `answer`. */
+let queued: RetrieveOutcome[];
 let asked: RetrieveRequest[];
 
 const fakeKnowledge: KnowledgeClient = {
   retrieve: async (request) => {
     asked.push(request);
-    return answer;
+    return queued.shift() ?? answer;
   },
 };
 
@@ -47,6 +49,7 @@ async function loadManual(version = "v001", threshold?: { version: string; value
 beforeEach(async () => {
   kit = toolTestKit();
   asked = [];
+  queued = [];
   answer = found();
   await seedDay(kit);
   await loadManual("v001", { version: "v001", value: 0.35 });
@@ -88,6 +91,27 @@ describe("[FL-028] a policy question answered from the manual, with its section"
     answer = found(chunk("MED-01", 0.66));
     expect(await search({ query: "potencia mínima para cerrar", category: "MED" })).toMatchObject({ ok: true, coverage: "FOUND", passages: [{ sectionId: "MED-01" }] });
     expect(asked[0]?.category).toBe("MED");
+  });
+
+  it("[FL-028] a wrong category never hides a covered topic: nothing worth citing in it → once more over the whole manual", async () => {
+    queued = [found(chunk("DIAG-02", 0.2))];
+    answer = found(chunk("COM-04", 0.66));
+    expect(await search({ query: "¿qué equipos le dejo al cliente?", category: "DIAG" })).toMatchObject({ ok: true, coverage: "FOUND", passages: [{ sectionId: "COM-04" }] });
+    expect(asked.map((request) => request.category)).toEqual(["DIAG", undefined]);
+  });
+
+  it("[FL-030] a topic the whole manual does not cover stays NONE after the second search, and a search without category runs once", async () => {
+    expect(await search({ query: "¿le dejo la contraseña de administrador?", category: "INS" })).toMatchObject({ ok: true, coverage: "NONE", passages: [] });
+    expect(asked.map((request) => request.category)).toEqual(["INS", undefined]);
+    asked = [];
+    expect(await search({ query: "¿le dejo la contraseña de administrador?" })).toMatchObject({ ok: true, coverage: "NONE" });
+    expect(asked).toHaveLength(1);
+  });
+
+  it("[FL-034] a category search that cannot be read is UNAVAILABLE at once, never asked again without the category", async () => {
+    answer = { kind: "UNAVAILABLE", reason: "SERVICE_ERROR", attempts: 3 };
+    expect(await search({ query: "roseta", category: "COM" })).toMatchObject({ ok: true, coverage: "UNAVAILABLE" });
+    expect(asked).toHaveLength(1);
   });
 
   it("[FL-028] uses the manual and the threshold in force: the newest versions in Reference", async () => {

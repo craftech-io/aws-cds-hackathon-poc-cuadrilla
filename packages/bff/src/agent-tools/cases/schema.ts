@@ -11,7 +11,7 @@ export const recordTroubleshootingStepTool = defineTool({
   target: "cases",
   name: "record_troubleshooting_step",
   description:
-    "Records a troubleshooting step you indicated from the manual and its outcome for the active order. The third NO_CHANGE or WORSE of the same symptom opens a DIAGNOSIS_ATTEMPTS case by itself. stepRef must be a section returned by search_procedures in this session.",
+    "Records a troubleshooting step you indicate from the manual for the active order: PENDING in the turn you indicate it, then its outcome with the same symptom and stepRef when the installer reports it. The third NO_CHANGE or WORSE of the same symptom opens a DIAGNOSIS_ATTEMPTS case by itself. stepRef must be a section returned by search_procedures in this session.",
   principals: ["HARNESS"],
   args: z.strictObject({
     symptom: Symptom.describe("Symptom the step addresses"),
@@ -25,7 +25,7 @@ export const escalateCaseTool = defineTool({
   target: "cases",
   name: "escalate_case",
   description:
-    "Opens a case for a supervisor on the active order (one per order and reason: a second call returns the existing one). Use OUT_OF_MANUAL when the manual does not cover it and the installer accepts escalating, INSTALLER_ASKED when the installer asks for a person. The summary states facts of the order only, no personal data. A person takes, declines and closes cases; never you.",
+    "Opens a case for a supervisor on the active order (one per order and reason: a second call returns the existing one). Use OUT_OF_MANUAL when the manual does not cover it and the installer accepts escalating, INSTALLER_ASKED when the installer asks for a person. Never for troubleshooting steps that failed, even when the manual says to escalate after them: record each outcome with record_troubleshooting_step, which opens that case by itself. The summary states facts of the order only, no personal data. A person takes, declines and closes cases; never you.",
   principals: ["HARNESS"],
   args: z.strictObject({
     reason: z.enum(["OUT_OF_MANUAL", "INSTALLER_ASKED", "OTHER"]).describe("Why the case opens"),

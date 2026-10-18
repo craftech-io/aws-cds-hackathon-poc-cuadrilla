@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ErrorCode, TurnTrigger } from "@cuadrilla/shared";
 import { between, readDoc } from "@cuadrilla/shared/testing";
+import { buildGatewayPayloads } from "../agent-tools/common/build-schemas";
 import { catalogTools } from "../agent-tools/common/catalog";
 import { DEFAULT_OPERATOR_NAME } from "../copy/brand";
 import * as promptModule from "./system-prompt";
@@ -102,5 +103,55 @@ describe("the system prompt (docs/design-brief.md §5.11)", () => {
     for (const code of SYSTEM_PROMPT.match(/\b(?:GROUNDING_FAIL|BRIDGE_ACTIVE|TEMPLATE_REQUIRED|NOT_COMPLETE)\b/g) ?? []) expect(ErrorCode.options).toContain(code);
     for (const trigger of TurnTrigger.options) expect(SYSTEM_PROMPT).toContain(trigger);
     expect(SYSTEM_PROMPT).not.toMatch(/take_case|close_case|decline_case|override_evidence/);
+  });
+
+  it("records a step PENDING in the turn it is indicated, after reading the ONU, so the orchestrator learns the installer acted (FL-020, FL-022)", () => {
+    const diagnosis = between(SYSTEM_PROMPT, "# Work orders and diagnosis", "\n# ");
+    expect(diagnosis).toContain("For a symptom of the ONU or its signal, call get_onu_status before guiding, then the manual");
+    expect(diagnosis).toContain("record_troubleshooting_step: PENDING in the turn you indicate it");
+    expect(diagnosis).toContain("its outcome with the same symptom and stepRef");
+    expect(diagnosis).not.toMatch(/once the installer tells you the outcome/);
+  });
+
+  it("lets the fixed safety instruction answer the turn, with nothing of the model's after it (ADR-0016, FL-069)", () => {
+    const safety = between(SYSTEM_PROMPT, "# Safety first", "\n# ");
+    expect(safety).toContain("That instruction is your answer of the turn: send nothing else in it (send_whatsapp answers ON_HOLD_SAFETY)");
+  });
+
+  it("answers what the manual covers without an escalation offer, and cites §COM-05 for a failed visit (FL-052, EV-01)", () => {
+    const escalation = SYSTEM_PROMPT.slice(SYSTEM_PROMPT.indexOf("# Escalation"));
+    expect(escalation).toContain("When the manual answers, give the cited answer without an escalation button");
+    expect(escalation).toContain("offer CONSULT_SUPERVISOR only when the manual does not cover it or the step you cite says to escalate now");
+    const closing = between(SYSTEM_PROMPT, "# Evidence and closing", "\n# ");
+    expect(closing).toContain("A failed visit (nobody at home) follows §COM-05: search_procedures for it in the turn you propose or record it, and cite it");
+  });
+
+  it("records every failed step and never escalates failed steps itself: the third failure opens DIAGNOSIS_ATTEMPTS by code (FL-021, FL-023)", () => {
+    const diagnosis = between(SYSTEM_PROMPT, "# Work orders and diagnosis", "\n# ");
+    expect(diagnosis).toContain("Every report that a step did not help is one NO_CHANGE (WORSE if it got worse), one per installer message");
+    expect(diagnosis).toContain("Never call escalate_case for failed steps, even when the manual says to escalate after them: the third failure opens the case by itself");
+    const escalate = catalogTools().find((tool) => tool.name === "escalate_case");
+    expect(escalate?.description).toContain("Never for troubleshooting steps that failed");
+  });
+
+  it("checks a reading of the installer's meter by §MED-01 and never passes ONU_ONLINE over it (EV-01 q-A-03)", () => {
+    const diagnosis = between(SYSTEM_PROMPT, "# Work orders and diagnosis", "\n# ");
+    expect(diagnosis).toContain("A reading from the installer's own meter is checked against the manual: search_procedures for the power ranges and cite it");
+    expect(diagnosis).toContain("never mark ONU_ONLINE or propose closing, whatever get_onu_status says");
+  });
+
+  it("asks search_procedures in plain words, never in tool or symptom codes the manual does not use", () => {
+    const search = buildGatewayPayloads().knowledge.inlinePayload.find((tool) => tool.name === "search_procedures");
+    expect(JSON.stringify(search?.inputSchema)).toContain("never tool, symptom or item codes such as LOW_POWER");
+  });
+
+  it("asks for every pending photo item in one message once ONU_ONLINE passes (FL-020)", () => {
+    const evidence = between(SYSTEM_PROMPT, "# Evidence and closing", "\n# ");
+    expect(evidence).toContain("Once ONU_ONLINE passes, one message lists every pending photo item.");
+  });
+
+  it("cites only a passage that answers: a glossary entry sharing the question's words is no answer (EV-01 q-R-09)", () => {
+    const manual = between(SYSTEM_PROMPT, "# Manual, facts and limits", "\n# ");
+    expect(manual).toContain("Cite only a passage that answers the question; one that just shares its words (a glossary entry) is no answer.");
   });
 });

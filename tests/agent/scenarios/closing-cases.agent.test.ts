@@ -72,16 +72,19 @@ describe("SC-05..SC-12 · closing, cases, safety, policy and injection (agent)",
   it("[SC-07/6] [FL-063] \"Cerrar caso\" → the CASE_CLOSED turn, which never asks again for an item already PASSED", async () => {
     const { flow, agent } = await worlds.open();
     await onOrder(flow, "inst-rogelio", "wo-24818", "11:40");
-    await flow.preset("wo-24818", { case: { reason: "DIAGNOSIS_ATTEMPTS", rung: "PRIMARY", status: "OPEN" }, onu: { behaviour: "LOW_POWER_THEN_OK" } });
+    await flow.preset("wo-24818", { case: { reason: "DIAGNOSIS_ATTEMPTS", rung: "PRIMARY", status: "OPEN" }, onu: { behaviour: "LOW_POWER_THEN_OK" }, checklist: { ONU_LABEL_PHOTO: DONE } });
     await flow.tap("sup-adriana", "TAKE_CASE");
     await flow.text("sup-adriana", "Ya corregí la potencia desde la central.");
+    // The items PASSED before the case closes are the ones the turn must not ask for again; an item the turn
+    // itself passes (ONU_ONLINE after its own reading) and then names as done is no repeated ask.
+    const passed = new Set((await flow.data.workOrders.listChecklist("wo-24818")).filter((entry) => entry.status === "PASSED").map((entry) => entry.item as string));
 
     await flow.tap("sup-adriana", "CLOSE_CASE");
 
     expect((await flow.data.cases.listCasesOfWorkOrder("wo-24818"))[0]?.status).toBe("CLOSED");
     const turn = (await flow.data.conversations.listTurnNotes("inst-rogelio", 50)).find((note) => note.trigger === "CASE_CLOSED");
     expect(turn, turnsSummary(agent.turns)).toBeDefined();
-    const passed = new Set((await flow.data.workOrders.listChecklist("wo-24818")).filter((entry) => entry.status === "PASSED").map((entry) => entry.item as string));
+    expect([...passed], "the preset's PASSED item").toContain("ONU_LABEL_PHOTO");
     const asked = (await flow.thread("inst-rogelio")).filter((message) => message.direction === "OUT" && message.turnId === turn?.turnId).flatMap((message) => refList(message, "items"));
     expect(asked.filter((item) => passed.has(item)), "asks again for an item already PASSED").toEqual([]);
     expect(await dirtyOutbound(flow, "inst-rogelio")).toEqual([]);
@@ -97,6 +100,9 @@ describe("SC-05..SC-12 · closing, cases, safety, policy and injection (agent)",
     expect(instructions, turnsSummary(agent.turns)).toHaveLength(1);
     expect(normalizeFacts(instructions[0]?.text ?? "")).toBe(normalizeFacts(esMX.safetyInstruction));
     expect(instructions[0]?.author).not.toBe("AGENT");
+    const thread = await flow.thread("inst-rogelio");
+    const after = thread.slice(thread.findIndex((message) => message.messageId === instructions[0]?.messageId) + 1);
+    expect(after.filter((message) => message.direction === "OUT" && message.author === "AGENT").map((message) => message.text), "the model adds safety advice of its own after the fixed instruction (ADR-0016)").toEqual([]);
     expect((await flow.data.cases.listCasesOfWorkOrder("wo-24819")).map((entry) => entry.reason)).toContain("SAFETY");
     expect((await flow.data.workOrders.requireWorkOrder("wo-24819")).onHoldSafety).toBe(true);
     expect((await flow.decisions()).filter((decision) => decision.action === "SAFETY_DETECTED").map((decision) => decision.detail?.detectedBy)).toHaveLength(1);

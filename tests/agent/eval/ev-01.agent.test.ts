@@ -1,6 +1,8 @@
 // EV-01 on the run's model: the 50 questions of the manual (scripts/seed/data/eval/questions.json, the set
-// `seed:load` writes as `REF#EVAL#QUESTIONS`), each asked in a fresh local world by Rogelio on 24817 (one
-// installer, one active order, no shared session: the isolation of `eval.runQuestions`). What the question
+// `seed:load` writes as `REF#EVAL#QUESTIONS`), each asked in a fresh local world on the order the committed
+// `eval` template names as its model (scripts/seed/data/worlds/eval.json, what `eval.runQuestions` copies for
+// each question), made active for its installer at the template's start: one installer, one active order, no
+// shared session, and the same order, ONU and plan the deployed measurement asks on. What the question
 // left is read and scored by the measurement's own code (evaluation/observe.ts `readQuestion`,
 // `escalationOffer`, evaluation/score.ts `scoreQuestion`), and the offer to escalate is tapped as the runner
 // does. Gates (packages/bff/src/metrics/eval-score.ts): an `R` question passes or the case fails; an `A`
@@ -18,12 +20,21 @@ import { type QuestionReading, escalationOffer, readQuestion } from "../../../pa
 import { type QuestionSpec, questionSpecOf } from "../../../packages/bff/src/evaluation/outcomes";
 import { scoreQuestion } from "../../../packages/bff/src/evaluation/score";
 import { QUESTION_TARGETS } from "../../../packages/bff/src/metrics/eval-score";
+import { committedEvalTemplate } from "../../../scripts/evaluation/lib/run";
 import { turnsSummary, useAgentWorld } from "../support/agent-world";
 import { onOrder } from "../support/oracles";
 
 const QUESTIONS: readonly QuestionSpec[] = (JSON.parse(readFileSync(join(import.meta.dirname, "../../../scripts/seed/data/eval/questions.json"), "utf8")) as { questions: unknown[] }).questions.map((row) => questionSpecOf(row as Record<string, unknown>));
-const INSTALLER = "inst-rogelio";
-const ORDER = "wo-24817";
+const TEMPLATE = committedEvalTemplate();
+/** The measurement world's start (`HH:MM` of the demo day): the simulated time every question is asked at. */
+const START = TEMPLATE.startAtSim.slice(11, 16);
+
+/** The model order of a question in the committed template: the order its own installer has active. */
+function modelOf(questionId: string): string {
+  const model = TEMPLATE.questions.find((entry) => entry.questionId === questionId)?.model;
+  if (model === undefined) throw new Error(`${questionId} has no model order in the eval template`);
+  return model;
+}
 
 interface Scored {
   readonly questionId: string;
@@ -48,20 +59,22 @@ afterAll(() => {
 describe("EV-01 · the manual's measurement (agent)", () => {
   it.each(QUESTIONS.map((question) => [question.questionId, question.type, question] as const))("[EV-01] %s (%s)", async (_id, _type, question) => {
     const { flow, agent } = await worlds.open();
-    await onOrder(flow, INSTALLER, ORDER, "09:40");
+    const order = modelOf(question.questionId);
+    const installerId = (await flow.data.workOrders.requireWorkOrder(order)).installerId;
+    await onOrder(flow, installerId, order, START);
     // Real time past the seed's rows, so the window holds only what this question leaves.
     flow.advanceReal(60_000);
     const sinceReal = new Date(flow.realNow().getTime() - 1_000).toISOString();
 
-    const sent = await flow.text(INSTALLER, question.text);
+    const sent = await flow.text(installerId, question.text);
 
-    const window = { installerId: INSTALLER, workOrderId: ORDER, sinceReal, inboundMessageId: sent.wamid };
+    const window = { installerId, workOrderId: order, sinceReal, inboundMessageId: sent.wamid };
     let reading: QuestionReading = await readQuestion(flow.data, window);
     const tapped = escalationOffer(reading.observation) !== undefined;
     if (tapped) {
       flow.advanceReal(1_000);
       const tapAtReal = flow.realNow().toISOString();
-      await flow.tap(INSTALLER, "CONSULT_SUPERVISOR");
+      await flow.tap(installerId, "CONSULT_SUPERVISOR");
       reading = await readQuestion(flow.data, { ...window, tapAtReal });
     }
     const score = scoreQuestion(question, reading.observation);

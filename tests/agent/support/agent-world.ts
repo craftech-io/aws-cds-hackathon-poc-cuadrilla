@@ -9,6 +9,8 @@
 // Harness and has no local stand-in: the kit's Harness applies no guardrail (its stop reasons are covered
 // by the unit tests of agent/harness-client.ts and worker/guardrail-block.ts). The folder is outside
 // `npm test` and the root tsconfig: CI never sees it.
+import { appendFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import type { InvokeHarnessStreamOutput } from "@aws-sdk/client-bedrock-agentcore";
 import { type CallTool, type LocalHarness, type LocalTurn, type ToolSpec, createLocalHarness, fromEnv } from "@craftech/agent-testkit";
 import { afterEach, expect } from "vitest";
@@ -64,12 +66,32 @@ export interface AgentWorld {
   readonly agent: LocalHarness;
 }
 
-/** Registers the `afterEach` that forgets the world; `open` builds one with the run's model. */
+/** Levels of the world's log lines a run keeps next to its turns: what explains a turn that left no record. */
+const KEPT_LEVELS = new Set(["warn", "error"]);
+
+/**
+ * Appends the world's warnings and errors to `<AGENT_TEST_OUT>/world-logs-<pid>.jsonl`, each with the case
+ * that produced it: a turn whose model call failed leaves no turn record, only these lines (the stage's
+ * logs are masked, so nothing personal lands in the file).
+ */
+function keepWorldLogs(flow: FlowWorld, label: string | undefined): void {
+  const out = process.env.AGENT_TEST_OUT;
+  if (out === undefined) return;
+  const lines = flow.logs.filter((line) => KEPT_LEVELS.has(String(line.level)));
+  if (lines.length === 0) return;
+  mkdirSync(out, { recursive: true });
+  appendFileSync(join(out, `world-logs-${process.pid}.jsonl`), lines.map((line) => JSON.stringify({ label, ...line })).join("\n") + "\n");
+}
+
+/** Registers the `afterEach` that keeps the world's warnings and forgets the world; `open` builds one with the run's model. */
 export function useAgentWorld(): { open(): Promise<AgentWorld> } {
   let current: LocalHarness | undefined;
+  let world: FlowWorld | undefined;
   afterEach(() => {
+    if (world !== undefined) keepWorldLogs(world, expect.getState().currentTestName);
     current?.reset();
     current = undefined;
+    world = undefined;
   });
   return {
     async open() {
@@ -101,6 +123,7 @@ export function useAgentWorld(): { open(): Promise<AgentWorld> } {
       });
       if (agent === undefined) throw new Error("the world did not build its Harness");
       current = agent;
+      world = flow;
       return { flow, agent };
     },
   };

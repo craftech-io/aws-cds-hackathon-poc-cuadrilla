@@ -3,6 +3,9 @@
 // the agent states is cited from this call of the same turn (`CP-CITATION`). Rules:
 //
 //   - `Retrieve` with 5 results, filtered by the manual version in force (and the category, if asked);
+//   - the category is the model's guess, never a fence: a narrowed search that leaves nothing worth
+//     citing is asked once more over the whole manual, so a wrong guess never turns a covered topic into
+//     `coverage: NONE`;
 //   - a passage whose section is not in the index of that version is dropped (never cite a ghost);
 //   - a passage under the score threshold in force (`Reference/KBTHRESHOLD#<version>`) is dropped, and
 //     with none left the answer is `coverage: NONE`: the manual does not cover it, nothing is invented;
@@ -11,7 +14,7 @@
 //
 // The output is stored for the turn (`RESULT#search_procedures`): G2's grounding source and the
 // sections `CP-CITATION` accepts.
-import { ok } from "@cuadrilla/shared";
+import { type ManualCategory, ok } from "@cuadrilla/shared";
 import type { KnowledgeCatalog, KnowledgeCatalogSnapshot } from "../../knowledge/catalog";
 import { manualLabel } from "../../knowledge/catalog";
 import type { KnowledgeClient, RetrievedChunk } from "../../knowledge/client";
@@ -57,7 +60,9 @@ export const searchProcedures: ToolImplementation<KnowledgeRuntime> = implementT
     return ok({ coverage: "UNAVAILABLE", passages: [], citationFormat: citationFormat() });
   }
   const answer = { manualVersion: catalog.manualVersion, citationFormat: citationFormat(catalog.manualVersion) };
-  const outcome = await ctx.deps.knowledge.retrieve({ clockId: ctx.scope.clockId, query: args.query, manualVersion: catalog.manualVersion, ...(args.category === undefined ? {} : { category: args.category }), logger: ctx.logger });
+  const retrieve = (category?: ManualCategory) => ctx.deps.knowledge.retrieve({ clockId: ctx.scope.clockId, query: args.query, manualVersion: catalog.manualVersion, ...(category === undefined ? {} : { category }), logger: ctx.logger });
+  let outcome = await retrieve(args.category);
+  if (outcome.kind === "OK" && args.category !== undefined && passagesOf(outcome.chunks, catalog).length === 0) outcome = await retrieve();
   if (outcome.kind === "UNAVAILABLE") return ok({ coverage: "UNAVAILABLE", passages: [], ...answer });
   const passages = passagesOf(outcome.chunks, catalog);
   // Scores only (never the query): the distribution `EV-01` recalibrates the threshold with.

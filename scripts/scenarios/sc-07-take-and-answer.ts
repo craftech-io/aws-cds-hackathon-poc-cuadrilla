@@ -23,7 +23,7 @@ export default defineScenario({
       startAtSim: at(DAY, "11:40"),
       settings: { demoMode: false },
       operations: [
-        { key: "k", model: "wo-24818", installer: "own", preset: { activeWorkOrderId: true, lastInboundAtSim: recent, onu: { behaviour: "LOW_POWER_THEN_OK" }, case: { reason: "DIAGNOSIS_ATTEMPTS", rung: "PRIMARY", status: "OPEN" } } },
+        { key: "k", model: "wo-24818", installer: "own", preset: { activeWorkOrderId: true, lastInboundAtSim: recent, onu: { behaviour: "LOW_POWER_THEN_OK" }, checklist: { ONU_LABEL_PHOTO: { status: "PASSED" } }, case: { reason: "DIAGNOSIS_ATTEMPTS", rung: "PRIMARY", status: "OPEN" } } },
         { key: "k2", model: "wo-24819", installer: "own", preset: { activeWorkOrderId: true, lastInboundAtSim: recent, case: { reason: "INSTALLER_ASKED", rung: "PRIMARY", status: "TAKEN" } } },
       ],
     });
@@ -139,12 +139,15 @@ export default defineScenario({
         const w = world(ctx);
         const k = op(w, "k");
         const caseId = stored<string>(ctx, "caseId");
+        // The items PASSED before the case closes: an item the turn itself passes and names as done is no repeated ask.
+        const before = await caseSnapshot(ctx, w, "k", caseId, [k.installerId]);
+        const passed = new Set(before.orders[0]?.checklist.filter((entry) => entry.status === "PASSED").map((entry) => entry.item) ?? []);
         await tap(ctx, w, staff(w, CREW_N3.primary), "CLOSE_CASE", { objectId: caseId });
         const snapshot = await caseSnapshot(ctx, w, "k", caseId, [k.installerId]);
         ctx.check(caseIn(snapshot, caseId).status === "CLOSED", "the case is not CLOSED");
         const turn = personIn(snapshot, k.installerId).turnNotes.find((note) => note.trigger === "CASE_CLOSED");
         ensure(turn !== undefined, "no CASE_CLOSED turn");
-        const passed = new Set(snapshot.orders[0]?.checklist.filter((entry) => entry.status === "PASSED").map((entry) => entry.item) ?? []);
+        ctx.check(passed.has("ONU_LABEL_PHOTO"), "the preset's PASSED item is not PASSED before the case closes");
         const asked = outOf(personIn(snapshot, k.installerId).messages).filter((message) => message.turnId === turn.turnId).flatMap((message) => (Array.isArray(message.refs?.items) ? (message.refs.items as string[]) : []));
         ctx.check(asked.every((item) => !passed.has(item as never)), "the agent asks again for an item already PASSED");
       },

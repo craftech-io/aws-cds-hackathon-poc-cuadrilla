@@ -177,7 +177,7 @@ Convenciones:
 
 ### FL-023 · Tres intentos de diagnóstico fallidos: escalamiento determinista
 - Actores: instalador, sistema · Canal: WhatsApp · Disparador: tercer `record_troubleshooting_step` con `NO_CHANGE` del mismo síntoma (clon de 24818).
-- Pasos: 1) El handler cuenta intentos por síntoma. 2) Al tercero abre el caso `DIAGNOSIS_ATTEMPTS` con el resumen verificado del agente (o uno fijo si el agente no dio uno válido). 3) `CASE_NOTICE` al instalador y escalón `PRIMARY` (FL-061).
+- Pasos: 1) El agente registra cada paso que no ayudó (`NO_CHANGE`, o `WORSE`) y nunca llama `escalate_case` por pasos fallidos, aunque el manual diga que se escala después de ellos (§DIAG-03); el handler cuenta intentos por síntoma. 2) Al tercero abre el caso `DIAGNOSIS_ATTEMPTS` con el resumen verificado del agente (o uno fijo si el agente no dio uno válido). 3) `CASE_NOTICE` al instalador y escalón `PRIMARY` (FL-061).
 - Estado esperado: `failedAttempts = 3`; exactamente un caso abierto por orden y motivo; el agente no sigue proponiendo pasos del mismo síntoma (`facts.caseOpen`).
 - Reglas: `LAD-OPEN`, idempotencia del caso por orden y motivo.
 - Prueba: U `agent-tools/cases/cases.test.ts`, `cases/ladder.test.ts` · LF `cases.flow.test.ts` · SR `SC-02/7`, `SC-06/1`.
@@ -214,7 +214,7 @@ Convenciones:
 
 ### FL-028 · Pregunta de política respondida con cita
 - Actores: instalador, agente · Canal: WhatsApp · Disparador: "La señora quiere la roseta en el otro cuarto, ¿se le cobra?".
-- Pasos: 1) `search_procedures` → §COM-04 (y §COM-02). 2) `REPLY` con la regla de 15 m y la cita. 3) G2 grounding contra los pasajes.
+- Pasos: 1) `search_procedures` → §COM-04 (y §COM-02); la categoría que pide el modelo es una pista, nunca un cerco: si en ella no queda nada citable, la búsqueda se repite una vez sobre todo el manual. 2) `REPLY` con la regla de 15 m y la cita. 3) G2 grounding contra los pasajes.
 - Estado esperado: `REPLY` con `refs.citations ∋ COM-04`; `guardrail.groundingScore ≥ 0,75`; ningún monto que no esté en el pasaje.
 - Reglas: `CP-CITATION`, G2.
 - Prueba: U `agent-tools/knowledge/search.test.ts`, `outbound/grounding.test.ts` · LF `manual.flow.test.ts` · UI `manual.spec.ts` · SR `SC-03/1`, `EV-01/2`.
@@ -229,9 +229,9 @@ Convenciones:
 ### FL-030 · Pregunta que el manual no cubre
 - Actores: instalador, agente · Canal: WhatsApp · Disparador: "¿Le dejo al cliente la contraseña de administrador de la ONU?".
 - Pasos: 1) `search_procedures` → `coverage: NONE` (ningún pasaje sobre 0,35). 2) `REPLY` "No está en el manual" con botones "Consultar a mi supervisor" / "No, gracias". 3) Nada inventado.
-- Estado esperado: `REPLY` sin citas y sin afirmaciones de política (oráculo); ningún caso todavía.
+- Estado esperado: `REPLY` sin citas y sin afirmaciones de política (oráculo); ningún caso todavía. Un mensaje guarda como citas solo las secciones que su texto nombra: una sección en `refs.citations` que el instalador no lee no es una cita.
 - Reglas: `CP-CITATION` (no aplica sin afirmación), G2.
-- Prueba: U `agent-tools/knowledge/search.test.ts` · LF `manual.flow.test.ts` · SR `SC-03/3`, `EV-01/2`. Notas: Oráculo §4.3.
+- Prueba: U `agent-tools/knowledge/search.test.ts`, `agent-tools/messaging/messaging.test.ts` · LF `manual.flow.test.ts` · SR `SC-03/3`, `EV-01/2`. Notas: Oráculo §4.3.
 
 ### FL-031 · Oferta de escalar aceptada
 - Actores: instalador, sistema · Canal: WhatsApp · Disparador: botón "Consultar a mi supervisor" de FL-030 (o aceptación en texto libre).
@@ -509,10 +509,10 @@ Convenciones:
 
 ### FL-069 · Riesgo detectado por el agente
 - Actores: instalador, agente · Canal: WhatsApp · Disparador: frase realmente fuera del léxico ("hay un panal de avispas dentro de la caja terminal y ya me picaron", `vn-12`).
-- Pasos: el agente llama `report_safety_hazard(ANIMAL, summary)` → mismo handler que FL-067/068.
-- Estado esperado: `SAFETY_INSTRUCTION` + caso `SAFETY`; `AuditLog` con `detectedBy AGENT` (o `LEXICON`, informado).
+- Pasos: el agente llama `report_safety_hazard(ANIMAL, summary)` → mismo handler que FL-067/068. La instrucción fija es la respuesta del turno: después de un reporte aceptado, `send_whatsapp` responde `ON_HOLD_SAFETY` y el modelo no agrega consejos de seguridad propios (ADR-0016).
+- Estado esperado: `SAFETY_INSTRUCTION` + caso `SAFETY`; `AuditLog` con `detectedBy AGENT` (o `LEXICON`, informado); ningún `REPLY` del agente después de la instrucción en ese turno.
 - Reglas: `SAFE-AGENT`.
-- Prueba: U `agent-tools/cases/cases.test.ts`, `safety/classifier.test.ts` (la frase es un negativo del léxico) · LF `safety.flow.test.ts` · SR `SC-08/3`. Notas: Oráculo §4.3 (se acepta también que el léxico lo detecte; el reporte dice cuál camino disparó).
+- Prueba: U `agent-tools/cases/cases.test.ts`, `agent-tools/messaging/messaging.test.ts`, `safety/classifier.test.ts` (la frase es un negativo del léxico) · LF `safety.flow.test.ts` · SR `SC-08/3`. Notas: Oráculo §4.3 (se acepta también que el léxico lo detecte; el reporte dice cuál camino disparó).
 
 ### FL-070 · Riesgo reportado por nota de voz
 - Actores: instalador · Canal: WhatsApp · Disparador: `vn-05` ("hay un cable de luz caído en la banqueta…").

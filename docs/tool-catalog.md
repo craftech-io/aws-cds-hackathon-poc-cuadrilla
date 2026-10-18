@@ -95,11 +95,11 @@ Determinista (el orquestador es externo) · `NetworkMock` por SigV4 con `X-World
 Determinista (la recuperación es de Bedrock) · `bedrock-agent-runtime:Retrieve` sobre la Knowledge Base · invocan: `harness`, `console` (visor), `qa` (`kb.probe`, solo en mundos `qa-*` y `eval-*`) · sin efectos salvo `TURN#`.
 
 ```json
-{"input": {"type": "object", "properties": {"sessionToken": {"type": "string"}, "query": {"type": "string", "description": "máx. 300 caracteres, en español"}, "category": {"type": "string", "description": "opcional; uno de: GEN | SEG | INS | MED | DIAG | EVI | COM | ESC | CAL"}}, "required": ["sessionToken", "query"]},
+{"input": {"type": "object", "properties": {"sessionToken": {"type": "string"}, "query": {"type": "string", "description": "máx. 300 caracteres, en español llano; sin códigos de tools, síntomas ni ítems"}, "category": {"type": "string", "description": "opcional; uno de: GEN | SEG | INS | MED | DIAG | EVI | COM | ESC | CAL"}}, "required": ["sessionToken", "query"]},
  "output": {"ok": "boolean", "coverage": "FOUND | NONE | UNAVAILABLE", "manualVersion": "string", "passages": [{"sectionId": "string", "title": "string", "text": "string", "score": "number"}], "citationFormat": "string", "error": "Error"}}
 ```
 
-Reglas: `numberOfResults 5`, filtro por `manualVersion` vigente; pasajes con puntaje < 0,35 se descartan; `text` ≤ 1.200 caracteres por pasaje; `citationFormat` = `"(Manual v1, §{sectionId})"`. `coverage NONE` → el agente dice que no está en el manual. La consulta del modelo no se registra completa en logs (se enmascara y trunca).
+Reglas: `numberOfResults 5`, filtro por `manualVersion` vigente; pasajes con puntaje < 0,35 se descartan; `text` ≤ 1.200 caracteres por pasaje; `citationFormat` = `"(Manual v1, §{sectionId})"`. Con `category`, si en ella no queda ningún pasaje citable, la búsqueda se repite una vez sin categoría (la categoría es una pista del modelo, nunca un cerco). `coverage NONE` → el agente dice que no está en el manual. La consulta del modelo no se registra completa en logs (se enmascara y trunca).
 
 ---
 
@@ -158,7 +158,7 @@ Determinista · invocan: `harness`.
  "output": {"ok": "boolean", "messageId": "string", "status": "SENT | DEFERRED", "windowState": "OPEN | TEMPLATE_REQUIRED", "policyResult": "PolicyResult", "guardrail": "Guardrail", "error": "Error"}}
 ```
 
-Reglas: destinatario = teléfono del instalador de la sesión (`LAM-RECIPIENT`); fuera de la ventana → `TEMPLATE_REQUIRED` sin enviar (el agente no tiene plantillas propias); ≤ 3 botones (títulos del código en `copy/es-MX.ts`, nonce por botón); `refs.citations` tiene que ser un subconjunto de los `sectionId` devueltos por `search_procedures` en el turno; un texto con afirmaciones de política o procedimiento sin cita → `GROUNDING_FAIL` (`CP-CITATION`).
+Reglas: destinatario = teléfono del instalador de la sesión (`LAM-RECIPIENT`); fuera de la ventana → `TEMPLATE_REQUIRED` sin enviar (el agente no tiene plantillas propias); ≤ 3 botones (títulos del código en `copy/es-MX.ts`, nonce por botón); `refs.citations` tiene que ser un subconjunto de los `sectionId` devueltos por `search_procedures` en el turno; un texto con afirmaciones de política o procedimiento sin cita → `GROUNDING_FAIL` (`CP-CITATION`); el mensaje guarda como citas solo las secciones de `refs.citations` que su texto nombra; después de un `report_safety_hazard` aceptado en el mismo turno → `ON_HOLD_SAFETY` sin enviar (la instrucción fija de §SEG-01 ya respondió, ADR-0016).
 
 ---
 
@@ -172,7 +172,7 @@ Determinista · escribe `WorkOrders/STEP#`, `AuditLog`; puede abrir un caso · i
  "output": {"ok": "boolean", "stepId": "string", "failedAttempts": "integer", "caseOpened": {"caseId": "string", "reason": "CaseReason"}, "error": "Error"}}
 ```
 
-Reglas: `stepRef` tiene que ser una sección devuelta en algún turno de la sesión; `NO_CHANGE`/`WORSE` suman al conteo del síntoma; al tercero, `open_case(DIAGNOSIS_ATTEMPTS)` con el resumen verificado; `ON_HOLD_SAFETY` si la orden está en espera.
+Reglas: el agente registra el paso `PENDING` en el turno en que lo indica y su resultado, con el mismo síntoma y `stepRef`, cuando el instalador lo informa; `stepRef` tiene que ser una sección devuelta en algún turno de la sesión; `NO_CHANGE`/`WORSE` suman al conteo del síntoma; al tercero, `open_case(DIAGNOSIS_ATTEMPTS)` con el resumen verificado; `ON_HOLD_SAFETY` si la orden está en espera.
 
 ### `escalate_case`
 Determinista · escribe `Cases`, `AuditLog`; notifica por la escalera · invocan: `harness` (motivos `OUT_OF_MANUAL`, `INSTALLER_ASKED`, `OTHER`).
@@ -182,7 +182,7 @@ Determinista · escribe `Cases`, `AuditLog`; notifica por la escalera · invocan
  "output": {"ok": "boolean", "caseId": "string", "existing": "boolean", "rung": "Rung", "notifiedFirstName": "string", "error": "Error"}}
 ```
 
-Reglas: un caso abierto por orden y motivo (el segundo devuelve el existente); el resumen pasa por G2 (fuente: resultados de la sesión) y por el enmascarador; si no pasa, el caso se abre con un resumen fijo armado por código.
+Reglas: un caso abierto por orden y motivo (el segundo devuelve el existente); nunca por pasos de diagnóstico fallidos, aunque el manual diga que se escala después de ellos (el tercero abre `DIAGNOSIS_ATTEMPTS` por código desde `record_troubleshooting_step`); el resumen pasa por G2 (fuente: resultados de la sesión) y por el enmascarador; si no pasa, el caso se abre con un resumen fijo armado por código.
 
 ### `report_safety_hazard`
 Determinista · mismo handler que el clasificador (`handle_safety`) · invocan: `harness`.

@@ -5,9 +5,14 @@
 // `LAM-BRIDGE`, the contact policy, G2 with the installer's message as its query (or the fixed status
 // question for a greeting, ADR-0028), the deterministic verification, the transport of the installer's
 // route, `Conversations` and `AuditLog`. A repeat of the same text in the turn is answered from the
-// first message (outbound/repeat.ts). The tool never throws: every refusal is `{ ok: false, error }`.
-import type { z } from "zod";
+// first message (outbound/repeat.ts). The message keeps as citations only the sections its text names
+// (`refs.citations` the installer never sees are no citation). After `report_safety_hazard` in the same
+// turn nothing else goes out: the fixed instruction of §SEG-01 is the answer, and the model never adds
+// safety advice of its own (ADR-0016, `ON_HOLD_SAFETY`). The tool never throws: every refusal is
+// `{ ok: false, error }`.
+import { z } from "zod";
 import { type PolicyResult, type ToolFailure, ToolError } from "@cuadrilla/shared";
+import { sectionsCitedIn } from "../../policy/rules-content";
 import { toPolicyResult } from "../../policy/result";
 import type { OutboundDeps } from "../../outbound/deps";
 import { sendOutbound } from "../../outbound/pipeline";
@@ -31,11 +36,30 @@ const WAMID = /^wamid\.[A-Za-z0-9_.:=+/-]{1,240}$/;
 
 const ALLOWED: PolicyResult = { allowed: true, ruleIds: [] };
 
+/** A `report_safety_hazard` of the turn that went through: its fixed instruction is out. */
+const SafetyReported = z.object({ ok: z.literal(true), caseId: z.string() }).loose();
+
+/** Refuses a message after this turn reported a hazard: the safety instruction already answered (ADR-0016). */
+async function refuseAfterSafetyReport(ctx: ToolContext<MessagingRuntime>): Promise<void> {
+  if (ctx.scope.turnId === undefined) return;
+  const reports = await ctx.deps.connector.runtime.listTurnResults(ctx.scope.turnId, "report_safety_hazard");
+  if (reports.some((result) => SafetyReported.safeParse(result.output).success)) {
+    throw new ToolError("ON_HOLD_SAFETY", "the fixed safety instruction of report_safety_hazard already answered this turn: send nothing else and end with the internal note", "SAFETY_REPORTED");
+  }
+}
+
+/** The sections of `refs.citations` the text names: what the installer reads cited. */
+function citationsOf(args: SendArgs) {
+  const named = new Set(sectionsCitedIn(args.text));
+  return (args.refs?.citations ?? []).filter((section) => named.has(section));
+}
+
 async function requestOf(args: SendArgs, ctx: ToolContext<MessagingRuntime>): Promise<WhatsAppSendInput> {
   const { scope, identity } = ctx;
   if (identity.kind !== "HARNESS" || scope.installerId === undefined || scope.eventAtSim === undefined) {
     throw new ToolError("FORBIDDEN", "send_whatsapp speaks only for a turn of the agent", "LAM-RECIPIENT");
   }
+  await refuseAfterSafetyReport(ctx);
   const orders = await authorizeWorkOrders(ctx, args.refs?.workOrderIds ?? []);
   if (args.refs?.caseId !== undefined) await authorizeCase(ctx, args.refs.caseId);
   const trigger = identity.session.trigger;
@@ -59,7 +83,7 @@ async function requestOf(args: SendArgs, ctx: ToolContext<MessagingRuntime>): Pr
     ...(source !== undefined && WAMID.test(source) ? { replyToWamid: source } : {}),
     text: args.text,
     ...(args.buttons === undefined || args.buttons.length === 0 ? {} : { buttons: args.buttons.map((button) => ({ action: button.action, ...(button.item === undefined ? {} : { item: button.item }) })) }),
-    citations: [...(args.refs?.citations ?? [])],
+    citations: citationsOf(args),
     ...(Object.keys(refs).length === 0 ? {} : { refs }),
   };
 }

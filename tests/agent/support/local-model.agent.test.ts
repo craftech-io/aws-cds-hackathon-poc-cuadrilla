@@ -1,8 +1,9 @@
 // The bench's retry of the local model server's transport failures (local-model.ts): a restart of Ollama is
-// waited out, an answer of the model or any other error is not retried, and a billed model is never asked twice.
+// waited out, a tool call the server could not parse is sampled again, an answer of the model or any other
+// error is not retried, and a billed model is never asked twice.
 import type { ModelClient, ModelResponse } from "@craftech/agent-testkit";
 import { describe, expect, it } from "vitest";
-import { withLocalRetries } from "./local-model";
+import { RETRY_TEMPERATURE, withLocalRetries } from "./local-model";
 
 const ANSWER: ModelResponse = { content: [{ text: "ok" }], stopReason: "end_turn", usage: { inputTokens: 1, outputTokens: 1 } };
 const REQUEST = { system: "s", messages: [], tools: [], maxTokens: 10 };
@@ -29,6 +30,21 @@ describe("withLocalRetries (bench)", () => {
     const { model, calls } = failing("ollama:qwen", [new TypeError("fetch failed"), new Error("Ollama qwen: HTTP 500"), new Error("Ollama qwen: model runner has unexpectedly stopped")]);
     await expect(withLocalRetries(model, [1, 1, 1], noSleep).converse(REQUEST)).resolves.toBe(ANSWER);
     expect(calls()).toBe(4);
+  });
+
+  it("samples a retry again: at temperature 0 the server's tool-call parse failure repeats, a retry may not", async () => {
+    const temperatures: Array<number | undefined> = [];
+    const model: ModelClient = {
+      id: "ollama:qwen",
+      pricing: { inputPerMTok: 0, outputPerMTok: 0 },
+      async converse(request) {
+        temperatures.push(request.temperature);
+        if ((request.temperature ?? 0) === 0) throw new Error("Ollama qwen: XML syntax error on line 27: element <parameter> closed by </function>");
+        return ANSWER;
+      },
+    };
+    await expect(withLocalRetries(model, [1, 1], noSleep).converse({ ...REQUEST, temperature: 0 })).resolves.toBe(ANSWER);
+    expect(temperatures).toEqual([0, RETRY_TEMPERATURE]);
   });
 
   it("gives up after the last pause and throws the transport error", async () => {

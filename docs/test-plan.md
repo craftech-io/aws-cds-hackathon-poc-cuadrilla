@@ -79,7 +79,7 @@ Generada desde las líneas "Prueba" de `docs/flows-catalog.md`; `npm run flows:c
 | FL-027 | Consejo por error recurrente | `services/profile/profile.test.ts` | `evidence.flow.test.ts` | — | `SC-15/1..2`, `SC-15/4` | — | `memory.inspect` con `waitForExtraction` |
 | FL-028 | Pregunta de política respondida con cita | `agent-tools/knowledge/search.test.ts`, `outbound/grounding.test.ts` | `manual.flow.test.ts` | `manual.spec.ts` | `SC-03/1`, `EV-01/2` | — | — |
 | FL-029 | Pregunta de procedimiento respondida con cita | `outbound/verify.test.ts` | `manual.flow.test.ts` | — | `SC-03/2`, `EV-01/2` | — | — |
-| FL-030 | Pregunta que el manual no cubre | `agent-tools/knowledge/search.test.ts` | `manual.flow.test.ts` | — | `SC-03/3`, `EV-01/2` | — | Oráculo §4.3 |
+| FL-030 | Pregunta que el manual no cubre | `agent-tools/knowledge/search.test.ts`, `agent-tools/messaging/messaging.test.ts` | `manual.flow.test.ts` | — | `SC-03/3`, `EV-01/2` | — | Oráculo §4.3 |
 | FL-031 | Oferta de escalar aceptada | `agent-tools/cases/cases.test.ts`, `channels/whatsapp/keywords.test.ts`, `channels/whatsapp/button-actions.test.ts` | `manual.flow.test.ts` | — | `SC-03/4` | — | — |
 | FL-032 | Temas denegados: precio, compensación, instrucción eléctrica | `infra/guardrail-policies.test.ts`, `worker/guardrail-block.test.ts` | `manual.flow.test.ts` | — | `SC-03/5..7`, `EV-01/2` | — | Oráculo §4.3 |
 | FL-033 | Respuesta no fundada bloqueada | `outbound/pipeline.test.ts`, `outbound/verify.test.ts`, `outbound/grounding.test.ts` | `manual.flow.test.ts` | — | — | — | Excepción §2.1 (requiere que el modelo invente) |
@@ -118,7 +118,7 @@ Generada desde las líneas "Prueba" de `docs/flows-catalog.md`; `npm run flows:c
 | FL-066 | Escalera sin supervisores alcanzables | `cases/ladder.test.ts` | `cases.flow.test.ts` | — | `SC-06/7` | — | — |
 | FL-067 | Riesgo eléctrico: instrucción inmediata del manual | `safety/classifier.test.ts`, `safety/handler.test.ts` | `safety.flow.test.ts` | — | `SC-08/1` | — | — |
 | FL-068 | Alerta en paralelo: supervisor y jefe de zona | `safety/handler.test.ts` | `safety.flow.test.ts` | — | `SC-08/2` | — | — |
-| FL-069 | Riesgo detectado por el agente | `agent-tools/cases/cases.test.ts`, `safety/classifier.test.ts` (la frase es un negativo del léxico) | `safety.flow.test.ts` | — | `SC-08/3` | — | Oráculo §4.3 (se acepta también que el léxico lo detecte; el reporte dice cuál camino disparó) |
+| FL-069 | Riesgo detectado por el agente | `agent-tools/cases/cases.test.ts`, `agent-tools/messaging/messaging.test.ts`, `safety/classifier.test.ts` (la frase es un negativo del léxico) | `safety.flow.test.ts` | — | `SC-08/3` | — | Oráculo §4.3 (se acepta también que el léxico lo detecte; el reporte dice cuál camino disparó) |
 | FL-070 | Riesgo reportado por nota de voz | `safety/classifier.test.ts` | `safety.flow.test.ts` | — | `SC-08/4` | — | — |
 | FL-071 | Seguridad conservadora y mientras la orden está en espera | `safety/classifier.test.ts`, `policy/quiet-hours.test.ts` | `safety.flow.test.ts` | — | `SC-08/5..7` | — | — |
 | FL-072 | Ventana de 24 h del instalador | `policy/window.test.ts`, `channels/whatsapp/events.test.ts` | `policy.flow.test.ts`, `onboarding.flow.test.ts` | — | `SC-11/1..2`, `SC-17/9.b` (variante c, pendiente P-01) | — | la variante (c) es excepción §2.1 hasta P-01; la ventana real cerrada de un teléfono ligado la prueban U y LF (`onboarding.flow.test.ts`: 25 h reales con el reloj del mundo en pausa), porque el `QaDriver` nunca escribe `PHONELEASE#`; `SC-17/9.b` prueba en vivo la ventana real abierta |

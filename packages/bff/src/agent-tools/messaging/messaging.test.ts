@@ -99,4 +99,25 @@ describe("send_whatsapp", () => {
     expect(second).toMatchObject({ ok: true, status: "SENT", messageId: first.ok ? first.messageId : "" });
     expect(kit.sends).toHaveLength(1);
   });
+
+  it("[FL-030] keeps as citations only the sections the text names: a refs.citations the installer never reads is no citation", async () => {
+    const kit = await messagingKit();
+    await rogelioWrote(kit);
+    await kit.result("search_procedures", { coverage: "FOUND", passages: [{ sectionId: "GEN-02" }, { sectionId: "COM-04" }] });
+    const silent = await kit.send({ text: "El manual no cubre el empalme en el poste; ¿lo consulto con tu supervisora?", refs: { citations: ["GEN-02"] }, buttons: [{ action: "CONSULT_SUPERVISOR" }] });
+    const cited = await kit.send({ text: "Tú nunca cobras en sitio (Manual v1, §COM-04).", refs: { citations: ["COM-04", "GEN-02"] } });
+    expect([silent, cited]).toMatchObject([{ ok: true }, { ok: true }]);
+    const out = (await kit.world.connector.conversations.listMessages("inst-rogelio")).filter((item) => item.direction === "OUT" && item.author === "AGENT");
+    expect(out.map((item) => item.refs?.citations ?? [])).toEqual([[], ["COM-04"]]);
+  });
+
+  it("[FL-069] after report_safety_hazard in the turn nothing else goes out: the fixed instruction answered (ADR-0016)", async () => {
+    const kit = await messagingKit();
+    await rogelioWrote(kit);
+    await kit.result("report_safety_hazard", { ok: false, error: { code: "INVALID", message: "summary too long" } });
+    expect(await kit.send({ text: "Sigue con la roseta." })).toMatchObject({ ok: true, status: "SENT" });
+    await kit.result("report_safety_hazard", { ok: true, caseId: "case-01M4TNRFE07K7XZPJFAKGQMAXS", instructionSent: true });
+    expect(await kit.send({ text: "No toques la caja y aléjate del área." })).toMatchObject({ ok: false, error: { code: "ON_HOLD_SAFETY", reason: "SAFETY_REPORTED" } });
+    expect(kit.sends).toHaveLength(1);
+  });
 });
