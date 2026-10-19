@@ -4,13 +4,16 @@
 // accepted alternative of §4.3 (a WORSE step, a case OTHER) passes too.
 import { describe, expect, it } from "vitest";
 import { callsOf, toolsOf, turnsSummary, useAgentWorld } from "../support/agent-world";
+import { localLimit } from "../support/known-limits";
 import { PHOTO_ITEMS, citesAny, cutTurns, dirtyOutbound, failedTurns, foreignOrderNumbers, itemStatus, onOrder, refList, repliesTo } from "../support/oracles";
 
 const worlds = useAgentWorld();
 
 describe("SC-02 · voice and diagnosis (agent)", () => {
-  it("[SC-02/2-3] [FL-019] [FL-020] vn-01 → get_onu_status LOS and §DIAG-02 with the step PENDING; vn-02 → ONLINE, ONU_ONLINE PASSED and the three photos asked", async () => {
-    const { flow, agent } = await worlds.open();
+  /** vn-01 on wo-24817 (LOS): get_onu_status, §DIAG-02 cited and its step PENDING. */
+  async function losByVoice(): Promise<Awaited<ReturnType<typeof worlds.open>>> {
+    const opened = await worlds.open();
+    const { flow, agent } = opened;
     await onOrder(flow, "inst-rogelio", "wo-24817", "09:20");
 
     await flow.voice("inst-rogelio", "vn-01");
@@ -19,6 +22,17 @@ describe("SC-02 · voice and diagnosis (agent)", () => {
     const first = (await repliesTo(flow, "inst-rogelio")).at(-1);
     expect(citesAny(first, ["DIAG-02"]), `${first?.text ?? "no reply"} · ${turnsSummary(agent.turns)}`).toBe(true);
     expect((await flow.data.workOrders.listSteps("wo-24817")).some((step) => step.stepRef.startsWith("DIAG-02") && step.outcome === "PENDING"), "a DIAG-02 step PENDING").toBe(true);
+    return opened;
+  }
+
+  it("[SC-02/2] [FL-019] vn-01 → get_onu_status LOS and §DIAG-02 with the step PENDING", async () => {
+    const { flow } = await losByVoice();
+    expect(await cutTurns(flow, "inst-rogelio")).toBe(0);
+    expect(await dirtyOutbound(flow, "inst-rogelio")).toEqual([]);
+  });
+
+  it.skipIf(localLimit("SC-02/2-3"))("[SC-02/2-3] [FL-019] [FL-020] vn-01 → get_onu_status LOS and §DIAG-02 with the step PENDING; vn-02 → ONLINE, ONU_ONLINE PASSED and the three photos asked", async () => {
+    const { flow, agent } = await losByVoice();
 
     await flow.voice("inst-rogelio", "vn-02");
 

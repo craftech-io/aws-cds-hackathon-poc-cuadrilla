@@ -8,7 +8,8 @@
 //               simulator answers to each address (`success+` delivers, `bounce+` bounces for good,
 //               `complaint+` complains), as EventBridge would deliver it.
 //   Knowledge   `Retrieve` over the manual's sections (scripts/seed/data/manual/v001) by the words of the
-//               query, weighted by how rare each word is in the manual; `outage` throws as Bedrock does.
+//               query (a plural matching its singular), weighted by how rare each word is in the manual;
+//               `outage` throws as Bedrock does.
 //   Transcribe  the fake of media/testing.ts writing the transcript of the voice notes' datasheet
 //               (scripts/seed/audio/datasheet.json), found by the bytes of the note it is asked for.
 import { createHash } from "node:crypto";
@@ -180,10 +181,21 @@ const STOPWORDS = new Set(
   "el la los las un una unos unas de del al a en y o u que se le lo me te mi tu su sus es son por para con sin como cuando donde mas pero si no ya hay este esta esto ese esa eso qué cual cuál cuanto muy".split(" "),
 );
 
+/**
+ * A word and its plural as one term, as the Knowledge Base's embeddings read them ("mueble" finds "muebles",
+ * "conector" finds "conectores", "poste" finds "postes"): a final "s", then a final "e" after a consonant,
+ * only past four letters. Number only: no verb or gender endings, which would merge different words.
+ */
+export function singularOf(word: string): string {
+  const base = word.length > 4 && word.endsWith("s") ? word.slice(0, -1) : word;
+  return base.length > 4 && /[^aeiou]e$/.test(base) ? base.slice(0, -1) : base;
+}
+
 function wordsOf(text: string): string[] {
   return fold(text)
     .split(/[^a-z0-9]+/)
-    .filter((word) => word.length >= 3 && !STOPWORDS.has(word));
+    .filter((word) => word.length >= 3 && !STOPWORDS.has(word))
+    .map(singularOf);
 }
 
 let sections: Section[] | undefined;
