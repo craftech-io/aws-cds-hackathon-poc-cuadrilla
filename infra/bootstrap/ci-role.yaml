@@ -18,7 +18,7 @@ Parameters:
   BucketPrefix:
     Type: String
     Default: aws-cds-hackathon-poc-cua
-    Description: Leading characters of AppName that survive SST's truncation of bucket names (infra/ci-spec.ts).
+    Description: Leading characters of AppName that survive SST's truncation of bucket and most Lambda names (infra/ci-spec.ts).
   DeployStage:
     Type: String
     Default: poc
@@ -617,7 +617,7 @@ Resources:
               "Null":
                 aws:ResourceTag/sst:app: "false"
 
-  # ---- Resources of the app fenced by name: the tag is not there yet
+  # ---- Resources of the app fenced by name: the tag is not there yet, or no longer (a deleted function)
   DeployNamedResourcesPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -701,6 +701,19 @@ Resources:
             Condition:
               ArnLike:
                 lambda:FunctionArn: !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${AppName}-*"
+          - Sid: GoneFunctionsOfThisApp
+            Effect: Allow
+            Action:
+              - lambda:DeleteFunction
+              - lambda:GetFunction
+              - lambda:GetFunctionConfiguration
+            Resource:
+              - !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${BucketPrefix}*-${DeployStage}-*"
+              - !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:aws-cds-hackathon-poc--${DeployStage}-AuthPostConfirmationFunction-*"
+              - !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:aws-cds-hackathon-po-${DeployStage}-AuthPostAuthenticationFunction-*"
+            Condition:
+              "Null":
+                aws:ResourceTag/sst:app: "true"
           - Sid: CognitoWebAclAssociation
             Effect: Allow
             Action:

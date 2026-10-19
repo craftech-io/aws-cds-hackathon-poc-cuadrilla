@@ -33,6 +33,23 @@ export function parameterBlock(name: string): string {
   return rest.slice(0, next === -1 ? undefined : next).join("\n");
 }
 
+/** `Default:` of one entry of `Parameters:`, unquoted; empty for a parameter without one. */
+export function parameterDefault(name: string): string {
+  return /^\s*Default: "?([^"\n]*)"?$/m.exec(parameterBlock(name))?.[1] ?? "";
+}
+
+/**
+ * The `!Sub` ARNs of a statement with the parameter defaults and this account substituted, as
+ * regular expressions in which IAM's `*` matches any run of characters.
+ */
+export function arnPatterns(body: string): RegExp[] {
+  const pseudo: Readonly<Record<string, string>> = { "AWS::Partition": "aws", "AWS::AccountId": "776805327629" };
+  return [...body.matchAll(/!Sub "(arn:[^"]+)"/g)].map((match) => {
+    const arn = (match[1] ?? "").replace(/\$\{([^}]+)\}/g, (_all, name: string) => pseudo[name] ?? parameterDefault(name));
+    return new RegExp(`^${arn.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
+  });
+}
+
 export interface Statement {
   readonly sid: string;
   readonly body: string;

@@ -132,11 +132,14 @@ jobs:
       - name: Who am I (proves the role was assumed without access keys)
         run: aws sts get-caller-identity
 
-      # P-07 removed the cost guard. The first deploy without it deleted the CostGuard function and then
-      # failed waiting for the deletion: the deploy role reads Lambda functions only through their sst:app
-      # tag, so a function that is gone answers 403 instead of 404, and the state kept it. This drops it
-      # from this app's SST state (never from AWS), and only when AWS no longer has it, so the deploy can
-      # remove the rest of the cost guard. Once it is out of the state, the step does nothing.
+      # Safety net. P-07 removed the cost guard, and the first deploy without it deleted the CostGuard
+      # function and then failed waiting for the deletion: the deploy role read Lambda functions only
+      # through their sst:app tag, so the gone function answered 403 instead of 404 and the state kept it.
+      # The root fix is in the bootstrap (GoneFunctionsOfThisApp, infra/bootstrap/ci-role.yaml): the role
+      # gets and deletes this app's functions by name once no tag is left, so a deletion reads back 404.
+      # This step stays for a deploy that runs before the operator applies that template: it drops the
+      # function from this app's SST state (never from AWS), and only when AWS no longer has it. Once it
+      # is out of the state, the step does nothing.
       - name: "State repair: drop the CostGuard function already deleted from AWS (P-07)"
         run: |
           state="$(mktemp)"

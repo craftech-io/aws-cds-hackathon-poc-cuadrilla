@@ -57,7 +57,8 @@ The demos account is SHARED with another project, so every statement is scoped t
   name   ARN prefix where the physical name keeps the app name whole (DynamoDB, SNS, SQS, event
          buses, schedule groups, the budget, CloudFront functions, the vector bucket kb-<app>-*,
          Transcribe jobs and vocabularies cuadrilla-poc-*), where tags cannot be used (S3, by
-         BucketPrefix) or are not there yet (reads before and right after a create).
+         BucketPrefix) or are not there yet (reads before and right after a create) or no longer
+         (a deleted Lambda function, by BucketPrefix and its truncated name).
   path   every IAM role and policy of the app lives under /<app>/ (infra/ci.ts). The path is part
          of the ARN and cannot be forged with a tag, so it fences IAM.
   ARN    fixed names: the WhatsApp topic <app>-wa-inbound, the configuration set <app>-email-poc,
@@ -89,6 +90,7 @@ What each group of statements is for:
 | `CognitoWebAclAssociation` | `AssociateWebACL` and `GetWebACLForResource` of Cognito on the account's pools: Cognito's check of the association does not see the pool's tags and the pool's ARN has an opaque id, so the fence is the web ACL (`WebAclsOfThisApp`) |
 | `CognitoWebAclDisassociation` | `DisassociateWebACL` of Cognito only on a pool tagged `sst:app` = this app |
 | `EventSourceMappingsOfThisApp` | Create, update and delete event source mappings only onto functions `<app>-*` (`lambda:FunctionArn`): the installer queue and the `Leads` stream |
+| `GoneFunctionsOfThisApp` | `GetFunction`, `GetFunctionConfiguration` and `DeleteFunction` by name, only on a function with no `sst:app` tag (`Null`). A deleted function has no tag, so under `TaggedAppResources` alone the provider's wait after `DeleteFunction` got 403 instead of 404 and the function stayed in the SST state (`CostGuard`, 2026-10-18). SST cuts the app name in Lambda names (64 characters): `function:<BucketPrefix>*-poc-*` covers every function but the two triggers it cuts to 20 and 22 characters, named on their own (`…-poc-AuthPostConfirmationFunction-*`, `…-poc-AuthPostAuthenticationFunction-*`). `ci-role-fences.test.ts` recomputes every name |
 | `SesEventDestinationsOfThisApp` | Event destinations only on the configuration set `<app>-email-poc`: EventBridge for ChannelEvents and CloudWatch by `kind` for the cut of the sign-up |
 | `WebAclReadsOfThisApp` (boundary) | App roles may read only the app's two web ACLs (the QaDriver's `waf.probe`) |
 | `InvokeAccountDeletionByName` (boundary) | `GuestAccountDeletion` has the fixed name `<app>-poc-guest-account-deletion`: the operator invokes it by name (`npm run leads:delete`) and app roles only through their own grants |
@@ -149,6 +151,11 @@ CI deploy after the model change may fail once on the Memory update (IAM propaga
 never a local deploy (`docs/architecture.md` §16). After the first deploy that creates the runtime, and
 after every deploy that replaces it, the operator gives the `…-DEFAULT` log group of the runtime its 30
 days (`docs/architecture.md` §17 item 15, `DEFAULT_RUNTIME_LOG_RETENTION` of `infra/agentcore-spec.ts`).
+
+**Deleted functions (`GoneFunctionsOfThisApp`).** The named-resources policy changed: the operator
+applies the template again with the command above before the next push, and checks it with
+`simulate-principal-policy` (below). Until then the state-repair step of `deploy.yml` covers
+`CostGuardFunction` only.
 
 The SST bootstrap of the account and the stage passphrase are created by the operator's first
 `npx sst secret set ... --stage poc` (step 3), never by CI.
@@ -215,6 +222,26 @@ aws --profile craftech-demos iam simulate-principal-policy \
 
 The first must be `allowed` and the second `implicitDeny`.
 
+`GoneFunctionsOfThisApp`: a function of this app that no longer exists (no tag in the context) is
+`allowed`; the same name with another app's tag, and another app's name, are `implicitDeny`:
+
+```bash
+aws --profile craftech-demos iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy \
+  --action-names lambda:GetFunction lambda:GetFunctionConfiguration lambda:DeleteFunction \
+  --resource-arns arn:aws:lambda:us-east-1:776805327629:function:aws-cds-hackathon-poc-cuadrilla-poc-CostGuardFunction-kunowwve \
+                  arn:aws:lambda:us-east-1:776805327629:function:aws-cds-hackathon-po-poc-AuthPostAuthenticationFunction-x
+aws --profile craftech-demos iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy \
+  --action-names lambda:GetFunction lambda:DeleteFunction \
+  --resource-arns arn:aws:lambda:us-east-1:776805327629:function:aws-cds-hackathon-po-poc-AuthPostAuthenticationFunction-x \
+  --context-entries "ContextKeyName=aws:ResourceTag/sst:app,ContextKeyValues=another-project,ContextKeyType=string"
+aws --profile craftech-demos iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy \
+  --action-names lambda:GetFunction lambda:DeleteFunction \
+  --resource-arns arn:aws:lambda:us-east-1:776805327629:function:aws-cds-hackathon-poc-other-poc-BffFunction-x
+```
+
 ## Residual risks
 
 Stated instead of hidden.
@@ -246,6 +273,11 @@ Stated instead of hidden.
   another SST app carries its own `sst:app`, which the role cannot overwrite
   (`DenyRetaggingOtherApps`); an untagged resource of the listed services could be claimed.
   Closing that needs one account per project or an SCP.
+- **Two Lambda names shorter than the app.** SST keeps only 20 and 22 characters of the app name in
+  `AuthPostAuthentication` and `AuthPostConfirmation`, characters every app of the account shares, so
+  another app with the same logical names and stage would match those two patterns. The `Null` tag
+  condition keeps `GoneFunctionsOfThisApp` off every function another SST app owns (its `sst:app` is
+  there); only a function that does not exist, or one created untagged outside SST, is reachable.
 - **Account-wide actions** with no resource-level permissions (CloudFront creates, `sst-asset-*`
   objects, listings, the Transcribe actions above), each justified next to its statement.
 - A missing permission fails closed: the deploy stops with AccessDenied naming the action. The

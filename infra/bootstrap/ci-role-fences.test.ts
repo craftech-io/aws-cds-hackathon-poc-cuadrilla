@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { bucketPrefix } from "../ci-spec";
+import { APP, LAMBDA_CAPABILITIES, STAGE } from "../iam-capabilities";
+import { guestAccountDeletionName } from "../leads-spec";
+import { qaDriverFunctionName } from "../observability-spec";
 import { policyEngineName } from "../policy-rules";
-import { allows, block, parameterBlock, read, statement, statementsOf, template } from "./template-text";
+import { sstPhysicalName } from "../role-policy-size";
+import { allows, arnPatterns, block, parameterBlock, read, statement, statementsOf, template } from "./template-text";
 
 const PREFIX = "arn:${AWS::Partition}:";
 const boundary = block(template, "  DeployBoundary:", "  DeploySstHomePolicy:");
@@ -152,25 +157,12 @@ describe("services this app adds to the scaffolding", () => {
 });
 
 describe("Cedar policies (names unique across every engine of the shared account)", () => {
-  const PARAMETERS: Readonly<Record<string, string>> = {
-    "AWS::Partition": "aws",
-    "AWS::AccountId": "776805327629",
-    Region: "us-east-1",
-    AgentNamePrefix: /Default: (\S+)/.exec(parameterBlock("AgentNamePrefix"))?.[1] ?? "",
-    DeployStage: /Default: (\S+)/.exec(parameterBlock("DeployStage"))?.[1] ?? "",
-  };
   const engineArn = (id: string): string => `arn:aws:bedrock-agentcore:us-east-1:776805327629:policy-engine/${id}`;
   const OWN_ENGINE = engineArn(`${policyEngineName("aws-cds-hackathon-poc-cuadrilla", "poc")}-a1B2c3D4e5`);
   const OTHER_ENGINES = [engineArn("other_poc_app_poc-z9Y8x7W6v5"), engineArn("aws_cds_hackathon_poc_other_poc-z9Y8x7W6v5")];
   const POLICY_ACTION = /bedrock-agentcore:(\*|Create\*|CreatePolicy|DeletePolicy|GetPolicy|UpdatePolicy)$/m;
   const grants = allows.filter(({ body }) => POLICY_ACTION.test(body));
-  /** The statement's ARN patterns with the template parameters substituted, as regular expressions. */
-  const patterns = (body: string): RegExp[] =>
-    [...body.matchAll(/!Sub "(arn:[^"]+)"/g)].map((match) => {
-      const arn = (match[1] ?? "").replace(/\$\{([^}]+)\}/g, (_all, name: string) => PARAMETERS[name] ?? `\${${name}}`);
-      return new RegExp(`^${arn.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
-    });
-  const granted = (arn: string): boolean => grants.some(({ body }) => patterns(body).some((pattern) => pattern.test(arn)));
+  const granted = (arn: string): boolean => grants.some(({ body }) => arnPatterns(body).some((pattern) => pattern.test(arn)));
 
   it("grants the policy actions on Resource * only behind the app's tag", () => {
     expect(grants.length).toBeGreaterThan(0);
@@ -185,5 +177,40 @@ describe("Cedar policies (names unique across every engine of the shared account
   it("never grants them on another app's engine or its policies", () => {
     expect(template).not.toContain("policy-engine/*");
     for (const engine of OTHER_ENGINES) for (const arn of [engine, `${engine}/policy/cuadrilla_poc_CED_NO_OVERRIDE-q1W2e3R4t5`]) expect(granted(arn), arn).toBe(false);
+  });
+});
+
+describe("Lambda functions of this app once deleted (no tag left to fence them)", () => {
+  // SST names a Function `<app>-<stage>-<logical>Function-<8>` in 64 characters and cuts the app name
+  // first (sstPhysicalName), so most names keep BucketPrefix of it and two keep fewer characters than
+  // any app of the account shares. Logical names: every role of iam-capabilities.ts but the two with a
+  // fixed name (the mocks' Functions are `<mock>Api`), plus CostGuard, whose deletion answered 403.
+  const PINNED: Readonly<Record<string, string>> = { QaDriver: qaDriverFunctionName(), GuestAccountDeletion: guestAccountDeletionName() };
+  const LOGICAL = [...Object.keys(LAMBDA_CAPABILITIES).filter((role) => !(role in PINNED)).map((role) => (role.endsWith("Mock") ? `${role}Api` : role)), "CostGuard"];
+  const SHARED_CUT = ["AuthPostConfirmation", "AuthPostAuthentication"];
+  const OTHER_APPS = ["aws-cds-hackathon-poc-other", "aws-cds-hackathon-poc-cu", "aws-cds-hackathon-poc-cx-sibling"];
+  const sstName = (logical: string, app: string = APP): string => sstPhysicalName(64, `${logical}Function`, app, STAGE);
+  const gone = statement("GoneFunctionsOfThisApp");
+  const granted = (name: string): boolean => arnPatterns(gone).some((pattern) => pattern.test(`arn:aws:lambda:us-east-1:776805327629:function:${name}`));
+
+  it("only gets and deletes, never on Resource *, and only a function with no sst:app tag", () => {
+    expect([...gone.matchAll(/- (lambda:\w+)$/gm)].map((match) => match[1])).toEqual(["lambda:DeleteFunction", "lambda:GetFunction", "lambda:GetFunctionConfiguration"]);
+    expect(gone).not.toContain('Resource: "*"');
+    expect(gone).toMatch(/"Null":\n\s+aws:ResourceTag\/sst:app: "true"$/);
+    expect(block(template, "  DeployNamedResourcesPolicy:", "  DeployEdgePolicy:")).toContain("Sid: GoneFunctionsOfThisApp\n");
+  });
+
+  it.each([...LOGICAL.map((logical) => sstName(logical)), ...Object.values(PINNED)])("names %s, so its deletion reads back 404 instead of 403", (name) => {
+    expect(granted(name)).toBe(true);
+  });
+
+  it("names a function on its own only where SST cuts the app name below BucketPrefix", () => {
+    expect(LOGICAL.filter((logical) => !sstName(logical).startsWith(bucketPrefix(APP)))).toEqual(SHARED_CUT);
+    for (const logical of SHARED_CUT) expect(gone).toContain(`-\${DeployStage}-${logical}Function-*"`);
+  });
+
+  it.each(OTHER_APPS)("never names a function of %s, unless SST cuts both apps to the same characters", (app) => {
+    for (const logical of LOGICAL) expect(granted(sstName(logical, app)), logical).toBe(SHARED_CUT.includes(logical));
+    for (const name of [`${app}-${STAGE}-qa-driver`, `${app}-${STAGE}-guest-account-deletion`]) expect(granted(name), name).toBe(false);
   });
 });
