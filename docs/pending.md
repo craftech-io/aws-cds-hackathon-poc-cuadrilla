@@ -1,10 +1,10 @@
 # Pendientes fuera de nuestras manos
 
-Solo lo que depende de alguien fuera del equipo de agentes (el CTO, Meta, AWS Partner Central, Devpost). Todo lo demás está en `docs/build-plan.md`. Cada entrada se cierra con fecha y quién la cerró en la columna "Estado" (`Cerrado el AAAA-MM-DD por <quién>`): `npm run channels:check-modes` lee esa columna y no deja pasar `live` en los transportes de WhatsApp mientras P-01 no diga "Cerrado". Una decisión parcial dentro de un pendiente abierto se anota después de "Abierto ·".
+Solo lo que depende de alguien fuera del equipo de agentes (el CTO, Meta, AWS Partner Central, Devpost). Todo lo demás está en `docs/build-plan.md`. Cada entrada se cierra con fecha y quién la cerró en la columna "Estado" (`Cerrado el AAAA-MM-DD por <quién>`): `npm run channels:check-modes` lee esa columna y no deja pasar `live` en los transportes de WhatsApp mientras P-01 no diga "Cerrado" (P-01 es un paso operativo: su estado empieza con "Paso operativo ·" hasta que se ejecuta). Una decisión parcial dentro de un pendiente abierto se anota después de "Abierto ·".
 
 | # | Pendiente | Dueño | Estado | Qué falta |
 |---|---|---|---|---|
-| P-01 | Conectar WhatsApp: número y WABA **nuevos**, solo de Cuadrilla, display name, plantillas aprobadas y destino de eventos | CTO (cuenta de Meta, número, al final del build); `devops` ejecuta los scripts; `qa` prueba en vivo | Abierto · opción A (WABA propia) decidida y datos de la plataforma verificados el 2026-09-26 · número y WABA nuevos y alta de Meta al final del build, decididos por el CTO el 2026-10-06 (ADR-0028); hasta entonces el canal es simulado y nada más espera por esto | §1 |
+| P-01 | Habilitar el transporte vivo de WhatsApp en el stage: número y WABA propios de Cuadrilla, display name, plantillas aprobadas y destino de eventos | CTO (cuenta de Meta y número); `devops` ejecuta los scripts; `qa` prueba en vivo | Paso operativo · el canal está implementado sobre AWS End User Messaging Social y se prueba de punta a punta en el simulador de teléfono de la consola; opción A (WABA propia) decidida y datos de la plataforma verificados el 2026-09-26; número y WABA nuevos decididos por el CTO el 2026-10-06 (ADR-0028); no bloquea ningún otro trabajo | §1 |
 | P-02 | Oportunidad ACE de la submission | CTO | Cerrado el 2026-09-26 por el CTO (oportunidad `O28893592`) | — (§2 registra el resultado) |
 | P-03 | Proyecto en Devpost, instrucciones de prueba privadas y credenciales de las cuentas invitadas `guest-NN` | CTO con el operador | Abierto · el orquestador crea el borrador con la cuenta del CTO (2026-09-26) | §3 |
 | P-04 | Video de 3 minutos | CTO | Abierto | §4 |
@@ -13,9 +13,11 @@ Solo lo que depende de alguien fuera del equipo de agentes (el CTO, Meta, AWS Pa
 | P-07 | Umbral de costo por conversación (`IspSettings.costBudgetUsdPerConversation`) y confirmación de la alarma `AgentSpendHourly` (USD 20 por hora) y del presupuesto del proyecto (USD 300 por mes) | CTO | Cerrado el 2026-10-14 por el CTO: sin umbral (sin umbral de costo por conversación, sin alarma de gasto del agente y sin presupuesto del proyecto) | — (§7 registra la decisión y lo que cambió) |
 | P-08 | Reaplicar el bootstrap de CI (`qa-runner` con sesiones de hasta 7200 s), fijar la variable `QA_RUNNER_SESSION_SECONDS=7200` y cargar el secreto `BFF_FUNCTION_URL` | Operador con su profile | Cerrado el 2026-10-10 por el operador (bootstrap reaplicado, `qa-runner` con `MaxSessionDuration` 7200 verificado con `get-role`; variable en 7200; secreto `BFF_FUNCTION_URL` cargado desde el estado de SST del app) | — (§8 registra los pasos) |
 
-## 1. Conectar WhatsApp (P-01)
+## 1. Transporte vivo de WhatsApp (P-01, paso operativo)
 
-**Número y WABA nuevos, solo de Cuadrilla** (decisión del CTO del 2026-10-06, ADR-0028): el CTO aporta la cuenta de Meta y hace el alta **al final del build**. Mientras tanto se construye todo de punta a punta (adaptador, transporte vivo, plantillas como código, notas de voz y fotos entrantes, eventos, scripts de los pasos 6 a 8) y el stage solo tiene el transporte simulado: la demo usa el simulador de teléfono. P-01 es un bloqueo externo y nunca frena otro trabajo. Si no cierra antes de grabar el video o de entregar la submission, el modo simulado es el respaldo documentado (ADR-0002) y todo material público lo dice.
+El canal de WhatsApp está **implementado sobre AWS End User Messaging Social**: adaptador, transporte vivo, plantillas como código, notas de voz y fotos entrantes, eventos por SNS y los scripts de los pasos 6 a 8. Se prueba de punta a punta en el **simulador de teléfono** de la consola, que entra por el mismo sobre de eventos, la misma política, el mismo agente y el mismo pipeline de salida (ADR-0002). Habilitar el transporte vivo en el stage es un **paso operativo** con un **número y una WABA nuevos, solo de Cuadrilla** (decisión del CTO del 2026-10-06, ADR-0028), que el CTO ejecuta con su cuenta de Meta cuando lo decide; no frena ningún otro trabajo.
+
+**Cómo se describe en público** (README, landing, materiales de la submission, decisión del CTO del 2026-10-25): WhatsApp está implementado sobre AWS End User Messaging Social y se prueba en el simulador de teléfono de la consola. Ningún material afirma un número vivo ni presenta el transporte vivo como algo en espera.
 
 ### 1.1 Hechos de la plataforma (verificados contra la documentación de AWS y de Meta el 2026-09-26)
 
@@ -77,7 +79,7 @@ Dueño: CTO con el operador. Verificación: proyecto visible en Devpost; `aws --
 
 1. Esperar el cierre de WP-50 ("100 % probada").
 2. `devops` reinicia el mundo `GLOBAL#isp-demo` justo antes de grabar (época nueva, memoria vacía, reloj en pausa a las 07:00).
-3. Grabar en inglés con el guion de `docs/design-brief.md` §14, incluido el segmento "what is real / what is simulated" y el aviso de demo sintética del co-branding (P-05): la consola y la landing muestran "Cuadrilla for <socio> · Powered by Craftech"; el teléfono se muestra con el rótulo "simulador" mientras P-01 siga abierto (o el teléfono real si ya cerró). Toda cifra de impacto de negocio va rotulada como meta o supuesto ("goal", "assumption"), nunca como medición; el video puede nombrar el concurso, la app que muestra no.
+3. Grabar en inglés con el guion de `docs/design-brief.md` §14, incluido el segmento "what is real / what is simulated" y el aviso de demo sintética del co-branding (P-05): la consola y la landing muestran "Cuadrilla for <socio> · Powered by Craftech"; el teléfono es el simulador de la consola, con su rótulo "simulador" (o un teléfono real si P-01 ya se ejecutó). Toda cifra de impacto de negocio va rotulada como meta o supuesto ("goal", "assumption"), nunca como medición; el video puede nombrar el concurso, la app que muestra no.
 4. Publicar en YouTube o Vimeo (público o no listado) para el formulario de la submission, y entregar el MP4 y un póster a `typescript-dev`: la landing lo sirve desde el propio sitio (`public/landing/video/`) en su sección de video, antes de la de arquitectura, con `preload="none"`, póster y sin autoplay (ADR-0028, WP-44).
 
 Dueño: CTO.

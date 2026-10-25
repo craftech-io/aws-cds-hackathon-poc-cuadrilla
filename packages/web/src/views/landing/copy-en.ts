@@ -201,8 +201,8 @@ export const en: LandingCopy = {
     columns: [
       { title: "Real", text: "Every cloud service doing the work: the agent (Bedrock AgentCore), the photo check, voice transcription, email delivery, storage and sign-in." },
       {
-        title: "Implemented, in simulated mode",
-        text: "The WhatsApp adapter over AWS End User Messaging Social: it's built and tested; in your demo you use it with a phone simulator, and it goes live once the WhatsApp Business account is connected.",
+        title: "Implemented, tried in the simulator",
+        text: "WhatsApp, implemented on AWS End User Messaging Social: in your demo you try it in the console's phone simulator, which goes through the same agent, rules and message pipeline.",
       },
       { title: "Our own mocks", text: "Work-order dispatch, the network orchestrator (ONU), staff, customers and phones." },
       { title: "Data", text: "100% synthetic: every person, address, work order and manual in this demo is made up. Nothing of yours appears in any screenshot." },

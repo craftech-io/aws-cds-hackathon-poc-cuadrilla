@@ -207,8 +207,8 @@ export const es = {
     columns: [
       { title: "Real", text: "Todo servicio de nube que hace el trabajo: el agente (Bedrock AgentCore), el chequeo de fotos, la transcripción de voz, el envío de emails, el almacenamiento y el inicio de sesión." },
       {
-        title: "Implementado, en modo simulado",
-        text: "El adaptador de WhatsApp sobre AWS End User Messaging Social: está construido y probado; en tu demo lo usas con un simulador de teléfono, y pasa a estar en vivo una vez que la cuenta de WhatsApp Business quede conectada.",
+        title: "Implementado, se prueba en el simulador",
+        text: "WhatsApp, implementado sobre AWS End User Messaging Social: en tu demo lo pruebas en el simulador de teléfono de la consola, que pasa por el mismo agente, las mismas reglas y el mismo circuito de mensajes.",
       },
       { title: "Mocks propios", text: "El despacho de órdenes, el orquestador de red (ONU), el personal, los clientes y los teléfonos." },
       { title: "Datos", text: "100 % sintéticos: toda persona, dirección, orden de trabajo y manual de esta demo es inventado. Nadie tuyo va a aparecer en ninguna captura." },
