@@ -4,16 +4,18 @@
 //                simulated time; ids, enums, counts and instants only, never a phone, an email or a name
 //   inbound      the installer's text or transcript, or a photo's caption, as the channel stored it (already
 //                masked), cleaned and clipped again by the normalizer; a supervisor's closing summary
-//   attachment   a photo the installer sent: only its candidate id and size, never the image (ADR-0015)
+//   attachment   a photo the installer sent: only its candidate id and size, never the image (ADR-0015);
+//                after a CHOOSE_ITEM tap, the earlier photo it names the item of, with that item
 //
 // agent/envelope.ts renders it; turns/invoke.ts gathers it.
+import { PhotoItem } from "@cuadrilla/shared";
 import type { AttachmentLine, EnvelopeEvent, FactLine } from "../agent/envelope";
 import { normalizeUntrusted } from "../channels/normalizer";
 import type { Connector } from "../connector/ports";
 import type { Case } from "../domain/cases";
 import type { Message } from "../domain/conversations";
 import type { WorkOrder } from "../domain/work-orders";
-import { candidateIdOf } from "../evidence/candidate";
+import { candidateIdOf, latestCandidateBefore } from "../evidence/candidate";
 import { MASK_MARKERS, type PrefilterBlock, prefilterBlock } from "../lib/mask";
 import { MEXICO_CITY_TIME_ZONE, toZonedIso } from "../services/business-hours/zoned-time";
 import type { TurnInbound, TurnRequest } from "./deps";
@@ -50,6 +52,33 @@ export function inboundOfMessage(message: Message): MessageInbound {
     ...(kind === "VOICE_TRANSCRIPT" && message.transcript !== undefined ? { confidence: message.transcript.confidence } : {}),
   };
   return { inbound, ...(attachment === undefined ? {} : { attachment }), ...(block === undefined ? {} : { block }) };
+}
+
+/** The photo item a CHOOSE_ITEM tap chose (the nonce's object, stored with the message by the channel). */
+export function chosenItemOf(message: Message): PhotoItem | undefined {
+  if (message.buttonAction !== "CHOOSE_ITEM") return undefined;
+  const object = message.refs?.buttonObject;
+  if (typeof object !== "object" || object === null) return undefined;
+  const { kind, id } = object as { readonly kind?: unknown; readonly id?: unknown };
+  if (kind !== "ITEM") return undefined;
+  const item = PhotoItem.safeParse(id);
+  return item.success ? item.data : undefined;
+}
+
+/**
+ * After a CHOOSE_ITEM tap, the photo it names the item of: the installer's newest photo on the order before
+ * the tap, with the chosen item. The model never carries a candidate id from an earlier turn.
+ */
+export async function chosenPhotoAttachment(
+  conversations: Pick<Connector["conversations"], "listMessages">,
+  message: Message,
+  scope: { readonly installerId: string; readonly clockId: string; readonly workOrderId: string },
+): Promise<AttachmentLine | undefined> {
+  const item = chosenItemOf(message);
+  if (item === undefined) return undefined;
+  const photo = await latestCandidateBefore(conversations, scope, message);
+  if (photo === undefined) return undefined;
+  return { kind: "IMAGE", candidateId: candidateIdOf(photo.messageId), ...(photo.media?.bytes === undefined ? {} : { bytes: photo.media.bytes }), item };
 }
 
 /** What the supervisor said, for the `CASE_CLOSED` turn: the case's closing summary, as untrusted text. */

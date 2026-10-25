@@ -253,7 +253,7 @@ describe("InstallerWorker", () => {
     expect((await fnArgs("InstallerWorker")).permissions).toEqual([
       { actions: ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"], resources: ["InstallerEvents.arn"] },
       ...storageStatements("InstallerWorker"),
-      { actions: ["s3:GetObject"], resources: ["Evidence.arn/certificates/*", "Evidence.arn/photos/*"] },
+      { actions: ["s3:GetObject"], resources: ["Evidence.arn/certificates/*", "Evidence.arn/photos/*", "Evidence.arn/guest/*/certificates/*", "Evidence.arn/guest/*/photos/*"] },
       NUMBER_STATEMENT,
     ]);
   });

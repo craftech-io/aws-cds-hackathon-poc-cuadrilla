@@ -13,6 +13,7 @@ export const loginCopyEn: LoginCopy = {
     title: "Sign in to the console",
     lead: "Use your email and password.",
     email: "Email",
+    signInId: "Email or username",
     password: "Password",
     submit: "Sign in",
     forgot: "I forgot my password",

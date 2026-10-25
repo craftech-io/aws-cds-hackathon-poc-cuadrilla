@@ -43,3 +43,12 @@ export async function findCandidate(conversations: Pick<ConversationsPort, "list
   const thread = await conversations.listMessages(query.installerId, { descending: true, limit: CANDIDATE_LOOKBACK });
   return thread.find((message) => candidateIdOf(message.messageId) === query.candidateId && isCandidateOf(message, query));
 }
+
+/**
+ * The newest photo of the installer on that order sent before `before` (a message id of the thread): the
+ * one a CHOOSE_ITEM tap names the item of, so the tap's turn validates it instead of asking for it again.
+ */
+export async function latestCandidateBefore(conversations: Pick<ConversationsPort, "listMessages">, query: Omit<CandidateQuery, "candidateId">, before: Pick<Message, "messageId" | "sentAtSim">): Promise<Message | undefined> {
+  const thread = await conversations.listMessages(query.installerId, { descending: true, limit: CANDIDATE_LOOKBACK });
+  return thread.find((message) => message.messageId !== before.messageId && message.sentAtSim <= before.sentAtSim && isCandidateOf(message, query));
+}

@@ -1,7 +1,7 @@
 // One component per state of the sign-in machine. They hold what the person types (in memory,
 // cleared when the step changes) and hand it to `dispatch`; the machine decides what comes next.
 import { useState, type FormEvent } from "react";
-import { hasOuterSpaces, looksLikeEmail, missingPasswordRules } from "../../lib/auth/credentials";
+import { hasOuterSpaces, looksLikeEmail, looksLikeSignInId, missingPasswordRules } from "../../lib/auth/credentials";
 import type { AuthFlowAction } from "../../lib/auth/flow";
 import { useLoginCopy } from "./auth-lang";
 import { CodeField, Field, LinkButton, NoticeNote, PasswordField, PasswordRules, StepHeading, SubmitButton } from "./form-parts";
@@ -32,7 +32,7 @@ export function CredentialsStep({
   const [email, setEmail] = useState(fixedEmail ?? initialEmail ?? "");
   const [password, setPassword] = useState("");
   const onSubmit = submit(() => {
-    if (!looksLikeEmail(email) || !password) return;
+    if (!looksLikeSignInId(email) || !password) return;
     dispatch({ type: "signIn", email, password });
     setPassword("");
   });
@@ -41,8 +41,8 @@ export function CredentialsStep({
       {inDrawer ? null : <StepHeading title={copy.credentials.title} lead={copy.credentials.lead} />}
       {notice ? <NoticeNote>{notice}</NoticeNote> : null}
       <Field
-        label={copy.credentials.email}
-        type="email"
+        label={copy.credentials.signInId}
+        type="text"
         autoComplete="username"
         inputMode="email"
         autoCapitalize="off"

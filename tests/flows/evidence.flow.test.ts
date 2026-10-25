@@ -5,7 +5,7 @@
 // the pipeline, `update_checklist`, the attempts and the case they open.
 import { describe, expect, it } from "vitest";
 import { VERDICT_REACTIONS } from "../../packages/bff/src/copy/buttons";
-import { READ_CHECKLIST, READ_ORDER, candidateOf, citedReply, outputOf, reply, search, validate } from "./support/agent";
+import { READ_CHECKLIST, READ_ORDER, VALIDATE_CHOSEN, citedReply, outputOf, passItem, reply, search, validate } from "./support/agent";
 import { photoTurn } from "./support/story";
 import { createFlowWorld, type FlowWorld } from "./support/world";
 
@@ -123,21 +123,16 @@ describe("evidence flows", () => {
 
   it("[FL-039] a rosette photo sent for the meter is the wrong subject; the installer accepts using it for the rosette and it passes", async () => {
     const world = await onSite("inst-rogelio", "wo-24817", { rx: -21.4 });
-    let candidateId = "";
     world.plan(
       {
         steps: [
           validate("POWER_READING_PHOTO"),
-          reply(
-            (context) => {
-              candidateId = candidateOf(context);
-              return outputOf(context, "validate_install_photo").reasonCode === "WRONG_SUBJECT" ? "Esa foto es de la roseta, no del medidor. ¿La uso para la roseta?" : "Recibida.";
-            },
-            { buttons: [{ action: "CHOOSE_ITEM", item: "ROSETTE_PHOTO" }] },
-          ),
+          reply((context) => (outputOf(context, "validate_install_photo").reasonCode === "WRONG_SUBJECT" ? "Esa foto es de la roseta, no del medidor. ¿La uso para la roseta?" : "Recibida."), {
+            buttons: [{ action: "CHOOSE_ITEM", item: "ROSETTE_PHOTO" }],
+          }),
         ],
       },
-      { steps: [{ tool: "validate_install_photo", input: () => ({ candidateId, item: "ROSETTE_PHOTO" }) }, reply("Listo, la usé para la roseta.")] },
+      { steps: [VALIDATE_CHOSEN, reply("Listo, la usé para la roseta.")] },
     );
     await world.photo("inst-rogelio", "ph-rosette-01");
     await world.tap("inst-rogelio", { title: "Roseta" });
@@ -147,7 +142,28 @@ describe("evidence flows", () => {
         ["ROSETTE_PHOTO", "PASS", null],
       ]),
     );
-    expect(world.harness.turns[1]?.envelope.candidateId).toBeUndefined();
+    // The tap's turn carries the same photo with the item chosen; no candidate id travels in the model's memory.
+    expect(world.harness.turns[1]?.envelope).toMatchObject({ candidateId: world.harness.turns[0]?.envelope.candidateId, item: "ROSETTE_PHOTO" });
+  });
+
+  it("[FL-046] [FL-103] a photo without its item: the agent asks with CHOOSE_ITEM buttons and the tap on «Etiqueta de la ONU» validates that photo (✅), never asking for it again", async () => {
+    const world = await onSite("inst-rogelio", "wo-24817", { rx: -21.4 });
+    world.plan(
+      { steps: [reply("¿De cuál punto es esta foto?", { buttons: ITEMS.map((item) => ({ action: "CHOOSE_ITEM", item })) })] },
+      { steps: [VALIDATE_CHOSEN, passItem("ONU_LABEL_PHOTO"), reply("Foto recibida y validada.")] },
+    );
+    await world.photo("inst-rogelio", "ph-label-01");
+    expect(await validations(world, "wo-24817")).toEqual([]);
+    await world.tap("inst-rogelio", { title: "Etiqueta de la ONU" });
+    const [photoTurn, tapTurn] = world.harness.turns;
+    expect(photoTurn?.envelope.item).toBeUndefined();
+    expect(tapTurn?.envelope).toMatchObject({ candidateId: photoTurn?.envelope.candidateId, item: "ONU_LABEL_PHOTO" });
+    expect((await validations(world, "wo-24817")).map((validation) => [validation.item, validation.verdict])).toEqual([["ONU_LABEL_PHOTO", "PASS"]]);
+    expect(await itemStatus(world, "wo-24817", "ONU_LABEL_PHOTO")).toBe("PASSED");
+    const reactions = await world.delivered("inst-rogelio", "VERDICT_REACTION");
+    expect(reactions.map((reaction) => reaction.refs?.verdict)).toEqual(["PASS"]);
+    expect(JSON.stringify(reactions[0]?.refs?.whatsapp ?? reactions[0])).toContain(VERDICT_REACTIONS.PASS);
+    expect((await world.delivered("inst-rogelio", "REPLY")).map((message) => message.text)).toEqual(["¿De cuál punto es esta foto?", "Foto recibida y validada."]);
   });
 
   it("[FL-040] the label with the order's serial and the rosette pass, the customer's conformity by button, and the agent offers to close", async () => {

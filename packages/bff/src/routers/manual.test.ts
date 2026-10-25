@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { ChannelError } from "@cuadrilla/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createCallerFactory, createContextFactory } from "./trpc";
 import { DEMO } from "../services/people/testing";
@@ -63,5 +64,23 @@ describe("brand.get (public, ADR-0018)", () => {
     expect(brand.disclaimer?.es).toContain("Socio de Diseño");
     expect(brand.logos.onLight).toContain("/s3/Seed/brand/logo-on-light.svg");
     expect(brand.logos.onDark).toBeNull();
+  });
+
+  it("[FL-090] co-branding with logos that cannot be read (HeadObject 403): the wordmark, and the manual still opens", async () => {
+    const t = await consoleTestWorld(DEMO);
+    await loadManual(t);
+    t.ports.brandConfig = {
+      mode: "cobrand",
+      partnerDisplayName: "Socio de Diseño",
+      partnerShortName: "Socio",
+      logoAssetKeys: { onLight: "brand/logo-on-light.svg", onDark: "brand/logo-on-dark.svg" },
+      disclaimer: { es: "Demo sintética.", en: "Synthetic demo." },
+    };
+    Object.assign(t.ports.objects, { exists: () => Promise.reject(new ChannelError("UNAVAILABLE", "WHATSAPP", "HeadObject failed: Unknown", { retryable: true })) });
+    const anonymous = createCallerFactory(appRouter)(await createContextFactory(() => t.deps)({ event: { headers: {} } }));
+    expect(await anonymous.brand.get()).toMatchObject({ mode: "cobrand", logos: { onLight: null, onDark: null }, disclaimer: { es: expect.stringContaining("Socio de Diseño") } });
+    const manual = await (await t.as("OPS", "usr-ops")).manual.sections();
+    expect(manual.operator).toMatchObject({ mode: "cobrand", disclaimer: { es: expect.stringContaining("Socio de Diseño") } });
+    expect(manual.sections.map((section) => section.sectionId)).toEqual(["COM-04", "DIAG-02"]);
   });
 });

@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { Drawer } from "../../components/Drawer";
 import { useSession } from "../../context/SessionContext";
+import { signInIdOf } from "../../lib/auth-claims";
 import { flowDeps } from "../../lib/auth/deps";
 import type { AuthFlowDeps, AuthFlowState } from "../../lib/auth/flow";
 import { AuthFlowPanel } from "./AuthFlowPanel";
@@ -30,10 +31,9 @@ function StepUp({ onClose }: { readonly onClose: () => void }) {
   const principal = state.status === "authenticated" ? state.principal : undefined;
   const previous = state.status === "authenticated" ? state.tokens : undefined;
   const [finished, setFinished] = useState(false);
-  const deps = useMemo(
-    () => (auth && principal?.email ? flowDeps(auth.cognito, auth.srp, { kind: "stepUp", sub: principal.sub, email: principal.email }) : undefined),
-    [auth, principal?.sub, principal?.email],
-  );
+  const sub = principal?.sub;
+  const signInId = principal === undefined ? undefined : signInIdOf(principal);
+  const deps = useMemo(() => (auth && sub && signInId ? flowDeps(auth.cognito, auth.srp, { kind: "stepUp", sub, email: signInId }) : undefined), [auth, sub, signInId]);
   const flow = useAuthFlow(deps, (done) => {
     if (auth && previous?.refreshToken) void auth.cognito.revoke(previous.refreshToken).catch(() => undefined);
     completeSignIn(done.tokens);
@@ -41,11 +41,11 @@ function StepUp({ onClose }: { readonly onClose: () => void }) {
   });
 
   if (finished) return <Finished text={loginCopy.stepUp.done} onClose={onClose} />;
-  if (!deps || !principal?.email) return <ErrorNote>{loginCopy.errors.UNAVAILABLE}</ErrorNote>;
+  if (!deps || !signInId) return <ErrorNote>{loginCopy.errors.UNAVAILABLE}</ErrorNote>;
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate">{loginCopy.stepUp.lead}</p>
-      <AuthFlowPanel flow={flow} fixedEmail={principal.email} inDrawer />
+      <AuthFlowPanel flow={flow} fixedEmail={signInId} inDrawer />
     </div>
   );
 }

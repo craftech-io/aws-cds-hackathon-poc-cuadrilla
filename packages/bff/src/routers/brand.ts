@@ -4,7 +4,9 @@
 //
 //   get   { mode, displayName, logos: { onLight, onDark } | null each, disclaimer: { es, en } | null }
 //         Logos are presigned GETs (5 minutes) of the partner's two SVGs in `Seed/brand/`, only when the
-//         object exists; otherwise `null` and the web draws the text wordmark. In co-branding the
+//         object exists; otherwise `null` and the web draws the text wordmark. A logo that cannot be read
+//         (a missing object answers HeadObject 403 to a role without s3:ListBucket) is `null` too: a logo
+//         never fails the brand, nor the views that show it (the manual). In co-branding the
 //         synthetic-demo disclaimer always travels with the partner's name.
 import { resolveBrand } from "../copy/brand";
 import { type ConsolePorts, consolePortsOf } from "./console-ports";
@@ -18,7 +20,10 @@ const links = new Map<string, { readonly url: string | null; readonly untilMs: n
 async function logoUrl(ports: ConsolePorts, key: string, nowMs: number): Promise<string | null> {
   const cached = links.get(key);
   if (cached !== undefined && cached.untilMs > nowMs) return cached.url;
-  const url = (await ports.objects.exists("Seed", key)) ? await ports.objects.presignGet({ bucket: "Seed", key, contentType: "image/svg+xml" }) : null;
+  const url = await ports.objects
+    .exists("Seed", key)
+    .then((exists) => (exists ? ports.objects.presignGet({ bucket: "Seed", key, contentType: "image/svg+xml" }) : null))
+    .catch(() => null);
   links.set(key, { url, untilMs: nowMs + LOGO_LINK_REUSE_MS });
   return url;
 }

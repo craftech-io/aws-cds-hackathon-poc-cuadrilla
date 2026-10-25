@@ -102,8 +102,9 @@ export const CAPABILITIES: Readonly<Record<CapabilityName, Capability>> = {
   SEND_WHATSAPP: {
     grants: [
       { actions: ["social-messaging:SendWhatsAppMessage", "social-messaging:PostWhatsAppMessageMedia"], resources: ["{whatsappPhone}"] },
-      // PostWhatsAppMessageMedia reads the object with the caller's own credentials.
-      { actions: ["s3:GetObject"], resources: ["{Evidence}/certificates/*", "{Evidence}/photos/*"] },
+      // PostWhatsAppMessageMedia reads the object with the caller's own credentials; the certificate email
+      // attaches the same PDF (channels/email/attachments.ts). A guest world's live under `guest/<seg>/`.
+      { actions: ["s3:GetObject"], resources: ["{Evidence}/certificates/*", "{Evidence}/photos/*", "{Evidence}/guest/*/certificates/*", "{Evidence}/guest/*/photos/*"] },
     ],
   },
   PIPELINE: {

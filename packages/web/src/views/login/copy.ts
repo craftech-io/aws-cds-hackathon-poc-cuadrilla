@@ -24,6 +24,7 @@ const es = {
     title: "Inicia sesión en la consola",
     lead: "Usa tu email y tu contraseña.",
     email: "Email",
+    signInId: "Email o usuario",
     password: "Contraseña",
     submit: "Iniciar sesión",
     forgot: "Olvidé mi contraseña",

@@ -93,6 +93,13 @@ describe("first login after an invitation (NEW_PASSWORD_REQUIRED → optional TO
     expect(cognito.user("operaciones@example.test").totpEnabled).toBe(false);
   });
 
+  it("[FL-079] an invited guest without email signs in with its username (guest-NN)", async () => {
+    await cognito.addUser({ email: "guest-01", password: PASSWORD, role: "GUEST" });
+    const done = expectStep(await run(INITIAL_STATE, { type: "signIn", email: " Guest-01 ", password: PASSWORD }), "done");
+    expect(done.totpVerified).toBe(false);
+    expect(cognito.calls[0]?.payload).toContain('"username":"guest-01"');
+  });
+
   it("[FL-108] never offers TOTP to a GUEST", async () => {
     await cognito.addUser({ email: "guest-01@example.test", password: PASSWORD, role: "GUEST" });
     const done = expectStep(await run(INITIAL_STATE, { type: "signIn", email: "guest-01@example.test", password: PASSWORD }), "done");

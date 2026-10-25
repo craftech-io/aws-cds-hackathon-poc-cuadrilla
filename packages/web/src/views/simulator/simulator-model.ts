@@ -37,7 +37,10 @@ export interface PhoneItem {
   readonly reactions: readonly string[];
 }
 
-const byTime = (a: Bubble, b: Bubble) => Date.parse(a.sentAtSim) - Date.parse(b.sentAtSim) || a.messageId.localeCompare(b.messageId);
+const realOf = (bubble: Bubble): number => (bubble.sentAtReal ? Date.parse(bubble.sentAtReal) : Number.NaN);
+
+/** Simulated time first; within one simulated instant (a paused clock), the order they were stored in. */
+const byTime = (a: Bubble, b: Bubble) => Date.parse(a.sentAtSim) - Date.parse(b.sentAtSim) || realOf(a) - realOf(b) || a.messageId.localeCompare(b.messageId);
 
 /** The chat as the phone shows it. */
 export function phoneItems(bubbles: readonly Bubble[]): PhoneItem[] {

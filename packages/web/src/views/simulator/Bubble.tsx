@@ -47,7 +47,7 @@ function Media({ bubble }: { readonly bubble: BubbleData }) {
     return <p className="text-sm text-slate italic">{pending}</p>;
   }
   if (mediaKind === "IMAGE") return <img src={mediaUrl} alt={copy.photoAlt} loading="lazy" decoding="async" className="block max-h-64 w-full rounded-xl object-cover" />;
-  if (mediaKind === "AUDIO") return <audio controls preload="none" src={mediaUrl} aria-label={copy.voiceLabel(timeOf(bubble))} className="h-10 w-56 max-w-full" />;
+  if (mediaKind === "AUDIO") return <audio controls preload="metadata" src={mediaUrl} aria-label={copy.voiceLabel(timeOf(bubble))} className="h-10 w-56 max-w-full" />;
   const name = bubble.fileName ?? copy.documentPending;
   return (
     <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-lg bg-paper px-2 py-1.5 text-sm text-navy hover:bg-mist" aria-label={copy.openDocument(name)}>

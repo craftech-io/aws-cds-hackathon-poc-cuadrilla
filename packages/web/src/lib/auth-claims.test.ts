@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseIdTokenClaims, principalFromClaims, principalFromIdToken } from "./auth-claims";
+import { parseIdTokenClaims, principalFromClaims, principalFromIdToken, signInIdOf } from "./auth-claims";
 
 function jwt(payload: Record<string, unknown>): string {
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -17,6 +17,15 @@ const base = {
 };
 
 describe("principal from the id token", () => {
+  it("[FL-079] signs an invited guest without email in again by its username", () => {
+    const { email: _email, ...withoutEmail } = base;
+    const guest = principalFromIdToken(jwt({ ...withoutEmail, "cognito:username": "guest-01", role: "GUEST" }));
+    expect(guest).toMatchObject({ username: "guest-01", isGuest: true });
+    expect(guest.email).toBeUndefined();
+    expect(signInIdOf(guest)).toBe("guest-01");
+    expect(signInIdOf(principalFromIdToken(jwt({ ...base, "cognito:username": "gst-1" })))).toBe("ana@example.test");
+  });
+
   it("reads ispId, the stamped role and groups", () => {
     const principal = principalFromIdToken(jwt({ ...base, ispId: "isp-demo", role: "SUPERVISOR", "cognito:groups": ["OPS"] }));
     expect(principal).toMatchObject({ sub: "sub-1", ispId: "isp-demo", role: "SUPERVISOR", groups: ["OPS"], expiresAt: 1_800_000_000_000 });

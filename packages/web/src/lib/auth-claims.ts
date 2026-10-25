@@ -13,6 +13,7 @@ const IdTokenClaimsSchema = z.looseObject({
   iat: z.number().int(),
   token_use: z.literal("id"),
   email: z.string().optional(),
+  "cognito:username": z.string().optional(),
   name: z.string().optional(),
   ispId: z.string().min(1).optional(),
   role: z.string().optional(),
@@ -26,6 +27,8 @@ export type IdTokenClaims = z.infer<typeof IdTokenClaimsSchema>;
 export interface Principal {
   readonly sub: string;
   readonly email?: string;
+  /** Cognito username; an invited account without email (`guest-07`) signs in with it. */
+  readonly username?: string;
   readonly name?: string;
   /** Operator the user belongs to; absent until the registry assigns one. */
   readonly ispId?: string;
@@ -78,10 +81,16 @@ export function principalFromClaims(claims: IdTokenClaims): Principal {
     isGuest: role === "GUEST" || claims.isGuest === "true",
     expiresAt: claims.exp * 1000,
     ...(claims.email !== undefined ? { email: claims.email } : {}),
+    ...(claims["cognito:username"] !== undefined ? { username: claims["cognito:username"] } : {}),
     ...(claims.name !== undefined ? { name: claims.name } : {}),
     ...(claims.ispId !== undefined ? { ispId: claims.ispId } : {}),
   };
   return role ? { ...principal, role } : principal;
+}
+
+/** What the person types to sign in again (a step-up): the email, or the username of an account without one. */
+export function signInIdOf(principal: Pick<Principal, "email" | "username">): string | undefined {
+  return principal.email ?? principal.username;
 }
 
 export function principalFromIdToken(token: string): Principal {

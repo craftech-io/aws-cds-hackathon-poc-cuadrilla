@@ -103,6 +103,8 @@ export async function bubbleOf(message: Message, ports: ConsolePorts) {
     reaction: payload?.type === "reaction" ? { emoji: payload.reaction.emoji, to: payload.reaction.message_id } : null,
     status: message.status,
     sentAtSim: message.sentAtSim,
+    // Breaks the ties of a paused clock: the installer's message and the reply share one simulated minute.
+    sentAtReal: message.sentAtReal ?? message.createdAt,
     providerMessageId: message.providerMessageId ?? null,
   };
 }

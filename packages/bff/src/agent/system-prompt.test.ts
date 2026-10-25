@@ -81,8 +81,13 @@ describe("the system prompt (docs/design-brief.md §5.11)", () => {
     expect(evidence).toContain("You never see a photo, so its item comes from the installer");
     expect(evidence).toContain("the one item your last message asked for");
     expect(evidence).toContain("never guess: ask which item with CHOOSE_ITEM buttons for the pending photo items");
-    expect(evidence).toContain("when they answer, validate that same candidateId with the item they chose");
+    expect(evidence).toContain("the tap brings the photo back with its item");
     expect(evidence.indexOf("never guess")).toBeLessThan(evidence.indexOf("call validate_install_photo"));
+  });
+
+  it("validates the photo a CHOOSE_ITEM tap brings back with the chosen item (FL-039)", () => {
+    const line = SYSTEM_PROMPT.split("\n").find((candidate) => candidate.startsWith("- <attachment kind=\"IMAGE\""));
+    expect(line).toContain('With item="…", the installer chose its item by button: validate it with it.');
   });
 
   it("treats the rubric get_checklist brings as manual §EVI-01, searched and cited in the turn (FL-035)", () => {

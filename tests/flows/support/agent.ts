@@ -78,6 +78,15 @@ export function validate(item: string): PlanStep {
   return { tool: "validate_install_photo", input: (context) => ({ candidateId: candidateOf(context), item }) };
 }
 
+/** `validate_install_photo` of the attachment a CHOOSE_ITEM tap brought back, with the item it carries. */
+export const VALIDATE_CHOSEN: PlanStep = {
+  tool: "validate_install_photo",
+  input: (context) => {
+    if (context.envelope.item === undefined) throw new Error("the turn's attachment carries no chosen item");
+    return { candidateId: candidateOf(context), item: context.envelope.item };
+  },
+};
+
 /** `update_checklist(item, PASSED)` with the validation of this turn, only when it passed. */
 export function passItem(item: string): PlanStep {
   return {

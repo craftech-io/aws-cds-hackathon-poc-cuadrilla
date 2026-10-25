@@ -87,7 +87,7 @@ export function storyAgent(fallback: PlanSource): PlanSource {
     const said = (envelope.inbound ?? "").toLowerCase();
     if (envelope.event.type === "CASE_CLOSED") return CASE_CLOSED_RESUME;
     if (envelope.event.type !== "INSTALLER_MESSAGE") return fallback(envelope);
-    if (envelope.candidateId !== undefined) return photoTurn(photoItemOf(envelope.preloaded));
+    if (envelope.candidateId !== undefined) return photoTurn(envelope.item ?? photoItemOf(envelope.preloaded));
     if (said.includes("luz pon")) return DIAGNOSE_NO_PON;
     if (said.includes("limpié el conector")) return CONFIRM_ONLINE;
     if (said.includes("roseta") && said.includes("cobra")) return POLICY_ROSETTE;

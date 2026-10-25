@@ -89,5 +89,11 @@ describe("renderEnvelope", () => {
     expect(() => renderEnvelope(input("x", { facts: [{ name: "order", attributes: { "on hold": true } }] }))).toThrow(RangeError);
     expect(() => renderEnvelope(input("x", { attachments: [{ kind: "IMAGE", candidateId: "a b" }] }))).toThrow(RangeError);
     expect(() => preloadedLine({ tool: "Get-Order", output: {} })).toThrow(RangeError);
+    expect(() => renderEnvelope(input("x", { attachments: [{ kind: "IMAGE", candidateId: "ec_1", item: "CUSTOMER_OK" as never }] }))).toThrow();
+  });
+
+  it("names the item a CHOOSE_ITEM tap chose for the photo it brings back", () => {
+    const { text } = renderEnvelope(input("x", { attachments: [{ kind: "IMAGE", candidateId: "ec_0123456789abcdef01234567", bytes: 9, item: "ONU_LABEL_PHOTO" }] }));
+    expect(text).toContain('<attachment kind="IMAGE" candidateId="ec_0123456789abcdef01234567" bytes="9" item="ONU_LABEL_PHOTO"/>');
   });
 });

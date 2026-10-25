@@ -11,13 +11,14 @@
 //   4. the active order has a troubleshooting step `PENDING` → the simulated orchestrator learns that the
 //      installer acted (`POST /v1/onus/{serial}/physical-action {kind: INSTALLER_STEP}`, until done per event)
 //   5. the active order has a case `TAKEN` → `relay_message` to the supervisor and the end (`CP-BRIDGE`)
-//   6. otherwise the agent's turn (`INSTALLER_MESSAGE`, turns/turn.ts)
+//   6. otherwise the agent's turn (`INSTALLER_MESSAGE`, turns/turn.ts); a CHOOSE_ITEM tap carries the photo
+//      it chose the item of (turns/facts.ts `chosenPhotoAttachment`)
 import type { NetworkClient } from "../network/client";
 import type { Message } from "../domain/conversations";
 import type { WorkOrder } from "../domain/work-orders";
 import { agentKillDecision } from "../ops/kill-switch";
 import type { TurnDeps, TurnOutcome, TurnRequest } from "../turns/deps";
-import { inboundOfMessage } from "../turns/facts";
+import { chosenPhotoAttachment, inboundOfMessage } from "../turns/facts";
 import { runAgentTurn } from "../turns/turn";
 import { resolveTurnOrder } from "./active-order";
 import { WORKER_ACTIONS, auditOnce, workerAudit } from "./audit";
@@ -137,7 +138,8 @@ export async function handleInboundMessage(deps: InboundDeps, ctx: WorkerContext
   if (resolved.kind === "CHOICE") return { kind: "ORDER_CHOICE", safetyFired };
   // A tap on a row of the list answers the message the list asked about (FL-013).
   const message = resolved.message;
-  const { inbound, attachment, block } = message === current ? own : inboundOfMessage(message);
+  const { inbound, attachment: sent, block } = message === current ? own : inboundOfMessage(message);
+  const attachment = sent ?? (order === undefined ? undefined : await chosenPhotoAttachment(data.conversations, message, { installerId: event.installerId, clockId: event.clockId, workOrderId: order.workOrderId }));
   if (order !== undefined) {
     await reportPhysicalAction(deps, ctx, event, order, current.sentAtSim);
     const taken = (await data.cases.listCasesOfWorkOrder(order.workOrderId)).find((caseItem) => caseItem.status === "TAKEN");

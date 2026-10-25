@@ -18,6 +18,8 @@ export interface ReadEnvelope {
   readonly inbound?: string;
   readonly inboundKind?: string;
   readonly candidateId?: string;
+  /** The item of the attachment: the one the installer chose with a CHOOSE_ITEM button for that photo. */
+  readonly item?: string;
   /** The reads the worker ran before the Harness, by tool (ADR-0028). */
   readonly preloaded: Readonly<Record<string, unknown>>;
 }
@@ -41,13 +43,16 @@ export function readEnvelope(text: string): ReadEnvelope {
   const preloaded: Record<string, unknown> = {};
   for (const match of text.matchAll(/^<tool-result tool="([a-z_]+)">(.*)<\/tool-result>$/gm)) preloaded[match[1] ?? ""] = JSON.parse(match[2] ?? "null");
   const workOrder = attribute(eventLine, "workOrder");
-  const candidateId = attribute(/^<attachment [^>]*\/>/m.exec(text)?.[0], "candidateId");
+  const attachment = /^<attachment [^>]*\/>/m.exec(text)?.[0];
+  const candidateId = attribute(attachment, "candidateId");
+  const item = attribute(attachment, "item");
   return {
     text,
     sessionToken,
     event: { type: type as TurnTrigger, id: attribute(eventLine, "id") ?? "", at: attribute(eventLine, "at") ?? "", ...(workOrder === undefined ? {} : { workOrder }) },
     ...(block === null ? {} : { inbound: unescape(block[2] ?? ""), ...(attribute(block[1], "kind") === undefined ? {} : { inboundKind: attribute(block[1], "kind") }) }),
     ...(candidateId === undefined ? {} : { candidateId }),
+    ...(item === undefined ? {} : { item }),
     preloaded,
   };
 }

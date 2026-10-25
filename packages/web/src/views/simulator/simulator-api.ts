@@ -76,6 +76,8 @@ export const Bubble = z.looseObject({
   reaction: z.looseObject({ emoji: z.string(), to: z.string() }).nullable(),
   status: z.string(),
   sentAtSim: IsoInstant,
+  /** When it was stored, in real time: the order of two bubbles of the same simulated instant. */
+  sentAtReal: IsoInstant.nullable().optional(),
   providerMessageId: z.string().nullable(),
 });
 export type Bubble = z.infer<typeof Bubble>;

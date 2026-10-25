@@ -33,6 +33,14 @@ export function looksLikeEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
+/** A console username without an email (an invited account: `guest-07`, `usr-ops-lina`). */
+const USERNAME = /^[a-z0-9][a-z0-9._-]{2,127}$/;
+
+/** What signs in: the email of the account, or the username of an invited account that has none. */
+export function looksLikeSignInId(value: string): boolean {
+  return looksLikeEmail(value) || USERNAME.test(normalizeEmail(value));
+}
+
 /** A six-digit TOTP code, after removing the spaces people type or paste. */
 export function normalizeTotpCode(code: string): string | undefined {
   const digits = code.replace(/\s+/g, "");

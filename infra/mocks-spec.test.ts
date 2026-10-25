@@ -260,7 +260,7 @@ describe("InboundWhatsApp IAM (docs/architecture.md §14)", () => {
       if (statement.resources.includes("*")) expect(statement).toEqual({ actions: ["cloudwatch:PutMetricData"], resources: ["*"], conditions: [{ test: "StringEquals", variable: "cloudwatch:namespace", values: ["CuadrillaAgent"] }] });
     }
     expect(statements.find((statement) => statement.actions.includes("sqs:SendMessage"))?.resources).toEqual(["arn:queue"]);
-    expect(statements).toContainEqual({ actions: ["s3:GetObject"], resources: ["arn:storage:Evidence/certificates/*", "arn:storage:Evidence/photos/*"] });
+    expect(statements).toContainEqual({ actions: ["s3:GetObject"], resources: ["arn:storage:Evidence/certificates/*", "arn:storage:Evidence/photos/*", "arn:storage:Evidence/guest/*/certificates/*", "arn:storage:Evidence/guest/*/photos/*"] });
   });
 
   it("omits every social-messaging statement while the number id is the placeholder, never widening it", async () => {

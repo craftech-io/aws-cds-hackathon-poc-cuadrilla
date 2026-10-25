@@ -80,6 +80,14 @@ describe("phone simulator model [FL-082]", () => {
     expect(items[0]?.reactions).toEqual([]);
   });
 
+  it("[FL-082] within one simulated minute (a paused clock) the reply goes below the installer's message", () => {
+    const items = phoneItems([
+      bubble({ messageId: "a-reply", direction: "OUT", text: "Va", sentAtSim: "2026-10-13T09:40:00-06:00", sentAtReal: "2026-10-25T12:00:09.000Z" }),
+      bubble({ messageId: "wamid.SIM.z", direction: "IN", text: "¿Qué sigue?", status: "READ", sentAtSim: "2026-10-13T09:40:00-06:00", sentAtReal: "2026-10-25T12:00:01.000Z" }),
+    ]);
+    expect(items.map((item) => item.bubble.messageId)).toEqual(["wamid.SIM.z", "a-reply"]);
+  });
+
   it("[FL-082] groups by simulated day and tells the hour in the world's own time", () => {
     const items = phoneItems([
       bubble({ messageId: "a", sentAtSim: "2026-10-12T07:30:00-06:00" }),

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { groupSecret, missingPasswordRules, normalizeTotpCode, otpauthUri } from "./credentials";
+import { groupSecret, looksLikeSignInId, missingPasswordRules, normalizeTotpCode, otpauthUri } from "./credentials";
 import { TOKENS_KEY, isExpired, loadTokens, refreshTokens, restoreSession, revokeSession, safeReturnTo, saveTokens, type TokenSet } from "./tokens";
 
 class MemoryStorage {
@@ -85,6 +85,11 @@ describe("credentials helpers", () => {
   it("lists the password rules still missing", () => {
     expect(missingPasswordRules("abc")).toEqual(["length", "upper", "number", "symbol"]);
     expect(missingPasswordRules("Fixture-Password-1!")).toEqual([]);
+  });
+
+  it("[FL-079] signs in with an email or an invited account's username, nothing else", () => {
+    for (const id of ["ana@example.test", " Ana@Example.test ", "guest-01", "Guest-07", "usr-ops-lina"]) expect(looksLikeSignInId(id), id).toBe(true);
+    for (const id of ["", "  ", "ab", "guest 01", "-guest", "ana@", "<script>"]) expect(looksLikeSignInId(id), id).toBe(false);
   });
 
   it("accepts a six-digit code with spaces and nothing else", () => {

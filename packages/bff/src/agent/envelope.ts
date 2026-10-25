@@ -6,6 +6,8 @@
 //   <facts>…</facts>                                              state of the order, one fact per line
 //   <inbound-5c1e0a channel="WHATSAPP" kind="VOICE_TRANSCRIPT" confidence="0.93" truncated="false">…</inbound-5c1e0a>
 //   <attachment kind="IMAGE" candidateId="…" bytes="412331"/>     a photo the installer sent (never the image)
+//   <attachment kind="IMAGE" candidateId="…" item="ONU_LABEL_PHOTO"/>  an earlier photo whose item the installer
+//                                                                 just chose with a CHOOSE_ITEM button
 //   <tool-result tool="get_work_order">{…}</tool-result>          a read the worker already ran in this turn (ADR-0028)
 //
 // The untrusted text is sealed by channels/normalizer.ts (`untrustedBlocks`): escaped, inside a block
@@ -14,7 +16,7 @@
 // or `<tool-result>`. Every other value is escaped as an attribute or a JSON escape. The preloaded
 // results sit outside the untrusted block (the system prompt reads them as data, never instructions).
 // Pure on purpose: turns/ gathers the inputs from the connector.
-import { TurnTrigger } from "@cuadrilla/shared";
+import { PhotoItem, TurnTrigger } from "@cuadrilla/shared";
 import { type RandomBytes, type UntrustedBlockInput, escapeAttribute, sessionHeader, untrustedBlocks } from "../channels/normalizer";
 
 export interface EnvelopeEvent {
@@ -40,6 +42,8 @@ export interface AttachmentLine {
   readonly kind: "IMAGE";
   readonly candidateId: string;
   readonly bytes?: number;
+  /** The item the installer chose for this photo with a CHOOSE_ITEM button (never a guess of code or model). */
+  readonly item?: PhotoItem;
 }
 
 /** A read tool the worker ran with the turn's token before the Harness (ADR-0028): the tool's own answer. */
@@ -103,7 +107,10 @@ function factsBlock(facts: readonly FactLine[]): string {
 function attachmentLine(attachment: AttachmentLine): string {
   if (!CANDIDATE_ID.test(attachment.candidateId)) throw new RangeError("invalid candidate id");
   if (attachment.bytes !== undefined && (!Number.isInteger(attachment.bytes) || attachment.bytes < 0)) throw new RangeError("bytes must be a size");
-  return `<attachment${attributes({ kind: attachment.kind, candidateId: attachment.candidateId, ...(attachment.bytes === undefined ? {} : { bytes: attachment.bytes }) })}/>`;
+  const values: Record<string, FactValue> = { kind: attachment.kind, candidateId: attachment.candidateId };
+  if (attachment.bytes !== undefined) values.bytes = attachment.bytes;
+  if (attachment.item !== undefined) values.item = PhotoItem.parse(attachment.item);
+  return `<attachment${attributes(values)}/>`;
 }
 
 /**
