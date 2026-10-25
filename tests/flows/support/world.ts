@@ -12,7 +12,9 @@
 // test moves it; simulated time is each world's clock, which only the clock module moves (ADR-0010).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type ClockId, DEMO_CLOCK_ID, DEMO_ISP_ID, type WaButtonAction } from "@cuadrilla/shared";
+import { type ClockId, DEMO_CLOCK_ID, DEMO_ISP_ID, type PhotoItem, type WaButtonAction } from "@cuadrilla/shared";
+import { PHOTO_ITEM_BUTTONS } from "../../../packages/bff/src/copy/buttons";
+import { esMX } from "../../../packages/bff/src/copy/es-MX";
 import { simMediaKey } from "@cuadrilla/shared/media/keys";
 import { type ClockTarget, advanceClock } from "../../../packages/bff/src/clock/advance";
 import type { ClockMoved } from "../../../packages/bff/src/clock/state";
@@ -128,6 +130,8 @@ export interface FlowWorld {
   text(personId: string, body: string, clockId?: string): Promise<Sent>;
   voice(personId: string, voiceId: string, clockId?: string): Promise<Sent>;
   photo(personId: string, photo: string | { readonly bytes: Uint8Array; readonly mime?: string }, clockId?: string): Promise<Sent>;
+  /** A photo for `item`: sent, then the item's button tapped when the worker asks which item it is (worker/photo-item.ts). */
+  photoFor(personId: string, photo: string, item: PhotoItem, clockId?: string): Promise<Sent>;
   /** Taps the button `action` (or a row whose title or description contains `title`) of the last message that offers it. */
   tap(personId: string, button: WaButtonAction | { readonly title: string }, clockId?: string): Promise<Sent>;
   /** The person's thread in order (`sentAtSim`, then real time of storage). */
@@ -249,6 +253,25 @@ export async function createFlowWorld(options: FlowWorldOptions = {}): Promise<F
     return (await data.conversations.listMessages(personId)).sort((a, b) => Date.parse(a.sentAtSim) - Date.parse(b.sentAtSim) || (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : rank(a) - rank(b)));
   }
 
+  async function photo(personId: string, image: string | { readonly bytes: Uint8Array; readonly mime?: string }, clockId?: string): Promise<Sent> {
+    const bytes = typeof image === "string" ? photoBytes(image) : image.bytes;
+    const mime = typeof image === "string" ? "image/jpeg" : (image.mime ?? "image/jpeg");
+    const uploaded = await upload(personId, "PHOTO", bytes, mime);
+    return send(personId, { type: "photo", uploadId: uploaded.uploadId, mimeType: mime }, clockId);
+  }
+
+  async function tap(personId: string, button: WaButtonAction | { readonly title: string }, clockId?: string): Promise<Sent> {
+    const title = typeof button === "string" ? buttonText(button, "es") : button.title;
+    const offers = (await thread(personId)).filter((message) => message.direction === "OUT").reverse();
+    for (const message of offers) {
+      const found = buttonsOfMessage(message).find((candidate) => (typeof button === "string" ? candidate.title === title : candidate.title.includes(title) || (candidate.description ?? "").includes(title)));
+      if (found === undefined) continue;
+      const content: SimulatedContent = found.kind === "button" ? { type: "button", payload: found.id, text: found.title } : { type: found.kind, id: found.id, title: found.title };
+      return send(personId, content, clockId);
+    }
+    throw new Error(`no message to ${personId} offers "${title}"`);
+  }
+
   return {
     memory,
     data,
@@ -306,23 +329,13 @@ export async function createFlowWorld(options: FlowWorldOptions = {}): Promise<F
       const uploaded = await upload(personId, "VOICE", voiceBytes(voiceId), "audio/ogg");
       return send(personId, { type: "voice", uploadId: uploaded.uploadId, mimeType: "audio/ogg" }, clockId);
     },
-    async photo(personId, photo, clockId) {
-      const bytes = typeof photo === "string" ? photoBytes(photo) : photo.bytes;
-      const mime = typeof photo === "string" ? "image/jpeg" : (photo.mime ?? "image/jpeg");
-      const uploaded = await upload(personId, "PHOTO", bytes, mime);
-      return send(personId, { type: "photo", uploadId: uploaded.uploadId, mimeType: mime }, clockId);
+    photo,
+    async photoFor(personId, photoId, item, clockId) {
+      const sent = await photo(personId, photoId, clockId);
+      const [last] = (await thread(personId)).filter((message) => message.direction === "OUT").reverse();
+      return last?.kind === "SYSTEM_NOTICE" && last.text === esMX.itemChoicePrompt ? tap(personId, { title: PHOTO_ITEM_BUTTONS[item].es }, clockId) : sent;
     },
-    async tap(personId, button, clockId) {
-      const title = typeof button === "string" ? buttonText(button, "es") : button.title;
-      const offers = (await thread(personId)).filter((message) => message.direction === "OUT").reverse();
-      for (const message of offers) {
-        const found = buttonsOfMessage(message).find((candidate) => (typeof button === "string" ? candidate.title === title : candidate.title.includes(title) || (candidate.description ?? "").includes(title)));
-        if (found === undefined) continue;
-        const content: SimulatedContent = found.kind === "button" ? { type: "button", payload: found.id, text: found.title } : { type: found.kind, id: found.id, title: found.title };
-        return send(personId, content, clockId);
-      }
-      throw new Error(`no message to ${personId} offers "${title}"`);
-    },
+    tap,
     thread,
     async delivered(personId, kind) {
       const reached = new Set(["SENT", "DELIVERED", "READ"]);

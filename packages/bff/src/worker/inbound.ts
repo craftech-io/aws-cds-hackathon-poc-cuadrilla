@@ -11,7 +11,9 @@
 //   4. the active order has a troubleshooting step `PENDING` → the simulated orchestrator learns that the
 //      installer acted (`POST /v1/onus/{serial}/physical-action {kind: INSTALLER_STEP}`, until done per event)
 //   5. the active order has a case `TAKEN` → `relay_message` to the supervisor and the end (`CP-BRIDGE`)
-//   6. otherwise the agent's turn (`INSTALLER_MESSAGE`, turns/turn.ts); a CHOOSE_ITEM tap carries the photo
+//   6. a photo without a caption: one photo item pending is its item; several → the fixed question with
+//      CHOOSE_ITEM buttons and the end (worker/photo-item.ts, no turn)
+//   7. otherwise the agent's turn (`INSTALLER_MESSAGE`, turns/turn.ts); a CHOOSE_ITEM tap carries the photo
 //      it chose the item of (turns/facts.ts `chosenPhotoAttachment`)
 import type { NetworkClient } from "../network/client";
 import type { Message } from "../domain/conversations";
@@ -19,6 +21,7 @@ import type { WorkOrder } from "../domain/work-orders";
 import { agentKillDecision } from "../ops/kill-switch";
 import type { TurnDeps, TurnOutcome, TurnRequest } from "../turns/deps";
 import { chosenPhotoAttachment, inboundOfMessage } from "../turns/facts";
+import { itemNamedBy, photoItemDecision } from "./photo-item";
 import { runAgentTurn } from "../turns/turn";
 import { resolveTurnOrder } from "./active-order";
 import { WORKER_ACTIONS, auditOnce, workerAudit } from "./audit";
@@ -36,6 +39,7 @@ export type InboundOutcome =
   | { readonly kind: "MESSAGE_GONE" }
   | { readonly kind: "VOICE_REFUSED"; readonly notice: WorkerNoticeKey }
   | { readonly kind: "ORDER_CHOICE"; readonly safetyFired: boolean }
+  | { readonly kind: "ITEM_CHOICE" }
   | { readonly kind: "RELAYED"; readonly caseId: string; readonly safetyFired: boolean }
   | { readonly kind: "TURN"; readonly turn: TurnOutcome; readonly safetyFired: boolean };
 
@@ -139,13 +143,25 @@ export async function handleInboundMessage(deps: InboundDeps, ctx: WorkerContext
   // A tap on a row of the list answers the message the list asked about (FL-013).
   const message = resolved.message;
   const { inbound, attachment: sent, block } = message === current ? own : inboundOfMessage(message);
-  const attachment = sent ?? (order === undefined ? undefined : await chosenPhotoAttachment(data.conversations, message, { installerId: event.installerId, clockId: event.clockId, workOrderId: order.workOrderId }));
+  let attachment = sent ?? (order === undefined ? undefined : await chosenPhotoAttachment(data.conversations, message, { installerId: event.installerId, clockId: event.clockId, workOrderId: order.workOrderId }));
   if (order !== undefined) {
     await reportPhysicalAction(deps, ctx, event, order, current.sentAtSim);
     const taken = (await data.cases.listCasesOfWorkOrder(order.workOrderId)).find((caseItem) => caseItem.status === "TAKEN");
     if (taken !== undefined) {
       await deps.ports.cases.relayFromInstaller({ clockId: event.clockId, ispId: event.ispId, installerId: event.installerId, workOrderId: order.workOrderId, caseId: taken.caseId, message, eventId: event.eventId }, ctx);
       return { kind: "RELAYED", caseId: taken.caseId, safetyFired };
+    }
+    // A photo's item by code (worker/photo-item.ts), never guessed by the model.
+    const named = sent !== undefined && inbound?.kind === "IMAGE_CAPTION" ? itemNamedBy(inbound.text) : undefined;
+    if (sent !== undefined && named !== undefined) attachment = { ...sent, item: named };
+    if (sent !== undefined && inbound === undefined) {
+      const decision = await photoItemDecision(data.workOrders, order.workOrderId);
+      if (decision.kind === "KNOWN") attachment = { ...sent, item: decision.item };
+      if (decision.kind === "ASK") {
+        const buttons = decision.items.map((item) => ({ action: "CHOOSE_ITEM" as const, item }));
+        await sendWorkerNotice({ notices: deps.ports.notices, runtime: data.runtime }, ctx, targetOf(event, order.workOrderId), "itemChoicePrompt", buttons);
+        return { kind: "ITEM_CHOICE" };
+      }
     }
   }
   const request: TurnRequest = {

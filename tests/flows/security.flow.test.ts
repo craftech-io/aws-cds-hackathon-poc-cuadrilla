@@ -3,6 +3,7 @@
 // manipulated model would, the masking of the channel and the pre-filter before G1, the button nonces, the
 // sealed untrusted block of the envelope and the isolated photo validation.
 import { describe, expect, it } from "vitest";
+import type { PhotoItem } from "@cuadrilla/shared";
 import { esMX } from "../../packages/bff/src/copy/es-MX";
 import { buttonsOf, payloadOf } from "../../packages/bff/src/routers/simulator-views";
 import { READ_CHECKLIST, closeInstallation, reply } from "./support/agent";
@@ -124,7 +125,7 @@ describe("security flows", () => {
   ])("[FL-097] %s carries an injection in the image: only the isolated validation sees it, the checks decide (%s → %s) and nothing quotes it", async (photoId, item, reason) => {
     const world = await onSite("09:45", -21.4);
     world.plan(photoTurn(item));
-    await world.photo("inst-rogelio", photoId);
+    await world.photoFor("inst-rogelio", photoId, item as PhotoItem);
     const [validation] = await world.data.workOrders.listValidations("wo-24817", item as never);
     expect(validation).toMatchObject({ verdict: "REJECT", reasonCode: reason });
     expect(world.targets.photoModel.calls).toHaveLength(1);

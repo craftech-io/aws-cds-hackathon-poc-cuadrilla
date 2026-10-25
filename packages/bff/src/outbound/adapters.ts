@@ -153,6 +153,7 @@ export function pipelineWorkerNotices(deps: OutboundDeps, logger: Logger): Worke
           eventAtSim: await worldNow(deps, notice.clockId),
           notice: notice.notice,
           text: notice.text,
+          ...(notice.buttons === undefined ? {} : { buttons: notice.buttons.map((button) => ({ ...button })) }),
           inResponseToInbound: reply !== undefined,
           ...(reply !== undefined && WAMID.test(reply) ? { replyToWamid: reply } : {}),
           ...(notice.workOrderId === undefined ? {} : { workOrderId: notice.workOrderId }),

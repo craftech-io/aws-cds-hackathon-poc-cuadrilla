@@ -11,7 +11,7 @@
 // the event: a notice must not make the worker run a turn again.
 import type { RuntimePort } from "../connector/ports";
 import { esMX } from "../copy/es-MX";
-import type { WorkerContext, WorkerNoticeKey, WorkerNoticeSender } from "./ports";
+import type { WorkerContext, WorkerNotice, WorkerNoticeKey, WorkerNoticeSender } from "./ports";
 
 export interface NoticeTarget {
   readonly clockId: string;
@@ -51,10 +51,11 @@ export const NOTICE_TEXTS: Readonly<Record<WorkerNoticeKey, string>> = {
   voiceUnclear: esMX.voiceUnclear,
   voiceTooLong: esMX.voiceTooLong,
   voiceFailed: esMX.voiceFailed,
+  itemChoicePrompt: esMX.itemChoicePrompt,
 };
 
 /** Sends the fixed notice once per event; `false` when it was already sent or could not be sent. */
-export async function sendWorkerNotice(deps: NoticeDeps, ctx: Pick<WorkerContext, "log">, target: NoticeTarget, notice: WorkerNoticeKey): Promise<boolean> {
+export async function sendWorkerNotice(deps: NoticeDeps, ctx: Pick<WorkerContext, "log">, target: NoticeTarget, notice: WorkerNoticeKey, buttons?: WorkerNotice["buttons"]): Promise<boolean> {
   const source = `NOTICE:${notice}`;
   if ((await deps.runtime.getIdempotency(source, target.eventId)) !== undefined) return false;
   try {
@@ -65,6 +66,7 @@ export async function sendWorkerNotice(deps: NoticeDeps, ctx: Pick<WorkerContext
       notice,
       text: NOTICE_TEXTS[notice],
       eventId: target.eventId,
+      ...(buttons === undefined ? {} : { buttons }),
       ...(target.workOrderId === undefined ? {} : { workOrderId: target.workOrderId }),
       ...(target.replyToMessageId === undefined ? {} : { replyToMessageId: target.replyToMessageId }),
     });

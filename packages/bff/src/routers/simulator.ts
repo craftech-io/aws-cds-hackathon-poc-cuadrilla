@@ -18,6 +18,7 @@ import { z } from "zod";
 import { type ClockId, PersonId, PhotoId, ToolError, VoiceNoteId } from "@cuadrilla/shared";
 import { simMediaKey } from "@cuadrilla/shared/media/keys";
 import { COUNTER_KEYS, hourKey } from "../connector/keys";
+import { PHOTO_ITEM_BUTTONS } from "../copy/buttons";
 import { RUNTIME_TTL_SECONDS } from "../domain/runtime";
 import { rateLimitsOf } from "../channels/rate-limit";
 import { MEDIA_LIMITS, SIMULATOR_AUDIO_TYPES } from "../channels/whatsapp/config";
@@ -166,13 +167,15 @@ export async function sendVoice(ctx: Ctx, input: z.infer<typeof VoiceInput>) {
   return deliver(ctx, world, sender, { type: "voice", uploadId, mimeType });
 }
 
-async function sendPhoto(ctx: Ctx, input: z.infer<typeof PhotoInput>) {
+/** `caption`: a quick photo of the tour names its item with the item's button title. */
+async function sendPhoto(ctx: Ctx, input: z.infer<typeof PhotoInput>, quickCaption?: string) {
   const world = await simWorld(ctx);
   const sender = await senderOf(ctx, world, input.identity);
   await admit(ctx, world, sender, ["turns", "validations"]);
   const uploadId = "photoId" in input ? await sampleUpload(ctx, world, "PHOTO", seedKeys.photo(input.photoId), "image/jpeg") : input.uploadId;
   const { mimeType } = await takeUpload(ctx, world, uploadId, "PHOTO");
-  return deliver(ctx, world, sender, { type: "photo", uploadId, mimeType, ...("caption" in input && input.caption !== undefined ? { caption: input.caption } : {}) });
+  const caption = "caption" in input && input.caption !== undefined ? input.caption : quickCaption;
+  return deliver(ctx, world, sender, { type: "photo", uploadId, mimeType, ...(caption === undefined ? {} : { caption }) });
 }
 
 async function threadOf(ctx: Ctx, personId: string) {
@@ -218,7 +221,7 @@ export async function sendQuick(ctx: Ctx, quickId: string) {
       sent = await sendVoice(ctx, { identity, voiceId: quick.action.voiceId });
       break;
     case "PHOTO":
-      sent = await sendPhoto(ctx, { identity, photoId: quick.action.photoId });
+      sent = await sendPhoto(ctx, { identity, photoId: quick.action.photoId }, PHOTO_ITEM_BUTTONS[quick.action.item].es);
       break;
     case "TAP":
       sent = await tapByTitle(ctx, identity, quick.action.title);

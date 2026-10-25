@@ -4,7 +4,8 @@
 // bytes it receives) with the deterministic checks against the in-process orchestrator, the reaction by
 // the pipeline, `update_checklist`, the attempts and the case they open.
 import { describe, expect, it } from "vitest";
-import { VERDICT_REACTIONS } from "../../packages/bff/src/copy/buttons";
+import { PHOTO_ITEM_BUTTONS, VERDICT_REACTIONS } from "../../packages/bff/src/copy/buttons";
+import { esMX } from "../../packages/bff/src/copy/es-MX";
 import { READ_CHECKLIST, READ_ORDER, VALIDATE_CHOSEN, citedReply, outputOf, passItem, reply, search, validate } from "./support/agent";
 import { photoTurn } from "./support/story";
 import { createFlowWorld, type FlowWorld } from "./support/world";
@@ -68,15 +69,15 @@ describe("evidence flows", () => {
 
   it("[FL-036] the candidate id of the envelope is the one validate_install_photo accepts", async () => {
     const world = await onSite("inst-rogelio", "wo-24817", { rx: -21.4 });
-    world.plan({ steps: [{ tool: "validate_install_photo", input: (context) => ({ candidateId: context.envelope.candidateId ?? "", item: "POWER_READING_PHOTO" }) }] });
-    await world.photo("inst-rogelio", "ph-meter-01");
+    world.plan({ steps: [{ tool: "validate_install_photo", input: (context) => ({ candidateId: context.envelope.candidateId ?? "", item: context.envelope.item ?? "" }) }] });
+    await world.photoFor("inst-rogelio", "ph-meter-01", "POWER_READING_PHOTO");
     expect(world.harness.turns[0]?.calls[0]?.output).toMatchObject({ ok: true, verdict: "PASS" });
   });
 
   it("[FL-036] [FL-103] the meter in range passes: validation recorded, evidence copied without metadata, item passed and one ✅ reaction", async () => {
     const world = await onSite("inst-rogelio", "wo-24817", { rx: -21.4 });
     world.plan(photoTurn("POWER_READING_PHOTO"));
-    await world.photo("inst-rogelio", "ph-meter-01");
+    await world.photoFor("inst-rogelio", "ph-meter-01", "POWER_READING_PHOTO");
     const [validation] = await validations(world, "wo-24817", "POWER_READING_PHOTO");
     expect(validation).toMatchObject({ verdict: "PASS", rubricVersion: "v001", source: "SCRIPTED", stopReason: "tool_use" });
     expect(validation?.sha256).toMatch(/^[0-9a-f]{64}$/);
@@ -98,7 +99,7 @@ describe("evidence flows", () => {
   ])("[FL-037] [FL-103] %s out of range is rejected by the code with an actionable reason and one 🔁 reaction", async (photoId, workOrderId, rx, reason) => {
     const world = await onSite("inst-rogelio", workOrderId, { rx });
     world.plan(photoTurn("POWER_READING_PHOTO"));
-    await world.photo("inst-rogelio", photoId);
+    await world.photoFor("inst-rogelio", photoId, "POWER_READING_PHOTO");
     const [validation] = await validations(world, workOrderId, "POWER_READING_PHOTO");
     expect(validation).toMatchObject({ verdict: "REJECT", reasonCode: reason });
     expect(validation?.checks).toContain("VAL-RANGE");
@@ -116,7 +117,7 @@ describe("evidence flows", () => {
   ])("[FL-038] %s is rejected for quality (%s) and the item's failed attempts grow by one", async (photoId, reason) => {
     const world = await onSite("inst-karina", "wo-24820", { rx: -20.2 });
     world.plan(photoTurn("ONU_LABEL_PHOTO"));
-    await world.photo("inst-karina", photoId);
+    await world.photoFor("inst-karina", photoId, "ONU_LABEL_PHOTO");
     expect((await validations(world, "wo-24820", "ONU_LABEL_PHOTO")).map((validation) => [validation.verdict, validation.reasonCode])).toEqual([["REJECT", reason]]);
     expect((await world.data.workOrders.getChecklistItem("wo-24820", "ONU_LABEL_PHOTO"))?.attempts).toBe(1);
   });
@@ -134,7 +135,7 @@ describe("evidence flows", () => {
       },
       { steps: [VALIDATE_CHOSEN, reply("Listo, la usé para la roseta.")] },
     );
-    await world.photo("inst-rogelio", "ph-rosette-01");
+    await world.photoFor("inst-rogelio", "ph-rosette-01", "POWER_READING_PHOTO");
     await world.tap("inst-rogelio", { title: "Roseta" });
     expect((await validations(world, "wo-24817")).map((validation) => [validation.item, validation.verdict, validation.reasonCode ?? null])).toEqual(
       expect.arrayContaining([
@@ -142,28 +143,38 @@ describe("evidence flows", () => {
         ["ROSETTE_PHOTO", "PASS", null],
       ]),
     );
-    // The tap's turn carries the same photo with the item chosen; no candidate id travels in the model's memory.
+    // Each tap's turn carries the same photo with the item chosen; no candidate id travels in the model's memory.
+    expect(world.harness.turns[0]?.envelope.item).toBe("POWER_READING_PHOTO");
     expect(world.harness.turns[1]?.envelope).toMatchObject({ candidateId: world.harness.turns[0]?.envelope.candidateId, item: "ROSETTE_PHOTO" });
   });
 
-  it("[FL-046] [FL-103] a photo without its item: the agent asks with CHOOSE_ITEM buttons and the tap on «Etiqueta de la ONU» validates that photo (✅), never asking for it again", async () => {
+  it("[FL-046] [FL-103] a photo without a word and several items pending: the worker asks with CHOOSE_ITEM buttons (no turn), the tap on «Etiqueta de la ONU» validates that photo (✅), never asking for it again", async () => {
     const world = await onSite("inst-rogelio", "wo-24817", { rx: -21.4 });
-    world.plan(
-      { steps: [reply("¿De cuál punto es esta foto?", { buttons: ITEMS.map((item) => ({ action: "CHOOSE_ITEM", item })) })] },
-      { steps: [VALIDATE_CHOSEN, passItem("ONU_LABEL_PHOTO"), reply("Foto recibida y validada.")] },
-    );
+    world.plan({ steps: [VALIDATE_CHOSEN, passItem("ONU_LABEL_PHOTO"), reply("Foto recibida y validada.")] });
     await world.photo("inst-rogelio", "ph-label-01");
-    expect(await validations(world, "wo-24817")).toEqual([]);
+    expect(world.harness.turns).toHaveLength(0);
+    const [question] = await world.delivered("inst-rogelio", "SYSTEM_NOTICE");
+    expect(question?.text).toBe(esMX.itemChoicePrompt);
+    expect(((question?.interactive?.buttons ?? []) as Array<{ title: string }>).map((button) => button.title).sort()).toEqual(ITEMS.map((item) => PHOTO_ITEM_BUTTONS[item].es).sort());
     await world.tap("inst-rogelio", { title: "Etiqueta de la ONU" });
-    const [photoTurn, tapTurn] = world.harness.turns;
-    expect(photoTurn?.envelope.item).toBeUndefined();
-    expect(tapTurn?.envelope).toMatchObject({ candidateId: photoTurn?.envelope.candidateId, item: "ONU_LABEL_PHOTO" });
+    const [tapTurn] = world.harness.turns;
+    expect(tapTurn?.envelope).toMatchObject({ candidateId: expect.stringMatching(/^ec_/), item: "ONU_LABEL_PHOTO" });
     expect((await validations(world, "wo-24817")).map((validation) => [validation.item, validation.verdict])).toEqual([["ONU_LABEL_PHOTO", "PASS"]]);
     expect(await itemStatus(world, "wo-24817", "ONU_LABEL_PHOTO")).toBe("PASSED");
     const reactions = await world.delivered("inst-rogelio", "VERDICT_REACTION");
     expect(reactions.map((reaction) => reaction.refs?.verdict)).toEqual(["PASS"]);
     expect(JSON.stringify(reactions[0]?.refs?.whatsapp ?? reactions[0])).toContain(VERDICT_REACTIONS.PASS);
-    expect((await world.delivered("inst-rogelio", "REPLY")).map((message) => message.text)).toEqual(["¿De cuál punto es esta foto?", "Foto recibida y validada."]);
+    expect((await world.delivered("inst-rogelio", "REPLY")).map((message) => message.text)).toEqual(["Foto recibida y validada."]);
+  });
+
+  it("[FL-046] a photo without a word and one photo item pending: that item, validated in the photo's own turn", async () => {
+    const world = await onSite("inst-rogelio", "wo-24817", { rx: -21.4 });
+    for (const item of ["POWER_READING_PHOTO", "ROSETTE_PHOTO"] as const) await world.data.workOrders.updateChecklistItem("wo-24817", item, { status: "PASSED" }, { actor: "QA", atSim: await world.simNow() });
+    world.plan({ steps: [VALIDATE_CHOSEN, passItem("ONU_LABEL_PHOTO"), reply("Foto recibida y validada.")] });
+    await world.photo("inst-rogelio", "ph-label-01");
+    expect(world.harness.turns[0]?.envelope.item).toBe("ONU_LABEL_PHOTO");
+    expect(await world.delivered("inst-rogelio", "SYSTEM_NOTICE")).toEqual([]);
+    expect(await itemStatus(world, "wo-24817", "ONU_LABEL_PHOTO")).toBe("PASSED");
   });
 
   it("[FL-040] the label with the order's serial and the rosette pass, the customer's conformity by button, and the agent offers to close", async () => {
@@ -171,9 +182,9 @@ describe("evidence flows", () => {
     world.plan(photoTurn("POWER_READING_PHOTO"), photoTurn("ONU_LABEL_PHOTO"), {
       steps: [validate("ROSETTE_PHOTO"), { tool: "update_checklist", input: (context) => ({ item: "ROSETTE_PHOTO", status: "PASSED", validationId: String(outputOf(context, "validate_install_photo").validationId) }) }, reply("Listo. Cuando la clienta esté conforme, toca el botón.", { buttons: [{ action: "CUSTOMER_OK" }] })],
     });
-    await world.photo("inst-rogelio", "ph-meter-01");
-    await world.photo("inst-rogelio", "ph-label-01");
-    await world.photo("inst-rogelio", "ph-rosette-02");
+    await world.photoFor("inst-rogelio", "ph-meter-01", "POWER_READING_PHOTO");
+    await world.photoFor("inst-rogelio", "ph-label-01", "ONU_LABEL_PHOTO");
+    await world.photoFor("inst-rogelio", "ph-rosette-02", "ROSETTE_PHOTO");
     await world.tap("inst-rogelio", "CUSTOMER_OK");
     const checklist = await world.data.workOrders.listChecklist("wo-24817");
     expect(checklist.map((entry) => [entry.item, entry.status]).sort()).toEqual([...ITEMS, "CUSTOMER_OK", "ONU_ONLINE"].map((item) => [item, "PASSED"]).sort());
@@ -190,35 +201,35 @@ describe("evidence flows", () => {
   it("[FL-041] (a) a label with another serial and (b) a reading 6 dB off the orchestrator's are rejected by the checks", async () => {
     const karina = await onSite("inst-karina", "wo-24821", { rx: -22.8 });
     karina.plan(photoTurn("ONU_LABEL_PHOTO"));
-    await karina.photo("inst-karina", "ph-label-09");
+    await karina.photoFor("inst-karina", "ph-label-09", "ONU_LABEL_PHOTO");
     expect((await validations(karina, "wo-24821", "ONU_LABEL_PHOTO")).map((validation) => [validation.reasonCode, validation.checks.includes("VAL-SERIAL")])).toEqual([["SERIAL_MISMATCH", true]]);
     const rogelio = await onSite("inst-rogelio", "wo-24817", { rx: -21.4 });
     rogelio.plan(photoTurn("POWER_READING_PHOTO"));
-    await rogelio.photo("inst-rogelio", "ph-meter-05");
+    await rogelio.photoFor("inst-rogelio", "ph-meter-05", "POWER_READING_PHOTO");
     expect((await validations(rogelio, "wo-24817", "POWER_READING_PHOTO")).map((validation) => [validation.reasonCode, validation.checks.includes("VAL-CROSSCHECK")])).toEqual([["READING_MISMATCH", true]]);
   });
 
   it("[FL-041] (c) a photo already used as evidence of another order of the world is a duplicate without calling the model; in another world it is not", async () => {
     const world = await onSite("inst-rogelio", "wo-24817", { rx: -21.4 });
     world.plan(photoTurn("POWER_READING_PHOTO"), photoTurn("POWER_READING_PHOTO"));
-    await world.photo("inst-rogelio", "ph-meter-01");
+    await world.photoFor("inst-rogelio", "ph-meter-01", "POWER_READING_PHOTO");
     await world.data.worlds.setActiveWorkOrder("inst-rogelio", world.clockId, "wo-24818", await world.simNow());
     const calls = world.targets.photoModel.calls.length;
-    await world.photo("inst-rogelio", "ph-meter-01");
+    await world.photoFor("inst-rogelio", "ph-meter-01", "POWER_READING_PHOTO");
     const [duplicate] = await validations(world, "wo-24818", "POWER_READING_PHOTO");
     expect(duplicate).toMatchObject({ verdict: "REJECT", reasonCode: "DUPLICATE_EVIDENCE" });
     expect(world.targets.photoModel.calls).toHaveLength(calls);
     await world.data.worlds.setActiveWorkOrder("inst-rogelio-gtest", "GUEST#isp-guest-test", "wo-24817-gtest", await world.simNow("GUEST#isp-guest-test"));
     await world.network.client.setBehaviour({ clockId: "GUEST#isp-guest-test", serial: "DEMO3F2C19A0", caller: "QA", atSim: await world.simNow("GUEST#isp-guest-test"), change: { behaviour: "ONLINE_OK", fixed: true, rxPowerDbm: -21.4 } });
     world.plan(photoTurn("POWER_READING_PHOTO"));
-    await world.photo("inst-rogelio-gtest", "ph-meter-01");
+    await world.photoFor("inst-rogelio-gtest", "ph-meter-01", "POWER_READING_PHOTO");
     expect((await validations(world, "wo-24817-gtest", "POWER_READING_PHOTO")).map((validation) => validation.reasonCode ?? "PASS")).toEqual(["PASS"]);
   });
 
   it("[FL-042] the third rejection of the same item opens one PHOTO_ATTEMPTS case with the three attempts", async () => {
     const world = await onSite("inst-karina", "wo-24820", { rx: -20.2 });
     world.plan(photoTurn("ONU_LABEL_PHOTO"), photoTurn("ONU_LABEL_PHOTO"), photoTurn("ONU_LABEL_PHOTO"));
-    for (const photoId of ["ph-label-04", "ph-label-05", "ph-label-06"]) await world.photo("inst-karina", photoId);
+    for (const photoId of ["ph-label-04", "ph-label-05", "ph-label-06"]) await world.photoFor("inst-karina", photoId, "ONU_LABEL_PHOTO");
     const [caseItem, ...others] = await world.data.cases.listCasesOfWorkOrder("wo-24820");
     expect(others).toEqual([]);
     expect(caseItem?.reason).toBe("PHOTO_ATTEMPTS");
@@ -228,18 +239,17 @@ describe("evidence flows", () => {
     expect(world.harness.turns.at(-1)?.calls[0]?.output).toMatchObject({ ok: true, attempts: 3, caseOpened: { reason: "PHOTO_ATTEMPTS" } });
   });
 
-  it("[FL-046] (a) a photo nobody asked for is a candidate the agent asks about; (b) an image too heavy and (c) a sticker get fixed replies and no turn", async () => {
+  it("[FL-046] (a) a photo nobody asked for gets the fixed item question; (b) an image too heavy and (c) a sticker get fixed replies; no turn", async () => {
     const world = await onSite("inst-rogelio", "wo-24817", { onuOnline: false });
-    world.plan({ steps: [reply("¿Para qué ítem es esta foto?", { buttons: ITEMS.map((item) => ({ action: "CHOOSE_ITEM", item })) })] });
     await world.photo("inst-rogelio", "ph-meter-01");
-    expect(world.harness.turns[0]?.envelope.candidateId).toMatch(/.+/);
+    expect((await world.delivered("inst-rogelio", "SYSTEM_NOTICE")).map((message) => message.text)).toEqual([esMX.itemChoicePrompt]);
     expect(await validations(world, "wo-24817")).toEqual([]);
     const heavy = new Uint8Array(4_500_000);
     heavy.set([0xff, 0xd8, 0xff, 0xe0]);
     await world.photo("inst-rogelio", { bytes: heavy });
     await world.send("inst-rogelio", { type: "other", kind: "sticker" });
-    expect(world.harness.turns).toHaveLength(1);
-    const notices = (await world.delivered("inst-rogelio", "SYSTEM_NOTICE")).map((message) => message.text ?? "");
+    expect(world.harness.turns).toHaveLength(0);
+    const notices = (await world.delivered("inst-rogelio", "SYSTEM_NOTICE")).map((message) => message.text ?? "").filter((text) => text !== esMX.itemChoicePrompt);
     expect(notices).toHaveLength(2);
     expect(notices[0]).toMatch(/foto/i);
     const images = (await world.thread("inst-rogelio")).filter((message) => message.direction === "IN" && (message.content === "IMAGE" || message.content === "STICKER"));

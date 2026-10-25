@@ -16,7 +16,7 @@
 //
 // A handler throws to put the event back on the queue; whatever it enqueues goes through `ctx.sink`,
 // so the follow-up is in flight before the current event leaves it.
-import type { HazardCategory } from "@cuadrilla/shared";
+import type { HazardCategory, PhotoItem } from "@cuadrilla/shared";
 import type { TimerPort } from "../agent-tools/common/ports";
 import type { InstallerNoticeSender, WorkOrderActions } from "../channels/whatsapp/ports";
 import type { Message } from "../domain/conversations";
@@ -44,7 +44,7 @@ export interface WorkerContext {
 // ---- Fixed notices --------------------------------------------------------------------------------
 
 /** The texts of copy/es-MX.ts the worker itself sends to the installer (`SYSTEM_NOTICE`). */
-export type WorkerNoticeKey = "servicePaused" | "agentFallback" | "turnCap" | "guardrailRefusal" | "voiceUnclear" | "voiceTooLong" | "voiceFailed";
+export type WorkerNoticeKey = "servicePaused" | "agentFallback" | "turnCap" | "guardrailRefusal" | "voiceUnclear" | "voiceTooLong" | "voiceFailed" | "itemChoicePrompt";
 
 export interface WorkerNotice {
   readonly clockId: string;
@@ -53,6 +53,8 @@ export interface WorkerNotice {
   readonly personId: string;
   readonly notice: WorkerNoticeKey;
   readonly text: string;
+  /** `itemChoicePrompt`: one CHOOSE_ITEM button per photo item still to pass. */
+  readonly buttons?: ReadonlyArray<{ readonly action: "CHOOSE_ITEM"; readonly item: PhotoItem }>;
   readonly workOrderId?: string;
   /** The inbound message it answers: a reply is exempt from quiet hours (`CP-QUIET-HOURS`). */
   readonly replyToMessageId?: string;
