@@ -10,6 +10,7 @@
 // `guest` template, so 9.a binds the phone to that world. `pricing.category` is not in the stored statuses
 // (the snapshot reads messages, not their events): step 6 checks the statuses and reports where the category
 // is read (the `WhatsAppTemplateCategory` metric of the channel's log, which counts only non-utility ones).
+import { PHOTO_ITEM_BUTTONS } from "../../packages/bff/src/copy/buttons";
 import { DAY, at, decided, orderIn, personIn, say, settledOn, tap, withAction } from "./lib/assist";
 import { CREW_N3, caseOn } from "./lib/cases";
 import { Blocked, type ScenarioContext, ensure } from "./lib/context";
@@ -187,7 +188,7 @@ export default defineScenario({
         const a = op(w, "a");
         const expected = phone().photoClass;
         const label = expected === "PASS" ? "a sharp photo of the ONU's label" : "a photo of the ONU's label with glare";
-        const shot = await fromPhone(ctx, `Send ${label}`, (message) => message.media?.kind === "IMAGE");
+        const shot = await fromPhone(ctx, `Send ${label} with the caption "${PHOTO_ITEM_BUTTONS.ONU_LABEL_PHOTO.es}"`, (message) => message.media?.kind === "IMAGE");
         const snapshot = await settledOn(ctx, w, a.installerId, [a.workOrderId], [a.installerId], WAITS.photoSec + WAITS.turnSec);
         const validation = orderIn(snapshot, a.workOrderId).validations.find((entry) => entry.source !== "SEED" && JSON.stringify(entry).includes(shot.messageId));
         ensure(validation !== undefined, "no PhotoValidation of the photo");

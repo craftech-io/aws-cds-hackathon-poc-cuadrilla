@@ -29,7 +29,8 @@ const COBRAND = {
 };
 
 async function signIn(page: Page, account: Pick<Account, "email" | "password">): Promise<void> {
-  await page.getByLabel(loginCopy.credentials.email).fill(account.email);
+  // The sign-in field reads exactly "Email o usuario": staff sign in by email, guests by their user.
+  await page.getByLabel(loginCopy.credentials.signInId, { exact: true }).fill(account.email);
   await page.getByLabel(loginCopy.credentials.password, { exact: true }).fill(account.password);
   await page.getByRole("button", { name: loginCopy.credentials.submit }).click();
 }
@@ -180,6 +181,7 @@ test.describe("the login's copy and ways in [FL-079]", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", lang() === "en" ? "en" : "es-MX");
     await expect(page.getByRole("heading", { name: text.credentials.title })).toBeVisible();
     await expect(page.getByText(text.credentials.lead)).toBeVisible();
+    await expect(page.getByLabel(text.credentials.signInId, { exact: true })).toBeVisible();
     await expect(page.getByText(text.credentials.hint)).toBeVisible();
     await expect(page.getByText(text.credentials.tryDemo.before.trim())).toBeVisible();
     const tryDemo = page.getByRole("link", { name: text.credentials.tryDemo.link });

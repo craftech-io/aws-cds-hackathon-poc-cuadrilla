@@ -2,9 +2,11 @@
 // through `wa.inbound` (the simulator's path); the unit waits for quiescence and reads a snapshot of the
 // orders and people it asserts on; and the negatives every unit with turns repeats (no forbidden pattern
 // in any outgoing message, no turn stopped by `max_tokens`).
+import type { PhotoItem } from "@cuadrilla/shared";
 import type { Message } from "../../../packages/bff/src/domain/conversations";
 import type { InboundContent } from "../../../packages/bff/src/qa-driver/contract-inputs";
 import type { OrderSnapshot, PersonSnapshot, QaSnapshot } from "../../../packages/bff/src/qa-driver/snapshot";
+import { PHOTO_ITEM_BUTTONS } from "../../../packages/bff/src/copy/buttons";
 import { esMX } from "../../../packages/bff/src/copy/es-MX";
 import { type ScenarioContext, ensure } from "./context";
 import { normalizeFacts, outboundViolations } from "./oracles";
@@ -17,10 +19,12 @@ export function send(ctx: ScenarioContext, world: Pick<World, "clockId">, identi
 }
 
 export const say = (ctx: ScenarioContext, world: Pick<World, "clockId">, identity: Identity, text: string) => send(ctx, world, identity, { type: "text", text });
-export const tap = (ctx: ScenarioContext, world: Pick<World, "clockId">, identity: Identity, action: Extract<InboundContent, { type: "button" }>["action"], options: { readonly fromPersonId?: string; readonly objectId?: string } = {}) =>
+export const tap = (ctx: ScenarioContext, world: Pick<World, "clockId">, identity: Identity, action: Extract<InboundContent, { type: "button" }>["action"], options: { readonly fromPersonId?: string; readonly objectId?: string; readonly title?: string } = {}) =>
   send(ctx, world, identity, { type: "button", action, ...options });
 export const voice = (ctx: ScenarioContext, world: Pick<World, "clockId">, identity: Identity, voiceId: string) => send(ctx, world, identity, { type: "voice", voiceId });
-export const photo = (ctx: ScenarioContext, world: Pick<World, "clockId">, identity: Identity, photoId: string) => send(ctx, world, identity, { type: "photo", photoId });
+/** A photo; with `item`, its caption is the item's button title, which names the item (worker/photo-item.ts). */
+export const photo = (ctx: ScenarioContext, world: Pick<World, "clockId">, identity: Identity, photoId: string, item?: PhotoItem) =>
+  send(ctx, world, identity, { type: "photo", photoId, ...(item === undefined ? {} : { caption: PHOTO_ITEM_BUTTONS[item].es }) });
 
 /** Waits for the installer's quiescence and reads the orders and people named. */
 export function settledOn(ctx: ScenarioContext, world: Pick<World, "clockId">, installerId: string, workOrderIds: readonly string[], personIds: readonly string[] = [installerId], timeoutSec?: number): Promise<QaSnapshot> {

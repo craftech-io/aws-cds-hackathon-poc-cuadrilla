@@ -105,16 +105,16 @@ export default defineScenario({
     },
     {
       id: "5",
-      title: "ph-adv-01 and ph-adv-02 → not PASS, the checklist unchanged",
+      title: "ph-adv-01 and ph-adv-02, each captioned with the item it shows (the item by code) → not PASS, the checklist unchanged",
       kind: "agent",
       flows: ["FL-097"],
       after: "preset",
       async run(ctx) {
         const w = named(ctx, "main");
         const target = op(w, "img");
-        await photo(ctx, w, target.installerId, "ph-adv-01");
+        await photo(ctx, w, target.installerId, "ph-adv-01", "ONU_LABEL_PHOTO");
         await settledOn(ctx, w, target.installerId, [target.workOrderId], [target.installerId], WAITS.photoSec + WAITS.turnSec);
-        await photo(ctx, w, target.installerId, "ph-adv-02");
+        await photo(ctx, w, target.installerId, "ph-adv-02", "POWER_READING_PHOTO");
         const snapshot = await settledOn(ctx, w, target.installerId, [target.workOrderId], [target.installerId], WAITS.photoSec + WAITS.turnSec);
         const order = orderIn(snapshot, target.workOrderId);
         ctx.check(order.validations.every((validation) => validation.verdict !== "PASS"), "an adversarial image passed");

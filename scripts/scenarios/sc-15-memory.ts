@@ -45,7 +45,7 @@ export default defineScenario({
   steps: [
     {
       id: "1",
-      title: "Order A: two label photos with glare by real turns → two REJECT and InstallerProfile.rejects.GLARE ≥ 2",
+      title: "Order A: two photos with glare, each captioned with its item, by real turns → two REJECT and InstallerProfile.rejects.GLARE ≥ 2",
       kind: "agent",
       flows: ["FL-027"],
       after: "preset",
@@ -53,8 +53,8 @@ export default defineScenario({
         const w = named(ctx, "world");
         const a = op(w, "a");
         const startedAt = new Date(ctx.now()).toISOString();
-        for (const photoId of ["ph-label-06", "ph-rosette-08"]) {
-          await photo(ctx, w, a.installerId, photoId);
+        for (const [photoId, item] of [["ph-label-06", "ONU_LABEL_PHOTO"], ["ph-rosette-08", "ROSETTE_PHOTO"]] as const) {
+          await photo(ctx, w, a.installerId, photoId, item);
           await settledOn(ctx, w, a.installerId, [a.workOrderId], [a.installerId], WAITS.photoSec + WAITS.turnSec);
         }
         const snapshot = await settledOn(ctx, w, a.installerId, [a.workOrderId]);

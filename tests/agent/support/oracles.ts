@@ -4,10 +4,10 @@
 // outgoing message are the scenario runner's own (scripts/scenarios/lib/oracles.ts), imported, not copied.
 import type { PhotoItem } from "@cuadrilla/shared";
 import type { Message } from "../../../packages/bff/src/domain/conversations";
-import { agentReplies, citationsOf, offersEscalation, outboundViolations, refList } from "../../../scripts/scenarios/lib/oracles";
+import { agentReplies, citationsOf, offersButton, offersEscalation, outboundViolations, refList } from "../../../scripts/scenarios/lib/oracles";
 import type { FlowWorld } from "../../flows/support/world";
 
-export { citationsOf, offersEscalation, refList };
+export { citationsOf, offersButton, offersEscalation, refList };
 
 export const PHOTO_ITEMS = ["POWER_READING_PHOTO", "ONU_LABEL_PHOTO", "ROSETTE_PHOTO"] as const satisfies readonly PhotoItem[];
 
@@ -65,10 +65,4 @@ export async function foreignOrderNumbers(flow: FlowWorld, installerId: string):
   const others = ["inst-karina", "inst-tomas", "inst-beatriz", "inst-julian", "inst-ernesto", "inst-lorena", "inst-rogelio"].filter((id) => id !== installerId);
   const days = await Promise.all(others.map((id) => flow.data.workOrders.listInstallerDay(id, "2026-10-13")));
   return days.flat().map((order) => order.workOrderNumber);
-}
-
-/** A reply that offers `CHOOSE_ITEM` buttons: the agent asks which item a photo is for. */
-export function asksForItem(message: Message | undefined): boolean {
-  const buttons = (message?.interactive as { buttons?: Array<{ action?: unknown }> } | undefined)?.buttons ?? [];
-  return buttons.some((button) => button.action === "CHOOSE_ITEM") || /\?|¿/.test(message?.text ?? "");
 }

@@ -1,7 +1,9 @@
 // SC-04 · evidence photos (docs/test-plan.md §4.5; FL-035 … FL-046, FL-103). Two kinds of steps:
 //
-//   with a real turn (2, 15.a)    the photo enters as the installer's message and the agent validates it:
-//                                 the validation, the item and the reaction (one per photo, coherent)
+//   with a real turn (2, 15.a)    the photo enters as the installer's message with its item decided by
+//                                 code (FL-046: the caption with the item's title in 2; in 15.a, the fixed
+//                                 question with the pending items' buttons and no turn, then the tap) and
+//                                 the agent validates it: the validation, the item and the reaction
 //   by tool.invoke (3 … 11, 14)   `validate_install_photo` with `caller QA` over candidates the preset
 //                                 registered, no turn nor inbound message: the class of the verdict, the
 //                                 `reasonText` of `copy/`, the item never PASSED and no reaction (§4.3, row
@@ -10,11 +12,14 @@
 // The duplicates run in a world of their own (`sc04-dup`), like `EV-02`. Every seeded evidence of the main
 // world uses seeding renders, so no photo of the set collides with it.
 import type { PhotoValidation } from "../../packages/bff/src/domain/work-orders";
+import { PHOTO_ITEM_BUTTONS } from "../../packages/bff/src/copy/buttons";
 import { esMX } from "../../packages/bff/src/copy/es-MX";
+import { candidateIdOf } from "../../packages/bff/src/evidence/candidate";
+import type { QaSnapshot } from "../../packages/bff/src/qa-driver/snapshot";
 import { DAY, assertCleanOutbound, at, isNotice, orderIn, personIn, photo, say, send, settledOn, tap } from "./lib/assist";
 import { type ScenarioContext, ensure } from "./lib/context";
 import { WAITS } from "./lib/eventually";
-import { agentReplies, citationProblem, outOf, refList } from "./lib/oracles";
+import { agentReplies, citationProblem, offersButton, outOf, refList } from "./lib/oracles";
 import { defineScenario } from "./lib/steps";
 import { type World, createWorld, op, presetOf, stored } from "./lib/world";
 
@@ -126,14 +131,14 @@ export default defineScenario({
     },
     {
       id: "2",
-      title: "ph-meter-01 by a real turn → PASS, ✅ reaction, the item PASSED",
+      title: "ph-meter-01 with the caption \"Lectura del medidor\" (the item by code) by a real turn → PASS, ✅ reaction, the item PASSED",
       kind: "agent",
       flows: ["FL-036", "FL-103"],
       after: "preset",
       async run(ctx) {
         const w = main(ctx);
         const p = op(w, "p");
-        await photo(ctx, w, p.installerId, "ph-meter-01");
+        await photo(ctx, w, p.installerId, "ph-meter-01", "POWER_READING_PHOTO");
         const snapshot = await settledOn(ctx, w, p.installerId, [p.workOrderId], [p.installerId], WAITS.photoSec + WAITS.turnSec);
         const order = orderIn(snapshot, p.workOrderId);
         const validations = order.validations.filter((entry) => entry.item === "POWER_READING_PHOTO" && entry.source !== "SEED");
@@ -243,21 +248,36 @@ export default defineScenario({
       parts: [
         {
           part: "a",
-          title: "A photo nobody asked for, by a real turn → a candidate without validation and a question about the item",
+          title: "A photo nobody asked for, without a caption, the three photo items pending → the fixed question with their buttons and no turn; the tap → that candidate validated for the item chosen",
           kind: "agent",
           flows: ["FL-046"],
           after: "preset",
           async run(ctx) {
             const w = main(ctx);
             const u = op(w, "u");
+            const turnsOf = (snapshot: QaSnapshot) => personIn(snapshot, u.installerId).turnNotes.length;
+            const turnsBefore = turnsOf(await ctx.snapshot({ clockId: w.clockId, personIds: [u.installerId] }));
             await photo(ctx, w, u.installerId, "ph-rosette-03");
+            const asked = await settledOn(ctx, w, u.installerId, [u.workOrderId]);
+            const order = orderIn(asked, u.workOrderId);
+            ctx.none(asked, "validations before the item is chosen", order.validations.filter((entry) => entry.source !== "SEED"));
+            ctx.exactly(asked, turnsBefore, "turns after the photo", personIn(asked, u.installerId).turnNotes);
+            const pending = order.checklist.filter((entry) => entry.item in PHOTO_ITEM_BUTTONS && entry.status !== "PASSED" && entry.status !== "OVERRIDDEN").map((entry) => PHOTO_ITEM_BUTTONS[entry.item as Item].es);
+            const questions = personIn(asked, u.installerId).messages.filter((message) => message.direction === "OUT" && message.kind === "SYSTEM_NOTICE" && isNotice(message, "itemChoicePrompt"));
+            ctx.exactly(asked, 1, "itemChoicePrompt notices", questions);
+            const titles = ((questions[0]?.interactive as { buttons?: Array<{ title?: unknown }> } | undefined)?.buttons ?? []).map((button) => String(button.title));
+            ctx.check(titles.length === 3 && [...titles].sort().join() === [...pending].sort().join(), `the question offers ${titles.join(", ") || "no button"} for pending ${pending.join(", ")}`);
+            const sent = personIn(asked, u.installerId).messages.filter((message) => message.direction === "IN" && message.media?.kind === "IMAGE").at(-1);
+            ensure(sent !== undefined, "the photo is not in the thread");
+            await tap(ctx, w, u.installerId, "CHOOSE_ITEM", { title: PHOTO_ITEM_BUTTONS.ROSETTE_PHOTO.es });
             const snapshot = await settledOn(ctx, w, u.installerId, [u.workOrderId], [u.installerId], WAITS.photoSec + WAITS.turnSec);
-            const order = orderIn(snapshot, u.workOrderId);
-            ctx.none(snapshot, "validations of an unasked photo", order.validations.filter((entry) => entry.source !== "SEED"));
-            const reply = agentReplies(personIn(snapshot, u.installerId).messages).at(-1);
-            ensure(reply !== undefined, "no REPLY");
-            const asks = (reply.interactive as { buttons?: unknown[] } | undefined)?.buttons !== undefined || /\?|¿/.test(reply.text ?? "");
-            ctx.check(asks, "the reply does not ask which item the photo is for");
+            const validations = orderIn(snapshot, u.workOrderId).validations.filter((entry) => entry.source !== "SEED");
+            ctx.check(validations.length === 1 && validations[0]?.item === "ROSETTE_PHOTO" && validations[0].candidateId === candidateIdOf(sent.messageId), `after the tap: ${validations.map((entry) => `${entry.item} ${entry.candidateId ?? "?"}`).join(", ") || "no validation"}`);
+            ctx.check(turnsOf(snapshot) > turnsBefore, "the tap ran no turn");
+            const person = personIn(snapshot, u.installerId);
+            ctx.check(person.messages.filter((message) => isNotice(message, "itemChoicePrompt")).length === 1, "the item was asked again");
+            ctx.check(!agentReplies(person.messages).some((message) => offersButton(message, "CHOOSE_ITEM")), "a REPLY asks the item again");
+            assertCleanOutbound(ctx, snapshot);
           },
         },
         {
