@@ -116,6 +116,8 @@ Determinista · lee `WorkOrders/CHECK#`, `Reference/RUBRIC#` · invocan: `harnes
 ### `validate_install_photo`
 Determinista con una llamada multimodal aislada · lee `WorkOrders`, `Media`; escribe `WorkOrders/EVID#`, `VAL#`, `CHECK#` (solo `REJECTED`/`IN_REVIEW`), `Evidence/photos/` (JPEG sin metadatos); `bedrock:InvokeModel`; `NetworkMock`; reacción `VERDICT_REACTION` por el pipeline (FL-103), solo cuando la invoca `harness` · invocan: `harness`, `qa` (`tool.invoke` de `EV-02` y de `SC-04/3..8`, `SC-04/9.a`, `SC-04/10..14`: sin turno, sin reacción y nunca `CHECK# PASSED`, que solo escribe `update_checklist`).
 
+El `item` de una foto lo decide el código antes del turno, nunca el modelo (FL-046, `worker/photo-item.ts`): un pie que es el título del botón de un ítem, el único ítem de foto pendiente o el toque `CHOOSE_ITEM` de la pregunta fija `itemChoicePrompt`, que el worker manda sin turno cuando hay varios pendientes. El sobre lo trae como `<attachment kind="IMAGE" candidateId="…" item="…"/>` y el agente valida esa candidata con ese ítem; el botón `CHOOSE_ITEM` de `send_whatsapp` queda para ofrecer otro ítem a una foto ya validada (FL-039).
+
 ```json
 {"input": {"type": "object", "properties": {"sessionToken": {"type": "string"}, "candidateId": {"type": "string", "description": "id de la foto candidata del sobre"}, "item": {"type": "string", "description": "uno de: POWER_READING_PHOTO | ONU_LABEL_PHOTO | ROSETTE_PHOTO"}}, "required": ["sessionToken", "candidateId", "item"]},
  "output": {"ok": "boolean", "validationId": "string", "verdict": "Verdict", "reasonCode": "RejectReason", "reasonText": "string", "readings": {"readingDbm": "number", "wavelengthNm": "number", "serialMatches": "boolean"}, "attempts": "integer", "caseOpened": {"caseId": "string", "reason": "CaseReason"}, "error": "Error"}}
@@ -263,7 +265,7 @@ Todo procedimiento pasa por `ispProcedure`, salvo tres públicos sin datos de ni
 | `outbox` | `list`, `get` (texto plano, adjunto por GET prefirmado) |
 | `manual` | `sections`, `section` |
 | `metrics` | `summary` (por pestaña, cada KPI con N, fuente y rótulo; p50 y p95; consumo del techo global y estado del corte), `export` |
-| `brand` | `get` (público; modo, nombre visible de `resolveBrand`, URLs prefirmadas de los logos `onLight` y `onDark` de `Seed/brand/` o `null` para la marca de texto, aviso; ADR-0018) |
+| `brand` | `get` (público; modo, nombre visible de `resolveBrand`, URLs prefirmadas de los logos `onLight` y `onDark` de `Seed/brand/` o `null` para la marca de texto, también cuando el logo no se puede leer, así nunca falla la marca ni el visor del manual; aviso; ADR-0018) |
 | `audit` | `list`, `violations`, `decisionsByRule` |
 | `tour` | `steps({track: EXPRESS \| FULL})` (horas de "Qué mirar" desde `clock.get`, escena de cada paso, tiempo estimado del recorrido), `run(step)` (ejecuta el botón del paso por los mismos procedimientos del simulador y del reloj) |
 | `account` | `session` (aviso de otra sesión para `GUEST`), `changePassword`, `mfa.setup` (rechazados para `GUEST`), `deleteGuest` (**G R**, solo origen `SIGNUP`; `INVITED`/`TEST` → 403 y la portada no muestra el control: invoca `GuestAccountDeletion` solo con `{userId}` del principal, nunca un valor del input, y cierra la sesión) |

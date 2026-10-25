@@ -1072,6 +1072,7 @@ mismo patrón que `views/login/copy.ts`); especifica los cambios de fondo:
 | Campo | Antes (ya en el repo, voseo) | es-MX nuevo (tuteo) | en (nuevo) |
 |---|---|---|---|
 | `credentials.lead` | "Usa el email y la contraseña de tu invitación." | **Neutral (B9(5)): "Usa tu email y tu contraseña."** — ya no asume que todo login viene de una invitación, porque desde esta ola también inician sesión los invitados de alta propia | "Use your email and password." |
+| `credentials.signInId` (etiqueta del campo del paso `credentials` y del reingreso) | "Email" | **"Email o usuario"**: el campo es de texto (`autocomplete=username`) y acepta el email de la cuenta o el usuario de una cuenta invitada sin email (`guest-NN`); el reingreso (step-up) lo precarga con el email o, sin email, con ese usuario. La recuperación de contraseña sigue con `credentials.email` ("Email"), porque el código llega por email | "Email or username" |
 | `credentials.hint` | "Tu usuario se crea por invitación. Si no lo tienes, pídeselo a tu supervisor." | Se mantiene, **debajo** de `credentials.lead` como aclaración para roles internos, y se agrega un link: "¿Nunca has usado Cuadrilla? [Prueba la demo](/signup)" | "Never used Cuadrilla? [Try the demo](/signup)" |
 | `panel.points` (lista del panel de marca) | "Demo sintética: datos 100% inventados" | Se mantiene (ya sin mención al concurso) | Igual |
 

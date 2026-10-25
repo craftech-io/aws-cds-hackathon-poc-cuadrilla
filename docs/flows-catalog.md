@@ -272,7 +272,7 @@ Convenciones:
 
 ### FL-036 · Foto del medidor en rango: PASS
 - Actores: instalador, agente, validador · Canal: WhatsApp · Disparador: foto `ph-meter-01` (−21,4 dBm, 1490 nm).
-- Pasos: 1) Foto candidata registrada. 2) `validate_install_photo(candidate, POWER_READING_PHOTO)`: chequeos previos, `Converse` aislado con la única tool `record_verdict` (`toolChoice auto`, thinking adaptativo con effort bajo, sin `temperature`), chequeos de rango (B+), λ y ±3 dB contra el orquestador. 3) `update_checklist` → `PASSED`. 4) Reacción ✅ y `REPLY` de confirmación.
+- Pasos: 1) Foto candidata registrada; su ítem lo decide el código antes del turno (FL-046): un pie que es el título de un ítem lo nombra, el único ítem de foto pendiente es el suyo y, con varios, el toque de la pregunta fija la devuelve con el ítem elegido. 2) `validate_install_photo(candidate, POWER_READING_PHOTO)`: chequeos previos, `Converse` aislado con la única tool `record_verdict` (`toolChoice auto`, thinking adaptativo con effort bajo, sin `temperature`), chequeos de rango (B+), λ y ±3 dB contra el orquestador. 3) `update_checklist` → `PASSED`. 4) Reacción ✅ y `REPLY` de confirmación.
 - Estado esperado: `PhotoValidation verdict PASS` con `rubricVersion`, `sha256`, `stopReason`, tokens; `EVID#` copiado a `Evidence/photos/` sin metadatos; `CHECK#POWER_READING_PHOTO PASSED`.
 - Reglas: `VAL-RANGE`, `VAL-WAVELENGTH`, `VAL-CROSSCHECK`, `LAM-EVIDENCE`, `LAM-CANDIDATE`.
 - Prueba: U `evidence/validator.test.ts`, `evidence/checks.test.ts`, `agent-tools/evidence/validate.test.ts` · LF `evidence.flow.test.ts` · SR `SC-04/2`, `EV-02/2`.
@@ -293,8 +293,8 @@ Convenciones:
 
 ### FL-039 · Sujeto equivocado
 - Actores: validador · Canal: WhatsApp · Disparador: foto de la roseta (`ph-rosette-01`) enviada cuando se pidió el medidor.
-- Pasos: el modelo describe el sujeto; el código compara con el ítem pedido → `WRONG_SUBJECT`; el agente ofrece usarla para la roseta (nueva validación con ese ítem).
-- Estado esperado: `REJECT WRONG_SUBJECT` para el medidor; si el instalador acepta, una segunda `PhotoValidation` para `ROSETTE_PHOTO`.
+- Pasos: la foto llega con su ítem decidido por código (`POWER_READING_PHOTO`: el pie, el único pendiente o el toque de la pregunta fija, FL-046); el modelo describe el sujeto; el código compara con ese ítem → `WRONG_SUBJECT`; el agente ofrece usarla para la roseta con un botón `CHOOSE_ITEM`; el toque devuelve la misma candidata con `item="ROSETTE_PHOTO"` en el sobre y el agente la valida con ese ítem (ningún id de candidata viaja en la memoria del modelo).
+- Estado esperado: `REJECT WRONG_SUBJECT` para el medidor; si el instalador acepta, una segunda `PhotoValidation` de la misma candidata para `ROSETTE_PHOTO`.
 - Reglas: `LAM-CANDIDATE` (una candidata puede validarse para otro ítem de la misma orden).
 - Prueba: U `evidence/checks.test.ts` · LF `evidence.flow.test.ts` · SR `SC-04/8`, `EV-02/2`. Notas: `SC-04/8` valida por `tool.invoke` (sin turno): prueba el `REJECT` no `PASS`; la oferta de usarla para la roseta es del turno real y la prueba `LF`.
 
@@ -341,11 +341,11 @@ Convenciones:
 - Prueba: U `agent-tools/evidence/checklist.test.ts`, `infra/policy-rules.test.ts` · LF `security.flow.test.ts` · SR `SC-13/3`.
 
 ### FL-046 · Imagen no pedida, demasiado pesada o sticker
-- Actores: instalador · Canal: WhatsApp · Disparador: (a) foto antes de que se pida evidencia; (b) imagen de 4,5 MB; (c) sticker.
-- Pasos: (a) se registra como candidata y el agente pregunta para qué ítem es; (b) aviso fijo "mándala como foto, no como documento" y se borra; (c) respuesta fija.
-- Estado esperado: (a) una candidata sin validación hasta que el instalador elige; (b)(c) ningún turno, media borrada.
-- Reglas: límites de media, `LAM-CANDIDATE`.
-- Prueba: U `channels/whatsapp/media.test.ts` · LF `evidence.flow.test.ts` · SR `SC-04/15.a`, `SC-04/15.b`.
+- Actores: instalador · Canal: WhatsApp · Disparador: (a) foto sin pie (o con un pie que no nombra un ítem) con varios ítems de foto pendientes, por ejemplo antes de que se pida evidencia; (b) imagen de 4,5 MB; (c) sticker.
+- Pasos: el ítem de una foto lo decide el código, nunca el modelo, que no la ve (`worker/photo-item.ts`): un pie igual al título del botón de un ítem (es o en, sin distinguir mayúsculas, acentos ni puntuación; lo llevan las fotos rápidas del recorrido) lo nombra; sin pie, el único ítem de foto pendiente (sin `PASSED` ni `OVERRIDDEN`) es el suyo y la foto va al turno con ese ítem; un pie distinto va al agente como siempre. (a) Con varios pendientes y sin pie, la foto queda como candidata y el worker manda el aviso fijo `itemChoicePrompt` "¿Para cuál foto del checklist es esta imagen?" (`SYSTEM_NOTICE`) con un botón `CHOOSE_ITEM` por ítem pendiente, sin turno ni texto del modelo; el toque trae de vuelta esa foto (la última del instalador en la orden antes del toque) con el ítem elegido en el sobre (`<attachment … item="…"/>`) y el agente la valida con ese ítem en el turno del toque, sin volver a preguntar. (b) aviso fijo "mándala como foto, no como documento" y se borra; (c) respuesta fija.
+- Estado esperado: (a) una candidata sin `PhotoValidation` y ningún `TURN#` hasta el toque; después, una validación de esa candidata para el ítem elegido; (b)(c) ningún turno, media borrada.
+- Reglas: límites de media, `LAM-CANDIDATE`; el ítem por código.
+- Prueba: U `channels/whatsapp/media.test.ts`, `worker/photo-item.test.ts` · LF `evidence.flow.test.ts` · SR `SC-04/15.a`, `SC-04/15.b`.
 
 ## Área F · Cierre y acta
 
@@ -358,14 +358,14 @@ Convenciones:
 
 ### FL-048 · Acta por SES al cliente y a operaciones
 - Actores: sistema, cliente (simulador de SES), buzón de operaciones · Canal: email · Disparador: acta generada.
-- Pasos: dos `CERTIFICATE_EMAIL` con el PDF adjunto desde `actas@`; eventos de SES por EventBridge.
+- Pasos: dos `CERTIFICATE_EMAIL` con el PDF adjunto desde `actas@`, leído de `Evidence/certificates/` o, en un mundo de invitado, de `Evidence/guest/<seg>/certificates/` (todo rol que manda el acta lee los dos prefijos); eventos de SES por EventBridge.
 - Estado esperado: dos `OutboundEmail` en el buzón de salida con `DELIVERY` (≤ 300 s); `Certificate.deliveries` `DELIVERED`; destinatarios dentro del cerco.
 - Reglas: `CP-RECIPIENT-FENCE`, `CP-CERT-EVIDENCE`.
-- Prueba: U `channels/email/outbound.test.ts`, `certificates/deliveries.test.ts` · LF `closing.flow.test.ts` · UI `outbox.spec.ts` · SR `SC-05/3` · SMK `SMK/6`.
+- Prueba: U `channels/email/outbound.test.ts`, `certificates/deliveries.test.ts`, `infra/storage-access.test.ts` · LF `closing.flow.test.ts` · UI `outbox.spec.ts` · SR `SC-05/3` · SMK `SMK/6`.
 
 ### FL-049 · Acta al instalador por WhatsApp
 - Actores: sistema, instalador · Canal: WhatsApp · Disparador: acta generada.
-- Pasos: ventana abierta → documento (`PostWhatsAppMessageMedia` + `document`); ventana cerrada → plantilla `acta_instalacion` con encabezado de documento. El toque del botón "Cerrar instalación" es un entrante del instalador: actualiza `lastInboundAtSim` antes de cerrar, así que un cierre por botón siempre entrega el documento. La plantilla sale cuando el acta se genera sin entrante reciente: un `CERT_RETRY` que llega con la ventana vencida, un cierre en un turno que no disparó el instalador o, en QA, `tool.invoke(close_installation)` (`caller QA`).
+- Pasos: ventana abierta → documento (`PostWhatsAppMessageMedia` + `document`, que lee el PDF con el rol del que envía, también bajo `Evidence/guest/<seg>/certificates/` en un mundo de invitado); ventana cerrada → plantilla `acta_instalacion` con encabezado de documento. El toque del botón "Cerrar instalación" es un entrante del instalador: actualiza `lastInboundAtSim` antes de cerrar, así que un cierre por botón siempre entrega el documento. La plantilla sale cuando el acta se genera sin entrante reciente: un `CERT_RETRY` que llega con la ventana vencida, un cierre en un turno que no disparó el instalador o, en QA, `tool.invoke(close_installation)` (`caller QA`).
 - Estado esperado: `Message OUT kind CERTIFICATE` con la clave del PDF; estado `delivered` (sintético en simulado).
 - Reglas: `CP-WA-24H`, `CP-TEMPLATE-APPROVED`, `CP-CERT-EVIDENCE`.
 - Prueba: U `channels/whatsapp/outbound.test.ts`, `certificates/deliveries.test.ts` · LF `closing.flow.test.ts` · SR `SC-05/4`. Notas: `SC-05/4.a` prueba el documento tras el botón y `SC-05/4.b`, la plantilla con `tool.invoke(close_installation)` sin entrante sobre una orden `qa-*` con `lastInboundAtSim` de hace 25 h; `certificates/deliveries.test.ts` asierta que el toque del botón reabre la ventana.
@@ -583,7 +583,7 @@ Convenciones:
 
 ### FL-079 · Login propio y tokens de 15 minutos
 - Actores: usuario de consola, invitado · Canal: consola · Disparador: `/login` (cuentas invitadas `guest-NN` con su usuario; roles internos con usuario o email).
-- Pasos: SRP; MFA TOTP opcional y cambio de contraseña inicial para `SUPERVISOR`/`OPS`; `GUEST` sin ninguno; tokens de 15 min con refresh silencioso. El login de un invitado de alta propia con su email es FL-108.
+- Pasos: el campo "Email o usuario" ("Email or username") acepta el email de la cuenta o el usuario de una cuenta invitada sin email (`guest-NN`; normalizado a minúsculas y sin espacios); SRP; MFA TOTP opcional y cambio de contraseña inicial para `SUPERVISOR`/`OPS`; `GUEST` sin ninguno; tokens de 15 min con refresh silencioso; el reingreso de `recentLoginProcedure` (step-up) usa el email del token o, sin email, su `cognito:username`. El login de un invitado de alta propia con su email es FL-108.
 - Estado esperado: principal con `ispId`, rol e `isGuest` resueltos desde `Isps/USER#` por el `sub` (nunca desde `custom:ispId`, que el usuario no puede escribir); `GUEST` no ve TOTP ni cambio de contraseña y el BFF los rechaza.
 - Reglas: Cognito (`writeAttributes = [name]`), trigger pre-token, `recentLoginProcedure`.
 - Prueba: U `auth/jwt.test.ts`, `auth/principal.test.ts`, `auth-triggers/pre-token.test.ts`, `infra/auth.test.ts` · UI `login.spec.ts` · SR `SC-19/1`, `SC-19/3` · SMK `SMK/2`. Notas: Login SRP en el navegador, cambio de contraseña y TOTP en `UI` y en el ensayo del invitado del operador (§2.1); el SR usa el principal `GUEST` armado por el `QaDriver`.
@@ -661,7 +661,7 @@ Convenciones:
 ### FL-090 · Buzón de salida y visor del manual
 - Actores: supervisor, invitado · Canal: consola · Disparador: `/app/outbox` y `/app/manual`.
 - Pasos: cada email tal como salió con adjunto y eventos; secciones del manual vigente con su id (destino del link de cada cita).
-- Estado esperado: cuerpos en texto plano; PDF por GET prefirmado; la sección citada en FL-028 existe y abre.
+- Estado esperado: cuerpos en texto plano; PDF por GET prefirmado; la sección citada en FL-028 existe y abre; un logo del socio que no se puede leer (objeto ausente: `HeadObject` responde 403 a un rol sin `s3:ListBucket`) es `null` en `brand.get` y la consola dibuja la marca de texto: un logo nunca rompe la marca ni el visor del manual.
 - Reglas: —
 - Prueba: U `routers/outbox.test.ts`, `routers/manual.test.ts` · UI `outbox.spec.ts`, `manual.spec.ts` · SR `SC-05/3`.
 
