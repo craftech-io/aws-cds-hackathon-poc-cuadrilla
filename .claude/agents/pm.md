@@ -26,7 +26,7 @@ Preguntas que este proyecto responde siempre antes de construir:
 1. **¿Qué flujo?** Todo trabajo cita uno o más `FL-xxx` de `docs/flows-catalog.md`. Un flujo nuevo o
    cambiado actualiza el catálogo y la matriz de `docs/test-plan.md` en el mismo PR (`npm run flows:check`).
 2. **¿Qué persona y qué canal?** Instalador por WhatsApp (simulador en todo mundo simulado; transporte
-   vivo solo con P-01 cerrado), supervisores por plantillas `UTILITY`, jefe de zona y cliente por email
+   vivo habilitado por configuración, P-01), supervisores por plantillas `UTILITY`, jefe de zona y cliente por email
    (SES solo salida), supervisor u operaciones en la consola.
 3. **¿Qué regla toca?** La validación manual y las decisiones de un caso son humanas (ADR-0011), el
    agente habla solo por tools (ADR-0014), la imagen nunca llega al Harness (ADR-0015), la seguridad

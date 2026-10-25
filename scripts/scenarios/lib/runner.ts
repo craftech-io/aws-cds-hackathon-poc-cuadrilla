@@ -117,7 +117,7 @@ export async function runScenario(options: RunOptions, scenario: ScenarioDef, pr
   let blocked: { verdict: Verdict; error: string } | undefined;
   try {
     const pending = scenario.pending === undefined ? undefined : await scenario.pending(setupCtx);
-    if (pending !== undefined) blocked = { verdict: "SKIPPED_PENDING_P01", error: pending };
+    if (pending !== undefined) blocked = { verdict: "SKIPPED_LIVE_P01", error: pending };
     else await scenario.setup?.(setupCtx);
   } catch (error) {
     blocked = { verdict: verdictOf(error) === "BLOCKED" ? "BLOCKED" : "FAIL", error: `setup: ${describeError(error)}` };

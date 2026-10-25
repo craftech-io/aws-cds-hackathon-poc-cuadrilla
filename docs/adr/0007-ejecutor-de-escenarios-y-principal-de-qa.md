@@ -19,5 +19,5 @@ La compuerta es **solo IAM**: ningún escenario usa una contraseña ni un navega
 
 - Toda acción que muta exige una operadora de tipo `QA` o `EVAL` y un reloj `qa-*`/`eval-*`, o las listas cerradas de `GUEST#isp-guest-test` (`world.create` con la plantilla `guest`, `console.*` con el principal `GUEST`); borrados con condición `world IN (qa, eval)`.
 - Los pasos que dependen del modelo se marcan `agent` y se aceptan con oráculo en ≥ 2 de 3 corridas; los deterministas (`det`) pasan 3 de 3. Las precondiciones que antes exigían turnos del modelo se siembran con presets de `world.create` o con `case.open` (camino real de `open_case`).
-- El driver publica en el topic propio eventos con otro número (con el atributo `qa-foreign=1`) para probar el descarte sin WABA.
+- El driver publica en el topic propio eventos con otro número (con el atributo `qa-foreign=1`) para probar el descarte con el transporte simulado.
 - La suite completa cuesta turnos de Bedrock: se corre a pedido y antes de cada entrega, con topes de turnos y validaciones; en cada deploy solo corre el smoke.

@@ -50,7 +50,7 @@ async function main(): Promise<void> {
   const { CLIENT_TIMEOUTS, awsClientConfig } = await import("../../packages/bff/src/lib/clients");
   const { WHATSAPP_REGION, phoneNumberArn } = await import("../../packages/bff/src/channels/whatsapp/config");
   const connection = whatsAppConnection();
-  if (connection === undefined) throw new RangeError("the WABA is not connected (secrets still not-connected): docs/pending.md P-01");
+  if (connection === undefined) throw new RangeError("the WhatsApp secrets hold the placeholder value, so there is no linked number to check: docs/pending.md P-01 steps 5 and 6");
   const client = new SocialMessagingClient({ region: WHATSAPP_REGION, ...awsClientConfig(CLIENT_TIMEOUTS.socialMessaging) });
   const { account } = await client.send(new GetLinkedWhatsAppBusinessAccountCommand({ id: connection.wabaId }));
   const numbers = (account?.phoneNumbers ?? []).map((phone) => ({ phoneNumberId: phone.phoneNumberId ?? "", metaPhoneNumberId: phone.metaPhoneNumberId ?? "", arn: phone.arn ?? "" }));

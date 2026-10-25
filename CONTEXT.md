@@ -205,7 +205,7 @@ _Avoid_: emergencia (no somos un servicio de emergencias), accidente
 _Avoid_: medio, vía
 
 **Transportes y modo de canal** (`ChannelModes`, `whatsappMode`):
-El stage declara qué transportes de WhatsApp existen (`ChannelModes.whatsapp.transports`: `simulated` y, con la cuenta de WhatsApp Business conectada, `live`); cada **mundo** tiene su modo (`Isps/SETTINGS.whatsappMode`): `live` solo para el **mundo vivo** (uno solo, el del operador), `simulated` para invitados, QA y evaluación. El transporte de cada envío lo decide el destinatario (teléfono real → vivo; identidad sintética → simulado). Email corre `live`. El modo cambia el transporte, nunca el flujo.
+El stage declara qué transportes de WhatsApp existen (`ChannelModes.whatsapp.transports`: `simulated` y, cuando el stage lo habilita por configuración, `live`); cada **mundo** tiene su modo (`Isps/SETTINGS.whatsappMode`): `live` solo para el **mundo vivo** (uno solo, el del operador), `simulated` para invitados, QA y evaluación. El transporte de cada envío lo decide el destinatario (teléfono real → vivo; identidad sintética → simulado). Email corre `live`. El modo cambia el transporte, nunca el flujo.
 _Avoid_: feature flag, modo prueba, "pasar todo a vivo"
 
 **Mundo vivo** (`liveWorldClockId`):
@@ -241,7 +241,7 @@ Audio de WhatsApp (Ogg/Opus) que se transcribe con Amazon Transcribe en `es-MX` 
 _Avoid_: audio (suelto), dictado
 
 **Número de la POC** (`WhatsAppPhoneNumberId`, `WhatsAppMetaPhoneNumberId`):
-El número de WhatsApp de Cuadrilla, que EUM Social identifica de dos formas: el **id de AWS** (`phone-number-id-<32 hex>`), que sirve para enviar, bajar y subir media y en IAM, y el **id de Meta** (numérico), que es el que traen los eventos (`metadata.phone_number_id`, `MetaPhoneNumberIds`). Es un número **nuevo**, con una WABA propia, solo de Cuadrilla; su alta de Meta la hace el CTO al final del build (P-01, ADR-0028). Todo evento cuyo id de Meta no sea el nuestro (otra POC que comparta la cuenta de WhatsApp Business o el topic) es un **evento ajeno** y se descarta antes de leer su contenido. Nunca se filtra con el id de AWS.
+El número de WhatsApp de Cuadrilla, que EUM Social identifica de dos formas: el **id de AWS** (`phone-number-id-<32 hex>`), que sirve para enviar, bajar y subir media y en IAM, y el **id de Meta** (numérico), que es el que traen los eventos (`metadata.phone_number_id`, `MetaPhoneNumberIds`). Es un número **nuevo**, con una WABA propia, solo de Cuadrilla; su alta de Meta es el paso operativo que habilita el transporte vivo (P-01, ADR-0028). Todo evento cuyo id de Meta no sea el nuestro (otra POC que comparta la cuenta de WhatsApp Business o el topic) es un **evento ajeno** y se descarta antes de leer su contenido. Nunca se filtra con el id de AWS.
 _Avoid_: línea, "el phone number id" (sin decir cuál)
 
 **Política de contacto** (`ContactPolicy`, reglas `CP-*`):

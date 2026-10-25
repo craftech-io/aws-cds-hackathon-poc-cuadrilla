@@ -22,7 +22,8 @@
 // | LeadConfig                | Lead notice (ADR-0026): `{notifyRecipients: [1..5 @craftech.io], |
 // |                           | privacyContact?}`. PII-free; the mailbox is never in the code.   |
 //
-// The three WhatsApp secrets are `not-connected` until docs/pending.md P-01 is closed. The shape of
+// The three WhatsApp secrets hold the placeholder `not-connected` unless the stage has the live
+// transport (docs/pending.md P-01). The shape of
 // every value is checked by packages/bff/src/lib/secret-schemas.ts (zod), which the readers and
 // infra/secrets.test.ts share.
 //

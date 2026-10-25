@@ -284,15 +284,15 @@ qué le van a pedir:
 
 **Reescrita completa (B1, compliance-B6)**: la tabla anterior decía "el envío de emails y de WhatsApp"
 como real, lo que sugiere a un prospecto que su mundo manda WhatsApp de verdad. Es falso para todo mundo de
-invitado: el transporte vivo de WhatsApp solo existe para el mundo único del operador, después de cerrar
-P-01 (ADR-0002 §5); el WhatsApp que ve un invitado, siempre, es el simulador de teléfono. La propia §1.6 S1
+invitado: el transporte vivo de WhatsApp, que el stage habilita por configuración (P-01), solo existe para el
+mundo único del operador (ADR-0002 §5); el WhatsApp que ve un invitado, siempre, es el simulador de teléfono. La propia §1.6 S1
 ya lo decía bien ("simulado en esta demo") — esta sección contradecía esa fila. Se reemplaza por las
 **cuatro columnas de `docs/design-brief.md` §7.2**, la fuente de verdad de qué es real:
 
 | Columna | es-MX | en |
 |---|---|---|
 | Real en `poc` | Todo servicio de nube que hace el trabajo: el agente (Bedrock AgentCore), el chequeo de fotos, la transcripción de voz, el envío de emails, el almacenamiento y el inicio de sesión. | Every cloud service doing the work: the agent (Bedrock AgentCore), the photo check, voice transcription, email delivery, storage and sign-in. |
-| Implementado, en modo simulado | El adaptador de WhatsApp sobre AWS End User Messaging Social: está construido y probado; en tu demo lo usas con un simulador de teléfono, y pasa a estar en vivo una vez que la cuenta de WhatsApp Business quede conectada. | The WhatsApp adapter over AWS End User Messaging Social: it's built and tested; in your demo you use it with a phone simulator, and it goes live once the WhatsApp Business account is connected. |
+| Implementado, en modo simulado | WhatsApp, implementado sobre AWS End User Messaging Social: en tu demo lo pruebas en el simulador de teléfono de la consola, que pasa por el mismo agente, las mismas reglas y el mismo circuito de mensajes. | WhatsApp, implemented on AWS End User Messaging Social: in your demo you try it in the console's phone simulator, which goes through the same agent, rules and message pipeline. |
 | Mocks propios | El despacho de órdenes, el orquestador de red (ONU), el personal, los clientes y los teléfonos. | Work-order dispatch, the network orchestrator (ONU), staff, customers and phones. |
 | Datos | 100% sintéticos: toda persona, dirección, orden de trabajo y manual de esta demo es inventado. Nadie tuyo va a aparecer en ninguna captura. | 100% synthetic: every person, address, work order and manual in this demo is made up. Nothing of yours appears in any screenshot. |
 

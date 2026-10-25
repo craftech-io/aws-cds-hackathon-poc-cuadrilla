@@ -1,6 +1,6 @@
 // FL-089 in the browser: `/join`, the staff opt-in page, at 390×844 and 1440×900 in the language of the
 // project — the product's poster with the keyword, the QR that opens the console's phone simulator on
-// this same site (the stage runs the simulated transport until P-01), the way into the simulator
+// this same site (the stage runs the simulated transport; the live one is enabled by configuration, P-01), the way into the simulator
 // through the sign-in, the language switch, no horizontal scroll from 360 px, and the brand of the
 // stage in the neutral and co-branding modes.
 import { type Page, expect, test } from "@playwright/test";

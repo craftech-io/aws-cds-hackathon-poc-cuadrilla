@@ -73,7 +73,7 @@ describe("createChannelRegistry", () => {
     expect(built).toEqual(["wa-sim", "ses"]);
   });
 
-  it("refuses a live send while the stage has no live transport and never builds it (P-01 open)", () => {
+  it("refuses a live send while the stage has no live transport and never builds it (simulated-only stage)", () => {
     const { registry, built } = setup(["simulated"]);
     const live = whatsAppRouteOf(recipient({ phone: REAL, worldMode: "live" }));
     expect(() => registry.whatsapp(live)).toThrow(ChannelError);

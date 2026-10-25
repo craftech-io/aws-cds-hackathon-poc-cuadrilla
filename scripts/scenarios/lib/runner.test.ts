@@ -1,5 +1,5 @@
 // The runner over a fake driver (no AWS): units scored alone, a failure takes down only its `after` chain,
-// the cleanup (own and per world) always runs, a `pending` scenario is SKIPPED_PENDING_P01, a driver's
+// the cleanup (own and per world) always runs, a scenario its `pending` hook skips is SKIPPED_LIVE_P01, a driver's
 // NOT_WIRED is BLOCKED (never a pass), and the budget skips what is left.
 import { describe, expect, it } from "vitest";
 import type { QaActionName, QaResponse } from "../../../packages/bff/src/qa-driver/contract";
@@ -92,13 +92,13 @@ describe("runScenario", () => {
     expect(result.verdict).toBe("FAIL");
   });
 
-  it("marks a pending scenario's units SKIPPED_PENDING_P01 without running its setup", async () => {
+  it("marks a pending scenario's units SKIPPED_LIVE_P01 without running its setup", async () => {
     const driver = fakeDriver();
-    const scenario = scenarioOf("SC-17", [{ id: "1", ...body("det", "preset", fail) }], { pending: async () => "P-01 open" });
+    const scenario = scenarioOf("SC-17", [{ id: "1", ...body("det", "preset", fail) }], { pending: async () => "no live transport (P-01)" });
     const result = await runScenario(options(driver), scenario);
-    expect(result.units.map((unit) => unit.verdict)).toEqual(["SKIPPED_PENDING_P01"]);
+    expect(result.units.map((unit) => unit.verdict)).toEqual(["SKIPPED_LIVE_P01"]);
     expect(driver.calls.some((call) => call.action === "world.create")).toBe(false);
-    expect(result.verdict).toBe("SKIPPED_PENDING_P01");
+    expect(result.verdict).toBe("SKIPPED_LIVE_P01");
   });
 
   it("is BLOCKED, never a pass, when the driver answers NOT_WIRED or the step needs what is missing", async () => {

@@ -21,7 +21,7 @@ import {
 } from "@cuadrilla/shared";
 import { NonEmptyText, Sha256Hex, defineEntity } from "./common";
 
-/** Meta's review state of a template; `LOCAL_ONLY` until P-01 registers it. */
+/** Meta's review state of a template; `LOCAL_ONLY` for a template not registered with Meta (P-01 step 8). */
 export const TemplateReviewStatus = z.enum(["LOCAL_ONLY", "PENDING", "APPROVED", "REJECTED"]);
 export type TemplateReviewStatus = z.infer<typeof TemplateReviewStatus>;
 

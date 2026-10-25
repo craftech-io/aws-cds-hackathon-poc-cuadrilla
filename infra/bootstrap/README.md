@@ -43,7 +43,7 @@ every fixed name of `docs/architecture.md` §1 against a statement with its exac
 | `AgentNamePrefix` | `aws_cds_hackathon_poc_cuadrilla` | Runtime AgentCore creates under the Harness |
 | `GitHubOrg` / `GitHubRepo` | `craftech-io` / `aws-cds-hackathon-poc-cuadrilla` | Trust of both roles |
 | `GitHubOrgId` / `GitHubRepoId` | Mandatory, numeric | Provided by the operator (`gh api …`); no default |
-| `WhatsAppPhoneNumberArn` | Empty until `docs/pending.md` P-01 | ARN of the app's own number; while empty, the boundary grants no End User Messaging Social action at all |
+| `WhatsAppPhoneNumberArn` | Empty by default; set with the live transport (`docs/pending.md` P-01) | ARN of the app's own number; while empty, the boundary grants no End User Messaging Social action at all |
 | `RouterCachePolicyId` | `none` | Only when a cache policy must be changed by id |
 
 ## How every statement is fenced
@@ -114,8 +114,8 @@ aws --profile craftech-demos ssm get-parameter --name /sst/bootstrap --query Par
 
 Then the repository ids (`gh api orgs/craftech-io --jq .id` → 60447213 and
 `gh api repos/craftech-io/aws-cds-hackathon-poc-cuadrilla --jq .id`) and the stack. Pass
-`CreateOidcProvider=true` only when `token.actions.githubusercontent.com` is not listed. After
-P-01, apply again with `WhatsAppPhoneNumberArn=<arn of phoneNumbers[].arn>`.
+`CreateOidcProvider=true` only when `token.actions.githubusercontent.com` is not listed. To enable
+the live WhatsApp transport (P-01), apply again with `WhatsAppPhoneNumberArn=<arn of phoneNumbers[].arn>`.
 
 ```bash
 aws --profile craftech-demos cloudformation deploy \

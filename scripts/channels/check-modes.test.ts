@@ -6,18 +6,18 @@ import { MODES_FILE, PENDING_FILE, checkModes, checkOverridesExample, checkWorld
 const modesSource = (transports: string, email = "live") => `
 export const channelModes = {
   email: "${email}",
-  whatsapp: { transports: [${transports}] }, // add "live" only after docs/pending.md P-01 is closed
+  whatsapp: { transports: [${transports}] }, // "live" is added together with docs/pending.md P-01
 } as const satisfies ChannelModesConfig;
 `;
 
 const pending = (p01: string) => `
 | # | Pendiente | Dueño | Estado | Qué falta |
 |---|---|---|---|---|
-| P-01 | Conectar WhatsApp | CTO (Meta) | ${p01} | §1 |
+| P-01 | Habilitar el transporte vivo de WhatsApp | CTO (Meta) | ${p01} | §1 |
 | P-02 | Oportunidad ACE | CTO | Abierto | §2 |
 `;
 
-const OPEN = "Abierto · opción A decidida";
+const OPEN = "Paso operativo · canal implementado";
 const CLOSED = "Cerrado el 2026-10-10 por el CTO";
 const SIMULATED = '"simulated"';
 const BOTH = '"simulated", "live"';
@@ -51,14 +51,14 @@ describe("checkModes [FL-100]", () => {
     expect(checkModes(modesSource(SIMULATED), pending(OPEN))).toEqual([]);
   });
 
-  it("fails when the live transport is declared and P-01 is open", () => {
+  it("fails when the live transport is declared and P-01 is not recorded as done", () => {
     const errors = checkModes(modesSource(BOTH), pending(OPEN));
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('"live" is a WhatsApp transport');
     expect(errors[0]).toContain("P-01");
   });
 
-  it("passes when the live transport is declared and P-01 was closed", () => {
+  it("passes when the live transport is declared and P-01 is recorded as done", () => {
     expect(checkModes(modesSource(BOTH), pending(CLOSED))).toEqual([]);
   });
 

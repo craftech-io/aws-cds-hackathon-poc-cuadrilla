@@ -4,7 +4,7 @@
 //   - the steps and parts of every scenario of §4.5 (`4 [det] …`, `4.a [det] … · 4.b [agent] …`),
 //     where a step with more than one `[det]`/`[agent]` segment must be written in parts;
 //   - every `SC-nn/…`, `SMK/…` and `EV-nn/…` citation of the catalog resolves to a step or part;
-//   - "(pendiente P-01)" marks only `SC-17` citations of the flows §2.1 lists for P-01;
+//   - "(vivo, P-01)" marks only `SC-17` citations of the flows §2.1 lists for P-01;
 //   - the keys of the oracle table follow the grammar of §4.3 and its precedence has no tie.
 //
 // What the scenario files must declare (`flows`, `kind`, `after`, `oracleFlow`) is checked by
@@ -98,25 +98,25 @@ export function kindOf(plan: ScenarioPlan, target: string): StepKind | undefined
   return part === undefined ? entry?.kind : entry?.parts.get(part);
 }
 
-/** Flows §2.1 lets run `SKIPPED_PENDING_P01` (the row about live WhatsApp). */
-export function pendingP01Flows(testPlan: string): Set<string> {
+/** Flows §2.1 lets run `SKIPPED_LIVE_P01` (the row about live WhatsApp). */
+export function liveP01Flows(testPlan: string): Set<string> {
   const row = section(testPlan, "### 2.1", "### 2.2")
     .split("\n")
     .find((line) => line.startsWith("| FL-") && line.includes("P-01"));
   return new Set((row?.split(" | ")[0] ?? "").match(/FL-\d{3}/g) ?? []);
 }
 
-export function checkStepCitations(flows: readonly Flow[], plan: ScenarioPlan, pendingFlows: ReadonlySet<string>): string[] {
+export function checkStepCitations(flows: readonly Flow[], plan: ScenarioPlan, liveFlows: ReadonlySet<string>): string[] {
   const errors: string[] = [];
   for (const flow of flows) {
     for (const cited of [...flow.tests.SR, ...flow.tests.SMK]) {
       const { error } = resolveCitation(plan, cited);
       if (error) errors.push(`${flow.id}: ${error}`);
     }
-    for (const match of (flow.cells.SR ?? "").matchAll(/`([^`]+)` \([^()]*pendiente P-01\)/g)) {
+    for (const match of (flow.cells.SR ?? "").matchAll(/`([^`]+)` \([^()]*vivo, P-01\)/g)) {
       const cited = match[1] ?? "";
-      if (!cited.startsWith("SC-17/")) errors.push(`${flow.id}: ${cited} is marked pending P-01 but only SC-17 may be skipped (§2.1)`);
-      if (!pendingFlows.has(flow.id)) errors.push(`${flow.id}: marked pending P-01 but §2.1 does not list it`);
+      if (!cited.startsWith("SC-17/")) errors.push(`${flow.id}: ${cited} is marked live-only (P-01) but only SC-17 may be skipped (§2.1)`);
+      if (!liveFlows.has(flow.id)) errors.push(`${flow.id}: marked live-only (P-01) but §2.1 does not list it`);
     }
   }
   return errors;

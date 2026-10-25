@@ -1,7 +1,7 @@
 // The gate of "100 % probada" over the reports of consecutive runs (docs/test-plan.md §1 item 3): every
 // `det` unit passes in every run (3 of 3), every `agent` unit passes its oracle in at least two thirds of
-// the runs (2 of 3), each one on its own; a unit skipped because P-01 is pending counts as skipped only in
-// `SC-17`; every world of every run audited with 0 violations. `npm run scenarios -- --aggregate <dir>`.
+// the runs (2 of 3), each one on its own; a unit skipped because the stage has no live WhatsApp transport
+// (P-01) counts as skipped only in `SC-17`; every world of every run audited with 0 violations. `npm run scenarios -- --aggregate <dir>`.
 import { type RunReport, type Verdict, passed } from "./report";
 
 export const GATE_RUNS = 3;
@@ -28,8 +28,8 @@ export interface GateResult {
 
 /** Whether a unit's verdicts over the runs meet the gate of its kind. */
 export function unitMeetsGate(kind: "det" | "agent", verdicts: readonly Verdict[], scenario: string): { readonly ok: boolean; readonly passes: number; readonly note?: string } {
-  if (verdicts.length > 0 && verdicts.every((verdict) => verdict === "SKIPPED_PENDING_P01")) {
-    return scenario === "SC-17" ? { ok: true, passes: 0, note: "SKIPPED_PENDING_P01" } : { ok: false, passes: 0, note: "SKIPPED_PENDING_P01 outside SC-17" };
+  if (verdicts.length > 0 && verdicts.every((verdict) => verdict === "SKIPPED_LIVE_P01")) {
+    return scenario === "SC-17" ? { ok: true, passes: 0, note: "SKIPPED_LIVE_P01" } : { ok: false, passes: 0, note: "SKIPPED_LIVE_P01 outside SC-17" };
   }
   const passes = verdicts.filter(passed).length;
   if (kind === "det") return { ok: verdicts.length >= GATE_RUNS && passes === verdicts.length, passes };

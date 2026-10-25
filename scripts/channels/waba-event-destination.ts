@@ -8,7 +8,7 @@
 //   it already sends them to our topic            nothing to do (ALREADY_SET)
 //   no destination yet                            WOULD_SET; with --apply, SET
 //
-// Runs inside `sst shell` with the operator's profile once the WABA is connected (no role of the app or of
+// Runs inside `sst shell` with the operator's profile after P-01 steps 5 and 6 (no role of the app or of
 // CI holds `PutWhatsAppBusinessAccountEventDestinations`). SDK commands, checked in the installed
 // `@aws-sdk/client-socialmessaging` `.d.ts`: `GetLinkedWhatsAppBusinessAccountCommand {id}` →
 // `account{arn, eventDestinations[{eventDestinationArn}], phoneNumbers[{phoneNumberId, metaPhoneNumberId, arn}]}`
@@ -52,7 +52,7 @@ export interface LinkedWaba {
 export interface DestinationDeps {
   get(wabaId: string): Promise<LinkedWaba>;
   put(wabaId: string, topicArn: string): Promise<void>;
-  /** WABA id and the AWS id of our number; `undefined` until P-01 connects them. */
+  /** WABA id and the AWS id of our number; `undefined` while the secrets hold the placeholder value (P-01 step 6). */
   connection(): { readonly wabaId: string; readonly phoneNumberId: string } | undefined;
   report(line: string): void;
 }
@@ -61,14 +61,14 @@ export type DestinationOutcome = "ALREADY_SET" | "WOULD_SET" | "SET";
 
 export class DestinationRefused extends Error {
   override readonly name = "DestinationRefused";
-  constructor(readonly reason: "OTHER_NUMBERS" | "OTHER_DESTINATION" | "NOT_CONNECTED", message: string) {
+  constructor(readonly reason: "OTHER_NUMBERS" | "OTHER_DESTINATION" | "NO_LINKED_NUMBER", message: string) {
     super(message);
   }
 }
 
 export async function runDestination(args: DestinationArgs, deps: DestinationDeps): Promise<DestinationOutcome> {
   const connection = deps.connection();
-  if (connection === undefined) throw new DestinationRefused("NOT_CONNECTED", "the WABA is not connected (secrets still not-connected): close docs/pending.md P-01 first");
+  if (connection === undefined) throw new DestinationRefused("NO_LINKED_NUMBER", "the WhatsApp secrets hold the placeholder value, so there is no linked number to use: run docs/pending.md P-01 steps 5 and 6 first");
   const waba = await deps.get(connection.wabaId);
   const topicArn = topicArnFor(waba.arn);
   const others = waba.phoneNumberIds.filter((id) => id !== connection.phoneNumberId);

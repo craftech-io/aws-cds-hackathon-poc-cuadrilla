@@ -1,6 +1,6 @@
 // SC-17 · WhatsApp live (docs/test-plan.md §4.5; FL-091, FL-092, FL-095, FL-082, FL-101, FL-072): the real
-// transport with a team phone. While `live` is not one of the stage's transports (P-01 open) every step is
-// `SKIPPED_PENDING_P01`. With P-01 closed it needs the person holding the team phone (`setLiveOperator`, the
+// transport with a team phone. While `live` is not one of the stage's transports (it is enabled by configuration, P-01)
+// every step is `SKIPPED_LIVE_P01`. With the live transport it needs the person holding the team phone (`setLiveOperator`, the
 // runner's `--live-operator`): each step that needs the phone asks for one action on it and waits for its
 // effect in the world; without that person the scenario is BLOCKED, never green.
 //
@@ -112,7 +112,7 @@ export default defineScenario({
       ],
     });
     const identities = (await ctx.qa("console", { clockId: world(ctx).clockId, procedure: "simulator.identities" })) as { liveTransport: boolean };
-    return identities.liveTransport ? undefined : "live is not a WhatsApp transport of the stage (P-01 open)";
+    return identities.liveTransport ? undefined : "live is not a WhatsApp transport of the stage (enabled by configuration, P-01)";
   },
   async setup(ctx) {
     const w = world(ctx);

@@ -2,7 +2,7 @@
 // docs/architecture-integrations.md §4). Three layers, none of them the model's:
 //
 //   stage      `ChannelModes` (infra/channel-modes.ts): email is always `live` (SES); WhatsApp has
-//              `simulated` and, once P-01 is closed, `live`;
+//              `simulated` and, when enabled by configuration (P-01), `live`;
 //   world      `Isps/SETTINGS.whatsappMode`: `live` only for the single live world;
 //   recipient  a real phone of the live world (registered by the operator in `SeedOverrides`, the
 //              only way a real phone enters it), or one bound to a guest world by a join code

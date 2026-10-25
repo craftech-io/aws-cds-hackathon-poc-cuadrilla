@@ -16,7 +16,7 @@
 //   {model:HARNESS}         agentModelArns(HARNESS_MODEL_ID, …, the app's inference profile)
 //   {model:PHOTO}           agentModelArns(PHOTO_MODEL_ID, …, the profile while PHOTO_MODEL_ID is HARNESS_MODEL_ID)
 //   {model:PROFILE}         the app's inference profile (ADR-0028), for bedrock:GetInferenceProfile
-//   {whatsappPhone}         whatsappPhoneArn(WhatsAppPhoneNumberId); omitted while `not-connected` (P-01)
+//   {whatsappPhone}         whatsappPhoneArn(WhatsAppPhoneNumberId); omitted while the secret holds the placeholder (P-01)
 //
 // `Resource: "*"` appears only where IAM offers nothing else, each with its justification and a
 // condition (JUSTIFIED_WILDCARDS). No grant carries an SES receipt-rule action (the only active rule

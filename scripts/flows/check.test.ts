@@ -16,7 +16,7 @@ import {
   type FileAccess,
 } from "./check";
 import { checkOracleKeys, parseOracleKey } from "./oracle-keys";
-import { checkStepCitations, kindOf, parseScenarioPlan, pendingP01Flows, resolveCitation } from "./plan";
+import { checkStepCitations, kindOf, liveP01Flows, parseScenarioPlan, resolveCitation } from "./plan";
 
 const CATALOG = `
 ## Área A
@@ -46,9 +46,9 @@ describe("catalog and matrix", () => {
   });
 
   it("keeps annotations in the cell but never cites what they name", () => {
-    const parsed = parseProofLine("- Prueba: SR `SC-06/2` (det: preset con el `open_case` real), `SC-17/1` (pendiente P-01).");
+    const parsed = parseProofLine("- Prueba: SR `SC-06/2` (det: preset con el `open_case` real), `SC-17/1` (vivo, P-01).");
     expect(parsed.tests.SR).toEqual(["SC-06/2", "SC-17/1"]);
-    expect(parsed.cells.SR).toBe("`SC-06/2` (det: preset con el `open_case` real), `SC-17/1` (pendiente P-01)");
+    expect(parsed.cells.SR).toBe("`SC-06/2` (det: preset con el `open_case` real), `SC-17/1` (vivo, P-01)");
   });
 
   it("renders one row per flow with dashes for empty levels", () => {
@@ -120,7 +120,7 @@ const PLAN = `
 
 | Flujo | Por qué | Cómo |
 |---|---|---|
-| FL-091, FL-095 | WhatsApp vivo depende de la WABA (P-01) | fixtures |
+| FL-091, FL-095 | WhatsApp vivo: transporte habilitado por configuración (P-01) | fixtures |
 
 ### 2.2 Matriz
 
@@ -171,12 +171,12 @@ describe("scenario plan of §4.5", () => {
     expect(parseScenarioPlan(broken).errors).toEqual(["SC-04/1: more than one [det]/[agent] segment; write it in parts 1.a, 1.b (§4.3)"]);
   });
 
-  it("marks pending P-01 only on SC-17 citations of the flows §2.1 lists", () => {
-    const flows = parseCatalog("### FL-091 · Vivo\n- Prueba: SR `SC-17/7` (pendiente P-01).\n\n### FL-036 · Foto\n- Prueba: SR `SC-04/2` (pendiente P-01).\n");
-    expect(pendingP01Flows(withRows([]))).toEqual(new Set(["FL-091", "FL-095"]));
-    expect(checkStepCitations(flows, plan, pendingP01Flows(withRows([])))).toEqual([
-      "FL-036: SC-04/2 is marked pending P-01 but only SC-17 may be skipped (§2.1)",
-      "FL-036: marked pending P-01 but §2.1 does not list it",
+  it("marks live-only (P-01) only on SC-17 citations of the flows §2.1 lists", () => {
+    const flows = parseCatalog("### FL-091 · Vivo\n- Prueba: SR `SC-17/7` (vivo, P-01).\n\n### FL-036 · Foto\n- Prueba: SR `SC-04/2` (vivo, P-01).\n");
+    expect(liveP01Flows(withRows([]))).toEqual(new Set(["FL-091", "FL-095"]));
+    expect(checkStepCitations(flows, plan, liveP01Flows(withRows([])))).toEqual([
+      "FL-036: SC-04/2 is marked live-only (P-01) but only SC-17 may be skipped (§2.1)",
+      "FL-036: marked live-only (P-01) but §2.1 does not list it",
     ]);
   });
 });

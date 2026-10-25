@@ -89,7 +89,7 @@ export function seedOverrides(): SeedOverridesValue {
 /**
  * The two ids of the WhatsApp number and the WABA (ADR-0002): the AWS id sends, fetches media and
  * builds the IAM ARN; the Meta id is the only value an inbound event is compared with. `undefined`
- * while any of them still says `not-connected` (docs/pending.md P-01).
+ * while any of them holds the placeholder `not-connected` (docs/pending.md P-01).
  */
 export interface WhatsAppConnection {
   readonly wabaId: string;

@@ -22,7 +22,7 @@ export interface CliOptions {
   readonly reportDir: string;
   readonly aggregate?: string;
   readonly dryRun: boolean;
-  /** `SC-17` with P-01 closed: someone holds the team phone and answers the runner's prompts. */
+  /** `SC-17` with the live transport enabled (P-01): someone holds the team phone and answers the runner's prompts. */
   readonly liveOperator: boolean;
   readonly livePhoto: "PASS" | "NOT_PASS";
 }

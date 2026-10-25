@@ -125,7 +125,7 @@ async function main(): Promise<number> {
   const report = await runSuite({ runId: options.runId, suite: options.suite === "load" ? "custom" : options.suite, scenarios, driver, maxTurns: options.maxTurns, parallel: options.parallel, log, ...(options.maxCostUsd === undefined ? {} : { maxCostUsd: options.maxCostUsd }) });
   writeRunReport(options.reportDir, report);
   log(`verdict ${report.verdict} · agent units ${report.agentRate.passed}/${report.agentRate.total} · report in ${options.reportDir}/`);
-  return passed(report.verdict) || report.verdict === "SKIPPED_PENDING_P01" ? 0 : 1;
+  return passed(report.verdict) || report.verdict === "SKIPPED_LIVE_P01" ? 0 : 1;
 }
 
 main().then(

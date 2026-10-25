@@ -67,8 +67,8 @@ Si el modelo pide dos veces el mismo envío en un turno (mismo canal y mismo tex
 
 ### 8. WhatsApp: número y WABA nuevos
 
-- Cuadrilla usa un **número nuevo y una WABA propia**, solo de este producto. El CTO hace el alta de Meta (registro embebido, display name, verificación) **al final del build**; `P-01` sigue abierto hasta entonces.
-- Mientras tanto se construye todo de punta a punta (adaptador, transporte vivo, plantillas como código, notas de voz y fotos entrantes, eventos, scripts) y `ChannelModes.whatsapp` queda solo con el transporte `simulated`. `P-01` es un bloqueo externo: nunca es motivo para frenar otro trabajo.
+- Cuadrilla usa un **número nuevo y una WABA propia**, solo de este producto. El alta de Meta (registro embebido, display name, verificación) la hace el CTO como paso operativo (`P-01`) y habilita el transporte vivo por configuración.
+- Todo se construye de punta a punta (adaptador, transporte vivo, plantillas como código, notas de voz y fotos entrantes, eventos, scripts) y se prueba con el transporte `simulated`, el único de `ChannelModes.whatsapp` mientras el stage no habilite el vivo. `P-01` es un paso operativo: nunca es motivo para frenar otro trabajo.
 
 ## Considered options
 

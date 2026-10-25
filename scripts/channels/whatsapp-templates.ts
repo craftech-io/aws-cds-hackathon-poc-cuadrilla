@@ -1,7 +1,7 @@
 // Registers the six `UTILITY` `es_MX` WhatsApp templates with Meta through End User Messaging Social
 // (docs/architecture-integrations.md §4.5, docs/pending.md P-01 step 8). Their texts have one source,
-// packages/bff/src/copy/templates.ts (none names the operator). Runs inside `sst shell` once the WABA is
-// connected; without `--apply` it only says what it would do.
+// packages/bff/src/copy/templates.ts (none names the operator). Runs inside `sst shell` after P-01 steps 5
+// and 6; without `--apply` it only says what it would do.
 //
 //   npm run channels:whatsapp-templates -- --stage poc            which templates exist and which not
 //   npm run channels:whatsapp-templates -- --stage poc --apply    uploads the synthetic sample of the
@@ -70,7 +70,7 @@ export interface TemplatesDeps {
 
 export async function runTemplates(args: { readonly apply: boolean }, deps: TemplatesDeps): Promise<{ readonly created: number; readonly existing: number }> {
   const wabaId = deps.wabaId();
-  if (wabaId === undefined) throw new RangeError("the WABA is not connected (secrets still not-connected): close docs/pending.md P-01 first");
+  if (wabaId === undefined) throw new RangeError("the WhatsApp secrets hold the placeholder value, so there is no linked number to use: run docs/pending.md P-01 steps 5 and 6 first");
   const remote = await deps.list(wabaId);
   let created = 0;
   let existing = 0;

@@ -143,7 +143,7 @@ export const simulatorCopy = {
     MEDIA_TYPE: "Ese tipo de archivo no se acepta.",
     NO_BUTTON: "Ese botón todavía no le llegó a esta persona.",
     NO_PHONE: "Esta persona no tiene un teléfono registrado.",
-    LIVE_TRANSPORT_OFF: "El canal de WhatsApp en vivo todavía no está habilitado.",
+    LIVE_TRANSPORT_OFF: "En esta demo, WhatsApp funciona con el simulador de teléfono; el canal en vivo se habilita por configuración.",
     UPLOAD_REFUSED: "No pudimos subir el archivo. Revisa que sea del tipo y tamaño aceptados e intenta de nuevo.",
   } as Readonly<Record<string, string>>,
   done: "Enviado: Cuadrilla lo recibe igual que un mensaje de WhatsApp.",

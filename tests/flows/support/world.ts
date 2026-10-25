@@ -70,7 +70,7 @@ export interface FlowWorldOptions {
   readonly harness?: (gateway: LocalGateway) => LocalHarnessSeam;
   /** Cedar with the kill switch statement (`CED-KILL-SWITCH`). */
   readonly cedarKillSwitch?: boolean;
-  /** The stage has the live transport too (P-01 closed): an EUM Social stand-in records what it sends. */
+  /** The stage has the live transport too (P-01): an EUM Social stand-in records what it sends. */
   readonly live?: boolean;
 }
 

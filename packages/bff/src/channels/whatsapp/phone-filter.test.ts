@@ -71,13 +71,13 @@ describe("number filter with the real shape of the event", () => {
     expect(await screenRecord(liveRecord({ messages: [text], changeMetaId: null }), deps())).toMatchObject({ verdict: "FOREIGN", reason: "CHANGE_WITHOUT_METADATA" });
   });
 
-  it("[FL-095] discards qa-foreign=1 always, also before P-01 when the stage has no live transport", async () => {
+  it("[FL-095] discards qa-foreign=1 always, also on a stage without the live transport", async () => {
     const record = liveRecord({ messages: [text], contextMetaId: FOREIGN_META_ID, attributes: { "qa-foreign": "1" } });
     expect(await screenRecord(record, deps({ stageTransports: () => ["simulated"] }))).toMatchObject({ verdict: "FOREIGN", reason: "QA_FOREIGN", metaIdTail: "9876" });
     expect(await screenRecord(liveRecord({ messages: [text], attributes: { "qa-foreign": "1" } }), deps())).toMatchObject({ verdict: "FOREIGN", reason: "QA_FOREIGN" });
   });
 
-  it("[FL-095] everything is foreign while the number is not connected (P-01 open)", async () => {
+  it("[FL-095] everything is foreign while the number ids are placeholders (simulated-only stage)", async () => {
     expect(await screenRecord(liveRecord({ messages: [text] }), deps({ numberIds: () => undefined }))).toMatchObject({ verdict: "FOREIGN" });
   });
 

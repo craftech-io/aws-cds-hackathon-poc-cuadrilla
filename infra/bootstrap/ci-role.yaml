@@ -63,7 +63,7 @@ Parameters:
     Type: String
     Default: ""
     AllowedPattern: "^(|arn:aws:social-messaging:[a-z0-9-]+:[0-9]{12}:phone-number-id/[0-9a-f]{32})$"
-    Description: ARN of the own WhatsApp number (docs/pending.md P-01); empty until then, never a wildcard.
+    Description: ARN of the own WhatsApp number for the live transport (docs/pending.md P-01); empty by default, never a wildcard.
 
 Conditions:
   ShouldCreateOidcProvider: !Equals [!Ref CreateOidcProvider, "true"]

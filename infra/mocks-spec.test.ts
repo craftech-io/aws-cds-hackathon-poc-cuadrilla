@@ -263,14 +263,14 @@ describe("InboundWhatsApp IAM (docs/architecture.md §14)", () => {
     expect(statements).toContainEqual({ actions: ["s3:GetObject"], resources: ["arn:storage:Evidence/certificates/*", "arn:storage:Evidence/photos/*"] });
   });
 
-  it("omits every social-messaging statement while the number is not-connected, never widening it", async () => {
+  it("omits every social-messaging statement while the number id is the placeholder, never widening it", async () => {
     const { statements, drift } = await granted({ ...CONNECTED, phoneId: "not-connected" });
     expect(statements.flatMap((statement) => statement.actions).filter((action) => action.startsWith("social-messaging:"))).toEqual([]);
     expect(drift).toEqual({ extra: [], missing: ["social-messaging:GetWhatsAppMessageMedia", "social-messaging:PostWhatsAppMessageMedia", "social-messaging:SendWhatsAppMessage"] });
     expect(JSON.stringify(statements)).not.toContain("phone-number-id/*");
   });
 
-  it("gives any role with SEND_WHATSAPP its grants on our number only, and none while not-connected", async () => {
+  it("gives any role with SEND_WHATSAPP its grants on our number only, and none with the placeholder id", async () => {
     const connected = await evaluate(CONNECTED);
     expect(await resolveDeep(connected.whatsapp.whatsappPermissions("InstallerWorker"))).toEqual([
       { actions: ["social-messaging:SendWhatsAppMessage", "social-messaging:PostWhatsAppMessageMedia"], resources: [PHONE_ARN] },

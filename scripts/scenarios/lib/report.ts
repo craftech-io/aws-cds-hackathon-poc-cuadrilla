@@ -7,7 +7,7 @@ import { percentile } from "../../../packages/bff/src/metrics/kpis";
 import type { BlockOrigin } from "./context";
 import type { StepKind } from "./steps";
 
-export type Verdict = "PASS" | "WARN" | "FAIL" | "BLOCKED" | "SKIPPED" | "SKIPPED_PENDING_P01";
+export type Verdict = "PASS" | "WARN" | "FAIL" | "BLOCKED" | "SKIPPED" | "SKIPPED_LIVE_P01";
 
 export interface UnitResult {
   readonly id: string;
@@ -76,7 +76,7 @@ export interface RunReport {
   readonly budget: { readonly maxTurns: number; readonly maxCostUsd?: number; readonly aborted?: string };
 }
 
-const SEVERITY: Readonly<Record<Verdict, number>> = { PASS: 0, SKIPPED_PENDING_P01: 1, SKIPPED: 2, WARN: 3, BLOCKED: 4, FAIL: 5 };
+const SEVERITY: Readonly<Record<Verdict, number>> = { PASS: 0, SKIPPED_LIVE_P01: 1, SKIPPED: 2, WARN: 3, BLOCKED: 4, FAIL: 5 };
 
 export function worst(verdicts: readonly Verdict[]): Verdict {
   return verdicts.reduce<Verdict>((current, next) => (SEVERITY[next] > SEVERITY[current] ? next : current), "PASS");
@@ -99,7 +99,7 @@ export function agentRate(scenarios: readonly ScenarioResult[]): RunReport["agen
   let ok = 0;
   let total = 0;
   for (const unit of scenarios.flatMap((scenario) => scenario.units)) {
-    if (unit.kind !== "agent" || unit.verdict === "SKIPPED" || unit.verdict === "SKIPPED_PENDING_P01") continue;
+    if (unit.kind !== "agent" || unit.verdict === "SKIPPED" || unit.verdict === "SKIPPED_LIVE_P01") continue;
     total += 1;
     if (passed(unit.verdict)) ok += 1;
     for (const flow of unit.oracleFlow === undefined ? unit.flows : [unit.oracleFlow]) {

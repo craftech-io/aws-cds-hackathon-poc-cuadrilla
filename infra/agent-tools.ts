@@ -11,7 +11,7 @@
 // holds travels with its carrier (`toolCarriers`, infra/agentcore-spec.ts; the test checks the mapping is
 // total): the Linkable of the module that owns the resource, whose `include` is exactly that grant
 // (NetworkMock, GuardrailG2/G3, EmailChannel, Scheduler, KnowledgeBase, PhotoModel, CertificateWriter), the
-// statements on our WhatsApp number (`whatsappPermissions`, none while it is `not-connected`) and object
+// statements on our WhatsApp number (`whatsappPermissions`, none while its secret holds the placeholder value) and object
 // prefixes of a bucket (`StoragePrefix`: SEND_WHATSAPP's reads of certificates and photos, ToolEvidence's
 // writes of photos). PIPELINE holders also link, for their runtime, the stage's transports, SeedOverrides,
 // BrandConfig and the sending number; ToolEvidence links CostCaps (the global ceiling reserved before

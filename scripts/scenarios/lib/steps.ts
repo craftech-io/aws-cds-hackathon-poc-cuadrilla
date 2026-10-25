@@ -57,7 +57,7 @@ export interface ScenarioDef {
   /** Runs alone after the parallel part (`SC-20`: the counters of its run); `last` after every other (`SC-16`). */
   readonly alone?: boolean;
   readonly last?: boolean;
-  /** Why the whole scenario is skipped this run (`SC-17` while `live` is not a transport): its steps are `SKIPPED_PENDING_P01`. */
+  /** Why the whole scenario is skipped this run (`SC-17` while `live` is not a transport): its steps are `SKIPPED_LIVE_P01`. */
   readonly pending?: (ctx: ScenarioContext) => Promise<string | undefined>;
   /** The worlds and baselines every unit starts from (presets, never turns of the model); unit key `setup`. */
   readonly setup?: (ctx: ScenarioContext) => Promise<void>;

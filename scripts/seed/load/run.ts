@@ -7,7 +7,7 @@
 //   2  `Seed`: the photos (the set and the renders outside it), their catalog, the voice notes, the
 //      evaluation set and the sample of the certificate template's document header; `Manual`: every
 //      section and its sidecar. The world templates are the IaC's (infra/world-templates.ts), never here
-//   3  `Reference` (validated by the seed store): a WhatsApp template keeps the id and status P-01 gave it
+//   3  `Reference` (validated by the seed store): a WhatsApp template keeps the id and status Meta gave it (P-01 step 8)
 //   4  the Knowledge Base is ingested again only when the manual's fingerprint changed (also with
 //      `--force`), waiting for COMPLETE; then `MANUALINDEX` is written
 //   5  the demo world: created at epoch 1, or reset ("Reiniciar demo" as `seed:load`: epoch up, tombstone,
@@ -99,7 +99,7 @@ function checkedLogos(args: LoadArgs, ports: LoadPorts): Array<{ readonly key: s
   });
 }
 
-/** A template row keeps what P-01 gave it in the stage: Meta's id, its review status and category. */
+/** A template row keeps what its registration with Meta gave it in the stage (P-01 step 8): Meta's id, its review status and category. */
 async function referenceRows(seed: SeedOnDisk, worlds: WorldsDeps): Promise<Item[]> {
   const rows: Item[] = [];
   for (const row of seed.reference) {

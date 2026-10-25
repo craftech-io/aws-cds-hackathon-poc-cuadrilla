@@ -119,7 +119,7 @@ describe("transport per recipient, through channels/registry.ts", () => {
     expect(registry.whatsapp(await routeFor(DEMO, guestPhone))).toBe(transport);
   });
 
-  it("[FL-082] before P-01 the stage builds only the simulated transport and refuses a live route", async () => {
+  it("[FL-082] without the live transport the stage builds only the simulated transport and refuses a live route", async () => {
     const { transport } = await setup();
     let builtLive = false;
     const registry = createChannelRegistry({

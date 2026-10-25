@@ -1,7 +1,7 @@
 // Area I · Contact policy, window and quiet hours (docs/flows-catalog.md FL-072 and FL-073), in process:
 // the outbound pipeline's policy measured with the world's clock (synthetic identities), what is denied
 // stays on the order's timeline, and a proactive message in quiet hours is deferred to a `TIMER#` that the
-// clock fires at 07:00. The live variant of FL-072 (c) waits for P-01 (docs/test-plan.md §2.1).
+// clock fires at 07:00. The live variant of FL-072 (c) runs in SC-17 on a stage with the live transport (docs/test-plan.md §2.1).
 import { describe, expect, it } from "vitest";
 import { STATUS_REPLY, reply } from "./support/agent";
 import { createFlowWorld } from "./support/world";

@@ -1,6 +1,6 @@
 // The run's report and the "100 % probada" gate over three runs (docs/test-plan.md §1 item 3, §4.4): the
 // agent rate counts only agent units that ran and by the flow that decides each; a det unit passes 3 of 3,
-// an agent one 2 of 3, each part on its own; SKIPPED_PENDING_P01 is accepted only in SC-17.
+// an agent one 2 of 3, each part on its own; SKIPPED_LIVE_P01 is accepted only in SC-17.
 import { describe, expect, it } from "vitest";
 import { aggregate, unitMeetsGate } from "./aggregate";
 import { type RunReport, type ScenarioResult, type UnitResult, type Verdict, buildReport, renderMarkdown, worst } from "./report";
@@ -36,13 +36,13 @@ describe("buildReport", () => {
   it("rates the agent units that ran, by the flow that decides each, and adds usage and cost", () => {
     const report = run("1-1", [
       scenario("SC-04", [unit("9.a", "agent", "PASS", ["FL-040", "FL-103"], "FL-040"), unit("9.b", "det", "PASS", ["FL-040"]), unit("10", "agent", "FAIL", ["FL-041"]), unit("11", "agent", "SKIPPED", ["FL-041"])]),
-      scenario("SC-17", [unit("3", "agent", "SKIPPED_PENDING_P01", ["FL-091"])]),
+      scenario("SC-17", [unit("3", "agent", "SKIPPED_LIVE_P01", ["FL-091"])]),
     ]);
     expect(report.agentRate.passed).toBe(1);
     expect(report.agentRate.total).toBe(2);
     expect(report.agentRate.byFlow).toEqual({ "FL-040": { passed: 1, total: 1 }, "FL-041": { passed: 0, total: 1 } });
     expect(report.flows["FL-041"]).toBe("FAIL");
-    expect(report.flows["FL-091"]).toBe("SKIPPED_PENDING_P01");
+    expect(report.flows["FL-091"]).toBe("SKIPPED_LIVE_P01");
     expect(report.usage).toMatchObject({ turns: 8, validations: 2, estimatedCostUsd: 0.5 });
     expect(report.latencies.n).toBe(4);
     expect(report.verdict).toBe("FAIL");
@@ -66,9 +66,9 @@ describe("the gate over three runs", () => {
     expect(unitMeetsGate("agent", ["PASS", "PASS"], "SC-04").ok).toBe(false);
   });
 
-  it("accepts SKIPPED_PENDING_P01 only in SC-17", () => {
-    expect(unitMeetsGate("agent", ["SKIPPED_PENDING_P01", "SKIPPED_PENDING_P01", "SKIPPED_PENDING_P01"], "SC-17")).toMatchObject({ ok: true, note: "SKIPPED_PENDING_P01" });
-    expect(unitMeetsGate("det", ["SKIPPED_PENDING_P01", "SKIPPED_PENDING_P01", "SKIPPED_PENDING_P01"], "SC-12").ok).toBe(false);
+  it("accepts SKIPPED_LIVE_P01 only in SC-17", () => {
+    expect(unitMeetsGate("agent", ["SKIPPED_LIVE_P01", "SKIPPED_LIVE_P01", "SKIPPED_LIVE_P01"], "SC-17")).toMatchObject({ ok: true, note: "SKIPPED_LIVE_P01" });
+    expect(unitMeetsGate("det", ["SKIPPED_LIVE_P01", "SKIPPED_LIVE_P01", "SKIPPED_LIVE_P01"], "SC-12").ok).toBe(false);
   });
 
   it("passes a det part even when the agent part of the same step misses once, and fails on a violation", () => {

@@ -133,7 +133,7 @@ export const WORKER_LATE_LINKS = { agentcore: ["Harness"], media: ["Transcribe"]
 /**
  * Functions of those modules called with the role's name: `mockLinks`/`mockPermissions` (the mocks a
  * role calls and the mocks' tables it writes, WP-24) and `whatsappPermissions` (the role's grants on our
- * WhatsApp number over whatsappPhoneArn(), none while it is `not-connected`, WP-24).
+ * WhatsApp number over whatsappPhoneArn(), none while its secret holds the placeholder value, WP-24).
  */
 export const LATE_CALLS = { mocks: ["mockLinks", "mockPermissions"], "messaging-whatsapp": ["whatsappPermissions"] } as const satisfies Partial<Record<LateModule, readonly string[]>>;
 

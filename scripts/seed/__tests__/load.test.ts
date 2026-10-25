@@ -128,7 +128,7 @@ describe("seed:load", () => {
     expect((await world.harness.connector.workOrders.requireWorkOrder("wo-24817")).worldEpoch).toBe(3);
   });
 
-  it("keeps the id and review status P-01 gave a WhatsApp template", async () => {
+  it("keeps the id and review status Meta gave a WhatsApp template", async () => {
     const world = stage();
     await runLoad(SEED, parseLoadArgs([]), world.ports);
     const key = { PK: "REF#TEMPLATE#WHATSAPP", SK: "ordenes_del_dia" };

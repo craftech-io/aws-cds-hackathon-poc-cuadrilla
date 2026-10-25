@@ -181,7 +181,7 @@ describe("whatsappPhoneArn", () => {
     expect(whatsappPhoneArn(AWS_PHONE_ID)).toBe(`arn:aws:social-messaging:us-east-1:776805327629:phone-number-id/${"0123456789abcdef".repeat(2)}`);
   });
 
-  it("omits the statement while the number is not connected and rejects the Meta id", () => {
+  it("omits the statement for the placeholder value and rejects the Meta id", () => {
     expect(whatsappPhoneArn("not-connected")).toBeUndefined();
     expect(() => whatsappPhoneArn("106540352242922")).toThrow(/AWS id/);
     expect(() => whatsappPhoneArn("*")).toThrow();

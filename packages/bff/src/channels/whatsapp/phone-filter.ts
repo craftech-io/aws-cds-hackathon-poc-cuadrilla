@@ -49,7 +49,7 @@ export type ScreenResult =
   /** A dependency failed on a record that may be ours (a certificate download, a table read): let SNS retry. */
   | { readonly verdict: "RETRY"; readonly reason: string };
 
-/** The two ids of our number (lib/secrets.ts `whatsAppConnection`); `undefined` until P-01. */
+/** The two ids of our number (lib/secrets.ts `whatsAppConnection`); `undefined` while they hold the placeholder value (P-01). */
 export interface NumberIds {
   readonly phoneNumberId: string;
   readonly metaPhoneNumberId: string;

@@ -10,7 +10,7 @@
 //   3. A cited file that does not exist yet is pending and only reported, because the plan builds
 //      them wave by wave; `--strict` (the "100 % probada" gate, WP-50) fails on it.
 //   4. From the documents alone (plan.ts, oracle-keys.ts): every step citation resolves to a step or
-//      part of §4.5, a step with several [det]/[agent] segments is written in parts, "(pendiente
+//      part of §4.5, a step with several [det]/[agent] segments is written in parts, "(vivo,
 //      P-01)" marks only SC-17 citations of the flows of §2.1, and the oracle keys of §4.3 follow
 //      their grammar and precedence.
 //
@@ -19,7 +19,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkOracleKeys } from "./oracle-keys";
-import { checkStepCitations, parseScenarioPlan, pendingP01Flows } from "./plan";
+import { checkStepCitations, liveP01Flows, parseScenarioPlan } from "./plan";
 
 export const CATALOG_FILE = "docs/flows-catalog.md";
 export const TEST_PLAN_FILE = "docs/test-plan.md";
@@ -45,7 +45,7 @@ function emptyTests(): Record<Level, string[]> {
   return { U: [], LF: [], UI: [], SR: [], SMK: [] };
 }
 
-/** Text without its parenthesised annotations ("`SC-17/1` (pendiente P-01)" → "`SC-17/1` "). */
+/** Text without its parenthesised annotations ("`SC-17/1` (vivo, P-01)" → "`SC-17/1` "). */
 function withoutAnnotations(text: string): string {
   let previous = "";
   let current = text;
@@ -57,7 +57,7 @@ function withoutAnnotations(text: string): string {
 }
 
 /**
- * `- Prueba: U \`a\`, \`b\` · SR \`SC-01/1\` (pendiente P-01). Notas: …` → tests by level, the text of
+ * `- Prueba: U \`a\`, \`b\` · SR \`SC-01/1\` (vivo, P-01). Notas: …` → tests by level, the text of
  * each level and the notes. Backticked names inside an annotation (`open_case`, a clockId) are not
  * citations.
  */
@@ -214,7 +214,7 @@ function main(): void {
   const catalog = readFileSync(join(cwd, CATALOG_FILE), "utf8");
   const scenarioPlan = parseScenarioPlan(plan);
   errors.push(...scenarioPlan.errors);
-  errors.push(...checkStepCitations(flows, scenarioPlan.plan, pendingP01Flows(plan)));
+  errors.push(...checkStepCitations(flows, scenarioPlan.plan, liveP01Flows(plan)));
   errors.push(...checkOracleKeys(plan, catalog, scenarioPlan.plan));
 
   const citations = checkCitations(flows, diskAccess(cwd));

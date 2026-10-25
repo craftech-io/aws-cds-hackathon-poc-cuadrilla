@@ -284,7 +284,7 @@ Ninguno de estos grupos entra en `EV-02` ni en los 60 del set; tienen su propia 
 
 | Tipo | Contenido |
 |---|---|
-| `TEMPLATE#WHATSAPP` | Las 6 plantillas de `docs/architecture-integrations.md` §4.5 con cuerpo, parámetros, ejemplos sintéticos por parámetro, muestra del encabezado de documento de `acta_instalacion` (`Seed/templates/acta-muestra.pdf`, sintético y sin nombre de operadora); ningún texto de plantilla nombra a la operadora, botones, `category UTILITY`, `language es_MX`, `status LOCAL_ONLY` (pasa a `PENDING`/`APPROVED` con P-01) |
+| `TEMPLATE#WHATSAPP` | Las 6 plantillas de `docs/architecture-integrations.md` §4.5 con cuerpo, parámetros, ejemplos sintéticos por parámetro, muestra del encabezado de documento de `acta_instalacion` (`Seed/templates/acta-muestra.pdf`, sintético y sin nombre de operadora); ningún texto de plantilla nombra a la operadora, botones, `category UTILITY`, `language es_MX`, `status LOCAL_ONLY` (pasa a `PENDING`/`APPROVED` al registrarla con Meta, P-01 paso 8) |
 | `KBTHRESHOLD#v001` | Umbral de puntaje de `search_procedures` (0,35, `provisional: true`); la primera corrida de `EV-01` lo recalibra en una versión nueva |
 | `RUBRIC#v001` | Por ítem de foto: qué debe verse, criterios de enfoque, reflejo, encuadre y luz, y el texto accionable de cada motivo (importado de `copy/es-MX.ts`) |
 | `SAFETY_LEXICON#v001` | Frases y raíces es-MX de riesgo (§5.9 del brief), con ejemplos positivos y negativos que prueba `safety/classifier.test.ts` |

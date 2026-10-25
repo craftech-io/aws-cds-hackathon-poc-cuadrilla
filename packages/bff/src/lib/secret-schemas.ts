@@ -16,7 +16,7 @@ export const SECRET_NAMES = [
 ] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];
 
-/** Value of the three WhatsApp secrets until docs/pending.md P-01 is closed. */
+/** Placeholder value of the three WhatsApp secrets on a stage without the live transport (docs/pending.md P-01). */
 export const NOT_CONNECTED = "not-connected";
 
 /** AWS id of the phone number: sending, media and IAM; never compared with an inbound event. */

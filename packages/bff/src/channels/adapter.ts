@@ -3,7 +3,7 @@
 // `channels/<channel>/`, and nothing outside a transport knows whether it is live or simulated.
 //
 //   - `ChannelTransport`: a channel's way out through one transport. Email has one (`live`, SES);
-//     WhatsApp has the stage's transports (`simulated`, and `live` once P-01 is closed), and
+//     WhatsApp has the stage's transports (`simulated`, plus `live` when enabled by configuration, P-01), and
 //     channels/registry.ts picks the one each recipient needs;
 //   - `ChannelSendResult`: what a send answers, never an exception for an expected denial: the
 //     recipient fence, a cap or a provider failure come back as a code of docs/tool-catalog.md, so

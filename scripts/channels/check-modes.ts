@@ -1,8 +1,8 @@
 // CI check of the WhatsApp transports and world modes (ADR-0002, docs/architecture.md §18):
 //
 //   1. `infra/channel-modes.ts`: email is "live" and the WhatsApp transports of the stage are a
-//      plain literal list; "live" may be among them only when P-01 of docs/pending.md is closed
-//      ("Cerrado el AAAA-MM-DD por <quién>" in its "Estado" cell).
+//      plain literal list; "live" may be among them only when docs/pending.md records P-01, the
+//      operational step that enables it, as done ("Cerrado el AAAA-MM-DD por <quién>" in its "Estado" cell).
 //   2. Every world template of `scripts/seed/data/worlds/*.json` runs `whatsappMode: simulated`: a
 //      world goes live only through `SeedOverrides.liveWorldClockId`, never from a template.
 //   3. `scripts/seed/overrides.example.json` declares at most one live world.
@@ -21,7 +21,7 @@ export const PENDING_FILE = "docs/pending.md";
 export const WORLDS_DIR = "scripts/seed/data/worlds";
 export const OVERRIDES_EXAMPLE = "scripts/seed/overrides.example.json";
 
-/** Pending item that must be closed before WhatsApp may have the live transport. */
+/** Entry of docs/pending.md that records the operational step enabling the live WhatsApp transport. */
 export const WHATSAPP_GATE = "P-01";
 
 export interface Modes {
@@ -36,7 +36,7 @@ export function readModes(source: string): Modes {
   return { ...(email === undefined ? {} : { email }), ...(transports === undefined ? {} : { transports }) };
 }
 
-// The pending table: `| P-01 | Pendiente | Dueño | Estado | Qué falta |`. Returns the Estado cell.
+// The table of docs/pending.md: `| P-01 | Pendiente | Dueño | Estado | Qué falta |`. Returns the Estado cell.
 export function pendingStatus(markdown: string, id: string): string | undefined {
   for (const line of markdown.split("\n")) {
     if (!line.startsWith("|")) continue;
@@ -70,7 +70,7 @@ export function checkModes(modesSource: string, pendingMarkdown: string): string
     errors.push(`${MODES_FILE}: "live" is a WhatsApp transport but ${PENDING_FILE} has no row for ${WHATSAPP_GATE}.`);
   } else if (!isClosed(status)) {
     errors.push(
-      `${MODES_FILE}: "live" is a WhatsApp transport but ${WHATSAPP_GATE} in ${PENDING_FILE} is still open ` +
+      `${MODES_FILE}: "live" is a WhatsApp transport but ${WHATSAPP_GATE} in ${PENDING_FILE} is not recorded as done ` +
         `(Estado: "${status}"). The cell must read "Cerrado el <AAAA-MM-DD> por <quién>".`,
     );
   }

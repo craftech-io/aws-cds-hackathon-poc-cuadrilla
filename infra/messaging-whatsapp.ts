@@ -14,7 +14,7 @@
 //
 // Who may publish (`waInboundTopicPolicy`): EUM Social (`social-messaging.amazonaws.com`, with
 // `aws:SourceAccount` of this account) and the QaDriver's role, which publishes events with another
-// number and `qa-foreign=1` to prove the discard without a WABA (FL-095). A Deny of `sns:Publish`
+// number and `qa-foreign=1` to prove the discard on a simulated-only stage (FL-095). A Deny of `sns:Publish`
 // reaches every other principal (`aws:PrincipalServiceName`, `aws:PrincipalArn`), so no other role of
 // this shared account can inject "live" events with our number, whatever its own policy says. The
 // QaDriver belongs to infra/bff.ts (WP-38), read late (infra/mocks.ts `lateFunction`); until that
@@ -33,7 +33,7 @@
 //
 // Number. `WhatsAppPhoneNumberId` is the AWS id (`phone-number-id-<32 hex>`); its ARN drops the prefix
 // (`…:phone-number-id/<32 hex>`), and every `social-messaging:*` statement is omitted while the secret
-// is `not-connected`, never widened to `phone-number-id/*`: every role with SEND_WHATSAPP adds
+// holds the placeholder value, never widened to `phone-number-id/*`: every role with SEND_WHATSAPP adds
 // `whatsappPermissions(fn)`. The Meta id (`WhatsAppMetaPhoneNumberId`) is only compared with inbound
 // events, never used in IAM.
 //
@@ -86,10 +86,10 @@ export function waInboundTopicPolicy(topicArn: string, qaDriverRoleArn: string |
   };
 }
 
-/** ARN of our number for IAM, from the secret; `undefined` while it is `not-connected` (P-01). */
+/** ARN of our number for IAM, from the secret; `undefined` while it holds the placeholder value (P-01). */
 export const whatsappPhone: $util.Output<string | undefined> = WhatsAppPhoneNumberId.value.apply((id) => whatsappPhoneArn(id));
 
-/** A role's grants on our number (SEND_WHATSAPP, GetWhatsAppMessageMedia), on its exact ARN; none while it is `not-connected`. */
+/** A role's grants on our number (SEND_WHATSAPP, GetWhatsAppMessageMedia), on its exact ARN; none while the secret holds the placeholder value. */
 export function whatsappPermissions(fn: RoleName): $util.Output<Statement[]> {
   const grants = expectedGrants(fn).filter((grant) => grant.resources.includes(WHATSAPP_PHONE));
   return whatsappPhone.apply((phoneArn) => (phoneArn === undefined ? [] : grants.map((grant) => grantStatement(grant, () => phoneArn))));
@@ -129,7 +129,7 @@ const PIPELINE_LINK_CARRIED = new Set([...CAPABILITIES.PIPELINE.grants, ...CAPAB
 
 /**
  * InboundWhatsApp's statements: its tables, Media and the templates of Reference, its grants on our
- * number (none while it is not connected), SEND_WHATSAPP's reads of certificates and photos and
+ * number (none while the secret holds the placeholder value), SEND_WHATSAPP's reads of certificates and photos and
  * `cloudwatch:PutMetricData` in the app's namespace. `sqs:SendMessage` comes with the linked
  * `InstallerEvents` queue (infra/workers.ts hands a linked queue its URL and that action only); the rest
  * of PIPELINE (its fixed replies and the window fallback go through the outbound pipeline) with its links.

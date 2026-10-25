@@ -67,7 +67,7 @@ async function call<T>(operation: string, run: () => Promise<T>): Promise<T> {
 }
 
 export interface SocialMessagingOptions {
-  /** AWS id of our number, read lazily (it is `not-connected` until P-01 closes). */
+  /** AWS id of our number, read lazily (the placeholder `not-connected` on a simulated-only stage, P-01). */
   readonly originationPhoneNumberId: () => string;
   readonly client?: SocialMessagingClient;
 }

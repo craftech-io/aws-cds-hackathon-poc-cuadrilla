@@ -26,8 +26,8 @@ let social: SocialMessagingPort | undefined;
 let verifier: ReturnType<typeof createSnsVerifier> | undefined;
 
 /**
- * The two ids of our number from their secrets (docs/architecture.md §3); `undefined` while either is
- * `not-connected` (P-01). Only these two are linked to the channel: the WABA id is not needed here. A
+ * The two ids of our number from their secrets (docs/architecture.md §3); `undefined` while either holds
+ * the placeholder value (P-01). Only these two are linked to the channel: the WABA id is not needed here. A
  * malformed value fails without echoing it.
  */
 export function linkedNumberIds(): NumberIds | undefined {
@@ -38,7 +38,7 @@ export function linkedNumberIds(): NumberIds | undefined {
   return { phoneNumberId: phoneNumberId.data, metaPhoneNumberId: metaPhoneNumberId.data };
 }
 
-/** The container's EUM Social client; it reads the AWS id of the number at each call (P-01 may still be open). */
+/** The container's EUM Social client; it reads the AWS id of the number at each call (it changes when the stage enables the live transport, P-01). */
 export function socialMessaging(): SocialMessagingPort {
   social ??= createSocialMessaging({ originationPhoneNumberId: () => linkedNumberIds()?.phoneNumberId ?? NOT_CONNECTED });
   return social;
@@ -98,7 +98,7 @@ export function statusDeps(ports: Pick<InboundPorts, "fallback" | "logger" | "co
 
 /**
  * The two transports as channels/registry.ts builds them (`TransportFactories.whatsapp`): the registry
- * runs a factory only for a transport the stage has, so the live one is never built before P-01.
+ * runs a factory only for a transport the stage has, so the live one is built only on a stage with the live transport (P-01).
  */
 export function whatsAppTransportFactories(ports: Pick<InboundPorts, "fallback" | "logger" | "connector" | "realClock">): { readonly simulated: () => SimulatedTransport; readonly live: () => WhatsAppChannelTransport } {
   const connector = ports.connector ?? defaultConnector();

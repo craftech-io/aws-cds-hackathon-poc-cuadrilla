@@ -11,7 +11,7 @@
 //              enqueues `TIMER` on the local queue, as the worker's producer does
 //   inbound    `InboundWhatsApp` (channels/whatsapp/inbound.ts) with the stage's notices, queue and
 //              keyword handlers; the simulator's envelopes are signed with this world's subkey
-//   live       only when a test asks for it (P-01 closed in the stage): the live transport over an EUM
+//   live       only when a test asks for it (a stage with the live transport, P-01): the live transport over an EUM
 //              Social stand-in and SNS events signed with the fixtures' key (channels/whatsapp/testing.ts)
 import { createChannelRegistry } from "../../../packages/bff/src/channels/registry";
 import { type EmailClient, createEmailClient } from "../../../packages/bff/src/channels/email/outbound";
