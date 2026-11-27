@@ -5,12 +5,19 @@
 //   2. who is asking: the viewer of the edge (no other caller starts a sign-up) UNAVAILABLE (NO_VIEWER)
 //   3. the two consents against their version in force                       INVALID (CONSENT_…)
 //   4. the cut of the sign-up (KILL#SIGNUP, KILL#ALL)                          CAP_REACHED
-//   5. the domain of the email: MX, or A/AAAA, within 1 s                     INVALID (EMAIL_DOMAIN)
+//   5. the domain of the email: not a disposable mailbox (signup/disposable-domains.ts)
+//                                                                             INVALID (EMAIL_NOT_ACCEPTED)
+//      then MX, or A/AAAA, within 1 s                                         INVALID (EMAIL_DOMAIN)
 //   6. the visitor's counters, then the stage's day (signup/limits.ts)        RATE_LIMITED | CAP_REACHED
 //   7. two confirmed accounts of the same person                             RATE_LIMITED
 //   8. the lead: new, or one more pending user (≤ 3, the oldest retired, each start's form and
-//      consents kept apart under its own user); a confirmed one            EMAIL_TAKEN
+//      consents kept apart under its own user); a confirmed one is left as it is
 //   9. the ticket that binds the email and the new `gst-<ULID>` user, 10 minutes
+//
+// An email that already has an account answers exactly like a new one (a ticket, a user, an expiry),
+// so `signup.start` never tells who has an account. Its `SignUp` goes on too (auth-triggers/pre-sign-up.ts)
+// and Cognito sends the code to that inbox; only its owner can type it, and the confirmation then fails
+// with `AliasExistsException`, which the web reads as "you already have an account" (ADR-0025 §3).
 //
 // Emails, IPs and tickets never reach a log: a line carries the first 8 characters of the email's hash
 // at most (ADR-0026, PII). Refusals are `SignupRejected{reason}`, a start is `SignupStarted`.
@@ -23,7 +30,8 @@ import type { LeadStore } from "../leads/store";
 import type { Logger } from "../lib/log";
 import { type KillSwitchReader, blockingScope } from "../ops/kill-switch";
 import type { EdgeContext } from "../routers/trpc";
-import { type DnsResolver, emailDomainVerdict } from "./email-domain";
+import { isDisposableDomain } from "./disposable-domains";
+import { type DnsResolver, domainOf, emailDomainVerdict } from "./email-domain";
 import { parseSignupForm } from "./form";
 import { SIGNUP_LIMITS, confirmedAccountsOf, ipHashOf, reserveStart } from "./limits";
 import { SIGNUP_TICKET_TTL_MS, issueTicket } from "./ticket";
@@ -58,14 +66,14 @@ export interface SignupStarted {
   readonly expiresAt: string;
 }
 
-export type SignupRefusal = "INVALID_FORM" | "NO_VIEWER" | "CONSENT" | "EMAIL_DOMAIN" | "RATE_LIMITED" | "CAP_REACHED" | "EMAIL_TAKEN" | "UNAVAILABLE";
+export type SignupRefusal = "INVALID_FORM" | "NO_VIEWER" | "CONSENT" | "EMAIL_NOT_ACCEPTED" | "EMAIL_DOMAIN" | "RATE_LIMITED" | "CAP_REACHED" | "UNAVAILABLE";
 
 const REFUSALS: Readonly<Record<Exclude<SignupRefusal, "INVALID_FORM" | "CONSENT">, () => ToolError>> = {
   NO_VIEWER: () => new ToolError("UNAVAILABLE", "the account could not be created right now", "NO_VIEWER"),
+  EMAIL_NOT_ACCEPTED: () => new ToolError("INVALID", "disposable mailboxes are not accepted", "EMAIL_NOT_ACCEPTED"),
   EMAIL_DOMAIN: () => new ToolError("INVALID", "the domain of this email cannot receive mail", "EMAIL_DOMAIN"),
   RATE_LIMITED: () => new ToolError("CAP_REACHED", "too many sign-ups from this connection or with this email", "RATE_LIMITED"),
   CAP_REACHED: () => new ToolError("CAP_REACHED", "new test accounts are not being opened right now", "CAP_REACHED"),
-  EMAIL_TAKEN: () => new ToolError("CONFLICT", "there is already an account with this email", "EMAIL_TAKEN"),
   UNAVAILABLE: () => new ToolError("UNAVAILABLE", "the account could not be created right now", "UNAVAILABLE"),
 };
 
@@ -108,6 +116,7 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
   const email = normalizeLeadEmail(form.email);
   const emailKey = p.keys.emailHash();
   const emailHash = leadEmailHash(emailKey, email);
+  if (isDisposableDomain(domainOf(email))) return refuse("EMAIL_NOT_ACCEPTED", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
   const domain = await emailDomainVerdict(email, p.resolver);
   if (domain === "INVALID") return refuse("EMAIL_DOMAIN", REFUSALS.EMAIL_DOMAIN(), emailHash);
   if (domain === "UNKNOWN") call.log.warn("signup.email_domain.unknown", { metric: "SignupMxUnknown", value: 1, emailHash: hashPrefix(emailHash) });
@@ -132,10 +141,10 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
     consents,
     at: now,
   });
-  if (started.outcome === "EMAIL_TAKEN") return refuse("EMAIL_TAKEN", REFUSALS.EMAIL_TAKEN(), emailHash);
 
   const exp = Math.floor((now.getTime() + SIGNUP_TICKET_TTL_MS) / 1000);
   const ticket = issueTicket(p.keys.ticket(), { nonce: p.newUlid(now.getTime()), emailHash, username, exp });
-  call.log.info("signup.started", { metric: "SignupStarted", value: 1, outcome: started.outcome, origin: started.lead.origin, emailHash: hashPrefix(emailHash) });
+  const leadOrigin = started.outcome === "EMAIL_TAKEN" ? leadOriginOf(email) : started.lead.origin;
+  call.log.info("signup.started", { metric: "SignupStarted", value: 1, outcome: started.outcome, origin: leadOrigin, emailHash: hashPrefix(emailHash) });
   return { ticket, username, expiresAt: new Date(exp * 1000).toISOString() };
 }

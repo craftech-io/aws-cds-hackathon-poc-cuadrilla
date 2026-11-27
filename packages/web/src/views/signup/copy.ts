@@ -2,7 +2,8 @@
 // docs/landing-spec.md §7.3 (the form), §7.4 (the code) and §7.5 (what the visitor reads when a limit
 // or a check stops the sign-up). The two consents are NOT here: their text and version come from
 // packages/shared/src/legal/consents.ts, the source the BFF validates against. No message says whether
-// an email has an account, except EMAIL_TAKEN (ADR-0025 §3, a declared residual risk).
+// an email has an account: `signup.start` answers the same either way, and EMAIL_TAKEN shows only once
+// the visitor typed the code sent to that inbox (Cognito's AliasExistsException, ADR-0025 §3).
 import type { SignupErrorCode } from "./signup-model";
 
 export type SignupLang = "es" | "en";
@@ -69,6 +70,7 @@ export const signupCopy: Readonly<Record<SignupLang, SignupCopy>> = {
       CAP_REACHED: ["Por ahora no estamos abriendo cuentas nuevas de prueba. Vuelve más tarde o ", { label: "hablemos", href: CONTACT_URL, external: true }, " y te preparamos una demo guiada."],
       TICKET_INVALID: ["La sesión del formulario venció, intenta de nuevo."],
       EMAIL_DOMAIN: ["Revisa tu email: ese dominio no puede recibir correo."],
+      EMAIL_NOT_ACCEPTED: ["Usa tu email de trabajo o uno personal: no aceptamos casillas temporales."],
       UNAVAILABLE: ["No pudimos crear tu cuenta en este momento. Intenta de nuevo en unos minutos."],
       BROWSER_CHECK: ["No pudimos verificar tu navegador. Recarga la página, desactiva el bloqueador de contenido para este sitio o intenta desde otro navegador."],
       WEAK_PASSWORD: ["La contraseña no cumple los requisitos."],
@@ -105,6 +107,7 @@ export const signupCopy: Readonly<Record<SignupLang, SignupCopy>> = {
       CAP_REACHED: ["We're not opening new test accounts right now. Try again later, or ", { label: "let's talk", href: CONTACT_URL, external: true }, " and we'll set up a guided demo."],
       TICKET_INVALID: ["The form session expired, please try again."],
       EMAIL_DOMAIN: ["Check your email: that domain can't receive mail."],
+      EMAIL_NOT_ACCEPTED: ["Use your work email or a personal one: temporary mailboxes aren't accepted."],
       UNAVAILABLE: ["We couldn't create your account right now. Please try again in a few minutes."],
       BROWSER_CHECK: ["We couldn't verify your browser. Reload the page, turn off your content blocker for this site, or try another browser."],
       WEAK_PASSWORD: ["The password doesn't meet the requirements."],

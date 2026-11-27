@@ -6,8 +6,10 @@
 //                               `clientMetadata.signupTicket` (signup/ticket.ts): a valid HMAC, not
 //                               expired, the `emailHash` of this email, this very `userName`, and at
 //                               most two uses, always for that user; no `custom:*` attribute; a
-//                               `locale` in {es-MX, en}; the email without a confirmed lead
-//                               (EMAIL_TAKEN); the person below its two confirmed accounts (RATE_LIMITED:
+//                               `locale` in {es-MX, en}; an email with a confirmed lead goes on
+//                               like any other (the refusal would tell who has an account: Cognito
+//                               sends the code to that inbox and its confirmation then fails with
+//                               AliasExistsException); the person below its two confirmed accounts (RATE_LIMITED:
 //                               another address of the same person may have confirmed since its
 //                               start); the sign-up not cut and today's starts not over the cap
 //                               (CAP_REACHED), all READ, never incremented (only `signup.start` counts)
@@ -40,7 +42,7 @@ import { readTicket, spendTicketUse } from "../signup/ticket";
 export const PRE_SIGN_UP_DEADLINE_MS = 4_000;
 
 /** The codes the browser can read in Cognito's answer (lib/auth/errors.ts of the web). */
-export type PreSignUpRefusal = "TICKET_INVALID" | "EMAIL_TAKEN" | "RATE_LIMITED" | "CAP_REACHED" | "ATTRIBUTE_NOT_ALLOWED" | "LOCALE_NOT_ALLOWED" | "SOURCE_NOT_ALLOWED" | "UNAVAILABLE";
+export type PreSignUpRefusal = "TICKET_INVALID" | "RATE_LIMITED" | "CAP_REACHED" | "ATTRIBUTE_NOT_ALLOWED" | "LOCALE_NOT_ALLOWED" | "SOURCE_NOT_ALLOWED" | "UNAVAILABLE";
 
 export class PreSignUpRefused extends Error {
   override readonly name = "PreSignUpRefused";
@@ -95,7 +97,6 @@ async function checkSignUp(deps: PreSignUpDeps, userName: string, attributes: Re
   // that raced it) takes no more accounts. Read only: nothing here counts.
   if ((await startsToday(deps.runtime, now)) > SIGNUP_LIMITS.startsPerDay) throw new PreSignUpRefused("CAP_REACHED");
   const lead = await deps.leads.get(emailHash);
-  if (lead?.status === "CONFIRMED") throw new PreSignUpRefused("EMAIL_TAKEN");
   // `signup.start` read it when it issued the ticket; another address of the person may have confirmed since.
   if (lead !== undefined && (await confirmedAccountsOf(deps.runtime, lead.abuseHash)) >= SIGNUP_LIMITS.confirmedAccountsPerPerson) throw new PreSignUpRefused("RATE_LIMITED");
   if (!(await spendTicketUse(deps.runtime, read.ticket, now))) throw new PreSignUpRefused("TICKET_INVALID");
