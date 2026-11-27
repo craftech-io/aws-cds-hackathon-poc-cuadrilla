@@ -195,7 +195,7 @@ Resources:
               - logs:CreateLogStream
               - logs:PutLogEvents
             Resource: !Sub "arn:${AWS::Partition}:logs:${Region}:${AWS::AccountId}:log-group:*"
-          - Sid: AgentWorkloadIdentity
+          - Sid: AgentIdentity
             Effect: Allow
             Action: bedrock-agentcore:GetWorkloadAccessToken*
             Resource: !Sub "arn:${AWS::Partition}:bedrock-agentcore:${Region}:${AWS::AccountId}:workload-identity-directory/default*"
@@ -211,6 +211,7 @@ Resources:
               - cloudwatch:PutMetricData
               - ecr-public:GetAuthorizationToken
               - logs:DescribeLogGroups
+              - sns:Publish
               - transcribe:StartTranscriptionJob
               - xray:GetSamplingRules
               - xray:GetSamplingTargets
@@ -295,7 +296,7 @@ Resources:
             Effect: Allow
             Action: lambda:InvokeFunction
             Resource: !Sub "arn:${AWS::Partition}:lambda:${Region}:${AWS::AccountId}:function:${AppName}-${DeployStage}-guest-account-deletion"
-          - Sid: PassAppRolesToScheduler
+          - Sid: PassRolesToScheduler
             Effect: Allow
             Action: iam:PassRole
             Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppName}/*"

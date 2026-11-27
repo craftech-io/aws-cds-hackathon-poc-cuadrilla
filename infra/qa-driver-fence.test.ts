@@ -4,7 +4,7 @@
 // IAM evaluates `StringLike`, against keys of the live demo world, a real guest and the stage.
 import { describe, expect, it } from "vitest";
 import { type Grant, LAMBDA_CAPABILITIES, type LambdaName, expectedData, expectedGrants } from "./iam-capabilities";
-import { ITEM_WRITES, QA_DRIVER_WRITE_KEYS, guestTestObjectPrefix, type QaFencedTable } from "./qa-driver-fence";
+import { ITEM_WRITES, QA_DRIVER_WRITE_KEYS, QA_SEAM_AUTOMATION_MARK, guestTestObjectPrefix, type QaFencedTable } from "./qa-driver-fence";
 import { TABLE_ACTIONS, dataAccessGrants } from "./storage-access";
 import { mediaKeySegment } from "../packages/shared/src/media/keys";
 import { qaLimitsKey, qaSlotScope } from "../packages/bff/src/guest/slots";
@@ -42,10 +42,16 @@ describe("QaDriver data access [W3 review B1/B4]", () => {
         expect(grant.sid).toBe("CasesFencedInCode");
         continue;
       }
+      if (grant.sid === "QaSeamAutomationMark") {
+        // [FL-125] One attribute of a sign-up guest's row, by key, and nothing else.
+        expect(grant).toEqual(QA_SEAM_AUTOMATION_MARK);
+        expect(grant.actions).toEqual(["dynamodb:UpdateItem"]);
+        continue;
+      }
       expect(grant.conditions, table).toEqual([{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: QA_DRIVER_WRITE_KEYS[table?.slice(1, -1) as QaFencedTable] }]);
     }
     const fenced = tableWrites.map((grant) => grant.resources[0]).sort();
-    expect(fenced).toEqual(["{AuditLog}", "{Cases}", "{Conversations}", "{CuadrillaMetrics}", "{Isps}", "{People}", "{Runtime}", "{WorkOrders}"]);
+    expect(fenced).toEqual(["{AuditLog}", "{Cases}", "{Conversations}", "{CuadrillaMetrics}", "{Isps}", "{Isps}", "{People}", "{Runtime}", "{WorkOrders}"]);
     expect([...ITEM_WRITES, ...TABLE_ACTIONS.read].sort()).toEqual([...TABLE_ACTIONS.write].sort());
   });
 
