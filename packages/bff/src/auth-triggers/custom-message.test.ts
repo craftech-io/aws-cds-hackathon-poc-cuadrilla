@@ -4,7 +4,7 @@ import { createLogger } from "../lib/log";
 import { createKillSwitchReader, setKillSwitch } from "../ops/kill-switch";
 import { type MemoryRuntimeStore, createMemoryRuntimeStore } from "../ops/memory-runtime-store";
 import { findNeutralTerms } from "../../../../scripts/lint/neutral-terms";
-import { createCustomMessageHandler } from "./custom-message";
+import { AUTH_CODE_EMAILS_PER_DAY, authMailDayKey, createCustomMessageHandler, reserveCodeEmail } from "./custom-message";
 
 // A stage in co-branding: the trigger must not care (it neither links nor reads BrandConfig).
 const PARTNER = "Design Partner Demo";
@@ -21,6 +21,7 @@ vi.mock("sst", () => ({
 }));
 
 const ORIGIN = "https://cuadrilla.demo.craftech.io";
+const TODAY = new Date("2026-11-27T12:00:00.000Z");
 const HOSTILE_NAME = "Gana dinero en https://estafa.example/premio ahora";
 
 function event(triggerSource: string, userAttributes: Record<string, string> = {}): CustomMessageTriggerEvent {
@@ -41,7 +42,7 @@ describe("custom message trigger [FL-104] [FL-106] [FL-109] [FL-112]", () => {
   let lines: string[];
   const handler = () =>
     createCustomMessageHandler(
-      (log) => ({ kill: createKillSwitchReader({ store: kill, ttlMs: 0 }), origin: ORIGIN, log }),
+      (log) => ({ kill: createKillSwitchReader({ store: kill, ttlMs: 0 }), reserveCodeEmail: () => reserveCodeEmail(kill, TODAY), origin: ORIGIN, log }),
       () => createLogger({ sink: (line) => void lines.push(line) }),
     );
   const outcome = async (source: string, attributes: Record<string, string> = {}): Promise<string> => {
@@ -104,10 +105,20 @@ describe("custom message trigger [FL-104] [FL-106] [FL-109] [FL-112]", () => {
 
   it("fails closed when the cut cannot be read: no sign-up code goes out", async () => {
     const broken = createCustomMessageHandler(
-      (log) => ({ kill: { status: () => Promise.reject(new Error("Runtime down")) }, origin: ORIGIN, log }),
+      (log) => ({ kill: { status: () => Promise.reject(new Error("Runtime down")) }, reserveCodeEmail: async () => true, origin: ORIGIN, log }),
       () => createLogger({ sink: (line) => void lines.push(line) }),
     );
     await expect(broken(event("CustomMessage_SignUp"))).rejects.toThrow("Runtime down");
     await expect(broken(event("CustomMessage_ForgotPassword"))).resolves.toMatchObject({ response: { emailMessage: expect.stringContaining("{####}") } });
+  });
+
+  it("[FL-104] resent and recovery codes take a place of the stage's day; over it no email goes out, the sign-up's first code still does", async () => {
+    (kill.items as Map<string, Record<string, unknown>>).set(authMailDayKey(TODAY), { used: AUTH_CODE_EMAILS_PER_DAY - 1, limit: AUTH_CODE_EMAILS_PER_DAY });
+    expect(await outcome("CustomMessage_ForgotPassword")).not.toMatch(/^REFUSED/);
+    expect(kill.items.get("AUTHMAIL#GLOBAL#2026-11-27")?.used).toBe(AUTH_CODE_EMAILS_PER_DAY);
+    expect(await outcome("CustomMessage_ForgotPassword")).toBe("REFUSED CAP_REACHED");
+    expect(await outcome("CustomMessage_ResendCode")).toBe("REFUSED CAP_REACHED");
+    expect(await outcome("CustomMessage_SignUp")).not.toMatch(/^REFUSED/);
+    expect(kill.items.get("AUTHMAIL#GLOBAL#2026-11-27")).toMatchObject({ used: AUTH_CODE_EMAILS_PER_DAY, expiresAt: Date.parse("2026-11-28T00:00:00Z") / 1000 + 172_800 });
   });
 });

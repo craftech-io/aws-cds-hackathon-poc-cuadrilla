@@ -217,8 +217,9 @@ export const SIGNUP_ROLES = {
     capabilities: ["LEADS_READ"],
     grants: [runtime(["dynamodb:UpdateItem"], ["SIGNUPTICKET#*"]), runtime(KEY_READS, ["SIGNUP#*", "SIGNUPKEY#*", "KILL#*"])],
   },
-  // Only the cut of the sign-up: no table, no secret (the auth emails carry the neutral brand).
-  AuthCustomMessage: { capabilities: [], grants: [runtime(KEY_READS, ["KILL#*"])] },
+  // The cut of the sign-up and the day's place of a resent or recovery code: no other table, no secret
+  // (the auth emails carry the neutral brand).
+  AuthCustomMessage: { capabilities: [], grants: [runtime(KEY_READS, ["KILL#*"]), runtime(["dynamodb:UpdateItem"], ["AUTHMAIL#*"])] },
   // Lead PENDING → CONFIRMED, the guest's row in a generation of its own, the slot and the uniqueness of the sub.
   AuthPostConfirmation: {
     capabilities: ["LEADS_WRITE"],

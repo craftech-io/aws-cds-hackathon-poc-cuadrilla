@@ -20,15 +20,17 @@
 //     6 RatePerIp                               everything        Block over 1,000 per IP in 300 s
 //   <app>-<stage>-auth   REGIONAL, on the Cognito user pool
 //     1 AWSManagedRulesAmazonIpReputationList
-//     2-4 per-IP rates on `x-amz-target`: SignUp 10, ConfirmSignUp + ResendConfirmationCode +
-//       ForgotPassword + ConfirmForgotPassword 20, InitiateAuth + RespondToAuthChallenge 100 (per 300 s);
-//       all Block.
+//     2-5 per-IP rates on `x-amz-target`: SignUp 10, ResendConfirmationCode + ForgotPassword (the two
+//       that make Cognito send a code to an inbox) 10, the minimum AWS WAF takes for a rate rule,
+//       ConfirmSignUp + ConfirmForgotPassword 20, InitiateAuth + RespondToAuthChallenge 100 (per 300 s);
+//       all Block. Spread over many IPs, the codes are also capped per real day for the whole stage by
+//       the custom message trigger (`AUTHMAIL#GLOBAL#<day>`, packages/bff/src/auth-triggers/custom-message.ts).
 //   No rule of the pool's ACL reads the body's user name: Cognito never hands usernames, passwords,
 //   emails or phone numbers to AWS WAF (Cognito developer guide, "Things to know about AWS WAF web ACLs
 //   and Amazon Cognito"), so a `JsonBody` `/Username` match never sees a value. The `gst-*` user of
 //   `SignUp` is enforced by the pre sign-up trigger's ticket (ADR-0025 §3); what an email as the user
 //   name of `ConfirmSignUp` or `ResendConfirmationCode` can tell is a declared residual risk, bounded by
-//   rule 3 of this ACL and Cognito's own per-user limits (ADR-0025, "Riesgos residuales" (6)).
+//   rules 3 and 4 of this ACL and Cognito's own per-user limits (ADR-0025, "Riesgos residuales" (6)).
 //
 // The sign-up scope is ONE value shared by rules 2 to 4: the URI starts with `/api/` AND its path or
 // its query string CONTAINS `signup.`, every comparison after URL_DECODE and LOWERCASE. "Starts with
@@ -217,7 +219,8 @@ export function edgeRules(): WafRule[] {
 /** The Cognito operations each rate rule of the pool's ACL counts, with its limit per IP. */
 export const COGNITO_RATE_RULES = [
   { name: "RateSignUp", limit: 10, operations: ["SignUp"] },
-  { name: "RateCodesAndRecovery", limit: 20, operations: ["ConfirmSignUp", "ResendConfirmationCode", "ForgotPassword", "ConfirmForgotPassword"] },
+  { name: "RateCodeEmails", limit: 10, operations: ["ResendConfirmationCode", "ForgotPassword"] },
+  { name: "RateCodeChecks", limit: 20, operations: ["ConfirmSignUp", "ConfirmForgotPassword"] },
   { name: "RateSignIn", limit: 100, operations: ["InitiateAuth", "RespondToAuthChallenge"] },
 ] as const;
 

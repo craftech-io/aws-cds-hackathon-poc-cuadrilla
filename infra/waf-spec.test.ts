@@ -162,12 +162,15 @@ describe("pool ACL (REGIONAL, on the user pool)", () => {
     expect(rules.map((item) => [item.Priority, item.Name])).toEqual([
       [1, "AWSManagedRulesAmazonIpReputationList"],
       [2, "RateSignUp"],
-      [3, "RateCodesAndRecovery"],
-      [4, "RateSignIn"],
+      [3, "RateCodeEmails"],
+      [4, "RateCodeChecks"],
+      [5, "RateSignIn"],
     ]);
     expect(COGNITO_RATE_RULES.map((item) => [item.name, item.limit, [...item.operations]])).toEqual([
       ["RateSignUp", 10, ["SignUp"]],
-      ["RateCodesAndRecovery", 20, ["ConfirmSignUp", "ResendConfirmationCode", "ForgotPassword", "ConfirmForgotPassword"]],
+      // The operations that send a code to an inbox get the lowest rate AWS WAF allows.
+      ["RateCodeEmails", 10, ["ResendConfirmationCode", "ForgotPassword"]],
+      ["RateCodeChecks", 20, ["ConfirmSignUp", "ConfirmForgotPassword"]],
       ["RateSignIn", 100, ["InitiateAuth", "RespondToAuthChallenge"]],
     ]);
     for (const item of rules.slice(1)) expect(item.Action, item.Name).toEqual({ Block: {} });
