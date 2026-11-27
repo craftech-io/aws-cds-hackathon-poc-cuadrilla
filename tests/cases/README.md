@@ -1,4 +1,4 @@
-# Casos de QA (FL-001 a FL-122)
+# Casos de QA (FL-001 a FL-125)
 
 Un archivo `FL-XXX.md` por flujo de `docs/flows-catalog.md`, con el mismo id y el mismo título. Cada caso dice qué entra, qué pasos se corren, qué resultado se verifica sin leer código, con qué oráculo se acepta un paso que depende del modelo y qué evidencia se guarda. Las pruebas que cita cada caso son las de la matriz de `docs/test-plan.md` §2.2; los escenarios, los de §4.5; los oráculos, los de §4.3; los umbrales de evaluación, los de §5.
 
@@ -156,3 +156,6 @@ Un archivo `FL-XXX.md` por flujo de `docs/flows-catalog.md`, con el mismo id y e
 | [FL-120](FL-120.md) | Guard de superficies neutrales | — (sin AWS) |
 | [FL-121](FL-121.md) | Email ya registrado | `SC-20/4` |
 | [FL-122](FL-122.md) | Roles internos solo por invitación | `SC-20/5` |
+| [FL-123](FL-123.md) | Celular del alta y enrolamiento por SMS | — (sin SMS real) |
+| [FL-124](FL-124.md) | Código por SMS en cada ingreso | — (sin SMS real) |
+| [FL-125](FL-125.md) | Cuentas de automatización sin SMS | — (por la costura de `SC-20`) |

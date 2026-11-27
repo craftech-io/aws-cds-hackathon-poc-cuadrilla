@@ -304,6 +304,10 @@ _Avoid_: regaño, feedback
 Persona que prueba la demo en su propio mundo, con los permisos de `SUPERVISOR` solo dentro de él (ADR-0024). `INVITED`: cuentas `guest-NN` que crea el operador (credenciales solo por vía privada); `SIGNUP`: alta propia con email verificado; `TEST`: `guest-test`, el ensayo del operador y el principal `usr-qa-guest` del ejecutor. Los roles internos (`SUPERVISOR`, `OPS`) nunca nacen de un alta propia.
 _Avoid_: jurado, juez, evaluador, judge (en código, datos y superficies visibles), demo user
 
+**Código por SMS** (`phone`, ADR-0029):
+Segundo factor de toda sesión de Cognito: seis dígitos por SMS al celular de la cuenta. **Enrolamiento**: el primer código hace del número el celular de la cuenta (`phone`, `phoneVerifiedAt` en `Isps/USER#`), que el usuario ya no cambia; **ingreso**: el código va a ese número. El pase vale para la **sesión** del id token (`origin_jti`), no para la cuenta. Una **cuenta de automatización** (`phoneCheck AUTOMATION`, puesta solo por el operador o la costura de QA) no lo pide.
+_Avoid_: 2FA de la cuenta, verificación del usuario (es de la sesión), teléfono del simulador (otra cosa: las identidades sintéticas del mundo)
+
 **Alta propia** (`signup`):
 Creación de una cuenta de invitado desde `/signup`: formulario, **ticket de alta**, `SignUp` de Cognito, **código de verificación** por email y confirmación (ADR-0025). Cada alta confirmada es un **lead**.
 _Avoid_: registro (suelto; ver "Flagged ambiguities"), onboarding

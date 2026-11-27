@@ -8,6 +8,8 @@ El CTO pidió (2026-09-26) que cualquier visitante pueda probar la demo solo: al
 
 La revisión de seguridad del diseño (2026-09-26, antes de la ola 2b.1) agregó: la verificación de origen del `Bff` (§3), la etiqueta de IP anónima en lugar del CAPTCHA (§4), el corte del alta y la protección de la reputación de SES (§3, §4), las condiciones de los triggers de confirmación y de ingreso (§1), el nombre de usuario ligado al ticket y la limpieza de usuarios sin confirmar (§1, §3; ADR-0026), el cerco del borrado y de la costura de QA (§6, §7) y la clave de abuso por email (§3). La segunda ronda de esa revisión agregó la forma única, sin lotes, de los procedimientos del alta en el borde de la app (§3) y el alcance del WAF del alta con decodificación y coincidencia por contenido (§4). Al cierre de la ola 5 (2026-10-09) el `pm` decidió que `SC-20` inicia sus altas por el **camino público** y no por el `QaDriver` (§7, "Nota del cierre de la ola 5").
 
+**Nota del 2026-11-27 (ADR-0029).** El alta pide además el celular, y toda sesión de Cognito pasa un código por SMS antes de que el BFF le responda: la confirmación del email ya no reserva el mundo (la cuenta nace en `PHONE_PENDING`) y el post authentication ya no pide mundos ni generaciones, salvo para cuentas de automatización; lo hace el BFF cuando la sesión pasa su código. La costura de QA (§7) marca su cuenta como automatización.
+
 ## Decisión
 
 ### 1. Cognito: alta, verificación, login, recuperación y logout

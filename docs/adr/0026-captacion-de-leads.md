@@ -33,6 +33,8 @@ Stream `NEW_AND_OLD_IMAGES` con filtros de la fuente de eventos sobre los items 
 
 ## Aviso a Craftech por cada lead nuevo
 
+> **Desde el 2026-11-27 (ADR-0029)** el aviso sale cuando la cuenta del lead verifica su celular por SMS (filtro del `MODIFY` que agrega `phoneVerifiedAt`), no al confirmar el email, e incluye el teléfono verificado; un lead confirmado sin celular verificado no genera aviso ni cuenta como contactable (salvo los avisados antes de ese día).
+
 - Lambda `LeadStream` (`packages/bff/src/handlers/lead-stream.ts`) suscrita al stream con filtro `MODIFY` de un `META` sin `status` que pasa a `status CONFIRMED` (y a `REMOVE` por TTL, abajo), destino de falla en una cola `LeadStreamDlq` con alarma.
 - Envía un email por SES desde `"Cuadrilla · Leads" <leads@cuadrilla.demo.craftech.io>` a los destinatarios de la **configuración** `LeadConfig` (secreto `sst.Secret`, zod: `{notifyRecipients: string[1..5], privacyContact?: string}`); lo carga el operador con la casilla que indicó el CTO (ADR-0027: su casilla personal `@craftech.io`, cargada el 2026-10-06) y `privacyContact` = sales@craftech.io. **Nunca se escribe en el código ni en los tests** (los tests usan direcciones `@craftech.io` de fixture).
 - **Cerco propio del aviso** (`packages/bff/src/leads/notify-fence.ts`, mismo parser RFC 5322 que el cerco de la demo): solo destinatarios de dominio exacto `craftech.io` (sin subdominios, sin sufijos engañosos); el zod del secreto lo exige al cargar y el envío lo reverifica; la capacidad IAM `SEND_LEAD_NOTIFY` fija `ses:FromAddress = leads@…` y `ForAllValues:StringLike ses:Recipients = *@craftech.io`. El cerco de la demo (`CP-RECIPIENT-FENCE`) no cambia y nunca admite `craftech.io`.
