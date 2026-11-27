@@ -4,6 +4,7 @@ import { createLogger } from "../lib/log";
 import { type CostAuditEvent, type CostCapsDeps, type GlobalCostCaps, type ReserveCostRequest, costFailure, globalCapUsage, planCounters, realDayKey, realHourKey, releaseCost, reserveCost } from "./cost-caps";
 import { createKillSwitchReader, setKillSwitch } from "./kill-switch";
 import { createMemoryRuntimeStore } from "./memory-runtime-store";
+import { GUEST_SPEND_TEST_CAPS } from "../worker/testing";
 
 // Real time of the test: Tuesday 20/10 15:20 UTC (the demo world is paused on 13/10, which does not matter here).
 const REAL = Date.parse("2026-10-20T15:20:00.000Z");
@@ -185,7 +186,8 @@ describe("globalCapUsage", () => {
 });
 
 describe("[FL-112] worlds of the own sign-up: world → account → sub-ceiling → global ceiling (ADR-0025 §3)", () => {
-  const SIGNUP_CAPS: GlobalCostCaps = { ...GLOBAL, guestSignup: { turnsPerDay: 600, validationsPerDay: 150, transcribeSecondsPerDay: 1800, perUserTurnsPerDay: 40 } };
+  const GUEST_SIGNUP_CAPS = { turnsPerDay: 600, validationsPerDay: 150, transcribeSecondsPerDay: 1800, perUserTurnsPerDay: 40, ...GUEST_SPEND_TEST_CAPS };
+  const SIGNUP_CAPS: GlobalCostCaps = { ...GLOBAL, guestSignup: GUEST_SIGNUP_CAPS };
   const OWNER = "usr-g01K60000000000000000000001";
   const signupWorld = (ispId = "isp-guest-s261020abcde", ownerUserId: string | null = OWNER) => ({
     clockId: `GUEST#${ispId}`,
@@ -205,14 +207,19 @@ describe("[FL-112] worlds of the own sign-up: world → account → sub-ceiling 
       ["TURNCAP#isp-guest-s261020abcde#2026-10-20T15", 20, "OPERATOR"],
       ["TURNCAP#isp-guest-s261020abcde#2026-10-20", 60, "OPERATOR"],
       [`TURNCAP#GUESTUSER#${OWNER}#2026-10-20`, 40, "GUEST_ACCOUNT"],
+      [`COSTUSD#GUESTUSER#${OWNER}`, 1_000_000, "GUEST_SPEND"],
       ["TURNCAP#GUESTSIGNUP#2026-10-20", 600, "GUEST_SIGNUP"],
       ["TURNCAP#GLOBAL#2026-10-20", 1500, "GLOBAL"],
     ]);
     expect(keys({ world: signupWorld(), resource: "validations", amount: 1, reserve: ["GLOBAL"] })).toEqual([
+      [`VALCAP#GUESTUSER#${OWNER}#2026-10-20`, 5, "GUEST_ACCOUNT"],
+      [`COSTUSD#GUESTUSER#${OWNER}`, 1_000_000, "GUEST_SPEND"],
       ["VALCAP#GUESTSIGNUP#2026-10-20", 150, "GUEST_SIGNUP"],
       ["VALCAP#GLOBAL#2026-10-20", 400, "GLOBAL"],
     ]);
     expect(keys({ world: signupWorld(), resource: "transcribe", amount: 12, reserve: ["GLOBAL"] })).toEqual([
+      [`TRANSCRIBE#GUESTUSER#${OWNER}#2026-10-20`, 100, "GUEST_ACCOUNT"],
+      [`COSTUSD#GUESTUSER#${OWNER}`, 1_000_000, "GUEST_SPEND"],
       ["TRANSCRIBE#GUESTSIGNUP#2026-10-20", 1800, "GUEST_SIGNUP"],
       ["TRANSCRIBE#GLOBAL#2026-10-20", 5400, "GLOBAL"],
     ]);
@@ -234,7 +241,8 @@ describe("[FL-112] worlds of the own sign-up: world → account → sub-ceiling 
   });
 
   it("[FL-112] the account's 40 turns a day hold across generations of the same guest", async () => {
-    const { deps, used } = setup(SIGNUP_CAPS);
+    // A spend allowance far above 40 turns, so only the day's quota decides here.
+    const { deps, used } = setup({ ...SIGNUP_CAPS, guestSignup: { ...GUEST_SIGNUP_CAPS, perUserSpendMicroUsd: 100_000_000 } });
     for (let turn = 0; turn < 40; turn += 1) {
       const world = signupWorld(turn < 20 ? "isp-guest-s261020abcde" : "isp-guest-s261020fghij");
       expect(await reserveCost(deps, { world, resource: "turns", amount: 1, reserve: ["GLOBAL"], surface: "AGENT" })).toMatchObject({ ok: true });
@@ -253,6 +261,6 @@ describe("[FL-112] worlds of the own sign-up: world → account → sub-ceiling 
     await setKillSwitch({ store, reader: kill }, { scope: "AGENT", on: false, actor: "OPERATOR" });
     expect(await reserveCost(deps, turnSpend(signupWorld("isp-guest-s261020abcde", null)))).toMatchObject({ ok: false, code: "CAP_REACHED", counter: { tier: "GUEST_ACCOUNT", limit: 0 } });
     const bare = setup(GLOBAL);
-    expect(await reserveCost(bare.deps, { world: signupWorld(), resource: "validations", amount: 1, reserve: ["GLOBAL"] })).toMatchObject({ ok: false, code: "CAP_REACHED", counter: { tier: "GUEST_SIGNUP", limit: 0 } });
+    expect(await reserveCost(bare.deps, { world: signupWorld(), resource: "validations", amount: 1, reserve: ["GLOBAL"] })).toMatchObject({ ok: false, code: "CAP_REACHED", counter: { tier: "GUEST_ACCOUNT", limit: 0 } });
   });
 });

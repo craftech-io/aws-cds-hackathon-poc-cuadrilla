@@ -11,7 +11,7 @@ import { ConnectorError } from "@cuadrilla/shared";
 import { dynamoDocumentClient } from "../lib/clients";
 import { tableName } from "../lib/resource";
 import { type RetryOptions, withRetry } from "../lib/retry";
-import type { CapCounter, CapLedgerStore, CapStoreReserveResult } from "./cost-caps";
+import { type CapCounter, type CapLedgerStore, type CapStoreReserveResult, roomNeeded } from "./cost-caps";
 import type { KillSwitchRecord, KillSwitchStore } from "./kill-switch";
 
 const TABLE = "Runtime";
@@ -73,7 +73,7 @@ function checkItem(table: string, counter: CapCounter) {
       Key: { PK: counter.key, SK: META },
       ConditionExpression: "attribute_not_exists(#used) OR #used <= :max",
       ExpressionAttributeNames: { "#used": "used" },
-      ExpressionAttributeValues: { ":max": counter.limit - 1 },
+      ExpressionAttributeValues: { ":max": counter.limit - roomNeeded(counter) },
       ReturnValuesOnConditionCheckFailure: "ALL_OLD" as const,
     },
   };
@@ -81,12 +81,14 @@ function checkItem(table: string, counter: CapCounter) {
 
 function reserveItem(table: string, counter: CapCounter, nowIso: string) {
   if (counter.amount === 0) return checkItem(table, counter);
+  // A `TOTAL` counter (the spend of an account) has no TTL: it never expires.
+  const ttl = counter.expiresAt === undefined ? "" : ", #expiresAt = if_not_exists(#expiresAt, :expiresAt)";
   return {
     Update: {
       TableName: table,
       Key: { PK: counter.key, SK: META },
       UpdateExpression:
-        "ADD #used :amount SET #entity = :entity, #ledger = :ledger, #resource = :resource, #period = :period, #capLimit = :limit, #expiresAt = if_not_exists(#expiresAt, :expiresAt), #createdAt = if_not_exists(#createdAt, :now), #updatedAt = :now",
+        `ADD #used :amount SET #entity = :entity, #ledger = :ledger, #resource = :resource, #period = :period, #capLimit = :limit${ttl}, #createdAt = if_not_exists(#createdAt, :now), #updatedAt = :now`,
       ConditionExpression: "attribute_not_exists(#used) OR #used <= :max",
       ExpressionAttributeNames: {
         "#used": "used",
@@ -95,7 +97,7 @@ function reserveItem(table: string, counter: CapCounter, nowIso: string) {
         "#resource": "resource",
         "#period": "period",
         "#capLimit": "capLimit",
-        "#expiresAt": "expiresAt",
+        ...(counter.expiresAt === undefined ? {} : { "#expiresAt": "expiresAt" }),
         "#createdAt": "createdAt",
         "#updatedAt": "updatedAt",
       },
@@ -106,9 +108,9 @@ function reserveItem(table: string, counter: CapCounter, nowIso: string) {
         ":resource": counter.resource,
         ":period": counter.period,
         ":limit": counter.limit,
-        ":expiresAt": counter.expiresAt,
+        ...(counter.expiresAt === undefined ? {} : { ":expiresAt": counter.expiresAt }),
         ":now": nowIso,
-        ":max": counter.limit - Math.max(counter.amount, 1),
+        ":max": counter.limit - roomNeeded(counter),
       },
       ReturnValuesOnConditionCheckFailure: "ALL_OLD" as const,
     },
@@ -145,7 +147,7 @@ export function createDynamoRuntimeStore(options: DynamoRuntimeStoreOptions = {}
 
   return {
     async reserve(counters, { idempotencyKey, nowIso }): Promise<CapStoreReserveResult> {
-      const impossible = counters.find((counter) => counter.limit < Math.max(counter.amount, 1));
+      const impossible = counters.find((counter) => counter.limit < roomNeeded(counter));
       if (impossible !== undefined) return { ok: false, failedKey: impossible.key };
       const name = table();
       const command = new TransactWriteCommand({
@@ -199,6 +201,34 @@ export function createDynamoRuntimeStore(options: DynamoRuntimeStoreOptions = {}
           if (errorName(error) !== "ConditionalCheckFailedException") throw toConnectorError(error);
         }
       }
+    },
+
+    async adjust(key, delta, { idempotencyKey, nowIso }) {
+      // One transaction with a client token: a retried settlement within DynamoDB's window applies once.
+      const command = new TransactWriteCommand({
+        TransactItems: [
+          {
+            Update: {
+              TableName: table(),
+              Key: { PK: key, SK: META },
+              UpdateExpression: "ADD #used :delta SET #updatedAt = :now",
+              ExpressionAttributeNames: { "#used": "used", "#updatedAt": "updatedAt" },
+              ExpressionAttributeValues: { ":delta": delta, ":now": nowIso },
+            },
+          },
+        ],
+        ClientRequestToken: clientRequestToken(`adjust#${idempotencyKey}`),
+      });
+      await withRetry(
+        async () => {
+          try {
+            return await client().send(command);
+          } catch (error) {
+            throw toConnectorError(error);
+          }
+        },
+        { ...options.retry, shouldRetry: (error) => error instanceof ConnectorError && (error.code === "THROTTLED" || error.code === "TIMEOUT") },
+      );
     },
 
     async readUsed(keys) {

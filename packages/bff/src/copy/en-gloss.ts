@@ -137,6 +137,7 @@ export const enGloss: CopyPack = {
   servicePaused: "Cuadrilla is paused right now; try again in a while. If there is a safety hazard, write it: the alert to your supervisor still works.",
   agentFallback: "I couldn't process your message, try again in a moment.",
   turnCap: "I've reached the question limit for now; try again later. If it's urgent, ask your supervisor.",
+  spendCap: "This trial account has used up its whole demo allowance, so I can't take more questions, photos or voice notes. If you want to keep trying Cuadrilla, write to the Craftech team.",
   guardrailRefusal: "I can't answer that here. Your shift supervisor will review your question.",
   closeNotComplete: (missing) => {
     const items = inChecklistOrder(missing).map((item) => CHECKLIST_ITEM[item]);

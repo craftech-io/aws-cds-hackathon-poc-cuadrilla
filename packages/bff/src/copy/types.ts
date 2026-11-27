@@ -93,6 +93,8 @@ export interface CopyPack {
   readonly agentFallback: string;
   /** Operator or stage turn cap reached (`TURN_CAP`). */
   readonly turnCap: string;
+  /** A sign-up account spent its whole allowance: no more turns, photos or voice notes. */
+  readonly spendCap: string;
   /** G1 blocked the message: the Harness text never goes out (docs/design-brief.md §5.5). */
   readonly guardrailRefusal: string;
   /** "Cerrar instalación" answered `NOT_COMPLETE` (FL-050): the items come from `missing`. */

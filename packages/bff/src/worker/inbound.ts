@@ -48,6 +48,7 @@ const VOICE_NOTICES: Readonly<Record<Exclude<TranscriptionOutcome["status"], "TR
   TOO_LONG: "voiceTooLong",
   FAILED: "voiceFailed",
   CAP_REACHED: "turnCap",
+  SPEND_CAP: "spendCap",
   PAUSED: "servicePaused",
 };
 

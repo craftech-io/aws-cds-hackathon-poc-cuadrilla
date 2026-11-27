@@ -12,8 +12,13 @@
 // the sign-up guests never use up the capacity of the invited ones and a new generation never resets
 // its guest's quota (`KILL#` stays above everything):
 //
-//   TURNCAP#GUESTUSER#<userId>#<day>                  turns of one account (`IspSettings.ownerUserId`)
+//   TURNCAP|VALCAP|TRANSCRIBE#GUESTUSER#<userId>#<day> turns, photos, audio of one account (`IspSettings.ownerUserId`)
+//   COSTUSD#GUESTUSER#<userId>                        micro-dollars the account ever spent (period TOTAL, no TTL)
 //   TURNCAP|VALCAP|TRANSCRIBE#GUESTSIGNUP#<day>       every sign-up world together (`CostCaps.guestSignup`)
+//
+// The spend counter takes the estimate of the resource (`spendEstimateMicroUsd`) and needs that much
+// room even when it is only checked, so turns that start together at the edge of USD 1 never all fit;
+// a turn settles it to its priced cost afterwards (`settleSpend`, turns/record.ts).
 //
 // QA and evaluation worlds never touch the real global ceiling (they have a budget per run). A `qa-*`
 // world with `globalCapsOverride` gets a test scope instead: `…#GLOBAL#<clockId>#<day>` (its clock id
@@ -27,6 +32,7 @@ import { ClockId, type KillScope, type ToolFailure, fail, ispIdOfClock, ispKindO
 import { type Clock, systemClock } from "../lib/clock";
 import type { Logger } from "../lib/log";
 import { readLinked } from "../lib/resource";
+import { guestSpendKey, spendEstimate } from "./guest-spend";
 import { type KillSurface, type KillSwitchReader, blockingScope } from "./kill-switch";
 
 export const CostResource = z.enum(["turns", "validations", "transcribe", "emails"]);
@@ -35,7 +41,7 @@ export type CostResource = z.infer<typeof CostResource>;
 export const CapLedger = z.enum(["SIMULATOR", "OPERATOR", "GLOBAL"]);
 export type CapLedger = z.infer<typeof CapLedger>;
 
-export const CapPeriod = z.enum(["HOUR", "DAY"]);
+export const CapPeriod = z.enum(["HOUR", "DAY", "TOTAL"]);
 export type CapPeriod = z.infer<typeof CapPeriod>;
 
 /** TTL of every counter past the end of its period (docs/architecture.md §5: rates and caps, 48 h). */
@@ -44,7 +50,18 @@ export const CAP_TTL_AFTER_PERIOD_SECONDS = 48 * 3_600;
 const Limit = z.number().int().nonnegative();
 
 /** `CostCaps.guestSignup`: the sub-ceiling of the sign-up worlds and the quota of one account (ADR-0025 §3). */
-export const GuestSignupCaps = z.object({ turnsPerDay: Limit, validationsPerDay: Limit, transcribeSecondsPerDay: Limit, perUserTurnsPerDay: Limit });
+export const GuestSignupCaps = z.object({
+  turnsPerDay: Limit,
+  validationsPerDay: Limit,
+  transcribeSecondsPerDay: Limit,
+  perUserTurnsPerDay: Limit,
+  perUserValidationsPerDay: Limit,
+  perUserTranscribeSecondsPerDay: Limit,
+  /** What one account may ever spend, in micro-dollars (1_000_000 = USD 1). */
+  perUserSpendMicroUsd: Limit,
+  /** Micro-dollars reserved before a turn, a photo validation and each second of audio. */
+  spendEstimateMicroUsd: z.object({ turn: Limit, validation: Limit, transcribeSecond: Limit }),
+});
 export type GuestSignupCaps = z.infer<typeof GuestSignupCaps>;
 
 /** `sst.Linkable("CostCaps")` of infra/cost-caps.ts: the stage's ceiling per real day. */
@@ -76,17 +93,24 @@ export interface CapCounter {
   readonly period: CapPeriod;
   readonly limit: number;
   readonly amount: number;
-  /** TTL, epoch seconds. */
-  readonly expiresAt: number;
-  /** Real instant the period ends and the counter starts over ("cuándo se libera"). */
-  readonly resetsAtReal: string;
+  /** Room the counter must have for a check (`amount` 0); by default 1. */
+  readonly minRoom?: number;
+  /** TTL, epoch seconds; absent for a `TOTAL` counter, which never expires. */
+  readonly expiresAt?: number;
+  /** Real instant the period ends and the counter starts over ("cuándo se libera"); absent for `TOTAL`. */
+  readonly resetsAtReal?: string;
   /** Inside the GLOBAL ledger of a sign-up world: the account's quota or the sub-ceiling of every sign-up world. */
   readonly tier?: CapTier;
   /** The test scope of a `qa-*` world's `globalCapsOverride`: never the stage's ceiling, never its cut. */
   readonly testScope?: true;
 }
 
-export type CapTier = "GUEST_ACCOUNT" | "GUEST_SIGNUP";
+export type CapTier = "GUEST_ACCOUNT" | "GUEST_SIGNUP" | "GUEST_SPEND";
+
+/** Room a counter needs for this reservation or check. */
+export function roomNeeded(counter: Pick<CapCounter, "amount" | "minRoom">): number {
+  return Math.max(counter.amount, counter.minRoom ?? 1);
+}
 
 export type CapStoreReserveResult = { readonly ok: true } | { readonly ok: false; readonly failedKey: string; readonly used?: number };
 
@@ -98,6 +122,8 @@ export interface CapLedgerStore {
   release(counters: readonly CapCounter[]): Promise<void>;
   /** `used` of each existing counter. */
   readUsed(keys: readonly string[]): Promise<ReadonlyMap<string, number>>;
+  /** Adds a signed delta to a counter without a condition (a spend that already happened), once per key. */
+  adjust(key: string, delta: number, options: { readonly idempotencyKey: string; readonly nowIso: string }): Promise<void>;
 }
 
 // ---- Periods (real time, UTC) ------------------------------------------------------------------
@@ -112,7 +138,8 @@ export function realHourKey(instant: Date): string {
   return instant.toISOString().slice(0, 13);
 }
 
-function periodOf(period: CapPeriod, now: Date): { readonly token: string; readonly endsAt: Date } {
+function periodOf(period: CapPeriod, now: Date): { readonly token: string; readonly endsAt?: Date } {
+  if (period === "TOTAL") return { token: "TOTAL" };
   const start = new Date(now.getTime());
   if (period === "DAY") start.setUTCHours(0, 0, 0, 0);
   else start.setUTCMinutes(0, 0, 0);
@@ -160,6 +187,8 @@ const SIMULATOR_CAP_FIELDS: Readonly<Record<CostResource, ReadonlyArray<readonly
 
 interface CounterSpec {
   readonly key: (token: string) => string;
+  /** The counter's own amount for the request's (the spend counter prices it); by default the request's. */
+  readonly amount?: (requested: number) => number;
   readonly ledger: CapLedger;
   readonly period: CapPeriod;
   readonly limit: number | undefined;
@@ -167,22 +196,31 @@ interface CounterSpec {
   readonly testScope?: true;
 }
 
+const PER_USER_FIELD = { turns: "perUserTurnsPerDay", validations: "perUserValidationsPerDay", transcribe: "perUserTranscribeSecondsPerDay" } as const satisfies Record<GlobalResource, keyof GuestSignupCaps>;
+
 /**
- * The account and the sub-ceiling of a sign-up world, before its global ceiling. A world without its
- * guest, or a stage without the sub-ceiling, gets a limit of 0: it spends nothing (fails closed).
+ * The account (its day and its spend) and the sub-ceiling of a sign-up world, before its global
+ * ceiling. A world without its guest, or a stage without the sub-ceiling, gets a limit of 0: it spends
+ * nothing (fails closed).
  */
 function signupSpecs(clockId: string, resource: GlobalResource, settings: CapSettings, globalCaps: GlobalCostCaps): CounterSpec[] {
   const ledger = "GLOBAL";
   const caps = globalCaps.guestSignup;
   const { prefix, field } = GLOBAL_LEDGER[resource];
-  const specs: CounterSpec[] = [];
-  if (resource === "turns") {
-    const owner = settings.ownerUserId;
-    const key = owner === undefined ? (token: string) => `TURNCAP#GUESTUSER#${ispIdOfClock(clockId)}#${token}` : (token: string) => `TURNCAP#GUESTUSER#${owner}#${token}`;
-    specs.push({ ledger, period: "DAY", tier: "GUEST_ACCOUNT", limit: owner === undefined ? 0 : (caps?.perUserTurnsPerDay ?? 0), key });
-  }
-  specs.push({ ledger, period: "DAY", tier: "GUEST_SIGNUP", limit: caps?.[field] ?? 0, key: (token) => `${prefix}#GUESTSIGNUP#${token}` });
-  return specs;
+  const owner = settings.ownerUserId ?? ispIdOfClock(clockId);
+  const known = settings.ownerUserId !== undefined && caps !== undefined;
+  return [
+    { ledger, period: "DAY", tier: "GUEST_ACCOUNT", limit: known ? caps[PER_USER_FIELD[resource]] : 0, key: (token) => `${prefix}#GUESTUSER#${owner}#${token}` },
+    {
+      ledger,
+      period: "TOTAL",
+      tier: "GUEST_SPEND",
+      limit: known ? caps.perUserSpendMicroUsd : 0,
+      key: () => guestSpendKey(owner),
+      amount: (requested) => (caps === undefined ? 1 : Math.max(1, spendEstimate(resource, requested, caps))),
+    },
+    { ledger, period: "DAY", tier: "GUEST_SIGNUP", limit: caps?.[field] ?? 0, key: (token) => `${prefix}#GUESTSIGNUP#${token}` },
+  ];
 }
 
 function ledgerSpecs(ledger: CapLedger, clockId: string, resource: CostResource, settings: CapSettings, globalCaps: GlobalCostCaps): CounterSpec[] {
@@ -228,15 +266,16 @@ export function planCounters(request: ReserveCostRequest, globalCaps: GlobalCost
     for (const spec of ledgerSpecs(ledger, clockId, resource, settings, globalCaps)) {
       if (spec.limit === undefined) continue;
       const period = periodOf(spec.period, now);
+      const own = spec.amount?.(amount) ?? amount;
       counters.push({
         key: spec.key(period.token),
         ledger,
         resource,
         period: spec.period,
         limit: spec.limit,
-        amount: reserved.has(ledger) ? amount : 0,
-        expiresAt: Math.floor(period.endsAt.getTime() / 1000) + CAP_TTL_AFTER_PERIOD_SECONDS,
-        resetsAtReal: period.endsAt.toISOString(),
+        amount: reserved.has(ledger) ? own : 0,
+        ...(own > 1 ? { minRoom: own } : {}),
+        ...(period.endsAt === undefined ? {} : { expiresAt: Math.floor(period.endsAt.getTime() / 1000) + CAP_TTL_AFTER_PERIOD_SECONDS, resetsAtReal: period.endsAt.toISOString() }),
         ...(spec.tier === undefined ? {} : { tier: spec.tier }),
         ...(spec.testScope === undefined ? {} : { testScope: spec.testScope }),
       });
@@ -318,6 +357,7 @@ export async function releaseCost(deps: Pick<CostCapsDeps, "store">, reserved: r
 /** The envelope a tool or the simulator returns for a denied reservation. */
 export function costFailure(outcome: Exclude<ReserveCostOutcome, { readonly ok: true }>): ToolFailure {
   if (outcome.code === "KILL_SWITCH_ACTIVE") return fail("UNAVAILABLE", "the service is paused", "KILL_SWITCH_ACTIVE");
+  if (outcome.counter.resetsAtReal === undefined) return fail("CAP_REACHED", "this demo account used up its usage allowance: tell the installer the demo reached its limit", outcome.counter.tier ?? outcome.counter.ledger);
   return fail("CAP_REACHED", `the ${outcome.counter.resource} cap of this period is reached until ${outcome.counter.resetsAtReal}`, outcome.counter.tier ?? outcome.counter.ledger);
 }
 
@@ -335,5 +375,5 @@ export async function globalCapUsage(deps: Pick<CostCapsDeps, "store" | "globalC
   const day = periodOf("DAY", now);
   const rows = GLOBAL_RESOURCES.map((resource) => ({ resource, key: `${GLOBAL_LEDGER[resource].prefix}#GLOBAL#${day.token}`, limit: caps[GLOBAL_LEDGER[resource].field] }));
   const used = await deps.store.readUsed(rows.map((row) => row.key));
-  return rows.map((row) => ({ resource: row.resource, used: used.get(row.key) ?? 0, limit: row.limit, resetsAtReal: day.endsAt.toISOString() }));
+  return rows.map((row) => ({ resource: row.resource, used: used.get(row.key) ?? 0, limit: row.limit, resetsAtReal: (day.endsAt ?? now).toISOString() }));
 }

@@ -159,6 +159,8 @@ describe("phone simulator caps [FL-083]", () => {
     expect(rate).toEqual({ text: simulatorCopy.caps.reasons.RATE_LIMIT, untilIso: "2026-10-20T16:00:00.000Z" });
     expect(capNoticeOf(apiError({ reason: "SIMULATOR", message: "the turns cap is reached until 2026-10-21T00:00:00Z" }))).toEqual({ text: simulatorCopy.caps.reasons.SIMULATOR, untilIso: "2026-10-21T00:00:00Z" });
     expect(capNoticeOf(apiError({ reason: "GLOBAL", message: "no date" }))).toEqual({ text: simulatorCopy.caps.reasons.GLOBAL });
+    // The account's spend never frees: no time is shown.
+    expect(capNoticeOf(apiError({ reason: "GUEST_SPEND", message: "the turns cap is reached for this account" }))).toEqual({ text: simulatorCopy.caps.reasons.GUEST_SPEND });
     expect(capNoticeOf(apiError({ reason: "SOMETHING_NEW" }))).toEqual({ text: simulatorCopy.caps.fallback });
     expect(capNoticeOf(apiError({ code: "SERVICE_UNAVAILABLE", reason: "KILL_SWITCH_ACTIVE" }))).toEqual({ text: simulatorCopy.caps.reasons.KILL_SWITCH_ACTIVE });
     expect(capNoticeOf(apiError({ code: "FORBIDDEN", kind: "forbidden", reason: "UPLOAD_NOT_YOURS" }))).toBeUndefined();

@@ -1,6 +1,7 @@
 // The worker's fixed notices to the installer (docs/design-brief.md §5.1): `servicePaused` while the agent
-// is cut, `turnCap` over a cap, `guardrailRefusal` after a block, `agentFallback` when a turn fails or
-// leaves the installer without an answer, and the voice notices. Each text has one source,
+// is cut, `turnCap` over a cap, `spendCap` once a sign-up account spent its whole allowance,
+// `guardrailRefusal` after a block, `agentFallback` when a turn fails or leaves the installer without an
+// answer, and the voice notices. Each text has one source,
 // copy/es-MX.ts; each send goes through the outbound pipeline (WorkerNoticeSender), so the contact
 // policy, the transport of the recipient and the audit log see it like any other `SYSTEM_NOTICE`.
 //
@@ -47,6 +48,7 @@ export const NOTICE_TEXTS: Readonly<Record<WorkerNoticeKey, string>> = {
   servicePaused: esMX.servicePaused,
   agentFallback: esMX.agentFallback,
   turnCap: esMX.turnCap,
+  spendCap: esMX.spendCap,
   guardrailRefusal: esMX.guardrailRefusal,
   voiceUnclear: esMX.voiceUnclear,
   voiceTooLong: esMX.voiceTooLong,

@@ -32,8 +32,16 @@ export const WO = "wo-24817";
 export const MSG = "wamid.SIM.01JB8Z9Q2W3E4R5T6Y7V8X9MSG";
 export const RUNTIME_SESSION_KEY = deriveSubkey("test-master-key-test-master-key-00000000", "runtime-session");
 
+/** The per-account caps of a sign-up account beyond its turns, as the stage sets them (infra/cost-caps.ts). */
+export const GUEST_SPEND_TEST_CAPS = {
+  perUserValidationsPerDay: 5,
+  perUserTranscribeSecondsPerDay: 100,
+  perUserSpendMicroUsd: 1_000_000,
+  spendEstimateMicroUsd: { turn: 150_000, validation: 30_000, transcribeSecond: 400 },
+} as const;
+
 /** The stage's ceiling of the tests (ADR-0019 values are larger; these keep the counters readable). */
-export const TEST_GLOBAL_CAPS: GlobalCostCaps = { turnsPerDay: 100, validationsPerDay: 50, transcribeSecondsPerDay: 1_000, guestSignup: { turnsPerDay: 20, validationsPerDay: 10, transcribeSecondsPerDay: 100, perUserTurnsPerDay: 10 } };
+export const TEST_GLOBAL_CAPS: GlobalCostCaps = { turnsPerDay: 100, validationsPerDay: 50, transcribeSecondsPerDay: 1_000, guestSignup: { turnsPerDay: 20, validationsPerDay: 10, transcribeSecondsPerDay: 100, perUserTurnsPerDay: 10, ...GUEST_SPEND_TEST_CAPS } };
 
 export interface Recorded {
   readonly harness: HarnessTurnRequest[];

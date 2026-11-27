@@ -154,6 +154,7 @@ export const esMX: CopyPack = {
   servicePaused: "Cuadrilla está en pausa en este momento; intenta de nuevo en un rato. Si hay un riesgo de seguridad, escríbelo: la alerta a tu supervisor sigue activa.",
   agentFallback: "No pude procesar tu mensaje, intenta de nuevo en un momento.",
   turnCap: "Por ahora llegué al límite de consultas; intenta de nuevo más tarde. Si es urgente, consulta a tu supervisor.",
+  spendCap: "Esta cuenta de prueba ya usó todo su cupo de la demo, así que no puedo atender más consultas, fotos ni audios. Si quieres seguir probando Cuadrilla, escríbele al equipo de Craftech.",
   guardrailRefusal: "Eso no lo puedo responder por aquí. Tu supervisor de turno va a revisar tu consulta.",
   closeNotComplete,
   buttonExpired: "Ese botón ya no está disponible. Si necesitas algo, escríbeme.",

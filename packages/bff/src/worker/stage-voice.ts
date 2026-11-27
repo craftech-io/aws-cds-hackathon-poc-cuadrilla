@@ -25,6 +25,8 @@ export function transcriptionOutcomeOf(outcome: Extract<VoiceNoteOutcome, { ok: 
       return { status: "PAUSED" };
     case "CAP_REACHED":
       return { status: "CAP_REACHED" };
+    case "SPEND_CAP":
+      return { status: "SPEND_CAP" };
     default:
       return { status: "FAILED" };
   }

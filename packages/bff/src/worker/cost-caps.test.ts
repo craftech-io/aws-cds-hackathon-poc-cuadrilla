@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { MODEL_RATES, TokenKind, bedrockRateKey } from "../services/ratecard/ratecard";
 import { CLOCK, ISP, MSG, TURN_AT_SIM, type WorkerKit, fillCounter, inboundEvent, inboundMessage, metricLines, seedWorld, workerKit } from "./testing";
 
 let kit: WorkerKit;
@@ -82,6 +83,34 @@ describe("worker/cost-caps", () => {
     expect(kit.rec.harness).toHaveLength(1);
     expect(metricLines(kit, "GuestSignupCapHits")).toMatchObject([{ scope: "GUEST_SIGNUP" }]);
     expect(used(GLOBAL_TURNS)).toBe(1);
+  });
+
+  it("[FL-112] a sign-up account that spent its USD 1 gets spendCap, for turns and voice notes, without the Harness", async () => {
+    const signup = { clockId: "GUEST#isp-guest-s261013abcde", ispId: "isp-guest-s261013abcde" };
+    await seedWorldOf(signup.clockId, signup.ispId, "GUEST", { ownerUserId: "usr-gst-01jb8z9q", capsProfile: "SIGNUP" });
+    fillCounter(kit, "COSTUSD#GUESTUSER#usr-gst-01jb8z9q", 900_000, 1_000_000);
+    await turnIn(signup.clockId, signup.ispId, "evt-s-2");
+    expect(kit.rec.harness).toEqual([]);
+    expect(metricLines(kit, "GuestSignupCapHits")).toMatchObject([{ scope: "GUEST_SPEND" }]);
+    expect(used("COSTUSD#GUESTUSER#usr-gst-01jb8z9q")).toBe(900_000);
+    kit.transcription = { status: "SPEND_CAP" };
+    await message(1, { content: "VOICE", text: undefined, media: { kind: "AUDIO", s3Key: "sim/abc-e3/up-3", mime: "audio/ogg", durationSec: 8 } });
+    expect(kit.rec.notices.map((notice) => notice.notice)).toEqual(["spendCap"]);
+  });
+
+  it("[FL-112] a turn of a sign-up account reserves its estimate and settles it to the turn's priced cost", async () => {
+    const signup = { clockId: "GUEST#isp-guest-s261013abcde", ispId: "isp-guest-s261013abcde" };
+    await seedWorldOf(signup.clockId, signup.ispId, "GUEST", { ownerUserId: "usr-gst-01jb8z9q", capsProfile: "SIGNUP" });
+    for (const kind of TokenKind.options) {
+      await kit.connector.reference.put("RateCard", { key: bedrockRateKey(kind), price: MODEL_RATES.prices[kind], unit: "PER_1M_TOKENS", provisional: false, source: MODEL_RATES.source, asOf: MODEL_RATES.asOf });
+    }
+    const during: unknown[] = [];
+    // 10k input (USD 0.02), 2k output (0.02), 100k cache reads (0.01), 4k cache writes (0.01): USD 0.06.
+    const usage = { inputTokens: 10_000, outputTokens: 2_000, cacheReadTokens: 100_000, cacheWriteTokens: 4_000 };
+    kit.harnessScripts.push(async () => (during.push(used("COSTUSD#GUESTUSER#usr-gst-01jb8z9q")), { usage }));
+    await turnIn(signup.clockId, signup.ispId, "evt-s-3");
+    expect(during).toEqual([150_000]);
+    expect(used("COSTUSD#GUESTUSER#usr-gst-01jb8z9q")).toBe(60_000);
   });
 
   it("[FL-100] with KILL#AGENT the worker answers servicePaused without the Harness or Transcribe; safety still runs; off again, the next message has its turn", async () => {

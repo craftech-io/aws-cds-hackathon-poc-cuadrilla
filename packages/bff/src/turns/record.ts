@@ -5,8 +5,9 @@
 //                     sentinel, a failed turn)
 //   CuadrillaMetrics  the turn and its tokens on the order's KPI row, its latency, the first-reply
 //                     latency (real ms from the inbound message to the first outbound of the turn) and
-//                     the turn's cost by the verified rate card (`costUsd`, the metrics' cost per
-//                     conversation; absent while a model row is not verified)
+//                     the turn's cost by the verified rate card, cache reads and writes included (`costUsd`,
+//                     the metrics' cost per conversation and what a sign-up account's spend settles to;
+//                     absent while a model row is not verified)
 //   log fields        `TurnLatency`, `TurnErrors`, `TurnMaxTokens`, `FirstReplyLatency` (logs only, ADR-0028;
 //                     no spend alarm reads the turn's cost: P-07, closed by the CTO on 2026-10-14)
 //   answered          whether the installer got something from the turn: a message of the turn, or an
@@ -67,11 +68,12 @@ export async function writeTurnNote(deps: TurnRecordDeps, input: NoteInput): Pro
   }
 }
 
-/** The turn, its tokens, its latency and its priced cost on the order's KPI row (`EVAL` in an evaluation world). */
-export async function recordTurnKpi(deps: TurnRecordDeps, request: TurnRequest, usage: HarnessUsage, latencyMs: number, firstReplyLatencyMs?: number): Promise<void> {
+/** The turn, its tokens, its latency and its priced cost on the order's KPI row (`EVAL` in an evaluation world); answers the cost. */
+export async function recordTurnKpi(deps: TurnRecordDeps, request: TurnRequest, usage: HarnessUsage, latencyMs: number, firstReplyLatencyMs?: number): Promise<number | undefined> {
   const order = request.workOrderId === undefined ? {} : { workOrderId: request.workOrderId };
   const usd = await turnCostUsd(deps, usage, order);
   if (request.workOrderId !== undefined) await addTurnToKpi(deps, { ...request, workOrderId: request.workOrderId }, { usage, latencyMs, firstReplyLatencyMs, costUsd: usd });
+  return usd;
 }
 
 interface TurnKpiDelta {
@@ -102,9 +104,9 @@ async function addTurnToKpi(deps: TurnRecordDeps, request: TurnRequest & { reado
 }
 
 /** The cost in USD of these model tokens by the verified rate card rows, or `undefined` while a row it needs is not verified. */
-export function tokensCostUsd(tokens: Pick<HarnessUsage, "inputTokens" | "outputTokens">, rows: readonly unknown[]): number | undefined {
+export function tokensCostUsd(tokens: Pick<HarnessUsage, "inputTokens" | "outputTokens"> & Partial<Pick<HarnessUsage, "cacheReadTokens" | "cacheWriteTokens">>, rows: readonly unknown[]): number | undefined {
   const usage = {
-    models: { [DEFAULT_MODEL_ID]: { input: tokens.inputTokens, output: tokens.outputTokens, cacheRead: 0, cacheWrite: 0 } },
+    models: { [DEFAULT_MODEL_ID]: { input: tokens.inputTokens, output: tokens.outputTokens, cacheRead: tokens.cacheReadTokens ?? 0, cacheWrite: tokens.cacheWriteTokens ?? 0 } },
     embeddingTokens: 0,
     agentCore: { gateway: 0, memoryEvents: 0, memoryRecords: 0, harness: 0 },
     transcribeSeconds: 0,
