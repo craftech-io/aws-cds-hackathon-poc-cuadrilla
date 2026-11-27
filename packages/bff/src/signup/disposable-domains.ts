@@ -13,6 +13,7 @@ export const DISPOSABLE_DOMAINS: ReadonlySet<string> = new Set([
   "10mail.org",
   "10minutemail.com",
   "1secmail.com",
+  "freeml.net",
   "20minutemail.com",
   "33mail.com",
   "anonaddy.me",
@@ -37,12 +38,17 @@ export const DISPOSABLE_DOMAINS: ReadonlySet<string> = new Set([
   "mailinator.com",
   "mailinator.net",
   "mailnesia.com",
+  "mimimail.me",
   "mailpoof.com",
+  "mailpwr.com",
+  "mailtowin.com",
+  "maximail.vip",
   "mintemail.com",
   "moakt.com",
   "mohmal.com",
   "mytemp.email",
   "nada.email",
+  "pickmail.org",
   "sharklasers.com",
   "spambox.us",
   "spamgourmet.com",
@@ -67,6 +73,25 @@ export const DISPOSABLE_DOMAINS: ReadonlySet<string> = new Set([
  * so a domain that is not listed yet is refused by its MX (signup/email-domain.ts). Same rules.
  */
 export const DISPOSABLE_MX_HOSTS: ReadonlySet<string> = new Set(["smtp.is"]);
+
+/**
+ * Addresses of the mail servers of disposable services, seen on 2026-11-27: a domain whose MX host
+ * resolves to one of them is disposable whatever its name (signup/email-domain.ts). Each with the
+ * service it belongs to.
+ */
+export const DISPOSABLE_MX_ADDRESSES: ReadonlyMap<string, string> = new Map([
+  ["78.47.124.133", "10mail.org family: emltmp.com, emlpro.com, mailpwr.com, mimimail.me, pickmail.org, freeml.net, mailtowin.com, maximail.vip"],
+  ["94.130.108.80", "10mail.org family: emltmp.com, emlpro.com, mailpwr.com, mimimail.me, pickmail.org, freeml.net, mailtowin.com, maximail.vip"],
+  ["49.12.18.190", "smtp.is (euploading.com)"],
+  ["15.204.213.223", "vomoto.com, blondmail.com"],
+  ["178.162.170.166", "Guerrilla Mail"],
+  ["178.32.61.35", "1secmail.com"],
+]);
+
+/** True for an address of a disposable service's mail server. */
+export function isDisposableMxAddress(address: string): boolean {
+  return DISPOSABLE_MX_ADDRESSES.has(address.trim().toLowerCase());
+}
 
 /** Second-level names reserved for documentation and tests, and their subdomains. */
 const RESERVED_DOMAINS: ReadonlySet<string> = new Set(["example.com", "example.net", "example.org", "test.com"]);

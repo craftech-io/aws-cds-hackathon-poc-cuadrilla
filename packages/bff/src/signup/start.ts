@@ -11,9 +11,9 @@
 //   5. the domain of the email: not a disposable mailbox of the public or the own list, nor a
 //      reserved or test domain (signup/disposable-domains.ts)                 INVALID (EMAIL_NOT_ACCEPTED)
 //      then MX, or A/AAAA, within 2 s (a resolver that fails lets it through) INVALID (EMAIL_NOT_ACCEPTED)
-//      and no MX at a disposable service's mail server                        INVALID (EMAIL_NOT_ACCEPTED)
+//      and no MX at a disposable service's mail server, by name or by address INVALID (EMAIL_NOT_ACCEPTED)
 //      Every refusal of the domain gives the visitor the same answer; the log line tells them apart
-//      (`DISPOSABLE`, `EMAIL_RESERVED`, `EMAIL_DOMAIN`, `DISPOSABLE_MX`).
+//      (`DISPOSABLE`, `EMAIL_RESERVED`, `EMAIL_DOMAIN`, `DISPOSABLE_MX`, `DISPOSABLE_MX_ADDRESS`).
 //   6. the visitor's counters, then the stage's day (signup/limits.ts)        RATE_LIMITED | CAP_REACHED
 //   7. two confirmed accounts of the same person                             RATE_LIMITED
 //   8. the lead: new, or one more pending user (≤ 3, the oldest retired, each start's form and
@@ -74,7 +74,7 @@ export interface SignupStarted {
 }
 
 /** Why a start was refused, as the log line says it (the visitor sees the error's `reason`). */
-export type SignupRefusal = "INVALID_FORM" | "PHONE_INVALID" | "PHONE_NOT_PERSONAL" | "PHONE_COUNTRY_NOT_ALLOWED" | "NO_VIEWER" | "CONSENT" | "DISPOSABLE" | "EMAIL_RESERVED" | "EMAIL_DOMAIN" | "DISPOSABLE_MX" | "RATE_LIMITED" | "CAP_REACHED" | "UNAVAILABLE";
+export type SignupRefusal = "INVALID_FORM" | "PHONE_INVALID" | "PHONE_NOT_PERSONAL" | "PHONE_COUNTRY_NOT_ALLOWED" | "NO_VIEWER" | "CONSENT" | "DISPOSABLE" | "EMAIL_RESERVED" | "EMAIL_DOMAIN" | "DISPOSABLE_MX" | "DISPOSABLE_MX_ADDRESS" | "RATE_LIMITED" | "CAP_REACHED" | "UNAVAILABLE";
 
 const REFUSALS = {
   NO_VIEWER: () => new ToolError("UNAVAILABLE", "the account could not be created right now", "NO_VIEWER"),
@@ -135,6 +135,7 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
   const domain = await emailDomainVerdict(email, p.resolver);
   if (domain === "INVALID") return refuse("EMAIL_DOMAIN", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
   if (domain === "DISPOSABLE") return refuse("DISPOSABLE_MX", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
+  if (domain === "DISPOSABLE_ADDRESS") return refuse("DISPOSABLE_MX_ADDRESS", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
   if (domain === "UNKNOWN") call.log.warn("signup.email_domain.unknown", { metric: "SignupMxUnknown", value: 1, emailHash: hashPrefix(emailHash) });
 
   const abuseHash = leadAbuseHash(emailKey, email);

@@ -36,7 +36,7 @@ Cada vez que el servidor frena algo por una regla de seguridad escribe una líne
 | Otros rechazos de la puerta | `UserInactive`, `RoleDenied`, `RecentLoginRequired`, `AuthRefused`, `AuthUnavailable` | ídem |
 | Tope de SMS alcanzado (cuál) | `SmsCapHits` con `reason` `SMS_*_LIMIT` | `phone/decisions.ts` |
 | Número o código rechazado | `PhoneCodeRefused` con `reason` (`PHONE_COUNTRY_NOT_ALLOWED`, `PHONE_NOT_PERSONAL`, `PHONE_INVALID`, `PHONE_IN_USE`, `PHONE_LOCKED`, `CODE_EXHAUSTED`, `CODE_EXPIRED`, `RESEND_TOO_SOON`, `ACCOUNT_BLOCKED`, `SMS_NOT_DELIVERABLE`, …) | ídem |
-| Alta rechazada (motivo) | `SignupRejected` con `reason` (`DISPOSABLE`, `EMAIL_RESERVED`, `EMAIL_DOMAIN`, `DISPOSABLE_MX`, `PHONE_INVALID`, `PHONE_NOT_PERSONAL`, `PHONE_COUNTRY_NOT_ALLOWED`, `RATE_LIMITED`, `CAP_REACHED`, …) | `signup/start.ts` |
+| Alta rechazada (motivo) | `SignupRejected` con `reason` (`DISPOSABLE`, `EMAIL_RESERVED`, `EMAIL_DOMAIN`, `DISPOSABLE_MX`, `DISPOSABLE_MX_ADDRESS`, `PHONE_INVALID`, `PHONE_NOT_PERSONAL`, `PHONE_COUNTRY_NOT_ALLOWED`, `RATE_LIMITED`, `CAP_REACHED`, …) | `signup/start.ts` |
 | Topes de costo | `TurnCapHits`, `SimulatorCapHits`, `GlobalCapHits`, `GuestSignupCapHits`, `KillSwitchActive` | ya existían (ADR-0019) |
 
 ### 4. Borde compartido `demos-borde`

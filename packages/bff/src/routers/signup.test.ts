@@ -242,6 +242,22 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     expect(await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana@nuevo-desechable.mx"))).toBeUndefined();
   });
 
+  it("[FL-104] a domain no list knows, whose MX resolves to a disposable service's address, is EMAIL_NOT_ACCEPTED without a lead; another address passes", async () => {
+    setup({
+      "mailnuevo.mx": { mx: [{ exchange: "mx.mailnuevo.mx", priority: 10 }] },
+      "mx.mailnuevo.mx": { a: ["94.130.108.80"] },
+      "propio.mx": { mx: [{ exchange: "mx.propio.mx", priority: 10 }] },
+      "mx.propio.mx": { a: ["203.0.113.25"] },
+    });
+    expect(await refusalOf(start(signupForm({ email: "ana@mailnuevo.mx" })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
+    expect(await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana@mailnuevo.mx"))).toBeUndefined();
+    // [FL-127] the decision by its name: SignupRejected with the reason, never the address.
+    const refused = deps.lines.map((line) => JSON.parse(line) as Record<string, unknown>).filter((line) => line.metric === "SignupRejected" && line.reason === "DISPOSABLE_MX_ADDRESS");
+    expect(refused).toHaveLength(1);
+    expect(JSON.stringify(refused)).not.toContain("ana@mailnuevo.mx");
+    await expect(start(signupForm({ email: "ana@propio.mx" }))).resolves.toMatchObject({ username: expect.any(String) });
+  });
+
   it("[FL-104] a disposable mailbox (or a subdomain of one) is EMAIL_NOT_ACCEPTED before any lookup or write", async () => {
     for (const email of ["ana@mailinator.com", "ana@inbox.yopmail.fr", "ANA@Guerrillamail.com", "ana@euploading.com", "ana@blondmail.com", "ana@tempmail.lol"]) {
       expect(await refusalOf(start(signupForm({ email })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
