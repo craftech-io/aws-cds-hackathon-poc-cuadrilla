@@ -28,6 +28,7 @@ export type SignupErrorCode =
   | "EMAIL_NOT_ACCEPTED"
   | "PHONE_INVALID"
   | "PHONE_NOT_PERSONAL"
+  | "PHONE_COUNTRY_NOT_ALLOWED"
   | "UNAVAILABLE"
   | "BROWSER_CHECK"
   | "WEAK_PASSWORD"
@@ -111,7 +112,7 @@ export const INITIAL_SIGNUP: SignupState = { step: "signUp" };
 /** A ticket this close to its end is not worth a retry: a new start is. */
 const TICKET_MARGIN_MS = 30_000;
 
-const START_REASONS: ReadonlySet<string> = new Set(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_NOT_ACCEPTED", "PHONE_INVALID", "PHONE_NOT_PERSONAL"]);
+const START_REASONS: ReadonlySet<string> = new Set(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_NOT_ACCEPTED", "PHONE_INVALID", "PHONE_NOT_PERSONAL", "PHONE_COUNTRY_NOT_ALLOWED"]);
 
 /** A WafTokenError anywhere in the chain: tRPC wraps what its `fetch` threw in a client error's `cause`. */
 function isBrowserCheck(error: unknown, depth = 0): boolean {
@@ -151,7 +152,7 @@ export function compactPhone(raw: string): string {
   return raw.trim().replace(/[\s().-]/g, "");
 }
 
-/** `+` and 8 to 15 digits, any country (ADR-0029). */
+/** `+` and 8 to 15 digits; the server also checks the country is of the Americas (ADR-0029). */
 export function looksLikePhone(raw: string): boolean {
   return /^\+[1-9]\d{7,14}$/.test(compactPhone(raw));
 }

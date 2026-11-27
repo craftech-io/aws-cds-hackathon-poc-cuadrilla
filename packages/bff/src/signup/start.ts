@@ -2,8 +2,9 @@
 // that writes. In this order, and nothing is written before the step that writes:
 //
 //   1. the form (zod, strict; the password is never here)                    INVALID (INVALID_FORM)
-//      and its phone, an international E.164 number of any country, not filler INVALID (PHONE_INVALID)
-//      and not a range that is no person's mobile (phone/number.ts)           INVALID (PHONE_NOT_PERSONAL)
+//      and its phone, an international E.164 number, not filler                INVALID (PHONE_INVALID)
+//      not a range that is no person's mobile (phone/number.ts)                INVALID (PHONE_NOT_PERSONAL)
+//      and of a country of the Americas                                       INVALID (PHONE_COUNTRY_NOT_ALLOWED)
 //   2. who is asking: the viewer of the edge (no other caller starts a sign-up) UNAVAILABLE (NO_VIEWER)
 //   3. the two consents against their version in force                       INVALID (CONSENT_…)
 //   4. the cut of the sign-up (KILL#SIGNUP, KILL#ALL)                          CAP_REACHED

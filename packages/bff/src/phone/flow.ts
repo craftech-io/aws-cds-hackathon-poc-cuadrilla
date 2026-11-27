@@ -26,7 +26,7 @@ import { ipHashOf } from "../signup/limits";
 import { type StoredCode, attemptCode, codeDigest, codeKey, newCode, readCode, resendAt, storeCode } from "./code";
 import { type LeadSide, PHONE_IN_USE, claimNumber, ownerOf, recordOnLead, recordOnRow, registryUser } from "./enrolment";
 import { PHONE_LIMITS, reserveSms } from "./limits";
-import { accountPhoneHash, isHomeNumber, maskPhone, parseAccountPhone } from "./number";
+import { accountPhoneHash, assertAmericas, isHomeNumber, maskPhone, parseAccountPhone } from "./number";
 import { type SessionGate, clearSession, indexSession, isSessionPassed, markSessionPassed, sessionKeyOf } from "./session";
 import type { SmsSender } from "./sms";
 
@@ -117,6 +117,8 @@ export interface SendInput {
 async function numberFor(ports: PhonePorts, principal: Principal, user: ConsoleUser, input: SendInput, code: StoredCode | undefined): Promise<{ readonly purpose: "ENROL" | "SIGN_IN"; readonly phone: string }> {
   if (user.phoneVerifiedAt !== undefined && user.phone !== undefined) {
     if (input.phone !== undefined) throw new ToolError("FORBIDDEN", "the verified phone of an account cannot be changed here", "PHONE_LOCKED");
+    // A number verified before only the Americas were accepted: no SMS; the operator changes it.
+    assertAmericas(user.phone);
     return { purpose: "SIGN_IN", phone: user.phone };
   }
   const typed = input.phone ?? code?.phone ?? (await signupPhone(ports, principal));
