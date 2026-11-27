@@ -54,7 +54,7 @@ describe("the DNS verdict of the domain [FL-104]", () => {
 
 describe("the address of the mail server [FL-104]", () => {
   it("[FL-104] lists the addresses of the disposable services' mail servers, each with its service", () => {
-    expect([...DISPOSABLE_MX_ADDRESSES.keys()]).toEqual(["78.47.124.133", "94.130.108.80", "49.12.18.190", "15.204.213.223", "178.162.170.166", "178.32.61.35"]);
+    expect([...DISPOSABLE_MX_ADDRESSES.keys()]).toEqual(["78.47.124.133", "94.130.108.80", "49.12.18.190", "15.204.213.223", "178.162.170.166", "178.32.61.35", "95.216.191.158"]);
     for (const service of DISPOSABLE_MX_ADDRESSES.values()) expect(service.length).toBeGreaterThan(3);
     expect(isDisposableMxAddress(" 94.130.108.80 ")).toBe(true);
     expect(isDisposableMxAddress("142.250.0.27")).toBe(false);
@@ -77,6 +77,15 @@ describe("the address of the mail server [FL-104]", () => {
     expect(await emailDomainVerdict("ana@legitimo.mx", resolver)).toBe("OK");
     expect(await emailDomainVerdict("ana@falla.mx", resolver)).toBe("OK");
     expect(resolver.lookups).toContain("a:mx.nuevo-dominio.mx");
+  });
+
+  it("[FL-104] a new domain of the mail.<domain> family at Hetzner, whose MX resolves to 95.216.191.158, is DISPOSABLE_ADDRESS; its known domains are listed", async () => {
+    const resolver = fakeResolver({
+      "dominio-hetzner.mx": { mx: [{ exchange: "mail.dominio-hetzner.mx.", priority: 10 }] },
+      "mail.dominio-hetzner.mx": { a: ["95.216.191.158"] },
+    });
+    expect(await emailDomainVerdict("ana@dominio-hetzner.mx", resolver)).toBe("DISPOSABLE_ADDRESS");
+    for (const domain of ["olipii.com", "gmeenramy.com", "lnovic.com", "ooynib.com", "bwmyga.com", "ruutukf.com"]) expect(isDisposableDomain(domain), domain).toBe(true);
   });
 });
 
