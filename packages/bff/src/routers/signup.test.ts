@@ -191,8 +191,14 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     expect(await h.leads.get(emailHash)).toEqual(confirmed);
   });
 
+  it("[FL-104] a domain not listed yet whose MX is a disposable service's mail server is EMAIL_NOT_ACCEPTED, without a lead", async () => {
+    setup({ "nuevo-desechable.example": { mx: [{ exchange: "mx.smtp.is.", priority: 10 }] } });
+    expect(await refusalOf(start(signupForm({ email: "ana@nuevo-desechable.example" })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
+    expect(await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana@nuevo-desechable.example"))).toBeUndefined();
+  });
+
   it("[FL-104] a disposable mailbox (or a subdomain of one) is EMAIL_NOT_ACCEPTED before any lookup or write", async () => {
-    for (const email of ["ana@mailinator.com", "ana@inbox.yopmail.fr", "ANA@Guerrillamail.com"]) {
+    for (const email of ["ana@mailinator.com", "ana@inbox.yopmail.fr", "ANA@Guerrillamail.com", "ana@euploading.com"]) {
       expect(await refusalOf(start(signupForm({ email })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
     }
     expect(counters()).toEqual([]);

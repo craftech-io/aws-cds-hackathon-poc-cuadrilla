@@ -12,6 +12,7 @@ export const DISPOSABLE_DOMAINS: ReadonlySet<string> = new Set([
   "dispostable.com",
   "dropmail.me",
   "emailondeck.com",
+  "euploading.com",
   "fakeinbox.com",
   "getairmail.com",
   "getnada.com",
@@ -47,9 +48,24 @@ export const DISPOSABLE_DOMAINS: ReadonlySet<string> = new Set([
   "yopmail.net",
 ]);
 
+/**
+ * Mail servers of disposable services: a new throwaway domain usually points its MX at one of these,
+ * so a domain that is not listed yet is refused by its MX (signup/email-domain.ts). Same rules.
+ */
+export const DISPOSABLE_MX_HOSTS: ReadonlySet<string> = new Set(["smtp.is"]);
+
+/** True for a host that is a listed mail server or any subdomain of one (`mx.smtp.is`). */
+export function isDisposableMxHost(host: string): boolean {
+  return matches(DISPOSABLE_MX_HOSTS, host.replace(/\.$/, ""));
+}
+
+function matches(list: ReadonlySet<string>, domain: string): boolean {
+  const labels = domain.toLowerCase().split(".");
+  for (let start = 0; start < labels.length - 1; start += 1) if (list.has(labels.slice(start).join("."))) return true;
+  return false;
+}
+
 /** True for a listed domain or any subdomain of one. */
 export function isDisposableDomain(domain: string): boolean {
-  const labels = domain.toLowerCase().split(".");
-  for (let start = 0; start < labels.length - 1; start += 1) if (DISPOSABLE_DOMAINS.has(labels.slice(start).join("."))) return true;
-  return false;
+  return matches(DISPOSABLE_DOMAINS, domain);
 }

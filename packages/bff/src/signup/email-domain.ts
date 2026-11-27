@@ -2,13 +2,15 @@
 // ones of the shared account that go to addresses nobody verified: a typo or a made-up domain is a hard
 // bounce, and bounces feed the SES reputation of the whole account. Checked before anything is written:
 //
-//   MX records               → OK, unless the only one is the null MX of RFC 7505 (`0 .`) → INVALID
+//   MX records               → OK, unless the only one is the null MX of RFC 7505 (`0 .`) → INVALID,
+//                              or one points at a disposable service's mail server → DISPOSABLE
 //   no MX, but A or AAAA     → OK (RFC 5321 §5.1, implicit MX)
 //   no MX, no A, no AAAA     → INVALID
 //   the 1 s deadline passed, or the resolver failed otherwise → UNKNOWN: the start goes on (metric
 //   `SignupMxUnknown`), a flaky resolver never blocks a real visitor
 import { resolve4, resolve6, resolveMx } from "node:dns/promises";
 import { withDeadline } from "../lib/deadline";
+import { isDisposableMxHost } from "./disposable-domains";
 
 /** The whole check, all lookups together (ADR-0025 §3). */
 export const EMAIL_DOMAIN_DEADLINE_MS = 1_000;
@@ -25,7 +27,7 @@ export interface DnsResolver {
   aaaa(domain: string): Promise<readonly string[]>;
 }
 
-export type EmailDomainVerdict = "OK" | "INVALID" | "UNKNOWN";
+export type EmailDomainVerdict = "OK" | "INVALID" | "DISPOSABLE" | "UNKNOWN";
 
 export const nodeResolver: DnsResolver = {
   mx: (domain) => resolveMx(domain),
@@ -53,6 +55,7 @@ const isNullMx = (record: MxRecord): boolean => record.priority === 0 && (record
 
 async function check(domain: string, resolver: DnsResolver): Promise<EmailDomainVerdict> {
   const mx = await records(() => resolver.mx(domain));
+  if (mx.some((record) => isDisposableMxHost(record.exchange))) return "DISPOSABLE";
   if (mx.length > 0) return mx.length === 1 && mx[0] !== undefined && isNullMx(mx[0]) ? "INVALID" : "OK";
   const [a, aaaa] = await Promise.all([records(() => resolver.a(domain)), records(() => resolver.aaaa(domain))]);
   return a.length > 0 || aaaa.length > 0 ? "OK" : "INVALID";

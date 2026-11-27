@@ -8,6 +8,7 @@
 //   5. the domain of the email: not a disposable mailbox (signup/disposable-domains.ts)
 //                                                                             INVALID (EMAIL_NOT_ACCEPTED)
 //      then MX, or A/AAAA, within 1 s                                         INVALID (EMAIL_DOMAIN)
+//      and no MX at a disposable service's mail server                        INVALID (EMAIL_NOT_ACCEPTED)
 //   6. the visitor's counters, then the stage's day (signup/limits.ts)        RATE_LIMITED | CAP_REACHED
 //   7. two confirmed accounts of the same person                             RATE_LIMITED
 //   8. the lead: new, or one more pending user (≤ 3, the oldest retired, each start's form and
@@ -119,6 +120,7 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
   if (isDisposableDomain(domainOf(email))) return refuse("EMAIL_NOT_ACCEPTED", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
   const domain = await emailDomainVerdict(email, p.resolver);
   if (domain === "INVALID") return refuse("EMAIL_DOMAIN", REFUSALS.EMAIL_DOMAIN(), emailHash);
+  if (domain === "DISPOSABLE") return refuse("EMAIL_NOT_ACCEPTED", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
   if (domain === "UNKNOWN") call.log.warn("signup.email_domain.unknown", { metric: "SignupMxUnknown", value: 1, emailHash: hashPrefix(emailHash) });
 
   const abuseHash = leadAbuseHash(emailKey, email);
