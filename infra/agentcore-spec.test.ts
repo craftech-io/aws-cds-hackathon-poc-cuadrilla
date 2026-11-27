@@ -282,12 +282,12 @@ describe("runtime log group and content in traces (docs/architecture.md §12)", 
     expect(spec.TRACE_CONTENT_CAPTURE).toMatchObject({ captureCanBeTurnedOff: false, decision: "RETENTION", runtimeLogGroupRetentionDays: spec.AGENT_LOG_RETENTION_DAYS });
   });
 
-  it("declares the DEFAULT group's 30 days as the manual configuration of §17 item 15: no pinned provider models it (ADR-0028)", () => {
+  it("declares the DEFAULT group's 14 days as the manual configuration of §17 item 15: no pinned provider models it (ADR-0028)", () => {
     const record = spec.DEFAULT_RUNTIME_LOG_RETENTION;
     const fields = recordedFields(record.checked);
     expect(fields).toEqual(expect.arrayContaining(["executionRoleArn", "targetVersion", "harnessName", "agentRuntimeName"]));
     expect(fields.filter((field) => /retention|logGroup|logging|logConfig/i.test(field))).toEqual([]);
-    expect(record).toMatchObject({ modeledByProvider: false, retentionDays: 30, manualConfig: "docs/architecture.md §17 item 15" });
+    expect(record).toMatchObject({ modeledByProvider: false, retentionDays: 14, manualConfig: "docs/architecture.md §17 item 15" });
     const item15 = architecture.split("\n").find((line) => line.startsWith("| 15 |")) ?? "";
     for (const command of [record.apply, record.verify]) expect(item15).toContain(`\`${command}\``);
     expect(record.apply).toContain(`<runtimeId>-${spec.RUNTIME_DEFAULT_ENDPOINT} --retention-in-days ${spec.AGENT_LOG_RETENTION_DAYS}`);

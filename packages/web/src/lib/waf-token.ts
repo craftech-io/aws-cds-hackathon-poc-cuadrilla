@@ -1,15 +1,15 @@
-// The AWS WAF token of the sign-up (ADR-0025 §4, docs/landing-spec.md §7.3 and §7.5). The edge web
-// ACL answers the sign-up with a silent Challenge: a browser proves itself with a token that the AWS
+// The AWS WAF token of the sign-up (ADR-0025 §4, docs/landing-spec.md §7.3 and §7.5), for an edge web
+// ACL that answers the sign-up with a silent Challenge: a browser proves itself with a token that the AWS
 // WAF application integration SDK gets without any widget, and the sign-up's `fetch` carries it. This
 // module loads the SDK (`challenge.js` at the integration URL of the ACL, a build variable), waits for
 // the token before "Crear cuenta" is enabled, and hands the sign-up client a `fetch` that goes through
 // the SDK's own wrapper. No CAPTCHA, ever: if the token does not come within 10 s (a content blocker,
 // an extension, the network), the form says so with its own neutral text.
 //
-// Where no web ACL fronts the app (a local server without an integration URL) there is no token to
-// get: the check passes and the plain `fetch` is used; the server side still decides. A deployed build
-// always has the URL (lib/env.ts requires it, infra/waf.ts fails the deploy without it). Either way the
-// sign-up fails closed: an answer that is still the edge's challenge (`x-amzn-waf-action: challenge`,
+// Where no web ACL challenges the sign-up there is no integration URL and no token to get: the check
+// passes and the plain `fetch` is used; the server side still decides. That is the deployed build today:
+// the account's shared edge ACL (`demos-borde`) has no challenge (ADR-0030). Either way the sign-up fails
+// closed: an answer that is still the edge's challenge (`x-amzn-waf-action: challenge`,
 // a 202 with the interstitial) is a browser check that did not pass, never a server error.
 
 /** What the SDK puts on `window.AwsWafIntegration` (AWS WAF application integration, JavaScript). */

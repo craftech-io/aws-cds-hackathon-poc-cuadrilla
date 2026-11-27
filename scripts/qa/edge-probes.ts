@@ -1,9 +1,9 @@
 // `npm run qa:edge-probes` (docs/test-plan.md §6.1, rows "Anti abuso" and "Origen"; ADR-0025 §3-§4): the
 // probes of the sign-up's edge that need no browser, against the deployed stage.
 //
-//   1. Through the Router, without a token of AWS WAF: `POST /api/signup.start` gets the challenge;
-//      a batch naming it and an encoded path (`/api/%73ignup.start`) get the challenge or the app's 400
-//      without a body; never a 200.
+//   1. Through the Router (the shared edge ACL `demos-borde` challenges nothing, ADR-0030): an empty
+//      `POST /api/signup.start` gets the app's 400 `INVALID_FORM`; a batch naming it and an encoded path
+//      (`/api/%73ignup.start`) the app's 400 without a body; never a 200.
 //   2. The Bff's Function URL called directly (`/api/signup.start` and `/api/health`): without the
 //      origin header, with an invented one, and with a forged `CloudFront-Viewer-Address` → 403
 //      without a body. Before and after, the leads (`Leads`, Select COUNT) and the sign-up counters
@@ -47,11 +47,11 @@ export async function routerProbes(baseUrl: string): Promise<Probe[]> {
   const probes: Probe[] = [];
   const single = await call(`${baseUrl}/api/signup.start`, POST_EMPTY);
   const singleVerdict = signupEdgeVerdict(single.status, single.headers, single.body);
-  probes.push({ name: "POST /api/signup.start without a WAF token", ok: singleVerdict === "challenge", detail: `${single.status} ${singleVerdict}` });
+  probes.push({ name: "POST /api/signup.start with an empty form", ok: singleVerdict === "refused" || singleVerdict === "challenge", detail: `${single.status} ${singleVerdict}` });
   for (const path of ["/api/health.live,signup.start?batch=1", "/api/%73ignup.start?batch=1"]) {
     const answer = await call(`${baseUrl}${path}`, POST_EMPTY);
     const verdict = signupEdgeVerdict(answer.status, answer.headers, answer.body);
-    probes.push({ name: `POST ${path} without a WAF token`, ok: verdict !== "failed" && answer.status !== 200, detail: `${answer.status} ${verdict}` });
+    probes.push({ name: `POST ${path}`, ok: verdict === "rejected" || verdict === "challenge", detail: `${answer.status} ${verdict}` });
   }
   return probes;
 }

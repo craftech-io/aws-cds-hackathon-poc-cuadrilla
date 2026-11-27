@@ -148,4 +148,4 @@ export function carriedResources(fn: LambdaName): LinkCarriedResource[] {
 }
 
 /** Placeholders the statements of infra/bff.ts resolve besides storage and `Leads` (infra/leads.ts). */
-export const STATEMENT_REFS = ["{UserPool}", "{Auth}", "{EdgeWebAcl}", "{AuthWebAcl}"] as const;
+export const STATEMENT_REFS = ["{UserPool}", "{Auth}", "{AuthWebAcl}"] as const;

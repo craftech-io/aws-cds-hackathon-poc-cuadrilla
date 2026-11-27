@@ -71,10 +71,12 @@ export default $config({
 
   async run() {
     // Defaults every Lambda in the app inherits; a module can still override them per function.
+    // Log retention: the one value of infra/log-retention.ts (14 days).
+    const { FUNCTION_LOG_RETENTION } = await import("./infra/log-retention");
     $transform(sst.aws.Function, (args) => {
       args.runtime ??= "nodejs22.x";
       args.architecture ??= "arm64";
-      args.logging ??= { retention: "1 month" };
+      args.logging ??= { retention: FUNCTION_LOG_RETENTION };
     });
 
     // A linked Dynamo or Bucket hands a Lambda its name and nothing else (SST would attach

@@ -14,7 +14,7 @@
 // step 8 proves the limit with the fifth and the sixth. Run it from a runner without other sign-ups in that
 // hour (a scenarios job of its own); a second run in the same hour from the same IP is refused at step 1.
 import { createHash } from "node:crypto";
-import { authRules, edgeRules } from "../../infra/waf-spec";
+import { authRules } from "../../infra/waf-spec";
 import { type ScenarioContext, AssertionFailed, ensure } from "./lib/context";
 import { edgeConfig } from "./lib/edge";
 import { WAITS } from "./lib/eventually";
@@ -298,14 +298,13 @@ export default defineScenario({
     },
     {
       id: "10",
-      title: "waf.probe → rules, actions (no CAPTCHA), the Count overrides, the sign-up scope, limits and associations equal to infra/waf-spec.ts",
+      title: "waf.probe → the pool's rules, actions (no CAPTCHA), limits and association equal to infra/waf-spec.ts",
       kind: "det",
       flows: ["FL-114"],
       after: "preset",
       async run(ctx) {
-        const probe = (await ctx.qa("waf.probe", {})) as { edge?: { WebACL?: { Rules?: unknown[] } }; auth?: { WebACL?: { Rules?: unknown[] } }; poolAssociation?: { WebACL?: unknown } };
+        const probe = (await ctx.qa("waf.probe", {})) as { auth?: { WebACL?: { Rules?: unknown[] } }; poolAssociation?: { WebACL?: unknown } };
         const same = (live: unknown[] | undefined, spec: readonly unknown[]) => JSON.stringify(normalizeRules(live ?? [])) === JSON.stringify(normalizeRules([...spec]));
-        ctx.check(same(probe.edge?.WebACL?.Rules, edgeRules()), "the edge ACL differs from infra/waf-spec.ts");
         ctx.check(same(probe.auth?.WebACL?.Rules, authRules()), "the pool's ACL differs from infra/waf-spec.ts");
         ctx.check(!JSON.stringify(probe).includes("Captcha"), "a rule uses CAPTCHA");
         ctx.check(probe.poolAssociation?.WebACL !== undefined, "the pool has no web ACL");

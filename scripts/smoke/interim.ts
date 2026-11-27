@@ -7,19 +7,19 @@
 //   3. GET /api/health     the BFF's health probe. Before WP-38 deploys the BFF the Router serves
 //                          the console's index.html there: reported, not failed, unless
 //                          `--expect-api` says the BFF must be up.
-//   4. The sign-up's edge (ADR-0025 §3-§4, SMK/9 until SC-00 exists), through the Router without a
-//      token of AWS WAF: `POST /api/signup.start` gets the challenge (`x-amzn-waf-action: challenge`),
-//      and a batch naming it (`POST /api/health.live,signup.start?batch=1`) the challenge or the
-//      app's 400; never a 200 nor RATE_LIMITED. Neither ever reaches `signup.start`: no lead, no
-//      counter, no email.
+//   4. The sign-up's edge (ADR-0025 §3-§4, ADR-0030, SMK/9 until SC-00 exists), through the Router:
+//      an empty `POST /api/signup.start` gets the app's own refusal of the form (400 `INVALID_FORM`;
+//      the shared edge ACL challenges nothing, a challenge would pass too), and a batch naming it
+//      (`POST /api/health.live,signup.start?batch=1`) the app's 400 without a body; never a 200 nor
+//      RATE_LIMITED. Neither ever starts a sign-up: no lead, no counter, no email.
 //   5. The id token reaches the BFF on a query (SMK/11): a tRPC query is a `GET`, and CloudFront strips
 //      `Authorization` from a `GET` unless the cache policy of `/api/*` keeps it in the key
 //      (infra/bootstrap/ci-role.yaml, ApiCachePolicy). `GET /api/guest.world` with a bearer that is not
 //      a JWT must answer 401 `TOKEN_INVALID` (the BFF saw the header), never `TOKEN_MISSING` (it was
 //      dropped on the way). Only when the BFF is up.
 //   6. Inventory (`--aws`): the DynamoDB tables and Lambda functions of the app that exist so far,
-//      and (SMK/10) the Bff's Function URL called directly answers 403 with no body, and the two web
-//      ACLs are attached (the Router's distribution and the user pool).
+//      and (SMK/10) the Bff's Function URL called directly answers 403 with no body, the shared edge
+//      ACL (`demos-borde`) is on the Router's distribution and the pool's ACL on the user pool.
 //                          Their names come from this app's own SST state (`sst state export`),
 //                          never from an account-wide listing: the account is shared with another
 //                          project and the deploy role has no `dynamodb:ListTables` nor
@@ -111,18 +111,34 @@ export function authForwardingVerdict(status: number, body: string): AuthForward
   return reason === "TOKEN_INVALID" ? "forwarded" : "failed";
 }
 
-export type SignupEdgeVerdict = "challenge" | "rejected" | "failed";
+export type SignupEdgeVerdict = "challenge" | "rejected" | "refused" | "failed";
+
+/** The tRPC `reason` of an error answer, if the body is one. */
+function trpcReason(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { error?: { data?: { reason?: unknown } } } | Array<{ error?: { data?: { reason?: unknown } } }>;
+    const reason = (Array.isArray(parsed) ? parsed[0] : parsed)?.error?.data?.reason;
+    return typeof reason === "string" ? reason : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
- * What the edge answered to a sign-up request without a WAF token: the challenge of AWS WAF, the
- * app's own 400 without a body (a batch naming `signup.`), or a failure (anything that could have
- * run `signup.start`: a 200, a RATE_LIMITED, another status).
+ * What the edge answered to an empty sign-up request: a challenge of AWS WAF (none today: the shared edge
+ * ACL has no challenge, ADR-0030), the app's own 400 without a body (a batch naming `signup.`), the app's
+ * refusal of the empty form (400 `INVALID_FORM`), or a failure (anything that could have started a
+ * sign-up or tells nothing: a 200, a RATE_LIMITED, another status).
  */
 export function signupEdgeVerdict(status: number, headers: HeaderMap, body: string): SignupEdgeVerdict {
   if ((headers["x-amzn-waf-action"] ?? "").toLowerCase() === "challenge") return "challenge";
   if (status === 400 && body.trim() === "") return "rejected";
+  if (status === 400 && trpcReason(body) === "INVALID_FORM") return "refused";
   return "failed";
 }
+
+/** The shared edge ACL's ARN marker on a distribution (`…:global/webacl/demos-borde/<id>`). */
+const SHARED_EDGE_ACL_MARKER = "/webacl/demos-borde/";
 
 /** The Bff's Function URL called directly must answer 403 with no body, before parsing anything. */
 export function directUrlProblems(status: number, body: string): string[] {
@@ -145,7 +161,7 @@ export interface EdgeInventory {
 
 type StateResource = { type?: unknown; outputs?: Record<string, unknown> };
 
-/** The public Function URL and whether both web ACLs are attached, from the app's own SST state. */
+/** The public Function URL, the shared edge ACL on the distribution and the pool's ACL, from the app's own SST state. */
 export function edgeInventory(state: unknown): EdgeInventory {
   const resources = ((state as { latest?: { resources?: unknown } } | null)?.latest?.resources ?? []) as StateResource[];
   const of = (type: string) => resources.filter((resource) => resource.type === type).map((resource) => resource.outputs ?? {});
@@ -153,11 +169,10 @@ export function edgeInventory(state: unknown): EdgeInventory {
     .filter((outputs) => outputs.authorizationType === "NONE" && typeof outputs.functionUrl === "string")
     .map((outputs) => outputs.functionUrl as string);
   const acls = new Map(of(WEB_ACL_TYPE).map((outputs) => [String(outputs.name), String(outputs.arn)]));
-  const edge = [...acls].find(([name]) => name.endsWith("-edge"))?.[1];
   const auth = [...acls].find(([name]) => name.endsWith("-auth"))?.[1];
   const problems: string[] = [];
   if (publicFunctionUrls.length !== 1) problems.push(`expected exactly one public Function URL (the Bff's), found ${publicFunctionUrls.length}`);
-  if (edge === undefined || !of(DISTRIBUTION_TYPE).some((outputs) => outputs.webAclId === edge)) problems.push("the edge web ACL is not on the Router's distribution");
+  if (!of(DISTRIBUTION_TYPE).some((outputs) => typeof outputs.webAclId === "string" && outputs.webAclId.includes(SHARED_EDGE_ACL_MARKER))) problems.push("the shared edge web ACL (demos-borde) is not on the Router's distribution");
   const pools = of(USER_POOL_TYPE).map((outputs) => outputs.arn);
   if (auth === undefined || !of(WEB_ACL_ASSOCIATION_TYPE).some((outputs) => outputs.webAclArn === auth && pools.includes(outputs.resourceArn))) problems.push("the user pool's web ACL is not associated with the pool");
   return { publicFunctionUrls, problems };
@@ -191,15 +206,15 @@ async function exportState(): Promise<unknown> {
 
 const POST_EMPTY: RequestInit = { method: "POST", headers: { "content-type": "application/json" }, body: "{}" };
 
-/** SMK/9 of the interim smoke: the sign-up through the Router, without a token of AWS WAF. */
+/** SMK/9 of the interim smoke: an empty sign-up and its batch through the Router. */
 async function signupEdge(baseUrl: string): Promise<{ line: string; problems: string[] }> {
   const problems: string[] = [];
   const single = await get(`${baseUrl}/api/signup.start`, POST_EMPTY);
   const singleVerdict = signupEdgeVerdict(single.status, single.headers, single.body);
-  if (singleVerdict !== "challenge") problems.push(`POST /api/signup.start without a WAF token answered ${single.status}: expected the challenge of AWS WAF`);
+  if (singleVerdict !== "refused" && singleVerdict !== "challenge") problems.push(`POST /api/signup.start with an empty form answered ${single.status}: expected the app's 400 INVALID_FORM`);
   const batch = await get(`${baseUrl}/api/health.live,signup.start?batch=1`, POST_EMPTY);
   const batchVerdict = signupEdgeVerdict(batch.status, batch.headers, batch.body);
-  if (batchVerdict === "failed") problems.push(`POST /api/health.live,signup.start?batch=1 answered ${batch.status}: expected the challenge or 400 without a body`);
+  if (batchVerdict !== "rejected" && batchVerdict !== "challenge") problems.push(`POST /api/health.live,signup.start?batch=1 answered ${batch.status}: expected 400 without a body`);
   return { line: `signup.start ${singleVerdict} · batch ${batchVerdict}`, problems };
 }
 

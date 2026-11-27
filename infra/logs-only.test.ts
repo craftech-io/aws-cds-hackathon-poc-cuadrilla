@@ -1,4 +1,4 @@
-// Observability is logs only (ADR-0028, docs/architecture.md §12): JSON logs kept 30 days in every group,
+// Observability is logs only (ADR-0028, ADR-0030, docs/architecture.md §12): JSON logs kept 14 days in every group,
 // no dashboard, no alarm and no budget (an alarm bills every month even when it never fires; P-07, closed
 // by the CTO on 2026-10-14: no cost threshold, no agent spend alarm, no project budget). Anything that
 // costs every month and that nobody reads fails here. The infra modules are read as text: the scan needs
@@ -7,6 +7,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AGENT_LOG_RETENTION_DAYS, DEFAULT_RUNTIME_LOG_RETENTION, RUNTIME_DEFAULT_ENDPOINT, RUNTIME_LOG_GROUP_PREFIX } from "./agentcore-spec";
+import { FUNCTION_LOG_RETENTION, LOG_RETENTION_DAYS } from "./log-retention";
 
 const ROOT = process.cwd();
 const read = (path: string): string => readFileSync(resolve(ROOT, path), "utf8");
@@ -55,18 +56,22 @@ describe("logs only (ADR-0028, docs/architecture.md §12)", () => {
     }
   });
 
-  it("keeps every log group 30 days: the functions by $transform, the live runtime group by the IaC", () => {
-    expect(AGENT_LOG_RETENTION_DAYS).toBe(30);
-    expect(read("sst.config.ts")).toContain('args.logging ??= { retention: "1 month" };');
+  it("[FL-127] keeps every log group 14 days, from one place: the functions by $transform, the live runtime group by the IaC", () => {
+    expect(LOG_RETENTION_DAYS).toBe(14);
+    expect(FUNCTION_LOG_RETENTION).toBe("2 weeks");
+    expect(AGENT_LOG_RETENTION_DAYS).toBe(LOG_RETENTION_DAYS);
+    expect(read("sst.config.ts")).toContain("args.logging ??= { retention: FUNCTION_LOG_RETENTION };");
     for (const { file, text } of SOURCES) {
-      for (const args of calls(text, /aws\.cloudwatch\.LogGroup/)) expect(args, file).toMatch(/retentionInDays: (AGENT_LOG_RETENTION_DAYS|30),/);
+      for (const args of calls(text, /aws\.cloudwatch\.LogGroup/)) expect(args, file).toMatch(/retentionInDays: AGENT_LOG_RETENTION_DAYS,/);
+      // No module sets another retention on a function or a group.
+      expect(text, file).not.toMatch(/retention: "(?!2 weeks)[^"]+"|retentionInDays: \d/);
     }
     expect(calls(read("infra/agentcore.ts"), /aws\.cloudwatch\.LogGroup/).join()).toContain("runtimeLogGroupName(id, endpoint)");
   });
 
-  it("declares the DEFAULT runtime group's 30 days in infra/agentcore-spec.ts, with its apply and verify commands", () => {
-    expect(DEFAULT_RUNTIME_LOG_RETENTION).toMatchObject({ modeledByProvider: false, retentionDays: 30, manualConfig: "docs/architecture.md §17 item 15" });
-    expect(DEFAULT_RUNTIME_LOG_RETENTION.apply).toBe(`aws --profile craftech-demos logs put-retention-policy --log-group-name ${RUNTIME_LOG_GROUP_PREFIX}<runtimeId>-${RUNTIME_DEFAULT_ENDPOINT} --retention-in-days 30`);
+  it("declares the DEFAULT runtime group's 14 days in infra/agentcore-spec.ts, with its apply and verify commands", () => {
+    expect(DEFAULT_RUNTIME_LOG_RETENTION).toMatchObject({ modeledByProvider: false, retentionDays: 14, manualConfig: "docs/architecture.md §17 item 15" });
+    expect(DEFAULT_RUNTIME_LOG_RETENTION.apply).toBe(`aws --profile craftech-demos logs put-retention-policy --log-group-name ${RUNTIME_LOG_GROUP_PREFIX}<runtimeId>-${RUNTIME_DEFAULT_ENDPOINT} --retention-in-days 14`);
     expect(DEFAULT_RUNTIME_LOG_RETENTION.verify).toMatch(/^aws --profile craftech-demos logs describe-log-groups --log-group-name-prefix \/aws\/bedrock-agentcore\/runtimes\/ /);
   });
 });
