@@ -6,6 +6,12 @@
 //   ispId, userId, role, isGuest    from the registry row, never from the `custom:ispId` attribute
 //   cognito:groups                  overridden with the registry role, so the token tells one story
 //   custom:ispId                    suppressed from the id token: nothing downstream can read it
+//   aws.cognito.signin.user.admin   suppressed from the access token of a guest and of a token with no
+//                                   principal: with it, the access token alone could call Cognito's
+//                                   ChangePassword, DeleteUser or UpdateUserAttributes past the console's
+//                                   `staffOnly` (routers/account.ts). The web never calls Cognito with a
+//                                   guest's access token (guests get no TOTP, no password change); staff
+//                                   keep the scope for their TOTP enrolment (SetUserMFAPreference, GetUser)
 //
 // A `custom:ispId` that differs from the registry is ignored and audited (`AuditLog DENY
 // CUSTOM_ISP_ID_IGNORED` in the registry operator; FL-081). A `sub` with no row, with two rows, or
@@ -31,6 +37,11 @@ import { withDeadline } from "../lib/deadline";
 import { type Logger, createLogger } from "../lib/log";
 import { describeError } from "../auth/errors";
 import { roleWorldMismatch, TOKEN_OPERATOR_KINDS } from "../auth/principal";
+
+/** The scope that lets an access token manage its own user in Cognito; only staff keep it. */
+export const SELF_ADMIN_SCOPE = "aws.cognito.signin.user.admin";
+
+const WITHOUT_SELF_ADMIN = { scopesToSuppress: [SELF_ADMIN_SCOPE] };
 
 /** The informative attribute the invitation sets; never trusted, never forwarded. */
 export const CUSTOM_ISP_ID_ATTRIBUTE = "custom:ispId";
@@ -71,7 +82,7 @@ export function decideTokenClaims(user: ConsoleUser | undefined, attributeIspId:
 /** Cognito's `claimsAndScopeOverrideDetails` for a decision. */
 export function overrideDetails(decision: TokenDecision): ClaimsAndScopeOverrideDetails {
   if (decision.kind === "NO_PRINCIPAL") {
-    return { idTokenGeneration: { claimsToSuppress: [CUSTOM_ISP_ID_ATTRIBUTE] }, groupOverrideDetails: { groupsToOverride: [] } };
+    return { idTokenGeneration: { claimsToSuppress: [CUSTOM_ISP_ID_ATTRIBUTE] }, accessTokenGeneration: WITHOUT_SELF_ADMIN, groupOverrideDetails: { groupsToOverride: [] } };
   }
   const { user } = decision;
   return {
@@ -79,6 +90,7 @@ export function overrideDetails(decision: TokenDecision): ClaimsAndScopeOverride
       claimsToAddOrOverride: { ispId: user.ispId, userId: user.userId, role: user.role, isGuest: String(user.role === "GUEST") },
       claimsToSuppress: [CUSTOM_ISP_ID_ATTRIBUTE],
     },
+    ...(user.role === "GUEST" ? { accessTokenGeneration: WITHOUT_SELF_ADMIN } : {}),
     groupOverrideDetails: { groupsToOverride: [user.role] },
   };
 }

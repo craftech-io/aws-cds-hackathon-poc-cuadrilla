@@ -44,7 +44,7 @@ export interface WorkerContext {
 // ---- Fixed notices --------------------------------------------------------------------------------
 
 /** The texts of copy/es-MX.ts the worker itself sends to the installer (`SYSTEM_NOTICE`). */
-export type WorkerNoticeKey = "servicePaused" | "agentFallback" | "turnCap" | "guardrailRefusal" | "voiceUnclear" | "voiceTooLong" | "voiceFailed" | "itemChoicePrompt";
+export type WorkerNoticeKey = "servicePaused" | "agentFallback" | "turnCap" | "spendCap" | "guardrailRefusal" | "voiceUnclear" | "voiceTooLong" | "voiceFailed" | "itemChoicePrompt";
 
 export interface WorkerNotice {
   readonly clockId: string;
@@ -87,6 +87,8 @@ export type TranscriptionOutcome =
   | { readonly status: "TOO_LONG" }
   | { readonly status: "FAILED" }
   | { readonly status: "CAP_REACHED"; readonly resetsAtReal?: string }
+  /** A sign-up account spent its whole allowance (`COSTUSD#GUESTUSER#`). */
+  | { readonly status: "SPEND_CAP" }
   | { readonly status: "PAUSED" };
 
 export interface VoiceTranscriber {

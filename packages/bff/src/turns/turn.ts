@@ -5,7 +5,8 @@
 //      installer's in that world, else the turn runs on the installer's day session
 //   2. the kill switch → `servicePaused` without the Harness (none if the message already got the safety
 //      instruction); a cap of the world, the operator or the stage → `TURN_CAP` with its scope and `turnCap`
-//      (worker/turn-cap.ts). Nothing is preloaded, nothing reaches Bedrock
+//      (`spendCap` when a sign-up account spent its USD 1, worker/turn-cap.ts). Nothing is preloaded,
+//      nothing reaches Bedrock
 //   3. a card in the installer's text → blocked before G1 (lib/mask.ts `prefilterBlock`, FL-078 b)
 //   4. the G1 pre-filter over the installer's text (turns/prefilter.ts): only a BLOCKED assessment blocks
 //      (worker/guardrail-block.ts); an anonymization goes on with G1's text, masked again by the
@@ -52,9 +53,10 @@ async function refuseByBudget(deps: TurnDeps, ctx: WorkerContext, request: TurnR
     action: WORKER_ACTIONS.turnCap,
     decision: "DENY",
     refs,
-    detail: { scope: budget.scope, ledger: budget.ledger, period: budget.period, limit: budget.limit, resetsAtReal: budget.resetsAtReal },
+    detail: { scope: budget.scope, ledger: budget.ledger, period: budget.period, limit: budget.limit, ...(budget.resetsAtReal === undefined ? {} : { resetsAtReal: budget.resetsAtReal }) },
   });
-  if (notify && request.safetyFired !== true) await sendWorkerNotice(notices, ctx, noticeTargetOf(request, workOrder?.workOrderId), "turnCap");
+  const notice = budget.scope === "GUEST_SPEND" ? "spendCap" : "turnCap";
+  if (notify && request.safetyFired !== true) await sendWorkerNotice(notices, ctx, noticeTargetOf(request, workOrder?.workOrderId), notice);
   return { kind: "SKIPPED", reason: "TURN_CAP" };
 }
 
@@ -125,6 +127,7 @@ export async function runAgentTurn(deps: TurnDeps, ctx: WorkerContext, request: 
     worldEpoch: clock.worldEpoch,
     simNow: simNowOf(clock, realNowMs).toISOString(),
     clockMode: effectiveMode(clock, realNowMs),
+    reserved: budget.reserved,
     ...(workOrder === undefined ? {} : { workOrder }),
   });
 }

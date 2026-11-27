@@ -12,10 +12,13 @@
 //                                                back to the queue (TurnRequeued)
 //
 // `IDEMP#TURN_RAN#<eventId>` is written as soon as the Harness answers, so an event retried after a later
-// failure never invokes the Harness twice.
+// failure never invokes the Harness twice. A turn the Harness answered settles the spend of a sign-up
+// account (`COSTUSD#GUESTUSER#`) from its estimate to its priced cost, cache tokens included.
 import { renderEnvelope } from "../agent/envelope";
 import { HarnessError, type HarnessTurnResult } from "../agent/harness-client";
 import type { WorkOrder } from "../domain/work-orders";
+import type { CapCounter } from "../ops/cost-caps";
+import { settleSpend } from "../ops/guest-spend";
 import { ulid } from "../lib/crypto";
 import { localDateOf, MEXICO_CITY_TIME_ZONE } from "../services/business-hours/zoned-time";
 import { openSession } from "../services/session/session";
@@ -40,6 +43,18 @@ export interface InvokeInput {
   readonly worldEpoch: number;
   readonly simNow: string;
   readonly clockMode: string;
+  /** The counters the turn's budget took (worker/turn-cap.ts). */
+  readonly reserved?: readonly CapCounter[];
+}
+
+/** The account's spend, from the turn's estimate to its priced cost; a failed settlement keeps the estimate. */
+async function settleTurn(deps: TurnDeps, ctx: WorkerContext, input: InvokeInput, usd: number | undefined): Promise<void> {
+  if (input.reserved === undefined) return;
+  try {
+    await settleSpend(deps.budget.costCaps, input.reserved, usd === undefined ? undefined : usd * 1_000_000, `turn#${input.request.eventId}`);
+  } catch (error) {
+    ctx.log.warn("turn.spend_settle_failed", { cause: error instanceof Error ? error.name : "unknown" });
+  }
 }
 
 type Invocation = { readonly ran: true; readonly result: HarnessTurnResult; readonly latencyMs: number } | { readonly ran: false; readonly cause: TurnFailureCause };
@@ -158,7 +173,7 @@ async function finishTurn(deps: TurnDeps, ctx: WorkerContext, input: InvokeInput
   logTurnMetric(ctx.log, TURN_LOG_METRICS.latency, { latencyMs, trigger: request.trigger, outcome: result.outcome, stopReason: result.stopReason, toolUses: result.toolUses, attempts: result.attempts });
   if (result.outcome === "GUARDRAIL") {
     await writeTurnNote(record, { request, turnId, text: FIXED_NOTES.guardrail, usage: result.usage, stopReason: result.stopReason, latencyMs });
-    await recordTurnKpi(record, request, result.usage, latencyMs);
+    await settleTurn(deps, ctx, input, await recordTurnKpi(record, request, result.usage, latencyMs));
     await handleGuardrailBlock(
       { data: deps.data, ports: deps.ports },
       ctx,
@@ -173,7 +188,7 @@ async function finishTurn(deps: TurnDeps, ctx: WorkerContext, input: InvokeInput
   const answered = sent.length > 0 || (await escalatedInTurn(deps.data, turnId));
   const firstReply = firstReplyLatency(request.message, sent);
   if (firstReply !== undefined) logTurnMetric(ctx.log, TURN_LOG_METRICS.firstReply, { latencyMs: firstReply, kind: request.inbound?.kind ?? "NONE" });
-  await recordTurnKpi(record, request, result.usage, latencyMs, firstReply);
+  await settleTurn(deps, ctx, input, await recordTurnKpi(record, request, result.usage, latencyMs, firstReply));
   if (!completed) await failTurn(deps, ctx, input, turnId, result.outcome === "MAX_TOKENS" ? "MAX_TOKENS" : "INCOMPLETE", result.stopReason);
   if (answersInstaller(request.trigger) && !answered) {
     await fallback(deps, ctx, input, turnId, completed ? "NO_REPLY" : result.stopReason);

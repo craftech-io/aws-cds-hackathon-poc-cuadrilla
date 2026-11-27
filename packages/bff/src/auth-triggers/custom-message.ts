@@ -7,19 +7,26 @@
 //                                           (KILL#SIGNUP or KILL#ALL): the trigger throws and Cognito
 //                                           sends no email
 //   CustomMessage_ForgotPassword            the recovery code, cut or not (sign-in and recovery go on)
+//
+// A resend and a recovery code are what someone can ask for an inbox that is not theirs, so both take
+// a place of the stage's day (`AUTHMAIL#GLOBAL#<realDay>`, AUTH_CODE_EMAILS_PER_DAY, a conditional ADD in
+// `Runtime` with a TTL) before Cognito sends: over it the trigger throws and no email goes out, from
+// any IP (the pool's WAF caps each IP: infra/waf-spec.ts).
 //   CustomMessage_AdminCreateUser           the operator's invitation
 //   CustomMessage_UpdateUserAttribute,      refused: there is no change of email (the lead stays bound
 //   _VerifyUserAttribute, anything else     to the verified address)
 //
 // No attribute the user wrote is ever read into the email (not `name`, not anything): only Cognito's
-// placeholders and fixed texts. The trigger reads only `Runtime/KILL#*`; no table, no secret.
+// placeholders and fixed texts. The trigger reads `Runtime/KILL#*` and writes only `AUTHMAIL#*`; no
+// other table, no secret.
 import type { CustomMessageTriggerEvent } from "aws-lambda";
 import { z } from "zod";
 import { describeError } from "../auth/errors";
 import { type AuthEmailKind, authEmailLocale, renderAuthEmail } from "../copy/auth-emails";
 import { withDeadline } from "../lib/deadline";
 import { type Logger, createLogger } from "../lib/log";
-import { killSwitchReader } from "../ops/defaults";
+import { type CapLedgerStore, CAP_TTL_AFTER_PERIOD_SECONDS, realDayKey } from "../ops/cost-caps";
+import { killSwitchReader, runtimeStore } from "../ops/defaults";
 import { type KillSwitchReader, blockingScope } from "../ops/kill-switch";
 import { CONSOLE_ORIGIN } from "../policy/rules-content";
 
@@ -35,6 +42,30 @@ const KIND_OF_SOURCE: Readonly<Record<string, AuthEmailKind>> = {
 
 /** The codes the cut refuses: the sign-up's and its resend. */
 const CUT_KINDS: ReadonlySet<AuthEmailKind> = new Set(["SIGN_UP", "RESEND_CODE"]);
+
+/** The codes anyone can ask for an existing account's inbox: each takes a place of the stage's day. */
+const CAPPED_KINDS: ReadonlySet<AuthEmailKind> = new Set(["RESEND_CODE", "FORGOT_PASSWORD"]);
+
+/** Resent sign-up codes and recovery codes the whole stage sends a real day (the sign-up's 300 starts a day, SIGNUP#GLOBAL). */
+export const AUTH_CODE_EMAILS_PER_DAY = 300;
+
+export const authMailDayKey = (at: Date): string => `AUTHMAIL#GLOBAL#${realDayKey(at)}`;
+
+/** One place of today's code emails; `false` when the day is full. */
+export async function reserveCodeEmail(store: Pick<CapLedgerStore, "reserve">, at: Date): Promise<boolean> {
+  const endsAt = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() + 1));
+  const counter = {
+    key: authMailDayKey(at),
+    ledger: "GLOBAL" as const,
+    resource: "emails" as const,
+    period: "DAY" as const,
+    limit: AUTH_CODE_EMAILS_PER_DAY,
+    amount: 1,
+    expiresAt: Math.floor(endsAt.getTime() / 1000) + CAP_TTL_AFTER_PERIOD_SECONDS,
+    resetsAtReal: endsAt.toISOString(),
+  };
+  return (await store.reserve([counter], { nowIso: at.toISOString() })).ok;
+}
 
 export type CustomMessageRefusal = "CAP_REACHED" | "SOURCE_NOT_ALLOWED";
 
@@ -57,6 +88,8 @@ const CustomMessageEvent = z.looseObject({
 
 export interface CustomMessageDeps {
   readonly kill: Pick<KillSwitchReader, "status">;
+  /** A place of today's resent and recovery codes (`reserveCodeEmail`). */
+  readonly reserveCodeEmail: () => Promise<boolean>;
   /** Console origin for the invitation's link and the logo. */
   readonly origin: string;
   readonly log: Logger;
@@ -71,6 +104,7 @@ export async function composeCustomMessage(deps: CustomMessageDeps, event: z.inf
   const kind = KIND_OF_SOURCE[event.triggerSource];
   if (kind === undefined) throw new CustomMessageRefused("SOURCE_NOT_ALLOWED");
   if (CUT_KINDS.has(kind) && blockingScope(await deps.kill.status(), "SIGNUP") !== undefined) throw new CustomMessageRefused("CAP_REACHED");
+  if (CAPPED_KINDS.has(kind) && !(await deps.reserveCodeEmail())) throw new CustomMessageRefused("CAP_REACHED");
   const email = renderAuthEmail(
     kind,
     authEmailLocale(event.request.userAttributes.locale),
@@ -106,6 +140,6 @@ export function createCustomMessageHandler(depsOf: (log: Logger) => CustomMessag
 }
 
 export const handler = createCustomMessageHandler(
-  (log) => ({ kill: killSwitchReader(), origin: CONSOLE_ORIGIN, log }),
+  (log) => ({ kill: killSwitchReader(), reserveCodeEmail: () => reserveCodeEmail(runtimeStore(), new Date()), origin: CONSOLE_ORIGIN, log }),
   () => createLogger({ bindings: { service: "auth-custom-message" } }),
 );

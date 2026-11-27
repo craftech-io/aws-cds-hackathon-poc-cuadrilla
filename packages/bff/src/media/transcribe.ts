@@ -33,7 +33,7 @@ import type { TranscribePort } from "./transcribe-client";
 import { type ReadTranscript, readTranscript } from "./transcript";
 
 /** Fixed texts the installer may get instead of a turn (copy/es-MX.ts). */
-export type VoiceNotice = Extract<keyof CopyPack, "voiceTooLong" | "voiceUnclear" | "voiceFailed" | "servicePaused" | "turnCap">;
+export type VoiceNotice = Extract<keyof CopyPack, "voiceTooLong" | "voiceUnclear" | "voiceFailed" | "servicePaused" | "turnCap" | "spendCap">;
 
 export type VoiceNoteFailure =
   | "UNSUPPORTED_FORMAT"
@@ -42,6 +42,7 @@ export type VoiceNoteFailure =
   | "TOO_LONG"
   | "KILL_SWITCH_ACTIVE"
   | "CAP_REACHED"
+  | "SPEND_CAP"
   | "START_FAILED"
   | "JOB_FAILED"
   | "POLL_FAILED"
@@ -189,7 +190,8 @@ export async function transcribeVoiceNote(deps: VoiceNoteDeps, request: VoiceNot
     idempotencyKey: `TRANSCRIBE#${jobName}`,
   });
   if (!reservation.ok) {
-    return reservation.code === "KILL_SWITCH_ACTIVE" ? failure("servicePaused", "KILL_SWITCH_ACTIVE", { jobName }) : failure("turnCap", "CAP_REACHED", { jobName });
+    if (reservation.code === "KILL_SWITCH_ACTIVE") return failure("servicePaused", "KILL_SWITCH_ACTIVE", { jobName });
+    return reservation.counter.tier === "GUEST_SPEND" ? failure("spendCap", "SPEND_CAP", { jobName }) : failure("turnCap", "CAP_REACHED", { jobName });
   }
 
   const config = deps.config();

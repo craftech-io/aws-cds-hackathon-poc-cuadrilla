@@ -3,17 +3,22 @@
 //   1. the kill switch (`KILL#ALL`, `KILL#AGENT`, `KILL#AGENT#<clockId>`)  → PAUSED: `servicePaused`, no Harness
 //   2. one turn reserved, all or nothing, in the world's simulator caps (`SIMCAP#`), the operator's turn
 //      caps (`TURNCAP#<ispId>`) and the stage's ceiling (`TURNCAP#GLOBAL`; a sign-up world also in its
-//      account quota and the sign-up sub-ceiling)                      → TURN_CAP: `turnCap`, no Harness
+//      account's day, its spend of all time and the sign-up sub-ceiling) → TURN_CAP: `turnCap`, no Harness;
+//      over the account's spend (`GUEST_SPEND`, USD 1 ever)            → TURN_CAP: `spendCap`, no Harness
 //
 // The reservation carries the event id, so a redelivered event never takes a second turn. QA and
 // evaluation worlds never touch the real ceiling (ops/cost-caps.ts gives them their own or none).
 import type { KillScope } from "@cuadrilla/shared";
 import type { Logger } from "../lib/log";
-import { type CapLedger, type CostCapsDeps, reserveCost } from "../ops/cost-caps";
+import { type CapCounter, type CapLedger, type CostCapsDeps, reserveCost } from "../ops/cost-caps";
 import { type KillSwitchReader, agentKillDecision } from "../ops/kill-switch";
 
 export type TurnBudget =
-  | { readonly allowed: true }
+  | {
+      readonly allowed: true;
+      /** What the turn took: the spend counter among them is settled after the turn (turns/invoke.ts). */
+      readonly reserved: readonly CapCounter[];
+    }
   | { readonly allowed: false; readonly refusal: "PAUSED"; readonly scope: KillScope }
   | {
       readonly allowed: false;
@@ -21,9 +26,10 @@ export type TurnBudget =
       /** `SIMULATOR`, `OPERATOR` or `GLOBAL`; `GUEST_ACCOUNT`/`GUEST_SIGNUP` for a sign-up world's tiers. */
       readonly scope: string;
       readonly ledger: CapLedger;
-      readonly period: "HOUR" | "DAY";
+      readonly period: "HOUR" | "DAY" | "TOTAL";
       readonly limit: number;
-      readonly resetsAtReal: string;
+      /** Absent for the account's spend, which never starts over. */
+      readonly resetsAtReal?: string;
     };
 
 export interface TurnBudgetDeps {
@@ -52,8 +58,16 @@ export async function reserveTurn(deps: TurnBudgetDeps, world: TurnWorld, eventI
     surface: "AGENT",
     idempotencyKey: `turn#${eventId}`,
   });
-  if (outcome.ok) return { allowed: true };
+  if (outcome.ok) return { allowed: true, reserved: outcome.reserved };
   if (outcome.code === "KILL_SWITCH_ACTIVE") return { allowed: false, refusal: "PAUSED", scope: outcome.scope };
   const { counter } = outcome;
-  return { allowed: false, refusal: "TURN_CAP", scope: counter.tier ?? counter.ledger, ledger: counter.ledger, period: counter.period, limit: counter.limit, resetsAtReal: counter.resetsAtReal };
+  return {
+    allowed: false,
+    refusal: "TURN_CAP",
+    scope: counter.tier ?? counter.ledger,
+    ledger: counter.ledger,
+    period: counter.period,
+    limit: counter.limit,
+    ...(counter.resetsAtReal === undefined ? {} : { resetsAtReal: counter.resetsAtReal }),
+  };
 }

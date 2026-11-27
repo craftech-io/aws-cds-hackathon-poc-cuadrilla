@@ -30,6 +30,16 @@ async function setup(verified = true) {
 }
 
 describe("the turn's priced cost", () => {
+  it("prices the cache reads and writes of the turn too", async () => {
+    const world = testConnector();
+    for (const kind of ["input", "output", "cacheRead", "cacheWrite"] as const) {
+      await world.connector.reference.put("RateCard", { key: bedrockRateKey(kind), price: MODEL_RATES.prices[kind], unit: "PER_1M_TOKENS", provisional: false, source: MODEL_RATES.source, asOf: MODEL_RATES.asOf });
+    }
+    const rows = await world.connector.reference.listRateCard();
+    // 1 M cache reads at USD 0.10 and 0.2 M cache writes at USD 2.50: USD 0.6 on top of nothing else.
+    expect(tokensCostUsd({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000, cacheWriteTokens: 200_000 }, rows)).toBe(0.6);
+  });
+
   it("prices the turn's own model tokens with the verified rows only", async () => {
     // 0.2 M input at USD 2 and 0.05 M output at USD 10 per million: USD 0.9 per turn.
     expect(tokensCostUsd(USAGE, await (await setup()).deps.data.reference.listRateCard())).toBe(0.9);

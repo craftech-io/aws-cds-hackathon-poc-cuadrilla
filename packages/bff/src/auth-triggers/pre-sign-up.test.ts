@@ -89,9 +89,9 @@ describe("pre sign-up trigger [FL-104] [FL-114] [FL-121] [FL-122]", () => {
     expect(runtimeKeys().some((key) => key.startsWith("SIGNUPTICKET#"))).toBe(false);
   });
 
-  it("[FL-121] an email whose lead is CONFIRMED → EMAIL_TAKEN", async () => {
+  it("[FL-121] an email whose lead is CONFIRMED goes on like any other: the refusal would tell who has an account", async () => {
     await h.leads.confirm({ emailHash: leadEmailHash(EMAIL_HASH_KEY, EMAIL), username, sub: "sub-ana", userId: "usr-g01K80000000000000000000009", at: SIGNUP_T0 });
-    expect(await refusalOf(signUpEvent(username, ticket))).toBe("EMAIL_TAKEN");
+    expect(await refusalOf(signUpEvent(username, ticket))).toBe("ACCEPTED");
   });
 
   it("[FL-114] a person who confirmed two accounts since the start (another address) → RATE_LIMITED, reading only", async () => {

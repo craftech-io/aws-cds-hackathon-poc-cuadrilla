@@ -174,13 +174,34 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     expect(counters()).toEqual([]);
   });
 
-  it("[FL-121] an email with a confirmed account is EMAIL_TAKEN, and no lead or user is added", async () => {
+  it("[FL-121] an email with a confirmed account answers exactly like a new one, and the lead stays as it was", async () => {
     const answer = await start();
     const emailHash = leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@example.com");
     await h.leads.confirm({ emailHash, username: answer.username, sub: "sub-ana", userId: "usr-g01K80000000000000000000009", at: SIGNUP_T0 });
+    const confirmed = await h.leads.get(emailHash);
     h.advance(HOUR);
-    expect(await refusalOf(start(signupForm({ email: "Ana.Prueba@Example.com" })))).toMatchObject({ code: "CONFLICT", reason: "EMAIL_TAKEN" });
-    expect((await h.leads.get(emailHash))?.pendingUsernames).toEqual([answer.username]);
+    const taken = await start(signupForm({ email: "Ana.Prueba@Example.com" }));
+    const fresh = await start(signupForm({ email: "nadie.todavia@example.com" }));
+    // Same fields, same shapes, same ticket lifetime: nothing tells the two apart.
+    expect(Object.keys(taken).sort()).toEqual(Object.keys(fresh).sort());
+    expect(taken.username).toMatch(/^gst-[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(taken.username).not.toBe(answer.username);
+    expect(Date.parse(taken.expiresAt) - Date.parse(fresh.expiresAt)).toBe(0);
+    expect(readTicket(TICKET_KEY, taken.ticket, new Date(SIGNUP_T0.getTime() + HOUR))).toMatchObject({ ok: true, ticket: { emailHash, username: taken.username } });
+    expect(await h.leads.get(emailHash)).toEqual(confirmed);
+  });
+
+  it("[FL-104] a domain not listed yet whose MX is a disposable service's mail server is EMAIL_NOT_ACCEPTED, without a lead", async () => {
+    setup({ "nuevo-desechable.example": { mx: [{ exchange: "mx.smtp.is.", priority: 10 }] } });
+    expect(await refusalOf(start(signupForm({ email: "ana@nuevo-desechable.example" })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
+    expect(await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana@nuevo-desechable.example"))).toBeUndefined();
+  });
+
+  it("[FL-104] a disposable mailbox (or a subdomain of one) is EMAIL_NOT_ACCEPTED before any lookup or write", async () => {
+    for (const email of ["ana@mailinator.com", "ana@inbox.yopmail.fr", "ANA@Guerrillamail.com", "ana@euploading.com"]) {
+      expect(await refusalOf(start(signupForm({ email })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
+    }
+    expect(counters()).toEqual([]);
   });
 
   it("[FL-114] without the edge's viewer: UNAVAILABLE, no lead, no ticket, no counter", async () => {

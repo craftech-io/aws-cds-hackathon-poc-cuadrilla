@@ -147,14 +147,15 @@ export type Counter = z.infer<typeof Counter>;
 
 /**
  * A cost-cap counter as ops/dynamo-runtime-store.ts writes it (ADR-0019): `used` against `capLimit`
- * for one ledger, resource and real period. No `version`: it only moves by conditional ADDs.
+ * for one ledger, resource and real period (`TOTAL`: the spend of a sign-up account, micro-dollars,
+ * no TTL). No `version`: it only moves by conditional ADDs (and the settlement of a turn's spend).
  */
 export const CapCounter = z.object({
   entity: z.literal("CapCounter"),
   used: z.number(),
   ledger: z.enum(["SIMULATOR", "OPERATOR", "GLOBAL"]),
   resource: z.enum(["turns", "validations", "transcribe", "emails"]),
-  period: z.enum(["HOUR", "DAY"]),
+  period: z.enum(["HOUR", "DAY", "TOTAL"]),
   capLimit: z.int().min(0),
   createdAt: IsoInstant.optional(),
   updatedAt: IsoInstant.optional(),

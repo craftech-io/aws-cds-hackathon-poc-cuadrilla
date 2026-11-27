@@ -5,7 +5,7 @@ import { principalFromClaims } from "../auth/principal";
 import { createTestIssuer } from "../auth/testing";
 import { createMemoryConnector, type Connector } from "../connector/index";
 import { createLogger } from "../lib/log";
-import { CUSTOM_ISP_ID_ATTRIBUTE, INDEX_RETRY_DELAYS_MS, type PreTokenDeps, createPreTokenHandler, decideTokenClaims, resolveRegistryUser } from "./pre-token";
+import { CUSTOM_ISP_ID_ATTRIBUTE, INDEX_RETRY_DELAYS_MS, SELF_ADMIN_SCOPE, type PreTokenDeps, createPreTokenHandler, decideTokenClaims, resolveRegistryUser } from "./pre-token";
 
 const SUB_ADRIANA = "7f1c9d2e-0000-4000-8000-00000000ad01";
 const SUB_GUEST = "7f1c9d2e-0000-4000-8000-00000000d707";
@@ -55,6 +55,9 @@ describe("pre token generation trigger [FL-079] [FL-081]", () => {
     const guest = await run({ sub: SUB_GUEST }, "TokenGeneration_RefreshTokens");
     expect(guest.response.claimsAndScopeOverrideDetails.idTokenGeneration?.claimsToAddOrOverride).toEqual({ ispId: "isp-guest-07", userId: "usr-guest-07", role: "GUEST", isGuest: "true" });
     expect(guest.response.claimsAndScopeOverrideDetails.groupOverrideDetails).toEqual({ groupsToOverride: ["GUEST"] });
+    // A guest's access token cannot manage its own Cognito user (ChangePassword, DeleteUser); staff keep it for TOTP.
+    expect(guest.response.claimsAndScopeOverrideDetails.accessTokenGeneration).toEqual({ scopesToSuppress: ["aws.cognito.signin.user.admin"] });
+    expect(SELF_ADMIN_SCOPE).toBe("aws.cognito.signin.user.admin");
     expect(lines.join("\n")).not.toContain("adriana@example.test");
   });
 
@@ -99,7 +102,11 @@ describe("pre token generation trigger [FL-079] [FL-081]", () => {
     const verifier = issuer.verifier();
     const expectNoPrincipal = async (sub: string) => {
       const result = await run({ sub, [CUSTOM_ISP_ID_ATTRIBUTE]: "isp-demo" });
-      expect(result.response.claimsAndScopeOverrideDetails).toEqual({ idTokenGeneration: { claimsToSuppress: [CUSTOM_ISP_ID_ATTRIBUTE] }, groupOverrideDetails: { groupsToOverride: [] } });
+      expect(result.response.claimsAndScopeOverrideDetails).toEqual({
+        idTokenGeneration: { claimsToSuppress: [CUSTOM_ISP_ID_ATTRIBUTE] },
+        accessTokenGeneration: { scopesToSuppress: [SELF_ADMIN_SCOPE] },
+        groupOverrideDetails: { groupsToOverride: [] },
+      });
       // The token Cognito issues with that answer: nothing stamped, no groups, no custom:ispId.
       const claims = await verifier.verify(issuer.idToken({ sub, ispId: undefined, userId: undefined, role: undefined, isGuest: undefined, "cognito:groups": [] }));
       expect(() => principalFromClaims(claims)).toThrowError(expect.objectContaining({ reason: AUTH_REASON.PRINCIPAL_INCOMPLETE }));

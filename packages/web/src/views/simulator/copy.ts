@@ -129,6 +129,7 @@ export const simulatorCopy = {
       GLOBAL: "La demo llegó a su tope de uso de hoy.",
       GUEST_ACCOUNT: "Tu cuenta llegó a su tope de uso de hoy.",
       GUEST_SIGNUP: "Las cuentas de prueba llegaron a su tope de uso de hoy.",
+      GUEST_SPEND: "Tu cuenta de prueba ya usó todo su cupo de la demo: no se abren más consultas, fotos ni audios. Si quieres seguir probando Cuadrilla, escríbenos y te preparamos una demo guiada.",
       KILL_SWITCH_ACTIVE: "El simulador está en pausa en este momento. Intenta de nuevo en un rato.",
     } as Readonly<Record<string, string>>,
     fallback: "Se alcanzó un tope de uso de la demo.",

@@ -362,8 +362,8 @@ describe("sign-up and leads", () => {
       { actions: ["dynamodb:UpdateItem"], keys: ["SIGNUPTICKET#*"] },
       { actions: ["dynamodb:BatchGetItem", "dynamodb:GetItem"], keys: ["SIGNUP#*", "SIGNUPKEY#*", "KILL#*"] },
     ]);
-    expect(runtime("AuthCustomMessage")).toEqual([{ actions: ["dynamodb:BatchGetItem", "dynamodb:GetItem"], keys: ["KILL#*"] }]);
-    expect(expectedGrants("AuthCustomMessage")).toHaveLength(1);
+    expect(runtime("AuthCustomMessage")).toEqual([{ actions: ["dynamodb:BatchGetItem", "dynamodb:GetItem"], keys: ["KILL#*"] }, { actions: ["dynamodb:UpdateItem"], keys: ["AUTHMAIL#*"] }]);
+    expect(expectedGrants("AuthCustomMessage")).toHaveLength(2);
     expect(runtime("AuthPostConfirmation").map((grant) => grant.keys)).toEqual([["GUESTACCOUNT#*", "GUESTWORLDS#*", "SIGNUPOK#*", "SIGNUPKEY#*", "SIGNUPSUB#*"]]);
     // The sign-in finishes a confirmation that failed after Cognito confirmed the user (ADR-0025 §1).
     expect(runtime("AuthPostAuthentication").map((grant) => grant.keys)).toEqual([["GUESTACCOUNT#*", "GUESTWORLDS#*", "SIGNUPOK#*", "SIGNUPKEY#*", "SIGNUPSUB#*"]]);

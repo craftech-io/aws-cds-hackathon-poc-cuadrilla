@@ -183,14 +183,14 @@ export default defineScenario({
     },
     {
       id: "4",
-      title: "Public signup.start with the same email → EMAIL_TAKEN and no new lead",
+      title: "Public signup.start with the same email answers like a new one and the lead stays confirmed",
       kind: "det",
       flows: ["FL-121"],
       after: "3",
       async run(ctx) {
         const before = (await ctx.qa("leads.get", { email: qaEmail(ctx.runId, 1) })) as LeadView;
         const again = await attemptStart(ctx, 1, { contactAccepted: true });
-        ctx.check(!again.ok && again.reason === "EMAIL_TAKEN", `the second start answered ${again.ok ? "ok" : again.reason ?? again.code}`);
+        ctx.check(again.ok, `the second start answered ${again.ok ? "ok" : again.reason ?? again.code}`);
         const after = (await ctx.qa("leads.get", { email: qaEmail(ctx.runId, 1) })) as LeadView;
         ctx.check(after.leadId === before.leadId && after.status === "CONFIRMED", "the lead changed");
       },

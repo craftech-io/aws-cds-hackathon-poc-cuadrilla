@@ -90,7 +90,10 @@ async function admit(ctx: Ctx, world: SimWorld, sender: Sender, resources: reado
       { world: { clockId: ctx.world.clockId, settings: world.settings }, resource, amount: resource === "transcribe" ? 60 : 1, reserve: [], check: ["SIMULATOR", "GLOBAL"], surface: "SIMULATOR" },
     );
     if (!outcome.ok && outcome.code === "KILL_SWITCH_ACTIVE") throw new ToolError("UNAVAILABLE", "the simulator is paused", "KILL_SWITCH_ACTIVE");
-    if (!outcome.ok) throw new ToolError("CAP_REACHED", `the ${resource} cap is reached until ${outcome.counter.resetsAtReal}`, outcome.counter.tier ?? outcome.counter.ledger);
+    if (!outcome.ok) {
+      const until = outcome.counter.resetsAtReal === undefined ? "for this account" : `until ${outcome.counter.resetsAtReal}`;
+      throw new ToolError("CAP_REACHED", `the ${resource} cap is reached ${until}`, outcome.counter.tier ?? outcome.counter.ledger);
+    }
   }
   const realNow = await world.ports.services.realClock.now();
   const limit = rateLimitsOf(world.settings).perRealHour;
