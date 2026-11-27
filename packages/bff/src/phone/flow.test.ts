@@ -5,7 +5,7 @@ import type { Principal } from "../auth/principal";
 import { MemoryTableClient } from "../connector/memory/table-client";
 import { createLogger } from "../lib/log";
 import { type PhoneCaller, endPhoneSession, phoneStatusOf, sendPhoneCode, verifyPhoneCode } from "./flow";
-import { PHONE_LIMITS, smsDayKey } from "./limits";
+import { PHONE_LIMITS, smsDayKey, smsForeignDayKey } from "./limits";
 import { type MemoryPhone, memoryPhone } from "./testing";
 
 const T0 = new Date("2026-11-27T15:00:00.000Z");
@@ -265,11 +265,45 @@ describe("caps of the SMS [FL-123]", () => {
     await expect(sendTo("+525500000009", IP)).rejects.toMatchObject({ reason: "SMS_IP_LIMIT" });
   });
 
-  it("[FL-123] 150 SMS per day in the whole demo; the next day starts over", async () => {
+  it("[FL-123] 40 SMS per day in the whole demo; the next day starts over", async () => {
+    expect(PHONE_LIMITS.smsPerDay).toBe(40);
     await h.client.put("Runtime", { PK: smsDayKey(T0), SK: "META", used: PHONE_LIMITS.smsPerDay });
     await expect(sendTo(PHONE, IP)).rejects.toMatchObject({ reason: "SMS_DAILY_LIMIT" });
     expect(h.phone.sms.sent).toEqual([]);
     h.advance(86_400_000);
     await expect(sendTo(PHONE, IP)).resolves.toMatchObject({ codeSent: true });
+  });
+
+  it("[FL-123] a number of the home region never takes the foreign quota", async () => {
+    for (const [n, phone] of ["+5491123456781", "+34612345678", "+18095550123"].entries()) {
+      await sendTo(phone, `203.0.113.${n + 1}`);
+      h.advance(60_000);
+    }
+    expect(h.phone.sms.sent).toHaveLength(3);
+    expect(await h.client.get("Runtime", { PK: smsForeignDayKey(T0), SK: "META" })).toBeUndefined();
+    expect(await h.client.get("Runtime", { PK: smsDayKey(T0), SK: "META" })).toMatchObject({ used: 3 });
+  });
+
+  it("[FL-123] numbers outside the home region share 5 SMS a day in the whole demo: the sixth is SMS_FOREIGN_LIMIT, a home number still goes out", async () => {
+    expect(PHONE_LIMITS.smsForeignPerDay).toBe(5);
+    const foreign = ["+14155550101", "+447911123456", "+4915112345678", "+33612345678", "+819012345678"];
+    for (const [n, phone] of foreign.entries()) {
+      await sendTo(phone, `203.0.113.${n + 1}`);
+      h.advance(60_000);
+    }
+    expect(await h.client.get("Runtime", { PK: smsForeignDayKey(T0), SK: "META" })).toMatchObject({ used: 5 });
+    await expect(sendTo("+358401234567", "203.0.113.50")).rejects.toMatchObject({ code: "CAP_REACHED", reason: "SMS_FOREIGN_LIMIT" });
+    expect(h.phone.sms.sent).toHaveLength(5);
+    await account(h, "usr-guest-08");
+    await expect(sendTo(PHONE, "203.0.113.51", principal("usr-guest-08"))).resolves.toMatchObject({ codeSent: true });
+    expect(h.phone.sms.sent).toHaveLength(6);
+  });
+
+  it("[FL-123] a range that is no person's mobile is refused when the number is typed; filler is an invalid phone", async () => {
+    for (const phone of ["+31970123456789", "+447012345678", "+882161234567", "+883510012345", "+870771234567", "+881612345678", "+88812345678", "+97912345678"]) {
+      await expect(sendTo(phone, IP)).rejects.toMatchObject({ reason: "PHONE_NOT_PERSONAL" });
+    }
+    await expect(sendTo("+5491100000000", IP)).rejects.toMatchObject({ reason: "PHONE_INVALID" });
+    expect(h.phone.sms.sent).toEqual([]);
   });
 });
