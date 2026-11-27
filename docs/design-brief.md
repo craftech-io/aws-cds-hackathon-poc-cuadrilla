@@ -386,7 +386,7 @@ Detalle en ADR-0025 y `docs/architecture-integrations.md` §9.
 |---|---|
 | Origen verificado | La Function URL del BFF solo atiende pedidos que pasaron por CloudFront (encabezado de origen secreto); la IP del visitante solo se lee después de ese chequeo |
 | Ticket de alta | `signup.start` valida formulario, consentimientos, dominio del email (MX) y límites, genera el usuario y emite un ticket ligado al email y al usuario; el pre-sign-up rechaza todo `SignUp` sin ticket (la API de Cognito es pública) |
-| 1 cuenta por email | Pre-sign-up (`EMAIL_TAKEN` si ya hay un lead confirmado) y alias de email de Cognito (`ConfirmSignUp` sin mover el alias); a lo sumo 2 cuentas por persona (sin etiquetas `+…` ni puntos de Gmail) |
+| 1 cuenta por email | Alias de email de Cognito (`ConfirmSignUp` sin mover el alias: `AliasExistsException`, que la web muestra como `EMAIL_TAKEN` solo después del código); `signup.start` y el pre-sign-up responden igual exista o no la cuenta; a lo sumo 2 cuentas por persona (sin etiquetas `+…` ni puntos de Gmail) |
 | Límites de la app | 5 altas iniciadas por IP y por hora (1 desde una IP anónima), 3 por persona y por hora y 5 por día, 300 por día en el stage; 150 altas confirmadas por día |
 | Mundos | 150 mundos de alta propia activos; TTL de 7 días reales; recreación al volver a entrar |
 | Uso por mundo, con el reloj real | Perfil `SIGNUP` de `docs/seed-spec.md` §4 (turnos 20/h y 60/día, validaciones 20/día, transcripción 300 s/día, emails 10/día, 15 mensajes por hora real por identidad, 15 saltos de escena por hora real); 40 turnos por día por cuenta; sub-techo diario de los invitados por alta dentro del techo global (600 turnos, 150 validaciones, 30 min de transcripción) |

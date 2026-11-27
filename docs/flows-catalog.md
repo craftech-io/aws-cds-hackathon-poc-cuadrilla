@@ -779,7 +779,7 @@ Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `
 
 ### FL-106 · Reenvío del código
 - Actores: visitante · Canal: web, email · Disparador: "Reenviar código".
-- Pasos: `ResendConfirmationCode` con el cliente `GuestSignup`; el trigger de mensaje personalizado arma el email (`CustomMessage_ResendCode`); los límites de Cognito y del WAF del pool acotan la frecuencia.
+- Pasos: `ResendConfirmationCode` con el cliente `GuestSignup`; el trigger de mensaje personalizado reserva un lugar del día del stage (`AUTHMAIL#GLOBAL#<realDay>`, 300) y arma el email (`CustomMessage_ResendCode`); los límites de Cognito y del WAF del pool (10 por IP cada 5 min) acotan la frecuencia.
 - Estado esperado: un email nuevo con código, neutral y en el idioma del alta; aviso "Código reenviado."; al superar el límite, el mensaje neutral de "Demasiados intentos".
 - Reglas: ADR-0025 §3 y §4.
 - Prueba: U `auth-triggers/custom-message.test.ts` · UI `signup.spec.ts`. Notas: Sin `SR`: el reenvío llega al simulador de SES y no deja estado propio; la regla de tasa del pool se verifica con `waf.probe` (FL-114).
@@ -884,8 +884,8 @@ Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `
 
 ### FL-121 · Email ya registrado
 - Actores: visitante · Canal: web · Disparador: alta con un email que ya tiene una cuenta confirmada.
-- Pasos: `signup.start` (o el pre sign-up, si el lead pasó a `CONFIRMED` entre medio) responde `EMAIL_TAKEN`; `ConfirmSignUp` sin mover el alias es la segunda capa.
-- Estado esperado: ninguna cuenta ni lead nuevos; el mensaje ofrece ingresar o recuperar la contraseña.
+- Pasos: `signup.start` y el pre sign-up responden igual que con un email nuevo (ticket, usuario `gst-*`, vencimiento); Cognito manda el código a esa casilla; `ConfirmSignUp` falla con `AliasExistsException` (el alias no se mueve), que la web muestra como `EMAIL_TAKEN`.
+- Estado esperado: el lead confirmado sin cambios y ninguna cuenta nueva confirmada; nada en la respuesta de `signup.start` dice si el email tiene cuenta; solo quien escribió el código de esa casilla ve el mensaje que ofrece ingresar o recuperar la contraseña.
 - Reglas: ADR-0025 §1.
 - Prueba: U `routers/signup.test.ts`, `auth-triggers/pre-sign-up.test.ts` · UI `signup.spec.ts` · SR `SC-20/4`.
 
