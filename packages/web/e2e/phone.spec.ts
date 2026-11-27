@@ -160,6 +160,22 @@ test.describe("the SMS code after the password", () => {
     await expect(page.getByRole("alert")).toContainText("No podemos enviar SMS a ese número");
   });
 
+  test("[FL-123] the foreign quota of the day says so and offers the contact of Craftech", async ({ page }) => {
+    await routeApi(page, { state: "ENROL", phone: "+14155550100", codeSent: false, refuseSend: "SMS_FOREIGN_LIMIT" });
+    await signInAsGuest(page);
+    await page.getByRole("button", { name: copy.send }).click();
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("fuera de Latinoamérica y España");
+    await expect(alert.getByRole("link", { name: "escríbenos" })).toHaveAttribute("href", "https://craftech.io/contact/");
+  });
+
+  test("[FL-123] a range that is no person's mobile asks for a personal one", async ({ page }) => {
+    await routeApi(page, { state: "ENROL", phone: "+31970123456789", codeSent: false, refuseSend: "PHONE_NOT_PERSONAL" });
+    await signInAsGuest(page);
+    await page.getByRole("button", { name: copy.send }).click();
+    await expect(page.getByRole("alert")).toHaveText(copy.errors.PHONE_NOT_PERSONAL.map((part) => (typeof part === "string" ? part : part.label)).join(""));
+  });
+
   test("[FL-124] the sign-out from the code's screen ends the session", async ({ page }) => {
     const state = await routeApi(page, { state: "SIGN_IN", maskedPhone: "•••• 5678", codeSent: false });
     await signInAsGuest(page);

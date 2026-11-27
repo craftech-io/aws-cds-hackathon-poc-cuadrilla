@@ -19,6 +19,7 @@ export type PhoneStatus = z.infer<typeof PhoneStatus>;
 
 export const PHONE_ERRORS = [
   "PHONE_INVALID",
+  "PHONE_NOT_PERSONAL",
   "PHONE_REQUIRED",
   "PHONE_IN_USE",
   "PHONE_LOCKED",
@@ -31,6 +32,7 @@ export const PHONE_ERRORS = [
   "SMS_NUMBER_LIMIT",
   "SMS_IP_LIMIT",
   "SMS_DAILY_LIMIT",
+  "SMS_FOREIGN_LIMIT",
   "SMS_NOT_DELIVERABLE",
   "UNAVAILABLE",
 ] as const;

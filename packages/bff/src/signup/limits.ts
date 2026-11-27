@@ -7,7 +7,7 @@
 //   SIGNUP#ANONDAY#<realDay>                   30 per day from anonymous IPs (stage)    RATE_LIMITED
 //   SIGNUP#EMAIL#<abuseHash>#<realHour>        3 per hour per person                    RATE_LIMITED
 //   SIGNUP#EMAILDAY#<abuseHash>#<realDay>      5 per day per person                     RATE_LIMITED
-//   SIGNUP#GLOBAL#<realDay>                    300 starts per day in the stage          CAP_REACHED
+//   SIGNUP#GLOBAL#<realDay>                    40 starts per day in the stage           CAP_REACHED
 //   SIGNUPKEY#<abuseHash> (confirmedAccounts)  2 confirmed accounts per person (read)   RATE_LIMITED
 //
 // The visitor's counters move together in one transaction (all or none), then the day of the stage in
@@ -27,7 +27,7 @@ export const SIGNUP_LIMITS = {
   anonymousPerDay: 30,
   perPersonPerHour: 3,
   perPersonPerDay: 5,
-  startsPerDay: 300,
+  startsPerDay: 40,
   confirmedAccountsPerPerson: 2,
 } as const;
 

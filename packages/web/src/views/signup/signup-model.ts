@@ -25,9 +25,9 @@ export type SignupErrorCode =
   | "RATE_LIMITED"
   | "CAP_REACHED"
   | "TICKET_INVALID"
-  | "EMAIL_DOMAIN"
   | "EMAIL_NOT_ACCEPTED"
   | "PHONE_INVALID"
+  | "PHONE_NOT_PERSONAL"
   | "UNAVAILABLE"
   | "BROWSER_CHECK"
   | "WEAK_PASSWORD"
@@ -111,7 +111,7 @@ export const INITIAL_SIGNUP: SignupState = { step: "signUp" };
 /** A ticket this close to its end is not worth a retry: a new start is. */
 const TICKET_MARGIN_MS = 30_000;
 
-const START_REASONS: ReadonlySet<string> = new Set(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_DOMAIN", "EMAIL_NOT_ACCEPTED", "PHONE_INVALID"]);
+const START_REASONS: ReadonlySet<string> = new Set(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_NOT_ACCEPTED", "PHONE_INVALID", "PHONE_NOT_PERSONAL"]);
 
 /** A WafTokenError anywhere in the chain: tRPC wraps what its `fetch` threw in a client error's `cause`. */
 function isBrowserCheck(error: unknown, depth = 0): boolean {

@@ -1,7 +1,7 @@
 // The anti-abuse check of the deployed sign-up (docs/test-plan.md §6.1, row "Anti abuso"; FL-113), run
 // LAST and in a NEW clock hour, so the per-IP counter of the hour starts empty: from the browser, the way
 // the sign-up's own client calls it (one `POST /api/signup.start`, through the AWS WAF SDK's `fetch` when
-// the page has it), an address whose domain has neither MX nor A → INVALID (EMAIL_DOMAIN, before any
+// the page has it), an address under a reserved name (`.invalid`) → INVALID (EMAIL_NOT_ACCEPTED, before any
 // counter); then six starts in a row with six QA addresses → the first five start, the sixth is
 // RATE_LIMITED (5 per IP and clock hour). The pending leads of the five are recorded for the cleanup
 // with `npm run leads:delete`. The edge probes without a browser (challenge, batch, encoded path,
@@ -41,7 +41,7 @@ async function start(page: Page, email: string): Promise<StartAnswer> {
 }
 
 test.describe("deployed anti-abuse", () => {
-  test("[FL-113] an address without MX nor A is INVALID; six starts in a row, the sixth RATE_LIMITED @abuse", async ({ page }) => {
+  test("[FL-113] an address under a reserved name is INVALID; six starts in a row, the sixth RATE_LIMITED @abuse", async ({ page }) => {
     onlyIn("abuse");
     test.setTimeout(240_000);
     const runFile = join(dirname(SHOTS_DIR), `run-${runTag()}.json`);
@@ -50,7 +50,7 @@ test.describe("deployed anti-abuse", () => {
     await page.waitForLoadState("networkidle");
 
     const invalid = await start(page, `qa-${runTag()}@sin-dominio-${runTag()}.invalid`);
-    expect(invalid, "a domain that cannot receive mail").toMatchObject({ status: 400, reason: "EMAIL_DOMAIN" });
+    expect(invalid, "a reserved domain").toMatchObject({ status: 400, reason: "EMAIL_NOT_ACCEPTED" });
 
     const answers: StartAnswer[] = [];
     for (let n = 1; n <= 6; n += 1) {

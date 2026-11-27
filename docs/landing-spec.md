@@ -1004,8 +1004,8 @@ visitante escribió el código que llegó a esa casilla (ADR-0025, riesgo residu
 | `CAP_REACHED` — tope diario de altas *iniciadas* en el stage (300/día, ADR-0025 §3) **o** `KILL#SIGNUP` encendido (ADR-0025 §4): los dos casos comparten el mismo código, así que el texto no promete "mañana" | `signup.start` | Por ahora no estamos abriendo cuentas nuevas de prueba. Vuelve más tarde o [hablemos](https://craftech.io/contact/) y te preparamos una demo guiada. | We're not opening new test accounts right now. Try again later, or [let's talk](https://craftech.io/contact/) and we'll set up a guided demo. |
 | `TICKET_INVALID` — el ticket de alta venció (10 min) o llegó a sus **a lo sumo dos usos** (ADR-0025 §3) | `SignUp` | La sesión del formulario venció, intenta de nuevo. | The form session expired, please try again. |
 | `INVALID` — consentimiento (versión vieja, o `TERMS_PRIVACY` sin marcar) | `signup.start` | Reusa el error de validación de la casilla A (no se envía) — no hay un mensaje aparte, el botón sigue deshabilitado. | Same. |
-| `INVALID` — dominio del email sin MX ni A/AAAA (ADR-0025 §3; `docs/test-plan.md` §6.1 lo prueba) | `signup.start` | Revisa tu email: ese dominio no puede recibir correo. | Check your email: that domain can't receive mail. |
-| `INVALID` (`EMAIL_NOT_ACCEPTED`) — casilla descartable de la lista versionada (ADR-0025 §3) | `signup.start` | Usa tu email de trabajo o uno personal: no aceptamos casillas temporales. | Use your work email or a personal one: temporary mailboxes aren't accepted. |
+| `INVALID` (`EMAIL_NOT_ACCEPTED`) — casilla descartable (lista pública o propia), dominio reservado o de prueba, o dominio sin MX ni A/AAAA (ADR-0025 §3, ADR-0029 §10; `docs/test-plan.md` §6.1 lo prueba) | `signup.start` | Usa tu email de trabajo o uno personal que reciba correo: no aceptamos casillas temporales ni de prueba. | Use your work email or a personal one that receives mail: temporary or test mailboxes aren't accepted. |
+| `INVALID` (`PHONE_NOT_PERSONAL`) — rango que no es un celular de persona (ADR-0029 §10) | `signup.start`, `phone.sendCode` | Usa un celular personal. | Use a personal mobile phone. |
 | `UNAVAILABLE` — sin `edge.viewerIp` (el pedido no pasó por CloudFront, ADR-0025 §3) | `signup.start` | No pudimos crear tu cuenta en este momento. Intenta de nuevo en unos minutos. | We couldn't create your account right now. Please try again in a few minutes. |
 | Errores de Cognito en `SignUp`/`ConfirmSignUp` (código inválido, contraseña débil, etc.) | Cognito | Traducidos a los textos de §7.3/§7.4 — nunca el texto crudo de Cognito. | Same. |
 | Challenge silencioso de WAF (`lib/waf-token.ts`, ADR-0025 §4 — "ninguna regla usa CAPTCHA") | Antes de `signup.start` | Sin texto propio: el botón "Crear cuenta" se habilita recién cuando `lib/waf-token.ts` consigue el token. Si no lo consigue en 10s (bloqueador de contenido, extensión de navegador o error de red): "No pudimos verificar tu navegador. Recarga la página, desactiva el bloqueador de contenido para este sitio o intenta desde otro navegador." | "We couldn't verify your browser. Reload the page, turn off your content blocker for this site, or try another browser." |
@@ -1131,10 +1131,13 @@ vista de la consola; nada de un mundo se muestra antes.
   con la cuenta regresiva "Puedes pedir otro código en 0:45", "Corregir el número" hasta verificar.
 - **Ingreso** ("Ingresa el código" / "Enter the code"): "Para entrar te enviamos un código por SMS a tu
   celular •••• 5678."; sin campo de número; el mismo código y reenvío.
-- **Errores** (`views/phone/copy.ts`): número inválido, en uso ("Ese número ya está en uso en otra
+- **Errores** (`views/phone/copy.ts`): número inválido, rango que no es un celular de persona ("Usa un
+  celular personal." / "Use a personal mobile phone."), en uso ("Ese número ya está en uso en otra
   cuenta"), bloqueado, código incorrecto, vencido o agotado, espera del reenvío, topes del día (la cuenta
-  "podrás entrar mañana") y número al que no llega SMS, cada uno con el contacto de Craftech cuando la
-  persona no puede seguir sola. "Cerrar sesión" debajo de la tarjeta.
+  "podrás entrar mañana"), cupo del día de los números de fuera de Latinoamérica y España ("Hoy ya no
+  podemos enviar más códigos a números fuera de Latinoamérica y España…" / "We can't send more codes
+  today to numbers outside Latin America and Spain…") y número al que no llega SMS, cada uno con el
+  contacto de Craftech cuando la persona no puede seguir sola. "Cerrar sesión" debajo de la tarjeta.
 
 ---
 

@@ -47,6 +47,7 @@ export const phoneCopy: Readonly<Record<"es" | "en", PhoneCopy>> = {
     retry: "Reintentar",
     errors: {
       PHONE_INVALID: ["Revisa el número: escríbelo con el prefijo internacional, + y de 8 a 15 dígitos."],
+      PHONE_NOT_PERSONAL: ["Usa un celular personal."],
       PHONE_REQUIRED: ["Escribe el celular que va a recibir el código."],
       PHONE_IN_USE: ["Ese número ya está en uso en otra cuenta. Usa otro celular o ", talkEs, "."],
       PHONE_LOCKED: ["El celular verificado de tu cuenta no se puede cambiar desde aquí. Si lo perdiste, ", talkEs, "."],
@@ -59,6 +60,7 @@ export const phoneCopy: Readonly<Record<"es" | "en", PhoneCopy>> = {
       SMS_NUMBER_LIMIT: ["Ese número ya recibió todos los códigos de hoy. Intenta mañana o ", talkEs, "."],
       SMS_IP_LIMIT: ["Desde esta conexión ya se pidieron todos los códigos de hoy. Intenta mañana o ", talkEs, "."],
       SMS_DAILY_LIMIT: ["Hoy no podemos enviar más códigos. Intenta mañana o ", talkEs, " y te preparamos una demo guiada."],
+      SMS_FOREIGN_LIMIT: ["Hoy ya no podemos enviar más códigos a números fuera de Latinoamérica y España. Intenta mañana o ", talkEs, " y te preparamos una demo guiada."],
       SMS_NOT_DELIVERABLE: ["No podemos enviar SMS a ese número (algunos países exigen un registro previo). Prueba con otro celular o ", talkEs, "."],
       UNAVAILABLE: ["No pudimos completar el paso en este momento. Intenta de nuevo en unos minutos."],
     },
@@ -82,6 +84,7 @@ export const phoneCopy: Readonly<Record<"es" | "en", PhoneCopy>> = {
     retry: "Try again",
     errors: {
       PHONE_INVALID: ["Check the number: write it with the international prefix, + and 8 to 15 digits."],
+      PHONE_NOT_PERSONAL: ["Use a personal mobile phone."],
       PHONE_REQUIRED: ["Type the phone that will receive the code."],
       PHONE_IN_USE: ["That number is already in use by another account. Use another phone or ", talkEn, "."],
       PHONE_LOCKED: ["Your account's verified phone can't be changed here. If you lost it, ", talkEn, "."],
@@ -94,6 +97,7 @@ export const phoneCopy: Readonly<Record<"es" | "en", PhoneCopy>> = {
       SMS_NUMBER_LIMIT: ["That number got all of today's codes. Try tomorrow or ", talkEn, "."],
       SMS_IP_LIMIT: ["This connection asked for all of today's codes. Try tomorrow or ", talkEn, "."],
       SMS_DAILY_LIMIT: ["We can't send more codes today. Try tomorrow, or ", talkEn, " and we'll set up a guided demo."],
+      SMS_FOREIGN_LIMIT: ["We can't send more codes today to numbers outside Latin America and Spain. Try tomorrow, or ", talkEn, " and we'll set up a guided demo."],
       SMS_NOT_DELIVERABLE: ["We can't text that number (some countries require a prior registration). Try another phone or ", talkEn, "."],
       UNAVAILABLE: ["We couldn't complete this step right now. Please try again in a few minutes."],
     },

@@ -6,7 +6,8 @@
 //                whether a code is out, when it expires and when another one may be asked for
 //   sendCode     ENROL: the number typed (or corrected) here, unless another account verified it;
 //                SIGN_IN: always the verified number, a number in the input is refused (PHONE_LOCKED).
-//                Once a minute; the daily caps of phone/limits.ts reserved before the SMS
+//                Once a minute; the daily caps of phone/limits.ts reserved before the SMS (a number
+//                outside the home region also takes the stage's foreign quota)
 //   verifyCode   the code of this session; on success the session is passed and, on an enrolment,
 //                the number becomes the account's (phone/enrolment.ts); then the account gets what it
 //                needs (its world, `afterPass`)
@@ -25,7 +26,7 @@ import { ipHashOf } from "../signup/limits";
 import { type StoredCode, attemptCode, codeDigest, codeKey, newCode, readCode, resendAt, storeCode } from "./code";
 import { type LeadSide, PHONE_IN_USE, claimNumber, ownerOf, recordOnLead, recordOnRow, registryUser } from "./enrolment";
 import { PHONE_LIMITS, reserveSms } from "./limits";
-import { accountPhoneHash, maskPhone, parseAccountPhone } from "./number";
+import { accountPhoneHash, isHomeNumber, maskPhone, parseAccountPhone } from "./number";
 import { type SessionGate, clearSession, isSessionPassed, markSessionPassed, sessionKeyOf } from "./session";
 import type { SmsSender } from "./sms";
 
@@ -136,7 +137,7 @@ export async function sendPhoneCode(ports: PhonePorts, caller: PhoneCaller, inpu
     const owner = await ownerOf(ports.client, phoneHash);
     if (owner !== undefined && owner !== principal.userId) throw PHONE_IN_USE();
   }
-  await reserveSms(ports.client, { userId: principal.userId, phoneHash, ipHash: ipHashOf(ports.keys.ip(), caller.viewerIp) }, now);
+  await reserveSms(ports.client, { userId: principal.userId, phoneHash, ipHash: ipHashOf(ports.keys.ip(), caller.viewerIp), home: isHomeNumber(target.phone) }, now);
   const code = (ports.newCode ?? newCode)();
   const sessionKey = sessionKeyOf(principal.sessionId);
   try {

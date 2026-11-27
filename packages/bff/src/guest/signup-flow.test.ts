@@ -27,7 +27,7 @@ import { SIGN_IN, ensureWorld, onSignIn } from "./sign-in";
 import { guestHarness } from "./testing";
 
 const issuer = createTestIssuer();
-const EMAIL = "ana.prueba@example.com";
+const EMAIL = "ana.prueba@correo-ficticio.mx";
 const SUB = "7f1c9d2e-0000-4000-8000-00000000a001";
 
 describe("the own sign-up, end to end over memory [FL-104] [FL-106] [FL-107] [FL-108] [FL-123]", () => {

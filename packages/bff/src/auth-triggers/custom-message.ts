@@ -46,7 +46,7 @@ const CUT_KINDS: ReadonlySet<AuthEmailKind> = new Set(["SIGN_UP", "RESEND_CODE"]
 /** The codes anyone can ask for an existing account's inbox: each takes a place of the stage's day. */
 const CAPPED_KINDS: ReadonlySet<AuthEmailKind> = new Set(["RESEND_CODE", "FORGOT_PASSWORD"]);
 
-/** Resent sign-up codes and recovery codes the whole stage sends a real day (the sign-up's 300 starts a day, SIGNUP#GLOBAL). */
+/** Resent sign-up codes and recovery codes the whole stage sends a real day (a ceiling of its own, next to the sign-up starts of SIGNUP#GLOBAL). */
 export const AUTH_CODE_EMAILS_PER_DAY = 300;
 
 export const authMailDayKey = (at: Date): string => `AUTHMAIL#GLOBAL#${realDayKey(at)}`;

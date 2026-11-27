@@ -46,9 +46,10 @@ Decisión del dueño del 2026-11-27, común a las demos públicas de Craftech. E
 | `PHONESMS#ACCOUNT#<userId>#<realDay>` | 6 SMS por cuenta por día (enrolamiento e ingresos sumados) | `SMS_ACCOUNT_LIMIT`: la cuenta no ingresa hasta el día siguiente |
 | `PHONESMS#NUMBER#<phoneHash>#<realDay>` | 3 por número por día | `SMS_NUMBER_LIMIT` |
 | `PHONESMS#IP#<ipHash>#<realDay>` | 5 por IP del visor por día | `SMS_IP_LIMIT` |
-| `PHONESMS#GLOBAL#<realDay>` | 150 por día en el stage | `SMS_DAILY_LIMIT` |
+| `PHONESMS#GLOBAL#<realDay>` | 40 por día en el stage (150 hasta el endurecimiento, §10) | `SMS_DAILY_LIMIT` |
+| `PHONESMS#FOREIGN#<realDay>` | 5 por día en el stage, compartidos por todos los números fuera de la región de casa (§10) | `SMS_FOREIGN_LIMIT`: la pantalla ofrece el contacto de Craftech |
 
-El mismo mecanismo que el alta (`signup/limits.ts` `counterIncrementOp`): los tres del llamador en una transacción con techo, después el del día; 48 h de TTL pasado el período; ninguna clave con el número ni la IP en claro (`phoneHash` con la subclave `account-phone`, `ipHash` con `ip-hash`). Sin la IP del visor (fuera del borde) no se envía nada. La última red es el tope de gasto de SMS de la cuenta (US$50 por mes, configuración de la cuenta compartida).
+El mismo mecanismo que el alta (`signup/limits.ts` `counterIncrementOp`): los tres del llamador en una transacción con techo, después el del día (y, para un número de fuera de la región de casa, el cupo de fuera, en la misma transacción); 48 h de TTL pasado el período; ninguna clave con el número ni la IP en claro (`phoneHash` con la subclave `account-phone`, `ipHash` con `ip-hash`). Sin la IP del visor (fuera del borde) no se envía nada. La última red es el tope de gasto de SMS de la cuenta (US$50 por mes, configuración de la cuenta compartida).
 
 ### 7. Un número, una cuenta
 
@@ -66,10 +67,24 @@ El mismo mecanismo que el alta (`signup/limits.ts` `counterIncrementOp`): los tr
 - El techo de permisos (`infra/bootstrap/ci-role.yaml`, `DeployBoundary`) suma `sns:Publish` a su sentencia sin recurso (`NoResourceLevelRuntime`); se aplica a mano con el comando de `infra/bootstrap/README.md`. Sin ese cambio aplicado, el envío falla con `AccessDenied` (`SMS_UNAVAILABLE`) y nadie puede pasar el código.
 - Configuración de la cuenta, fuera del repo (`docs/pending.md` P-09): la cuenta fuera del sandbox de SMS de SNS, el tope de gasto mensual de SMS en US$50 y, para países que lo exigen (Estados Unidos, India), un remitente registrado.
 
+### 10. Endurecimiento (2026-11-27)
+
+El mismo día en que se publicó el código, un atacante lo pasó en una demo hermana con un número virtual de Países Bajos (rango `+3197`, de máquinas), después de probar números de Estados Unidos y Finlandia, con casillas descartables que la lista no conocía. Cada SMS a Europa cuesta unos US$0,10 y el tope de gasto de SMS de la cuenta es de US$50 por mes, compartido por todas las demos: agotarlo deja a todas sin ingreso. Decisión del dueño:
+
+- **Tope del día**: 40 SMS en el stage (antes 150).
+- **Región de casa** (`phone/number.ts` `HOME_PREFIXES`, lista única): Argentina `+54`, Brasil `+55`, Chile `+56`, Colombia `+57`, México `+52`, Perú `+51`, Uruguay `+598`, Paraguay `+595`, Bolivia `+591`, Ecuador `+593`, Venezuela `+58`, Costa Rica `+506`, Panamá `+507`, Guatemala `+502`, El Salvador `+503`, Honduras `+504`, Nicaragua `+505`, República Dominicana `+1809`, `+1829`, `+1849` y España `+34`. Un número de cualquier otro país se sigue aceptando, pero comparte con todos los demás de fuera un cupo de 5 SMS por día en toda la demo (`PHONESMS#FOREIGN#<realDay>`), además de los otros topes; al agotarse, `SMS_FOREIGN_LIMIT`. Un número de casa nunca toca ese contador.
+- **Rangos que no son celulares de personas** (`phone/number.ts` `NON_PERSONAL_PREFIXES`, lista única): `+3197` (máquinas, Países Bajos), `+4470` (numeración personal, Reino Unido), `+882`, `+883` (redes internacionales), `+870`, `+881` (satelitales), `+888` y `+979`. Se rechazan al cargar el número en el alta y al escribirlo o corregirlo en el enrolamiento: `PHONE_NOT_PERSONAL`, «Usa un celular personal». Un número ya verificado no se vuelve a evaluar (no lo cambia el usuario, §2).
+- **Números de relleno**: los que terminan en siete o más dígitos iguales (`+5491100000000`) son `PHONE_INVALID`.
+- **Correo del alta** (ADR-0025 §3): a la lista propia se suma la lista pública del paquete `disposable-email-domains` (1.0.62, solo datos, versión fijada, solo en `packages/bff`; la web no lo importa) y los dominios vistos ese día (`10mail.org`, `emltmp.com`, `emlpro.com`, `vomoto.com`, `blondmail.com`, `tempmail.lol`, `1secmail.com`; `euploading.com` y `guerrillamailblock.com` ya estaban). Los dominios reservados o de prueba, los que el DNS dice que no existen y los que no tienen dónde recibir correo dan la misma respuesta que una casilla descartable (`EMAIL_NOT_ACCEPTED`); el log los distingue. Un MX bajo un dominio descartable también rechaza. El plazo del DNS pasa a 2 s, con un intento por consulta; si el DNS no responde o falla por otra causa, el alta sigue. Las consultas de DNS no necesitan permisos de IAM; las pruebas usan un resolvedor inyectado.
+- **Altas del día**: `SIGNUP#GLOBAL#<realDay>` baja de 300 a 40 inicios entre todos los visitantes (ADR-0025 §3): cada inicio, aunque nunca se confirme, crea un usuario de Cognito y manda un email que puede rebotar.
+
+No cambian la infraestructura (`infra/`, bootstrap, permisos, WAF) ni los demás topes.
+
 ## Alternativas descartadas
 
 - **Verificar el teléfono una sola vez.** No frena a quien adivina una contraseña. Descartada por el dueño.
 - **El MFA por SMS de Cognito.** Necesita un rol de SNS del pool, el atributo `phone_number` escribible y su propio flujo de desafío en la web, y no deja aplicar los topes por número, por IP y del día ni el índice de un número por cuenta. Descartada.
+- **Rechazar los números de fuera de la región de casa.** Descartada por el dueño: se aceptan, con un cupo diario compartido chico.
 - **Eximir por dominio de correo o por grupo** (por ejemplo, las direcciones `success+qa-…@simulator.amazonses.com`). Cualquiera puede escribir una dirección; la marca va por cuenta y solo del lado del servidor.
 
 ## Consecuencias

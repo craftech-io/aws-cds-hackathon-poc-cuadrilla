@@ -5,6 +5,7 @@ import { type TestContextDeps, createTestIssuer, functionUrlEvent, testContextDe
 import { signupKeyKey } from "../leads/guest-accounts";
 import { leadAbuseHash, leadEmailHash } from "../leads/keys";
 import { EMAIL_HASH_KEY, SIGNUP_T0, TICKET_KEY, VIEWER_IP, type FakeDomain, type SignupHarness, signupForm, signupHarness } from "../signup/testing";
+import { SIGNUP_LIMITS } from "../signup/limits";
 import { readTicket } from "../signup/ticket";
 import { createHandler } from "./handler";
 import { createSignupRouter } from "./signup";
@@ -48,7 +49,7 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     const answer = await start();
     expect(answer.username).toMatch(/^gst-[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(Date.parse(answer.expiresAt) - SIGNUP_T0.getTime()).toBeLessThanOrEqual(10 * 60_000);
-    const emailHash = leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@example.com");
+    const emailHash = leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@correo-ficticio.mx");
     const read = readTicket(TICKET_KEY, answer.ticket, SIGNUP_T0);
     expect(read).toMatchObject({ ok: true, ticket: { emailHash, username: answer.username } });
     const lead = await h.leads.get(emailHash);
@@ -80,7 +81,7 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     for (const phone of ["55 1234 5678", "+1234567", "+0123456789", "+1 234 567 890 123 456"]) expect(await refusalOf(start(signupForm({ phone })))).toMatchObject({ code: "BAD_REQUEST", reason: "PHONE_INVALID" });
     expect(counters()).toEqual([]);
     const answer = await start(signupForm({ phone: "+44 (20) 7946-0018" }));
-    const lead = await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@example.com"));
+    const lead = await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@correo-ficticio.mx"));
     expect(lead?.phone).toBe("+442079460018");
     expect(lead?.pending?.[answer.username]?.phone).toBe("+442079460018");
     expect(lead?.phoneVerifiedAt).toBeUndefined();
@@ -93,39 +94,51 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     expect(h.leadTable.leads.size).toBe(0);
   });
 
-  it("[FL-104] the email's domain: no MX, A or AAAA and a null MX are INVALID without a lead; only A passes; a slow resolver passes with SignupMxUnknown", async () => {
+  it("[FL-104] the email's domain: no MX, A or AAAA, a name the DNS does not know and a null MX are EMAIL_NOT_ACCEPTED without a lead; only A passes; a slow or broken resolver passes with SignupMxUnknown", async () => {
     setup({
-      "nowhere.example": {},
-      "nullmx.example": { mx: [{ exchange: "", priority: 0 }] },
-      "only-a.example": { a: ["192.0.2.7"] },
-      "slow.example": { delayMs: 1_500 },
-      "broken.example": { fail: "ESERVFAIL" },
+      "sin-correo.mx": {},
+      "no-existe.mx": { fail: "ENOTFOUND" },
+      "mx-nulo.mx": { mx: [{ exchange: "", priority: 0 }] },
+      "solo-a.mx": { a: ["192.0.2.7"] },
+      "lento.mx": { delayMs: 2_500 },
+      "roto.mx": { fail: "ESERVFAIL" },
     });
-    expect(await refusalOf(start(signupForm({ email: "ana@nowhere.example" })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_DOMAIN" });
-    expect(await refusalOf(start(signupForm({ email: "ana@nullmx.example" })))).toMatchObject({ reason: "EMAIL_DOMAIN" });
+    for (const email of ["ana@sin-correo.mx", "ana@no-existe.mx", "ana@mx-nulo.mx"]) {
+      expect(await refusalOf(start(signupForm({ email })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
+    }
     expect(h.leadTable.leads.size).toBe(0);
     expect(counters()).toEqual([]);
-    await expect(start(signupForm({ email: "ana@only-a.example" }))).resolves.toMatchObject({ username: expect.any(String) });
-    await expect(start(signupForm({ email: "ana@slow.example" }))).resolves.toMatchObject({ username: expect.any(String) });
-    await expect(start(signupForm({ email: "ana@broken.example" }))).resolves.toMatchObject({ username: expect.any(String) });
+    expect(deps.lines.filter((line) => line.includes('"reason":"EMAIL_DOMAIN"'))).toHaveLength(3);
+    await expect(start(signupForm({ email: "ana@solo-a.mx" }))).resolves.toMatchObject({ username: expect.any(String) });
+    await expect(start(signupForm({ email: "ana@lento.mx" }))).resolves.toMatchObject({ username: expect.any(String) });
+    await expect(start(signupForm({ email: "ana@roto.mx" }))).resolves.toMatchObject({ username: expect.any(String) });
     expect(deps.lines.filter((line) => line.includes('"metric":"SignupMxUnknown"'))).toHaveLength(2);
   });
 
+  it("[FL-104] a reserved or test domain is EMAIL_NOT_ACCEPTED, like a disposable mailbox, before any lookup or write", async () => {
+    for (const email of ["ana@test.com", "ana@example.com", "ana@mail.example.org", "ana@example.net", "ana@algo.test", "ana@algo.example", "ana@algo.invalid", "ana@algo.localhost"]) {
+      expect(await refusalOf(start(signupForm({ email })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
+    }
+    expect(h.resolver.lookups).toEqual([]);
+    expect(h.leadTable.leads.size).toBe(0);
+    expect(counters()).toEqual([]);
+  });
+
   it("[FL-113] the sixth start from one IP in an hour is RATE_LIMITED; the next hour starts over", async () => {
-    for (let n = 1; n <= 5; n += 1) await start(signupForm({ email: `persona${n}@example.com` }));
-    expect(await refusalOf(start(signupForm({ email: "persona6@example.com" })))).toMatchObject({ code: "TOO_MANY_REQUESTS", reason: "RATE_LIMITED" });
-    expect(await refusalOf(start(signupForm({ email: "persona6@example.com" })))).toMatchObject({ reason: "RATE_LIMITED" });
+    for (let n = 1; n <= 5; n += 1) await start(signupForm({ email: `persona${n}@correo-ficticio.mx` }));
+    expect(await refusalOf(start(signupForm({ email: "persona6@correo-ficticio.mx" })))).toMatchObject({ code: "TOO_MANY_REQUESTS", reason: "RATE_LIMITED" });
+    expect(await refusalOf(start(signupForm({ email: "persona6@correo-ficticio.mx" })))).toMatchObject({ reason: "RATE_LIMITED" });
     expect(h.leadTable.leads.size).toBe(5);
-    await expect(start(signupForm({ email: "persona6@example.com" }), { viewerIp: "198.51.100.20" })).resolves.toBeDefined();
+    await expect(start(signupForm({ email: "persona6@correo-ficticio.mx" }), { viewerIp: "198.51.100.20" })).resolves.toBeDefined();
     h.advance(HOUR);
-    await expect(start(signupForm({ email: "persona7@example.com" }))).resolves.toBeDefined();
+    await expect(start(signupForm({ email: "persona7@correo-ficticio.mx" }))).resolves.toBeDefined();
     expect(deps.lines.join("\n")).toContain('"metric":"SignupRejected"');
   });
 
   it("[FL-113] from an IP that AWS WAF labelled anonymous, the second start of the hour is RATE_LIMITED", async () => {
     const anonymous = { viewerIp: "192.0.2.44", anonymousIp: true };
-    await start(signupForm({ email: "uno@example.com" }), anonymous);
-    expect(await refusalOf(start(signupForm({ email: "dos@example.com" }), anonymous))).toMatchObject({ reason: "RATE_LIMITED" });
+    await start(signupForm({ email: "uno@correo-ficticio.mx" }), anonymous);
+    expect(await refusalOf(start(signupForm({ email: "dos@correo-ficticio.mx" }), anonymous))).toMatchObject({ reason: "RATE_LIMITED" });
     expect(counters().some((pk) => pk.startsWith("SIGNUP#ANONDAY#"))).toBe(true);
   });
 
@@ -149,7 +162,7 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     const first = await start();
     h.advance(HOUR);
     const second = await start(signupForm({ contact: true }));
-    const emailHash = leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@example.com");
+    const emailHash = leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@correo-ficticio.mx");
     const lead = await h.leads.get(emailHash);
     expect(lead?.pendingUsernames).toEqual([first.username, second.username]);
     expect(lead?.signupStartedAt).toBe(SIGNUP_T0.toISOString());
@@ -172,9 +185,21 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     expect(h.leadTable.leads.size).toBe(0);
   });
 
+  it("[FL-112] at most 40 starts a day in the whole demo, among every visitor: the 41st is CAP_REACHED and writes nothing", async () => {
+    expect(SIGNUP_LIMITS.startsPerDay).toBe(40);
+    for (let n = 1; n <= SIGNUP_LIMITS.startsPerDay; n += 1) {
+      await start(signupForm({ email: `persona${n}@correo-ficticio.mx` }), { viewerIp: `198.51.100.${n}` });
+    }
+    expect(h.leadTable.leads.size).toBe(SIGNUP_LIMITS.startsPerDay);
+    expect(await refusalOf(start(signupForm({ email: "persona41@correo-ficticio.mx" }), { viewerIp: "198.51.100.41" }))).toMatchObject({ code: "TOO_MANY_REQUESTS", reason: "CAP_REACHED" });
+    expect(h.leadTable.leads.size).toBe(SIGNUP_LIMITS.startsPerDay);
+    h.advance(24 * HOUR);
+    await expect(start(signupForm({ email: "persona41@correo-ficticio.mx" }), { viewerIp: "198.51.100.41" })).resolves.toBeDefined();
+  });
+
   it("[FL-112] the day's cap of starts and the cut of the sign-up (KILL#SIGNUP or KILL#ALL) answer CAP_REACHED", async () => {
     const day = `SIGNUP#GLOBAL#${SIGNUP_T0.toISOString().slice(0, 10)}`;
-    await h.runtime.put("Runtime", { PK: day, SK: "META", entity: "SignupCounter", used: 300 });
+    await h.runtime.put("Runtime", { PK: day, SK: "META", entity: "SignupCounter", used: SIGNUP_LIMITS.startsPerDay });
     expect(await refusalOf(start())).toMatchObject({ code: "TOO_MANY_REQUESTS", reason: "CAP_REACHED" });
     expect(h.leadTable.leads.size).toBe(0);
     setup();
@@ -188,12 +213,12 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
 
   it("[FL-121] an email with a confirmed account answers exactly like a new one, and the lead stays as it was", async () => {
     const answer = await start();
-    const emailHash = leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@example.com");
+    const emailHash = leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@correo-ficticio.mx");
     await h.leads.confirm({ emailHash, username: answer.username, sub: "sub-ana", userId: "usr-g01K80000000000000000000009", at: SIGNUP_T0 });
     const confirmed = await h.leads.get(emailHash);
     h.advance(HOUR);
-    const taken = await start(signupForm({ email: "Ana.Prueba@Example.com" }));
-    const fresh = await start(signupForm({ email: "nadie.todavia@example.com" }));
+    const taken = await start(signupForm({ email: "Ana.Prueba@Correo-Ficticio.MX" }));
+    const fresh = await start(signupForm({ email: "nadie.todavia@correo-ficticio.mx" }));
     // Same fields, same shapes, same ticket lifetime: nothing tells the two apart.
     expect(Object.keys(taken).sort()).toEqual(Object.keys(fresh).sort());
     expect(taken.username).toMatch(/^gst-[0-9A-HJKMNP-TV-Z]{26}$/);
@@ -204,13 +229,13 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
   });
 
   it("[FL-104] a domain not listed yet whose MX is a disposable service's mail server is EMAIL_NOT_ACCEPTED, without a lead", async () => {
-    setup({ "nuevo-desechable.example": { mx: [{ exchange: "mx.smtp.is.", priority: 10 }] } });
-    expect(await refusalOf(start(signupForm({ email: "ana@nuevo-desechable.example" })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
-    expect(await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana@nuevo-desechable.example"))).toBeUndefined();
+    setup({ "nuevo-desechable.mx": { mx: [{ exchange: "mx.smtp.is.", priority: 10 }] } });
+    expect(await refusalOf(start(signupForm({ email: "ana@nuevo-desechable.mx" })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
+    expect(await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana@nuevo-desechable.mx"))).toBeUndefined();
   });
 
   it("[FL-104] a disposable mailbox (or a subdomain of one) is EMAIL_NOT_ACCEPTED before any lookup or write", async () => {
-    for (const email of ["ana@mailinator.com", "ana@inbox.yopmail.fr", "ANA@Guerrillamail.com", "ana@euploading.com"]) {
+    for (const email of ["ana@mailinator.com", "ana@inbox.yopmail.fr", "ANA@Guerrillamail.com", "ana@euploading.com", "ana@blondmail.com", "ana@tempmail.lol"]) {
       expect(await refusalOf(start(signupForm({ email })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
     }
     expect(counters()).toEqual([]);
@@ -250,7 +275,7 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
   it("[FL-115] the IP and the email are never in clear in Runtime nor in the logs", async () => {
     await start();
     const stored = JSON.stringify(h.runtime.dump("Runtime"));
-    for (const clear of [VIEWER_IP, "ana.prueba@example.com", "@"]) expect(stored).not.toContain(clear);
+    for (const clear of [VIEWER_IP, "ana.prueba@correo-ficticio.mx", "@"]) expect(stored).not.toContain(clear);
     expect(deps.lines.join("\n")).not.toContain("ana.prueba");
     expect(deps.lines.join("\n")).not.toContain(VIEWER_IP);
   });
@@ -260,7 +285,7 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
       edge: { originKey: () => ORIGIN_KEY, log: () => deps.loggerFor("edge") },
     });
     const bodies: string[] = [];
-    for (const form of [signupForm({ email: "victima@example.com", extra: { origin: "QA" } }), { email: "victima@example.com", locale: "xx" }, signupForm({ email: "no-es-un-email@" })]) {
+    for (const form of [signupForm({ email: "victima@correo-ficticio.mx", extra: { origin: "QA" } }), { email: "victima@correo-ficticio.mx", locale: "xx" }, signupForm({ email: "no-es-un-email@" })]) {
       const event = functionUrlEvent("/api/signup.start", {
         method: "POST",
         body: JSON.stringify(form),

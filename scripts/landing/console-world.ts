@@ -44,8 +44,8 @@ export { TEST_POOL };
 /** The story's day at 07:00 in Mexico City: the real clock of every capture world. */
 export const CAPTURE_NOW = new Date("2026-10-13T13:00:00.000Z");
 
-/** The visitor who signs up in the captures: a synthetic address on a domain reserved for examples. */
-export const VISITOR = { email: "prueba@example.com" } as const;
+/** The visitor who signs up in the captures: a synthetic address on a made-up domain (the sign-up refuses reserved ones). */
+export const VISITOR = { email: "prueba@correo-ficticio.mx" } as const;
 
 /** The operator of the capture guest's world: a signup generation of the story's day (`isp-guest-s<yymmdd><5 base32>`). */
 export const GUEST_ISP = "isp-guest-s261013landg";

@@ -118,7 +118,7 @@ describe("the sign-up form [FL-104] [FL-115]", () => {
 });
 
 describe("refusals of the start and of Cognito [FL-113] [FL-114] [FL-121]", () => {
-  it.each(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_DOMAIN", "EMAIL_NOT_ACCEPTED"] as const)("[FL-113] signup.start answering %s stays on the form with that message", async (reason) => {
+  it.each(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_NOT_ACCEPTED", "PHONE_INVALID", "PHONE_NOT_PERSONAL"] as const)("[FL-113] signup.start answering %s stays on the form with that message", async (reason) => {
     startAnswer = refusedBy(reason);
     expect(await submit()).toEqual({ state: INITIAL_SIGNUP, error: reason });
     expect(signup.calls).toEqual([]);
