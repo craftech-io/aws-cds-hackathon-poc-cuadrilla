@@ -2,14 +2,14 @@
 // disposable mailboxes, reserved and test domains, and the DNS verdict with a fake resolver (never a
 // real lookup).
 import { describe, expect, it } from "vitest";
-import { DISPOSABLE_DOMAINS, isDisposableDomain, isDisposableMxHost, isReservedDomain } from "./disposable-domains";
+import { DISPOSABLE_DOMAINS, DISPOSABLE_MX_ADDRESSES, isDisposableDomain, isDisposableMxAddress, isDisposableMxHost, isReservedDomain } from "./disposable-domains";
 import { EMAIL_DOMAIN_DEADLINE_MS, emailDomainVerdict } from "./email-domain";
 import { fakeResolver } from "./testing";
 
 describe("disposable and reserved domains [FL-104]", () => {
   it("[FL-104] a domain of the public list (or a subdomain of one) is disposable, and so is every domain of the own list", () => {
     for (const domain of ["0-mail.com", "mailinator.com", "inbox.0-mail.com", "Trashmail.WS"]) expect(isDisposableDomain(domain), domain).toBe(true);
-    for (const domain of ["euploading.com", "10mail.org", "emltmp.com", "emlpro.com", "vomoto.com", "blondmail.com", "guerrillamailblock.com", "tempmail.lol", "1secmail.com"]) {
+    for (const domain of ["euploading.com", "10mail.org", "emltmp.com", "emlpro.com", "vomoto.com", "blondmail.com", "guerrillamailblock.com", "tempmail.lol", "1secmail.com", "mailpwr.com", "mimimail.me", "pickmail.org", "freeml.net", "mailtowin.com", "maximail.vip"]) {
       expect(DISPOSABLE_DOMAINS.has(domain), domain).toBe(true);
       expect(isDisposableDomain(domain), domain).toBe(true);
     }
@@ -51,3 +51,32 @@ describe("the DNS verdict of the domain [FL-104]", () => {
     expect(await emailDomainVerdict("ana@lento.mx", resolver, 50)).toBe("UNKNOWN");
   });
 });
+
+describe("the address of the mail server [FL-104]", () => {
+  it("[FL-104] lists the addresses of the disposable services' mail servers, each with its service", () => {
+    expect([...DISPOSABLE_MX_ADDRESSES.keys()]).toEqual(["78.47.124.133", "94.130.108.80", "49.12.18.190", "15.204.213.223", "178.162.170.166", "178.32.61.35"]);
+    for (const service of DISPOSABLE_MX_ADDRESSES.values()) expect(service.length).toBeGreaterThan(3);
+    expect(isDisposableMxAddress(" 94.130.108.80 ")).toBe(true);
+    expect(isDisposableMxAddress("142.250.0.27")).toBe(false);
+  });
+
+  it("[FL-104] a new domain whose MX resolves to a listed address is DISPOSABLE_ADDRESS; another address is OK; a failed address lookup is OK", async () => {
+    const resolver = fakeResolver({
+      "nuevo-dominio.mx": { mx: [{ exchange: "mx.nuevo-dominio.mx.", priority: 10 }] },
+      "mx.nuevo-dominio.mx": { a: ["78.47.124.133"] },
+      "otro-v6.mx": { mx: [{ exchange: "mail.otro-v6.mx", priority: 10 }, { exchange: "backup.otro-v6.mx", priority: 20 }] },
+      "mail.otro-v6.mx": { a: ["203.0.113.40"] },
+      "backup.otro-v6.mx": { aaaa: ["2001:db8::25"], a: ["178.32.61.35"] },
+      "legitimo.mx": { mx: [{ exchange: "mx.legitimo.mx", priority: 10 }] },
+      "mx.legitimo.mx": { a: ["203.0.113.25"], aaaa: ["2001:db8::1"] },
+      "falla.mx": { mx: [{ exchange: "mx.falla.mx", priority: 10 }] },
+      "mx.falla.mx": { fail: "ESERVFAIL" },
+    });
+    expect(await emailDomainVerdict("ana@nuevo-dominio.mx", resolver)).toBe("DISPOSABLE_ADDRESS");
+    expect(await emailDomainVerdict("ana@otro-v6.mx", resolver)).toBe("DISPOSABLE_ADDRESS");
+    expect(await emailDomainVerdict("ana@legitimo.mx", resolver)).toBe("OK");
+    expect(await emailDomainVerdict("ana@falla.mx", resolver)).toBe("OK");
+    expect(resolver.lookups).toContain("a:mx.nuevo-dominio.mx");
+  });
+});
+

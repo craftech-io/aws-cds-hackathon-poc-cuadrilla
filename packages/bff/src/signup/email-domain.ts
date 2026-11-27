@@ -4,7 +4,10 @@
 //
 //   MX records               → OK, unless the only one is the null MX of RFC 7505 (`0 .`) → INVALID,
 //                              or one points at a disposable service's mail server (or at a host
-//                              under a disposable domain) → DISPOSABLE
+//                              under a disposable domain) → DISPOSABLE, or one of the MX hosts resolves
+//                              (A or AAAA) to an address of a disposable service → DISPOSABLE_ADDRESS:
+//                              a new domain changes its name, not the server that receives its mail.
+//                              A lookup of those addresses that fails says nothing: the domain is OK
 //   no MX, but A or AAAA     → OK (RFC 5321 §5.1, implicit MX)
 //   no MX, no A, no AAAA     → INVALID (a name the DNS says does not exist lands here too)
 //   the 2 s deadline passed, or the resolver failed otherwise → UNKNOWN: the start goes on (metric
@@ -14,7 +17,7 @@
 // lookup: the resolver is a port (signup/testing.ts `fakeResolver`).
 import { Resolver } from "node:dns/promises";
 import { withDeadline } from "../lib/deadline";
-import { isDisposableMxHost } from "./disposable-domains";
+import { isDisposableMxAddress, isDisposableMxHost } from "./disposable-domains";
 
 /** The whole check, all lookups together (ADR-0025 §3). */
 export const EMAIL_DOMAIN_DEADLINE_MS = 2_000;
@@ -31,7 +34,7 @@ export interface DnsResolver {
   aaaa(domain: string): Promise<readonly string[]>;
 }
 
-export type EmailDomainVerdict = "OK" | "INVALID" | "DISPOSABLE" | "UNKNOWN";
+export type EmailDomainVerdict = "OK" | "INVALID" | "DISPOSABLE" | "DISPOSABLE_ADDRESS" | "UNKNOWN";
 
 let dns: Resolver | undefined;
 
@@ -62,10 +65,20 @@ async function records<T>(lookup: () => Promise<readonly T[]>): Promise<readonly
 
 const isNullMx = (record: MxRecord): boolean => record.priority === 0 && (record.exchange === "" || record.exchange === ".");
 
+/** Whether one of the mail servers' addresses is a disposable service's; a failed lookup is a no. */
+async function servedByDisposableAddress(hosts: readonly string[], resolver: DnsResolver): Promise<boolean> {
+  const lookups = hosts.flatMap((host) => [resolver.a(host), resolver.aaaa(host)].map((lookup) => lookup.then((addresses) => addresses, () => [] as readonly string[])));
+  return (await Promise.all(lookups)).some((addresses) => addresses.some(isDisposableMxAddress));
+}
+
 async function check(domain: string, resolver: DnsResolver): Promise<EmailDomainVerdict> {
   const mx = await records(() => resolver.mx(domain));
   if (mx.some((record) => isDisposableMxHost(record.exchange))) return "DISPOSABLE";
-  if (mx.length > 0) return mx.length === 1 && mx[0] !== undefined && isNullMx(mx[0]) ? "INVALID" : "OK";
+  if (mx.length === 1 && mx[0] !== undefined && isNullMx(mx[0])) return "INVALID";
+  if (mx.length > 0) {
+    const hosts = [...new Set(mx.map((record) => record.exchange.replace(/\.$/, "")).filter((host) => host.length > 0))];
+    return (await servedByDisposableAddress(hosts, resolver)) ? "DISPOSABLE_ADDRESS" : "OK";
+  }
   const [a, aaaa] = await Promise.all([records(() => resolver.a(domain)), records(() => resolver.aaaa(domain))]);
   return a.length > 0 || aaaa.length > 0 ? "OK" : "INVALID";
 }
