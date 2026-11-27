@@ -105,6 +105,8 @@ export async function worldStatusOf(ports: WorldStatusPorts, principal: GuestPri
   const refreshSession = account.clockId !== principal.clockId;
   if (account.status === "PERSON_LIMIT") return { ...base, createdAtReal: account.createdAtReal, status: "PERSON_LIMIT", canRetry: false, refreshSession };
   if (isExpiredAt(account, now)) return { ...base, ...dates, status: "FAILED", canRetry: true, refreshSession };
+  // Its session passed the SMS code but taking the slot failed (ADR-0029): "Reintentar" takes it.
+  if (account.status === "PHONE_PENDING") return { ...base, ...dates, status: "PROVISIONING", canRetry: true, refreshSession };
   const summary = account.status === "READY" ? await summaryOf(ports, account.ispId) : undefined;
   return { ...base, ...dates, status: account.status, canRetry: retryable(account, now), refreshSession, ...(summary === undefined ? {} : { summary }) };
 }

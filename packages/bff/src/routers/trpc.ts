@@ -11,6 +11,12 @@
 //                         (`guest.world`, `guest.retryWorld`, ADR-0025 §2)
 //   recentLoginProcedure  + an interactive sign-in at most 15 minutes old (manual validation, ADR-0011)
 //
+// The SMS code is the second factor of every Cognito session (ADR-0029): until the session passed it
+// (`PHONESESSION#`, phone/session.ts), every procedure of a principal answers 403
+// `PHONE_VERIFICATION_REQUIRED` but the phone step itself (`PHONE_STEP_PROCEDURES`: who is signed in,
+// and the code's status, send, check and sign-out). An account marked `phoneCheck AUTOMATION` by the
+// operator, and a principal of the `QaDriver` (no Cognito session), are never asked.
+//
 // `ispId`, `role` and the world come from the principal, never from the input. A request's principal
 // comes only from a verified id token (`createContextFactory`); the `QaDriver` builds its principals
 // on the server (`createServerContext`, auth/qa-principal.ts) and the same middlewares run for both.
@@ -68,7 +74,12 @@ export interface IspContext extends Context {
   readonly principal: Principal;
   readonly authFailure: null;
   readonly world: ConsoleWorld;
+  /** The session passed its SMS code (or needs none): the shell, the world's session, everything else. */
+  readonly secondFactorPassed: boolean;
 }
+
+/** What a session that has not passed the SMS code may still call (ADR-0029). */
+export const PHONE_STEP_PROCEDURES: readonly string[] = ["account.session", "phone.status", "phone.sendCode", "phone.verifyCode", "phone.carrySession", "phone.endSession"];
 
 export interface CreateContextOptions {
   readonly event: Pick<APIGatewayProxyEventV2, "headers"> & { readonly requestContext?: { readonly requestId?: string } };
@@ -188,7 +199,7 @@ function refuse(log: Logger, path: string, error: AuthError, extra: LogFields = 
 
 // A token lives 15 minutes and is verified offline: the registry row (read at most once a minute)
 // says whether the user is still active and still the same user of this operator.
-async function confirmRegistered(deps: ContextDeps, principal: Principal, log: Logger, path: string): Promise<void> {
+async function confirmRegistered(deps: ContextDeps, principal: Principal, log: Logger, path: string): Promise<UserMatch> {
   let match: UserMatch | undefined;
   try {
     match = await deps.users.find(principal.ispId, principal.sub);
@@ -197,6 +208,20 @@ async function confirmRegistered(deps: ContextDeps, principal: Principal, log: L
   }
   if (match === undefined || !match.active) refuse(log, path, new AuthError(AUTH_REASON.USER_INACTIVE, "this console account is no longer active"));
   if (match.userId !== principal.userId) refuse(log, path, new AuthError(AUTH_REASON.PRINCIPAL_INCOMPLETE, "sign in again to continue"));
+  return match;
+}
+
+/** Whether this Cognito session passed its SMS code; refuses every other procedure until it did. */
+async function secondFactorOf(deps: ContextDeps, principal: Principal, match: UserMatch, log: Logger, path: string): Promise<boolean> {
+  if (match.automation === true) return true;
+  let passed: boolean;
+  try {
+    passed = await deps.phoneGate.passed(principal);
+  } catch (error) {
+    return refuse(log, path, new AuthError(AUTH_REASON.AUTH_UNAVAILABLE, "could not read the session's verification", { cause: error }));
+  }
+  if (!passed && !PHONE_STEP_PROCEDURES.includes(path)) refuse(log, path, new AuthError(AUTH_REASON.PHONE_VERIFICATION_REQUIRED, "enter the code sent to your phone to continue"));
+  return passed;
 }
 
 function consoleWorld(principal: Principal, deps: ContextDeps): ConsoleWorld {
@@ -213,8 +238,8 @@ const resolvePrincipal = t.middleware(async ({ ctx, next, path }) => {
   if (!principal) return refuse(ctx.log, path, authFailure ?? new AuthError(AUTH_REASON.TOKEN_MISSING, "missing bearer token"));
   const log = ctx.log.child({ userId: principal.userId, ispId: principal.ispId, role: principal.role, origin: principal.origin });
   // A QA principal has no Cognito identity to look up: the QaDriver built it for this call.
-  if (principal.origin === "COGNITO") await confirmRegistered(ctx.deps, principal, log, path);
-  return next({ ctx: { principal, authFailure: null, log, world: consoleWorld(principal, ctx.deps) } });
+  const secondFactorPassed = principal.origin === "COGNITO" ? await secondFactorOf(ctx.deps, principal, await confirmRegistered(ctx.deps, principal, log, path), log, path) : true;
+  return next({ ctx: { principal, authFailure: null, log, world: consoleWorld(principal, ctx.deps), secondFactorPassed } });
 });
 
 // The row goes to the principal's own operator: who asked, for what, when (in the world's time if

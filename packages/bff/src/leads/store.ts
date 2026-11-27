@@ -8,14 +8,15 @@
 // `Leads` (`dynamodb:Attributes`, infra/leads-spec.ts), conditions included, so "the lead is still
 // pending" is checked by the code on the lead it read, and the version makes that read authoritative.
 //
-// Who calls what: `signup.start` (Bff) → `get`, `startPending`; post-confirmation → `confirm`;
+// Who calls what: `signup.start` (Bff) → `get`, `startPending`; the SMS enrolment (Bff) → `get`,
+// `verifyPhone`; post-confirmation → `confirm`;
 // post-authentication → `recordLogin`; `LeadStream` → `claimNotice`, `releaseNotice`,
 // `setPendingUsernames`, `log`; `GuestAccountDeletion` → `get`, `findBySub`, `deleteLead`, `log`;
 // the operator's scripts → `scan`, `withdrawContact`, `recordEvent`.
 import { ConnectorError } from "@cuadrilla/shared";
 import type { ConsentRecord, Lead, LeadActor, LeadEvent, LeadEventKind, LeadLogEntry, LeadLogInput, NotifyOutcome } from "./model";
 import { LEAD_EVENT_PREFIX, LeadLogEntry as LeadLogEntrySchema, emailHashOfPartition, isPending, leadLogPartition, leadSubKey, logExpiresAt } from "./model";
-import { type ConfirmInput, type StartPendingInput, confirmedLead, loggedInLead, newLead, restartedLead, withdrawnContactLead } from "./transitions";
+import { type ConfirmInput, type StartPendingInput, confirmedLead, loggedInLead, newLead, phoneVerifiedLead, restartedLead, withdrawnContactLead } from "./transitions";
 
 export type { ConfirmInput, StartPendingInput } from "./transitions";
 
@@ -27,6 +28,8 @@ export interface LeadTable {
    * otherwise only if the stored `version` equals it. `false` when the condition failed.
    */
   putMeta(lead: Lead, expectedVersion: number | undefined): Promise<boolean>;
+  /** SET `phone`, `phoneVerifiedAt` (and `updatedAt`, `version`) only: `false` when the version moved. */
+  patchPhone(emailHash: string, patch: { readonly phone: string; readonly phoneVerifiedAt: string }, expectedVersion: number): Promise<boolean>;
   /** `false` when the lead was not there (or had another version). */
   deleteMeta(emailHash: string, expectedVersion?: number): Promise<boolean>;
   /** `META` items whose `subKey` is `SUB#<sub>` (GSI1). */
@@ -50,6 +53,11 @@ export interface LeadStore {
   startPending(input: StartPendingInput): Promise<StartPendingResult>;
   /** Post-confirmation: a pending lead that lists `username` → `CONFIRMED`. */
   confirm(input: ConfirmInput): Promise<ConfirmResult>;
+  /**
+   * The BFF, when a sign-up guest's first session passes the SMS code (ADR-0029): the verified phone on
+   * its confirmed lead (same `sub`), once, event `PHONE_VERIFIED`. `false` when there is nothing to record.
+   */
+  verifyPhone(emailHash: string, input: { readonly sub: string; readonly phone: string; readonly at: Date }): Promise<boolean>;
   /** Post-authentication: `lastLoginAt` and 24 more months, event `LOGIN`. */
   recordLogin(sub: string, at: Date): Promise<Lead | undefined>;
   /** `LeadStream`: claims the notice (`notifiedAt` absent → set). `false` when it was already claimed. */
@@ -130,6 +138,19 @@ export function createLeadStore(table: LeadTable, options: LeadStoreOptions): Le
       });
       if (result.outcome === "CONFIRMED") await event(result.lead, "CONFIRMED", "GUEST", input.at);
       return result;
+    },
+
+    async verifyPhone(emailHash, input) {
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        const current = await table.getMeta(emailHash);
+        const next = current === undefined ? undefined : phoneVerifiedLead(current, input);
+        if (current === undefined || next === undefined || next.phoneVerifiedAt === undefined || next.phone === undefined) return false;
+        if (await table.patchPhone(emailHash, { phone: next.phone, phoneVerifiedAt: next.phoneVerifiedAt }, current.version)) {
+          await event(next, "PHONE_VERIFIED", "GUEST", input.at);
+          return true;
+        }
+      }
+      throw contention("recording the verified phone");
     },
 
     async recordLogin(sub, at) {

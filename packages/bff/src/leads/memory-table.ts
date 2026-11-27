@@ -22,6 +22,13 @@ export class MemoryLeadTable implements LeadTable {
     return true;
   }
 
+  async patchPhone(emailHash: string, patch: { readonly phone: string; readonly phoneVerifiedAt: string }, expectedVersion: number): Promise<boolean> {
+    const current = this.leads.get(leadPartition(emailHash));
+    if (current === undefined || current.version !== expectedVersion) return false;
+    this.leads.set(current.PK, LeadSchema.parse({ ...current, ...patch, updatedAt: patch.phoneVerifiedAt, version: expectedVersion + 1 }));
+    return true;
+  }
+
   async deleteMeta(emailHash: string, expectedVersion?: number): Promise<boolean> {
     const pk = leadPartition(emailHash);
     const current = this.leads.get(pk);

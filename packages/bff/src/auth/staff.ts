@@ -6,6 +6,8 @@
 export interface UserMatch {
   readonly userId: string;
   readonly active: boolean;
+  /** `phoneCheck AUTOMATION` of the row (ADR-0029): an account no person uses, exempt from the SMS code. */
+  readonly automation?: boolean;
 }
 
 /** What the directory needs from the connector (WP-07 implements it over `Isps`). */

@@ -3,6 +3,7 @@
 // Each view is `views/<route id>/view.tsx` (lib/view-registry.ts); a route whose view does not exist
 // yet shows its placeholder, so navigation, role guards and the shell work end to end from the start.
 // `/app` leads to the home of the role: the guest's portada for a guest, the work orders otherwise.
+// Nothing of a world is shown before the session passed its SMS code (views/phone/PhoneGate.tsx, ADR-0029).
 import { Suspense } from "react";
 import { FullScreenMessage } from "./components/FullScreenMessage";
 import { AppShell } from "./components/layout/AppShell";
@@ -15,6 +16,7 @@ import { Link, Redirect, useRouter } from "./lib/router";
 import { VIEWS } from "./lib/view-registry";
 import { type RouteMatch, homeOf, isConsoleRoot, matchRoute, routeAllows } from "./routes";
 import { SecurityPrompts } from "./views/login/SecurityPrompts";
+import { PhoneGate } from "./views/phone/PhoneGate";
 import { PlaceholderView } from "./views/placeholder/PlaceholderView";
 
 function BackHome() {
@@ -74,13 +76,15 @@ export default function ConsoleRoutes() {
   if (!routeAllows(match.route, principal.role)) return <Forbidden />;
 
   return (
-    <IspProvider ispId={principal.ispId}>
-      <WorldClockProvider>
-        <AppShell>
-          <ConsoleView match={match} />
-        </AppShell>
-        <SecurityPrompts />
-      </WorldClockProvider>
-    </IspProvider>
+    <PhoneGate>
+      <IspProvider ispId={principal.ispId}>
+        <WorldClockProvider>
+          <AppShell>
+            <ConsoleView match={match} />
+          </AppShell>
+          <SecurityPrompts />
+        </WorldClockProvider>
+      </IspProvider>
+    </PhoneGate>
   );
 }

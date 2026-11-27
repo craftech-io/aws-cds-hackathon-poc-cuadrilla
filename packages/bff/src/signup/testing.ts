@@ -117,6 +117,7 @@ export function signupHarness(domains: Readonly<Record<string, FakeDomain>> = {}
 
 export interface FormOptions {
   readonly email?: string;
+  readonly phone?: string;
   readonly contact?: boolean;
   readonly terms?: boolean;
   readonly version?: string;
@@ -129,6 +130,7 @@ export function signupForm(options: FormOptions = {}): Record<string, unknown> {
   const version = options.version ?? CONSENTS_VERSION;
   return {
     email: options.email ?? "ana.prueba@example.com",
+    phone: options.phone ?? "+52 55 0100 0001",
     name: "Ana Prueba",
     company: "Fibra de Prueba",
     jobTitle: "Coordinadora de campo",

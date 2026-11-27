@@ -36,6 +36,8 @@ export interface LeadForm {
   readonly name?: string | undefined;
   readonly company?: string | undefined;
   readonly jobTitle?: string | undefined;
+  /** E.164, normalized by `signup.start` (ADR-0029). */
+  readonly phone?: string | undefined;
 }
 
 export interface StartPendingInput extends LeadForm {
@@ -65,7 +67,7 @@ export interface ConfirmInput {
   readonly at: Date;
 }
 
-type FormFields = Pick<Lead, "name" | "company" | "jobTitle" | "utm" | "referrerOrigin">;
+type FormFields = Pick<Lead, "name" | "company" | "jobTitle" | "utm" | "referrerOrigin" | "phone">;
 
 function optionalFields(input: Partial<FormFields>): Partial<FormFields> {
   return {
@@ -74,6 +76,7 @@ function optionalFields(input: Partial<FormFields>): Partial<FormFields> {
     ...(input.jobTitle === undefined ? {} : { jobTitle: input.jobTitle }),
     ...(input.utm === undefined || Object.keys(input.utm).length === 0 ? {} : { utm: input.utm }),
     ...(input.referrerOrigin === undefined ? {} : { referrerOrigin: input.referrerOrigin }),
+    ...(input.phone === undefined ? {} : { phone: input.phone }),
   };
 }
 
@@ -145,7 +148,7 @@ function promoted(current: Lead, username: string): Omit<Lead, "pending"> {
   const start = current.pending?.[username];
   // A lead written before the entries existed keeps its own fields.
   if (start === undefined) return lead;
-  const { name: _name, company: _company, jobTitle: _jobTitle, utm: _utm, referrerOrigin: _referrer, ...rest } = lead;
+  const { name: _name, company: _company, jobTitle: _jobTitle, utm: _utm, referrerOrigin: _referrer, phone: _phone, ...rest } = lead;
   return {
     ...rest,
     email: start.email,
@@ -197,9 +200,24 @@ export function withdrawnContactLead(current: Lead, record: ConsentRecord, at: D
   };
 }
 
-/** Contactable: confirmed, from the web, and the contact consent in force accepted. */
-export function isContactable(lead: Pick<Lead, "status" | "origin" | "consents">): boolean {
-  return lead.status === "CONFIRMED" && lead.origin === "WEB" && lead.consents.CONTACT.accepted;
+/** The SMS enrolment of a confirmed lead's account (ADR-0029): its number, once; `undefined` otherwise. */
+export function phoneVerifiedLead(current: Lead, input: { readonly sub: string; readonly phone: string; readonly at: Date }): Lead | undefined {
+  if (current.status !== "CONFIRMED" || current.cognitoSub !== input.sub || current.phoneVerifiedAt !== undefined) return undefined;
+  const at = input.at.toISOString();
+  return { ...current, phone: input.phone, phoneVerifiedAt: at, version: current.version + 1, updatedAt: at };
+}
+
+/**
+ * Counts as a lead (ADR-0029): the account verified its phone by SMS, or the lead was notified before
+ * the SMS code existed (its notice already went out under the email-only rule).
+ */
+export function isQualified(lead: Pick<Lead, "status" | "phoneVerifiedAt" | "notifyOutcome">): boolean {
+  return lead.status === "CONFIRMED" && (lead.phoneVerifiedAt !== undefined || lead.notifyOutcome === "SENT");
+}
+
+/** Contactable: a qualified lead from the web whose contact consent in force is accepted. */
+export function isContactable(lead: Pick<Lead, "status" | "origin" | "consents" | "phoneVerifiedAt" | "notifyOutcome">): boolean {
+  return isQualified(lead) && lead.origin === "WEB" && lead.consents.CONTACT.accepted;
 }
 
 export type { LegalLocale };

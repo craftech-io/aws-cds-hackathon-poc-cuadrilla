@@ -2,7 +2,8 @@
 // `account` router of the console (docs/tool-catalog.md, "Procedimientos de la consola"): the session of
 // the principal and what it may do with its own account (ADR-0024, ADR-0025 §6, ADR-0026).
 //
-//   session          who is signed in and what the shell offers: for a GUEST, "one session per world"
+//   session          who is signed in, whether the session still owes its SMS code (ADR-0029: then it
+//                    claims nothing), and what the shell offers: for a GUEST, "one session per world"
 //                    (`Runtime/WORLDSESSION#<clockId>`, its own item: recording it never moves the clock's
 //                    version, so it never makes a reset, a jump or a move fail): a session that finds
 //                    another one active in the last 30 real minutes gets the notice and no "Reiniciar
@@ -91,9 +92,11 @@ async function claimSession(ctx: SessionCtx): Promise<boolean> {
   return false;
 }
 
-export async function sessionOf(ctx: SessionCtx) {
+export async function sessionOf(ctx: SessionCtx & Partial<Pick<IspContext, "secondFactorPassed">>) {
   const { principal } = ctx;
-  const otherSession = principal.role === "GUEST" ? await claimSession(ctx) : false;
+  // A session that has not passed its SMS code never becomes the world's (ADR-0029).
+  const secondFactorPassed = ctx.secondFactorPassed !== false;
+  const otherSession = principal.role === "GUEST" && secondFactorPassed ? await claimSession(ctx) : false;
   const acts = principal.role === "SUPERVISOR" || principal.role === "GUEST";
   return {
     userId: principal.userId,
@@ -105,6 +108,7 @@ export async function sessionOf(ctx: SessionCtx) {
     canChangePassword: principal.role !== "GUEST",
     canSetupMfa: principal.role !== "GUEST",
     canDeleteAccount: isSignupGuest(principal),
+    phoneVerificationRequired: !secondFactorPassed,
   };
 }
 

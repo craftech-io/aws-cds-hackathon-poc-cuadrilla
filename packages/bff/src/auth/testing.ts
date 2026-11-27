@@ -10,6 +10,7 @@ import { createMemoryConnector } from "../connector/index";
 import type { Connector } from "../connector/ports";
 import { createLogger } from "../lib/log";
 import type { ContextDeps } from "../routers/deps";
+import { passedGate } from "../phone/testing";
 import { memorySignupPorts } from "../signup/testing";
 import { cognitoIssuer } from "./config";
 import { type IdTokenVerifier, createCognitoIdTokenVerifier, staticJwksFetcher } from "./jwt";
@@ -116,6 +117,7 @@ export function testContextDeps(issuer: TestIssuer, overrides: Partial<ContextDe
     loggerFor: (correlationId) => createLogger({ correlationId, level: "debug", sink: (line) => void lines.push(line) }),
     signup: () => signup,
     ...overrides,
+    phoneGate: overrides.phoneGate ?? passedGate(),
   };
 }
 

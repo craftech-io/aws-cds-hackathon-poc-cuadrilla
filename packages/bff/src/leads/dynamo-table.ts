@@ -13,6 +13,7 @@ import {
   PutCommand,
   QueryCommand,
   ScanCommand,
+  UpdateCommand,
   type TransactWriteCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import { ConnectorError } from "@cuadrilla/shared";
@@ -111,6 +112,23 @@ export function createDynamoLeadTable(options: DynamoLeadTableOptions = {}): Lea
       const put = leadPutTransactItem(table(), lead, expectedVersion).Put;
       if (put === undefined) throw new RangeError("a lead put without its Put");
       return conditional(() => client().send(new PutCommand(put)));
+    },
+
+    // An UpdateItem that names only the phone, the version and the date: the BFF may write nothing else
+    // of a confirmed lead (`dynamodb:Attributes`, infra/leads-spec.ts).
+    patchPhone(emailHash, patch, expectedVersion) {
+      return conditional(() =>
+        client().send(
+          new UpdateCommand({
+            TableName: table(),
+            Key: leadKey(emailHash),
+            UpdateExpression: "SET #p = :p, #pv = :pv, #u = :u, #v = :next",
+            ConditionExpression: "#v = :v",
+            ExpressionAttributeNames: { "#p": "phone", "#pv": "phoneVerifiedAt", "#u": "updatedAt", "#v": "version" },
+            ExpressionAttributeValues: { ":p": patch.phone, ":pv": patch.phoneVerifiedAt, ":u": patch.phoneVerifiedAt, ":v": expectedVersion, ":next": expectedVersion + 1 },
+          }),
+        ),
+      );
     },
 
     deleteMeta(emailHash, expectedVersion) {

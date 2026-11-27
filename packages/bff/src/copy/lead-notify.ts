@@ -32,6 +32,8 @@ export interface LeadNoticeInput {
   readonly referrerOrigin?: string | undefined;
   /** ISO instant of the sign-up (the confirmation). */
   readonly signupAt: string;
+  /** The phone the account verified by SMS (ADR-0029): the notice goes out only once it exists. */
+  readonly phone?: string | undefined;
   /** `leads:notify-test`: marked "PRUEBA", fictitious data. */
   readonly test?: boolean;
 }
@@ -99,6 +101,7 @@ export function renderLeadNotice(input: LeadNoticeInput): LeadNotice {
     "",
     `Referencia: ${input.leadId}`,
     `Fecha de alta: ${formatInstant(input.signupAt)}`,
+    `Teléfono verificado por SMS: ${input.phone === undefined ? "(sin verificar)" : input.phone.replace(/[^+\d]/g, "")}`,
     `Idioma: ${LANGUAGE[input.locale] ?? "sin indicar"}`,
     `Consentimiento de contacto: ${input.contactAccepted ? "sí" : "no"} (versión ${input.contactVersion})`,
     `Origen: ${input.origin === "WEB" ? "web" : "prueba interna"}`,

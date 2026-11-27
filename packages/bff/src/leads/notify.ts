@@ -1,5 +1,5 @@
-// The notice to Craftech for a confirmed lead (ADR-0026, docs/architecture-integrations.md §9.3):
-// exactly one per lead. `notifiedAt` is claimed with a condition BEFORE the send, so a retry of the
+// The notice to Craftech for a confirmed lead (ADR-0026, docs/architecture-integrations.md §9.3), sent
+// once its account verified a phone by SMS (ADR-0029) and with that phone: exactly one per lead. `notifiedAt` is claimed with a condition BEFORE the send, so a retry of the
 // stream never sends twice; a send that fails gives the claim back (`notifyOutcome FAILED`) and throws,
 // so the stream retries and, after its retries, the record lands in `LeadStreamDlq` with its alarm.
 //
@@ -32,7 +32,7 @@ export interface NotifyDeps {
   readonly log: Logger;
 }
 
-export type NotifyResult = "SENT" | "SUPPRESSED_QA" | "ALREADY_NOTIFIED" | "NOT_CONFIRMED";
+export type NotifyResult = "SENT" | "SUPPRESSED_QA" | "ALREADY_NOTIFIED" | "NOT_CONFIRMED" | "PHONE_NOT_VERIFIED";
 
 /** What the notice says about a lead: its reference, the contact, the consent in force and the attribution. */
 export function noticeInputOf(lead: Lead): LeadNoticeInput {
@@ -49,6 +49,7 @@ export function noticeInputOf(lead: Lead): LeadNoticeInput {
     utm: lead.utm,
     referrerOrigin: lead.referrerOrigin,
     signupAt: lead.confirmedAt ?? lead.signupStartedAt,
+    ...(lead.phoneVerifiedAt === undefined ? {} : { phone: lead.phone }),
   };
 }
 
@@ -74,12 +75,13 @@ export async function sendLeadNotice(deps: Pick<NotifyDeps, "ses" | "channel" | 
   return output.MessageId;
 }
 
-/** The notice of one confirmed lead, at most once. */
+/** The notice of one confirmed lead whose account verified its phone (ADR-0029), at most once. */
 export async function notifyConfirmedLead(deps: NotifyDeps, emailHash: string): Promise<NotifyResult> {
   const lead = await deps.store.get(emailHash);
   if (lead === undefined || lead.status !== "CONFIRMED") return "NOT_CONFIRMED";
   const fields = { leadId: lead.leadId, emailHashPrefix: hashPrefix(emailHashOfPartition(lead.PK)) };
   if (lead.notifiedAt !== undefined) return "ALREADY_NOTIFIED";
+  if (lead.phoneVerifiedAt === undefined) return "PHONE_NOT_VERIFIED";
 
   if (lead.origin === "QA") {
     const claimed = await deps.store.claimNotice(emailHash, "SUPPRESSED_QA", deps.now());

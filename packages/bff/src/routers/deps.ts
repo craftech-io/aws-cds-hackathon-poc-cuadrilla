@@ -17,7 +17,10 @@ import { readLinked } from "../lib/resource";
 import { withRetry } from "../lib/retry";
 import { type NetworkClient, networkClient } from "../network/client";
 import { type HttpResponse, type HttpTransport, sigv4Transport } from "../network/sigv4";
+import type { PhonePorts } from "../phone/flow";
+import { type SessionGate, createSessionGate } from "../phone/session";
 import type { SignupPorts } from "../signup/start";
+import { tableClient } from "../connector/index";
 import type { GuestPorts } from "./guest";
 
 export type MockHealth = "OK" | "UNAVAILABLE";
@@ -48,6 +51,10 @@ export interface ContextDeps {
    */
   readonly signup?: () => SignupPorts;
   readonly guest?: () => GuestPorts;
+  /** Sessions that passed the SMS code (ADR-0029); the Lambda's reads `Runtime`, a test's may be a stand-in. */
+  readonly phoneGate: SessionGate;
+  /** The ports of the `phone` router for a local server or a test; the Lambda builds its own from the links. */
+  readonly phone?: () => PhonePorts;
 }
 
 // Same budget as the network client (docs/architecture-integrations.md §6): 3 s per attempt, 2 retries.
@@ -138,6 +145,7 @@ export function defaultDeps(): ContextDeps {
     verifier: createCognitoIdTokenVerifier(config),
     connector: data,
     users: createUserDirectory(data.isps),
+    phoneGate: createSessionGate(tableClient()),
     mocks: createMockHealthProbe({ network: networkClient(), dispatch: linkedDispatchTransport() }),
     wallClock: () => new Date(),
     loggerFor: (correlationId: string) => createLogger({ correlationId, bindings: { service: "bff" } }),

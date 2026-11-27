@@ -1,7 +1,7 @@
 // The two security prompts of the console, in place, without leaving the view:
 //   stepUp      LOGIN_NOT_RECENT: the same person signs in again (password, and the code when TOTP is
-//               on), which gives a fresh `auth_time`; the tokens are swapped and the old refresh
-//               token revoked.
+//               on), which gives a fresh `auth_time`; the new session keeps the SMS pass of this one
+//               (`phone.carrySession`, ADR-0029), the tokens are swapped and the old refresh token revoked.
 //   enrollTotp  the optional TOTP: associate a software token with the session's access token,
 //               scan, verify, make it the preferred factor. Never offered to a guest.
 // Opened from ApiErrorNotice through the session context; mounted once by app.tsx.
@@ -11,6 +11,7 @@ import { Drawer } from "../../components/Drawer";
 import { useSession } from "../../context/SessionContext";
 import { signInIdOf } from "../../lib/auth-claims";
 import { flowDeps } from "../../lib/auth/deps";
+import { createConsoleClient } from "../../lib/trpc";
 import type { AuthFlowDeps, AuthFlowState } from "../../lib/auth/flow";
 import { AuthFlowPanel } from "./AuthFlowPanel";
 import { loginCopy } from "./copy";
@@ -35,9 +36,13 @@ function StepUp({ onClose }: { readonly onClose: () => void }) {
   const signInId = principal === undefined ? undefined : signInIdOf(principal);
   const deps = useMemo(() => (auth && sub && signInId ? flowDeps(auth.cognito, auth.srp, { kind: "stepUp", sub, email: signInId }) : undefined), [auth, sub, signInId]);
   const flow = useAuthFlow(deps, (done) => {
-    if (auth && previous?.refreshToken) void auth.cognito.revoke(previous.refreshToken).catch(() => undefined);
-    completeSignIn(done.tokens);
-    setFinished(true);
+    // The new session of the same person keeps the SMS pass of this one (ADR-0029); then the swap.
+    const carried = previous === undefined ? Promise.resolve() : createConsoleClient(() => done.tokens.idToken).phone.carrySession.mutate({ previousIdToken: previous.idToken }).then(() => undefined, () => undefined);
+    void carried.then(() => {
+      if (auth && previous?.refreshToken) void auth.cognito.revoke(previous.refreshToken).catch(() => undefined);
+      completeSignIn(done.tokens);
+      setFinished(true);
+    });
   });
 
   if (finished) return <Finished text={loginCopy.stepUp.done} onClose={onClose} />;

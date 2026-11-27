@@ -1,7 +1,8 @@
 // Root router of the console: one key per feature (docs/tool-catalog.md "Procedimientos de la
 // consola"), each built from the procedures of ./trpc. The web client is typed against `AppRouter`.
 // Public, without any world's data: `health.live`, `brand.get` and `signup.start` (the own sign-up,
-// ADR-0025); everything else needs a principal of an operator (`ispProcedure` and its narrower ones).
+// ADR-0025); everything else needs a principal of an operator (`ispProcedure` and its narrower ones)
+// whose session passed the SMS code (`phone`, ADR-0029).
 //
 // `createQaCaller` is how the `QaDriver` runs `console.*` actions (ADR-0007): the real router and
 // middlewares, with a principal built on the server and bound to the world the action names.
@@ -19,6 +20,7 @@ import { metricsRouter } from "./metrics";
 import { ordersRouter } from "./orders";
 import { outboxRouter } from "./outbox";
 import { peopleRouter } from "./people";
+import { phoneRouter } from "./phone";
 import { signupRouter } from "./signup";
 import { simulatorRouter } from "./simulator";
 import { tourRouter } from "./tour";
@@ -30,6 +32,7 @@ export const appRouter = router({
   signup: signupRouter,
   guest: guestRouter,
   account: accountRouter,
+  phone: phoneRouter,
   orders: ordersRouter,
   cases: casesRouter,
   evidence: evidenceRouter,

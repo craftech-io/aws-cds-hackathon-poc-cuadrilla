@@ -41,6 +41,8 @@ export const CLIENT_TIMEOUTS = {
   scheduler: { requestTimeoutMs: 5_000, connectionTimeoutMs: CONNECT_MS, maxAttempts: 3 },
   sqs: { requestTimeoutMs: 5_000, connectionTimeoutMs: CONNECT_MS, maxAttempts: 3 },
   sns: { requestTimeoutMs: 5_000, connectionTimeoutMs: CONNECT_MS, maxAttempts: 3 },
+  /** SMS codes (phone/sms.ts): one attempt only, a retry could deliver a second code. */
+  sms: { requestTimeoutMs: 5_000, connectionTimeoutMs: CONNECT_MS, maxAttempts: 1 },
   eventBridge: { requestTimeoutMs: 5_000, connectionTimeoutMs: CONNECT_MS, maxAttempts: 3 },
   lambda: { requestTimeoutMs: 35_000, connectionTimeoutMs: CONNECT_MS, maxAttempts: 2 },
   cognito: { requestTimeoutMs: 5_000, connectionTimeoutMs: CONNECT_MS, maxAttempts: 3 },

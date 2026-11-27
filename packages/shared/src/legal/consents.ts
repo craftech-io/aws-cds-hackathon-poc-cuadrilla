@@ -41,7 +41,7 @@ export interface ConsentDefinition {
 }
 
 /** Version in force of both consents and of the legal pages. */
-export const CONSENTS_VERSION = "2026-10-06";
+export const CONSENTS_VERSION = "2026-11-27";
 
 export const TERMS_PRIVACY: ConsentDefinition = {
   id: "TERMS_PRIVACY",
@@ -49,8 +49,8 @@ export const TERMS_PRIVACY: ConsentDefinition = {
   required: true,
   text: {
     "es-MX":
-      "Acepto los Términos y el Aviso de privacidad de Craftech, incluida la transferencia de mis datos a Estados Unidos y a otras regiones de AWS descrita en el aviso.",
-    en: "I accept Craftech's Terms and Privacy Notice, including the transfer of my data to the United States and other AWS regions described in the notice.",
+      "Acepto los Términos y el Aviso de privacidad de Craftech, incluida la transferencia de mis datos a Estados Unidos y a otras regiones de AWS descrita en el aviso, y que mi celular se use para verificar mi cuenta con un código por SMS.",
+    en: "I accept Craftech's Terms and Privacy Notice, including the transfer of my data to the United States and other AWS regions described in the notice, and that my mobile phone is used to verify my account with a code by SMS.",
   },
   links: {
     "es-MX": [

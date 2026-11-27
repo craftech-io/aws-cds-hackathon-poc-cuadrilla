@@ -17,6 +17,8 @@ export interface SignupCopy {
   readonly title: string;
   readonly lead: string;
   readonly email: string;
+  readonly phone: string;
+  readonly phoneHint: string;
   readonly password: string;
   readonly optional: string;
   readonly name: string;
@@ -43,8 +45,10 @@ export interface SignupCopy {
 export const signupCopy: Readonly<Record<SignupLang, SignupCopy>> = {
   es: {
     title: "Crea tu cuenta",
-    lead: "Entras con esta cuenta y tu propio mundo de prueba se crea al confirmar el email.",
+    lead: "Entras con esta cuenta y tu propio mundo de prueba se crea al confirmar tu email y tu celular.",
     email: "Email",
+    phone: "Celular",
+    phoneHint: "Con el prefijo internacional, por ejemplo +52 55 1234 5678. Lo usamos solo para verificar tu cuenta con un código por SMS.",
     password: "Contraseña",
     optional: "Opcional",
     name: "Nombre (opcional)",
@@ -71,6 +75,7 @@ export const signupCopy: Readonly<Record<SignupLang, SignupCopy>> = {
       TICKET_INVALID: ["La sesión del formulario venció, intenta de nuevo."],
       EMAIL_DOMAIN: ["Revisa tu email: ese dominio no puede recibir correo."],
       EMAIL_NOT_ACCEPTED: ["Usa tu email de trabajo o uno personal: no aceptamos casillas temporales."],
+      PHONE_INVALID: ["Revisa tu celular: escríbelo con el prefijo internacional, + y de 8 a 15 dígitos."],
       UNAVAILABLE: ["No pudimos crear tu cuenta en este momento. Intenta de nuevo en unos minutos."],
       BROWSER_CHECK: ["No pudimos verificar tu navegador. Recarga la página, desactiva el bloqueador de contenido para este sitio o intenta desde otro navegador."],
       WEAK_PASSWORD: ["La contraseña no cumple los requisitos."],
@@ -80,8 +85,10 @@ export const signupCopy: Readonly<Record<SignupLang, SignupCopy>> = {
   },
   en: {
     title: "Create your account",
-    lead: "Sign in with this account and your own test world is created once you confirm your email.",
+    lead: "Sign in with this account and your own test world is created once you confirm your email and your phone.",
     email: "Email",
+    phone: "Mobile phone",
+    phoneHint: "With the international prefix, for example +1 415 555 0100. We use it only to verify your account with a code by SMS.",
     password: "Password",
     optional: "Optional",
     name: "Name (optional)",
@@ -108,6 +115,7 @@ export const signupCopy: Readonly<Record<SignupLang, SignupCopy>> = {
       TICKET_INVALID: ["The form session expired, please try again."],
       EMAIL_DOMAIN: ["Check your email: that domain can't receive mail."],
       EMAIL_NOT_ACCEPTED: ["Use your work email or a personal one: temporary mailboxes aren't accepted."],
+      PHONE_INVALID: ["Check your phone: write it with the international prefix, + and 8 to 15 digits."],
       UNAVAILABLE: ["We couldn't create your account right now. Please try again in a few minutes."],
       BROWSER_CHECK: ["We couldn't verify your browser. Reload the page, turn off your content blocker for this site, or try another browser."],
       WEAK_PASSWORD: ["The password doesn't meet the requirements."],

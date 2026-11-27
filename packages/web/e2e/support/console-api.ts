@@ -1,6 +1,7 @@
 // The procedures the shell reads, answered on `/api/*` in the tRPC batch protocol, for the specs that
-// run on Vite alone (login.spec.ts, wave 1): `brand.get`, `clock.get` and the bar's clock controls, and
-// `guest.world` (a world READY) for the guest's portada, where every guest lands after signing in.
+// run on Vite alone (login.spec.ts, wave 1): `brand.get`, `clock.get` and the bar's clock controls,
+// `guest.world` (a world READY) for the guest's portada, where every guest lands after signing in, and
+// `phone.status` PASSED (the session's SMS code, ADR-0029, has its own spec).
 // The spec sets what they answer (and can refuse the next call of a procedure) and reads every call.
 // The specs of the views run against the real router in tests/ui-server/ instead.
 import type { Page, Route } from "@playwright/test";
@@ -91,6 +92,11 @@ function answer(state: ConsoleApiState, path: string, input: unknown) {
       return data(state.clock);
     case "guest.world":
       return data(readyWorld());
+    // The session already passed its SMS code (the code's screen has its own spec, phone.spec.ts).
+    case "phone.status":
+      return data({ state: "PASSED", codeSent: false });
+    case "phone.endSession":
+      return data({ ended: true });
     case "clock.advance":
       state.clock.simNow = shiftSim(state.clock.simNow, MINUTES(input));
       return data({ simNow: state.clock.simNow });

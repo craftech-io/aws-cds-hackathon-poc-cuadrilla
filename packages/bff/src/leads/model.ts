@@ -47,6 +47,8 @@ export const SignupUserId = z.string().regex(SIGNUP_USER_ID_PATTERN, "expected u
 const Ulid = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
 const Iso = z.iso.datetime({ offset: true });
 const Text80 = z.string().trim().min(1).max(80);
+/** E.164: `+` and 8 to 15 digits (phone/number.ts). */
+export const AccountPhone = z.string().regex(/^\+[1-9]\d{7,14}$/);
 
 /** Who decided: the server, never a field of the request (ADR-0025 §7). */
 export const LeadOrigin = z.enum(["WEB", "QA"]);
@@ -95,6 +97,8 @@ export const PendingStart = z
     utm: Utm.optional(),
     referrerOrigin: z.string().max(300).optional(),
     consents: z.object({ TERMS_PRIVACY: ConsentRecord, CONTACT: ConsentRecord }).strict(),
+    /** The phone the form asked for (E.164), to prefill the account's SMS enrolment (ADR-0029). */
+    phone: AccountPhone.optional(),
     at: Iso,
   })
   .strict();
@@ -148,6 +152,12 @@ export const Lead = z.object({
   subKey: z.string().startsWith(LEAD_SUB_PREFIX).optional(),
   notifiedAt: Iso.optional(),
   notifyOutcome: NotifyOutcome.optional(),
+  /**
+   * The phone of the account: typed at the sign-up until `phoneVerifiedAt` says the account verified it
+   * by SMS (ADR-0029). Only a verified lead is notified to Craftech and counts as contactable.
+   */
+  phone: AccountPhone.optional(),
+  phoneVerifiedAt: Iso.optional(),
   expiresAt: z.int().min(0),
   version: z.int().min(1),
   createdAt: Iso,
@@ -155,7 +165,7 @@ export const Lead = z.object({
 });
 export type Lead = z.infer<typeof Lead>;
 
-export const LeadEventKind = z.enum(["STARTED", "CONFIRMED", "LOGIN", "NOTIFIED", "EXPORTED", "CONTACT_WITHDRAWN", "DELETION_REQUESTED"]);
+export const LeadEventKind = z.enum(["STARTED", "CONFIRMED", "PHONE_VERIFIED", "LOGIN", "NOTIFIED", "EXPORTED", "CONTACT_WITHDRAWN", "DELETION_REQUESTED"]);
 export type LeadEventKind = z.infer<typeof LeadEventKind>;
 
 export const LeadActor = z.enum(["GUEST", "OPERATOR", "TTL", "SYSTEM"]);

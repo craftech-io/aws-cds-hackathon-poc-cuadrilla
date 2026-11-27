@@ -2,6 +2,7 @@
 // that writes. In this order, and nothing is written before the step that writes:
 //
 //   1. the form (zod, strict; the password is never here)                    INVALID (INVALID_FORM)
+//      and its phone, an international E.164 number of any country            INVALID (PHONE_INVALID)
 //   2. who is asking: the viewer of the edge (no other caller starts a sign-up) UNAVAILABLE (NO_VIEWER)
 //   3. the two consents against their version in force                       INVALID (CONSENT_…)
 //   4. the cut of the sign-up (KILL#SIGNUP, KILL#ALL)                          CAP_REACHED
@@ -33,6 +34,7 @@ import { type KillSwitchReader, blockingScope } from "../ops/kill-switch";
 import type { EdgeContext } from "../routers/trpc";
 import { isDisposableDomain } from "./disposable-domains";
 import { type DnsResolver, domainOf, emailDomainVerdict } from "./email-domain";
+import { parseAccountPhone } from "../phone/number";
 import { parseSignupForm } from "./form";
 import { SIGNUP_LIMITS, confirmedAccountsOf, ipHashOf, reserveStart } from "./limits";
 import { SIGNUP_TICKET_TTL_MS, issueTicket } from "./ticket";
@@ -67,9 +69,9 @@ export interface SignupStarted {
   readonly expiresAt: string;
 }
 
-export type SignupRefusal = "INVALID_FORM" | "NO_VIEWER" | "CONSENT" | "EMAIL_NOT_ACCEPTED" | "EMAIL_DOMAIN" | "RATE_LIMITED" | "CAP_REACHED" | "UNAVAILABLE";
+export type SignupRefusal = "INVALID_FORM" | "PHONE_INVALID" | "NO_VIEWER" | "CONSENT" | "EMAIL_NOT_ACCEPTED" | "EMAIL_DOMAIN" | "RATE_LIMITED" | "CAP_REACHED" | "UNAVAILABLE";
 
-const REFUSALS: Readonly<Record<Exclude<SignupRefusal, "INVALID_FORM" | "CONSENT">, () => ToolError>> = {
+const REFUSALS: Readonly<Record<Exclude<SignupRefusal, "INVALID_FORM" | "PHONE_INVALID" | "CONSENT">, () => ToolError>> = {
   NO_VIEWER: () => new ToolError("UNAVAILABLE", "the account could not be created right now", "NO_VIEWER"),
   EMAIL_NOT_ACCEPTED: () => new ToolError("INVALID", "disposable mailboxes are not accepted", "EMAIL_NOT_ACCEPTED"),
   EMAIL_DOMAIN: () => new ToolError("INVALID", "the domain of this email cannot receive mail", "EMAIL_DOMAIN"),
@@ -94,6 +96,12 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
     form = parseSignupForm(call.input);
   } catch (error) {
     return refuse("INVALID_FORM", error as ToolError);
+  }
+  let phone: string;
+  try {
+    phone = parseAccountPhone(form.phone);
+  } catch (error) {
+    return refuse("PHONE_INVALID", error as ToolError);
   }
   const origin = viewerOf(call);
   if (origin === undefined) return refuse("NO_VIEWER", REFUSALS.NO_VIEWER());
@@ -139,6 +147,7 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
     name: form.name,
     company: form.company,
     jobTitle: form.jobTitle,
+    phone,
     ...leadAttribution({ utm: form.attribution?.utm, referrer: form.attribution?.referrer }),
     consents,
     at: now,

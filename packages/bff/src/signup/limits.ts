@@ -57,17 +57,17 @@ export interface VisitorKeys {
   readonly anonymous: boolean;
 }
 
-interface CounterSpec {
+export interface CounterSpec {
   readonly key: string;
   readonly limit: number;
   readonly periodEndsAt: Date;
 }
 
-function endOfHour(at: Date): Date {
+export function endOfHour(at: Date): Date {
   return new Date(Math.floor(at.getTime() / HOUR_MS) * HOUR_MS + HOUR_MS);
 }
 
-function endOfDay(at: Date): Date {
+export function endOfDay(at: Date): Date {
   return new Date(Math.floor(at.getTime() / DAY_MS) * DAY_MS + DAY_MS);
 }
 
@@ -88,7 +88,8 @@ export function visitorCounters(keys: VisitorKeys, at: Date): CounterSpec[] {
   return specs;
 }
 
-function incrementOp(spec: CounterSpec, at: Date): TransactOp {
+/** One counter of a period, raised by one only below its limit (the transaction fails as a whole above it). */
+export function counterIncrementOp(spec: CounterSpec, at: Date, entity = "SignupCounter"): TransactOp {
   return {
     op: "increment",
     table: "Runtime",
@@ -97,7 +98,7 @@ function incrementOp(spec: CounterSpec, at: Date): TransactOp {
     by: 1,
     max: spec.limit,
     defaults: {
-      entity: "SignupCounter",
+      entity,
       capLimit: spec.limit,
       createdAt: at.toISOString(),
       expiresAt: Math.floor(spec.periodEndsAt.getTime() / 1000) + COUNTER_TTL_AFTER_PERIOD_SECONDS,
@@ -107,7 +108,7 @@ function incrementOp(spec: CounterSpec, at: Date): TransactOp {
 
 export type ReserveOutcome = "RESERVED" | "RATE_LIMITED" | "CAP_REACHED";
 
-function isFull(error: unknown): boolean {
+export function isFull(error: unknown): boolean {
   return error instanceof ConnectorError && error.code === "CONFLICT";
 }
 
@@ -118,13 +119,13 @@ function isFull(error: unknown): boolean {
 export async function reserveStart(client: TableClient, keys: VisitorKeys, at: Date): Promise<ReserveOutcome> {
   const iso = at.toISOString();
   try {
-    await client.transact(visitorCounters(keys, at).map((spec) => incrementOp(spec, at)), iso);
+    await client.transact(visitorCounters(keys, at).map((spec) => counterIncrementOp(spec, at)), iso);
   } catch (error) {
     if (isFull(error)) return "RATE_LIMITED";
     throw error;
   }
   try {
-    await client.transact([incrementOp({ key: globalDayKey(at), limit: SIGNUP_LIMITS.startsPerDay, periodEndsAt: endOfDay(at) }, at)], iso);
+    await client.transact([counterIncrementOp({ key: globalDayKey(at), limit: SIGNUP_LIMITS.startsPerDay, periodEndsAt: endOfDay(at) }, at)], iso);
   } catch (error) {
     if (isFull(error)) return "CAP_REACHED";
     throw error;
@@ -132,7 +133,7 @@ export async function reserveStart(client: TableClient, keys: VisitorKeys, at: D
   return "RESERVED";
 }
 
-function numberOf(item: Item | undefined, attribute: string): number {
+export function numberOf(item: Item | undefined, attribute: string): number {
   const value = item?.[attribute];
   return typeof value === "number" ? value : 0;
 }

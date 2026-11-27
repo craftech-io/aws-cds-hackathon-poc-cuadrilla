@@ -5,7 +5,7 @@ import type { LeadConfigValue } from "../lib/secret-schemas";
 import type { LeadNotifyChannel } from "./config";
 import { type NotifyDeps, notifyConfirmedLead } from "./notify";
 import type { LeadStore } from "./store";
-import { NOTIFY_FIXTURE, T0, confirmedLead, hashOf, leadHarness, startLead } from "./testing";
+import { NOTIFY_FIXTURE, T0, VERIFIED_PHONE, confirmedLead, hashOf, leadHarness, startLead, verifiedLead } from "./testing";
 
 const CHANNEL: LeadNotifyChannel = { identityDomain: "cuadrilla.demo.craftech.io", configurationSetName: "cuadrilla-email-test", sender: "leads@cuadrilla.demo.craftech.io" };
 const CONFIG: LeadConfigValue = { notifyRecipients: [NOTIFY_FIXTURE] };
@@ -47,7 +47,7 @@ describe("notice of a new lead to Craftech [FL-116]", () => {
   });
 
   it("[FL-116] sends exactly one notice per confirmed lead: a retry of the stream never duplicates it", async () => {
-    await confirmedLead(h.store, { contact: true, company: "Fibra Demo" });
+    await verifiedLead(h.store, { contact: true, company: "Fibra Demo" });
     expect(await notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"))).toBe("SENT");
     expect(await notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"))).toBe("ALREADY_NOTIFIED");
     expect(h.sent).toHaveLength(1);
@@ -57,7 +57,7 @@ describe("notice of a new lead to Craftech [FL-116]", () => {
   });
 
   it("[FL-116] goes from leads@ to the fenced Craftech mailboxes, through the app's configuration set, tagged LEAD_NOTIFY", async () => {
-    await confirmedLead(h.store);
+    await verifiedLead(h.store);
     await notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"));
     const [input] = h.sent;
     expect(input?.FromEmailAddress).toMatch(/<leads@cuadrilla\.demo\.craftech\.io>$/);
@@ -71,17 +71,36 @@ describe("notice of a new lead to Craftech [FL-116]", () => {
 
   it("[FL-116] never reaches a recipient outside craftech.io, even if the secret was set by hand", async () => {
     const bad = harness({ notifyRecipients: ["leads@craftech.io.evil.test"] } as LeadConfigValue);
-    await confirmedLead(bad.store);
+    await verifiedLead(bad.store);
     await expect(notifyConfirmedLead(bad.deps, hashOf("ana.prueba@example.com"))).rejects.toThrow(RangeError);
     expect(bad.sent).toHaveLength(0);
     expect((await bad.store.get(hashOf("ana.prueba@example.com")))?.notifiedAt).toBeUndefined();
   });
 
   it("[FL-116] suppresses the leads of the QA seam (SUPPRESSED_QA) and sends nothing", async () => {
-    await confirmedLead(h.store, { email: "success+qa-run-1@simulator.amazonses.com" });
+    await verifiedLead(h.store, { email: "success+qa-run-1@simulator.amazonses.com" });
     expect(await notifyConfirmedLead(h.deps, hashOf("success+qa-run-1@simulator.amazonses.com"))).toBe("SUPPRESSED_QA");
     expect(h.sent).toHaveLength(0);
     expect((await h.store.get(hashOf("success+qa-run-1@simulator.amazonses.com")))?.notifyOutcome).toBe("SUPPRESSED_QA");
+  });
+
+  it("[FL-123] a confirmed lead whose account never verified a phone is never notified; a verified one carries its phone", async () => {
+    await confirmedLead(h.store);
+    expect(await notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"))).toBe("PHONE_NOT_VERIFIED");
+    expect(h.sent).toHaveLength(0);
+    expect((await h.store.get(hashOf("ana.prueba@example.com")))?.notifiedAt).toBeUndefined();
+    await h.store.verifyPhone(hashOf("ana.prueba@example.com"), { sub: "sub-0001", phone: VERIFIED_PHONE, at: T0 });
+    expect(await notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"))).toBe("SENT");
+    expect(h.sent[0]?.Content?.Simple?.Body?.Text?.Data).toContain(`Teléfono verificado por SMS: ${VERIFIED_PHONE}`);
+  });
+
+  it("[FL-123] the phone is recorded only for the account that confirmed the lead, and only once", async () => {
+    await confirmedLead(h.store);
+    expect(await h.store.verifyPhone(hashOf("ana.prueba@example.com"), { sub: "sub-other", phone: VERIFIED_PHONE, at: T0 })).toBe(false);
+    expect(await h.store.verifyPhone(hashOf("ana.prueba@example.com"), { sub: "sub-0001", phone: VERIFIED_PHONE, at: T0 })).toBe(true);
+    expect(await h.store.verifyPhone(hashOf("ana.prueba@example.com"), { sub: "sub-0001", phone: "+525500000002", at: T0 })).toBe(false);
+    expect(await h.store.get(hashOf("ana.prueba@example.com"))).toMatchObject({ phone: VERIFIED_PHONE, phoneVerifiedAt: T0.toISOString() });
+    expect((await h.store.listEvents(hashOf("ana.prueba@example.com"))).map((event) => event.kind)).toContain("PHONE_VERIFIED");
   });
 
   it("[FL-116] does nothing for a lead that is not confirmed", async () => {
@@ -92,7 +111,7 @@ describe("notice of a new lead to Craftech [FL-116]", () => {
   });
 
   it("[FL-116] escapes the visitor's fields, turns nothing into a link and neutralizes every domain, under 'sin verificar'", async () => {
-    await confirmedLead(h.store, HOSTILE);
+    await verifiedLead(h.store, HOSTILE);
     await notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"));
     const simple = h.sent[0]?.Content?.Simple;
     const text = simple?.Body?.Text?.Data ?? "";
@@ -109,7 +128,7 @@ describe("notice of a new lead to Craftech [FL-116]", () => {
   });
 
   it("[FL-116] without the contact consent, the subject and the first line say NO CONTACTAR", async () => {
-    await confirmedLead(h.store, { contact: false, company: "Fibra Demo" });
+    await verifiedLead(h.store, { contact: false, company: "Fibra Demo" });
     await notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"));
     const simple = h.sent[0]?.Content?.Simple;
     expect(simple?.Subject?.Data?.startsWith("NO CONTACTAR · ")).toBe(true);
@@ -117,7 +136,7 @@ describe("notice of a new lead to Craftech [FL-116]", () => {
   });
 
   it("[FL-116] a failed send gives the claim back (FAILED) and throws, so the stream retries and sends once", async () => {
-    await confirmedLead(h.store);
+    await verifiedLead(h.store);
     h.send.mockRejectedValueOnce(Object.assign(new Error("throttled"), { name: "TooManyRequestsException" }));
     await expect(notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"))).rejects.toThrow("throttled");
     expect((await h.store.get(hashOf("ana.prueba@example.com")))).toMatchObject({ notifyOutcome: "FAILED" });
@@ -127,7 +146,7 @@ describe("notice of a new lead to Craftech [FL-116]", () => {
   });
 
   it("[FL-116] never writes the lead's email in a log line (only the leadId and emailHash[0:8])", async () => {
-    await confirmedLead(h.store, { email: "Ana.Prueba@Example.com" });
+    await verifiedLead(h.store, { email: "Ana.Prueba@Example.com" });
     await notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"));
     const all = h.lines.join("\n");
     expect(all).not.toMatch(/ana\.prueba/i);
@@ -140,7 +159,7 @@ describe("notice of a new lead to Craftech [FL-116]", () => {
 describe("the notice as the reference of an erasure [FL-118]", () => {
   it("[FL-118] carries the leadId, so the operator finds and deletes it from the mailboxes after a deletion", async () => {
     const h = harness();
-    const lead = await confirmedLead(h.store);
+    const lead = await verifiedLead(h.store);
     await notifyConfirmedLead(h.deps, hashOf("ana.prueba@example.com"));
     expect(h.sent[0]?.Content?.Simple?.Body?.Text?.Data).toContain(`Referencia: ${lead.leadId}`);
   });

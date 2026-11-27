@@ -1,4 +1,5 @@
-// The `signUp` step (docs/landing-spec.md §7.3): email and password (the pool's policy as a live
+// The `signUp` step (docs/landing-spec.md §7.3): email, mobile phone (required, international, ADR-0029)
+// and password (the pool's policy as a live
 // checklist), then, after an "Opcional" separator, name, company and job title (≤ 80), then the two
 // consents, unchecked. "Crear cuenta" stays disabled until TERMS_PRIVACY is checked, the email looks like
 // one and the AWS WAF token is at hand; CONTACT never blocks. What is typed stays in this component's
@@ -21,7 +22,7 @@ interface SignUpFormProps {
 const MAX_OPTIONAL = 80;
 
 export function SignUpForm({ copy, locale, busy, wafReady, onSubmit }: SignUpFormProps) {
-  const [form, setForm] = useState<SignupFormValues>({ email: "", password: "", name: "", company: "", jobTitle: "", terms: false, contact: false });
+  const [form, setForm] = useState<SignupFormValues>({ email: "", phone: "", password: "", name: "", company: "", jobTitle: "", terms: false, contact: false });
   const set = <K extends keyof SignupFormValues>(key: K, value: SignupFormValues[K]) => setForm((current) => ({ ...current, [key]: value }));
   const ready = canSubmit(form) && wafReady;
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -33,6 +34,10 @@ export function SignUpForm({ copy, locale, busy, wafReady, onSubmit }: SignUpFor
     <form className="space-y-4" onSubmit={submit} aria-busy={busy || !wafReady}>
       <StepHeading title={copy.title} lead={copy.lead} />
       <Field label={copy.email} type="email" autoComplete="email" inputMode="email" autoCapitalize="off" spellCheck={false} maxLength={254} value={form.email} onChange={(event) => set("email", event.target.value)} required />
+      <Field label={copy.phone} type="tel" autoComplete="tel" inputMode="tel" maxLength={24} placeholder="+52 55 1234 5678" value={form.phone} onChange={(event) => set("phone", event.target.value)} aria-describedby="signup-phone-hint" required />
+      <p id="signup-phone-hint" className="-mt-2 text-xs text-slate">
+        {copy.phoneHint}
+      </p>
       <PasswordField label={copy.password} autoComplete="new-password" value={form.password} onChange={(event) => set("password", event.target.value)} required />
       <PasswordRules password={form.password} />
       <div className="flex items-center gap-3 pt-1" role="separator" aria-label={copy.optional}>

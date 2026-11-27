@@ -131,6 +131,11 @@ export type ShiftRoster = z.infer<typeof ShiftRoster>;
  * `console:invite` fills and a reload keeps. A guest carries its origin (ADR-0024); a guest of the own
  * sign-up also its Cognito user (`gst-<ULID>`, the only handle the deletion calls Cognito with) and
  * its last sign-in, and lives in the operator of its current world generation (ADR-0025 §2).
+ *
+ * The account's own phone (ADR-0029): `phone` and `phoneVerifiedAt` are written only by the BFF when a
+ * session passes its first SMS code (the enrolment), never by the user afterwards; `phoneCheck
+ * AUTOMATION` exempts a scenario or test account from the SMS code and is set only by the operator
+ * (`console:phone --automation`, `qa:confirm-signup`, `auth.confirmQaSignup`), never from a request.
  */
 export const ConsoleUser = defineEntity("ConsoleUser", {
   ispId: IspId,
@@ -143,5 +148,8 @@ export const ConsoleUser = defineEntity("ConsoleUser", {
   guestOrigin: GuestOrigin.optional(),
   cognitoUsername: z.string().regex(/^[A-Za-z0-9_.@+-]{1,128}$/).optional(),
   lastLoginAt: IsoInstant.optional(),
+  phone: z.string().regex(/^\+[1-9]\d{7,14}$/).optional(),
+  phoneVerifiedAt: IsoInstant.optional(),
+  phoneCheck: z.literal("AUTOMATION").optional(),
 });
 export type ConsoleUser = z.infer<typeof ConsoleUser>;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getGuestAccount } from "../guest/account";
 import { SIGNUP_WORLD_LIMITS, worldsDayKey } from "../guest/slots";
 import { EMAIL, QA_EMAIL, SUB, confirmationEvent, guestHarness, hashOf, pendingLead, type GuestHarness } from "../guest/testing";
+import { ensureWorld } from "../guest/sign-in";
 import { signupUserId, username } from "../leads/testing";
 import { createPostConfirmationHandler } from "./post-confirmation";
 
@@ -13,9 +14,11 @@ function handlerOf(harness: GuestHarness, suffixes?: string[]) {
 
 const guestRows = (harness: GuestHarness) => harness.client.dump("Isps").filter((row) => row.entity === "ConsoleUser");
 const ignoredLog = (harness: GuestHarness) => harness.leads.table.logs;
+/** The first session of the account passed its SMS code (ADR-0029): the BFF asks for what it needs. */
+const codePassed = (harness: GuestHarness, sub = SUB) => ensureWorld(harness.signInDeps(), sub);
 
-describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a world", () => {
-  it("[FL-105] a gst-* user with a pending lead that lists it: registry row GUEST/SIGNUP, SIGNUPSUB#, account PROVISIONING, lead CONFIRMED, GuestWorlds asked asynchronously", async () => {
+describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest whose world waits for its phone", () => {
+  it("[FL-105] [FL-123] a gst-* user with a pending lead that lists it: registry row GUEST/SIGNUP, SIGNUPSUB#, account PHONE_PENDING without slot, lead CONFIRMED; the world only after the SMS code", async () => {
     const harness = guestHarness();
     await pendingLead(harness);
     const event = confirmationEvent();
@@ -31,12 +34,19 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     expect(row).not.toHaveProperty("email");
     expect(harness.client.dump("Isps").find((item) => item.SK === "META")).toMatchObject({ ispId: "isp-guest-s261001abcde", kind: "GUEST", world: "guest" });
     expect(await harness.client.get("Runtime", { PK: `SIGNUPSUB#${SUB}`, SK: "META" })).toMatchObject({ userId: USER_ID, username: username(1) });
-    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ guestOrigin: "SIGNUP", clockId: "GUEST#isp-guest-s261001abcde", status: "PROVISIONING", generation: 1, slotDay: "261001", slotScope: "PUBLIC", expiresAtReal: "2026-10-08T15:00:00.000Z" });
+    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ guestOrigin: "SIGNUP", clockId: "GUEST#isp-guest-s261001abcde", status: "PHONE_PENDING", generation: 1, slotScope: "PUBLIC", expiresAtReal: "2026-10-08T15:00:00.000Z" });
+    expect((await getGuestAccount(harness.client, USER_ID))?.slotDay).toBeUndefined();
     const lead = await harness.leads.store.get(hashOf(EMAIL));
     expect(lead).toMatchObject({ status: "CONFIRMED", cognitoSub: SUB, cognitoUsername: username(1), userId: USER_ID });
-    expect(harness.provisioner.requests).toEqual([{ userId: USER_ID, clockId: "GUEST#isp-guest-s261001abcde", origin: "SIGNUP" }]);
+    expect(lead?.phoneVerifiedAt).toBeUndefined();
+    expect(harness.provisioner.requests).toEqual([]);
     const counters = await harness.client.get("Runtime", { PK: `SIGNUPKEY#${lead?.abuseHash ?? ""}`, SK: "META" });
     expect(counters).toMatchObject({ confirmedAccounts: 1 });
+    expect(await harness.client.get("Runtime", { PK: worldsDayKey("PUBLIC", "261001"), SK: "META" })).toBeUndefined();
+
+    expect(await codePassed(harness)).toEqual({ kind: "PROVISIONING", userId: USER_ID, clockId: "GUEST#isp-guest-s261001abcde" });
+    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PROVISIONING", slotDay: "261001" });
+    expect(harness.provisioner.requests).toEqual([{ userId: USER_ID, clockId: "GUEST#isp-guest-s261001abcde", origin: "SIGNUP" }]);
     expect(await harness.client.get("Runtime", { PK: worldsDayKey("PUBLIC", "261001"), SK: "META" })).toMatchObject({ count: 1 });
     expect(harness.lines.join("\n")).not.toContain(EMAIL);
   });
@@ -56,8 +66,7 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     await handlerOf(harness, ["fghij"])(confirmationEvent());
     expect(guestRows(harness)).toHaveLength(1);
     expect(harness.client.dump("Isps").filter((item) => item.SK === "META")).toHaveLength(1);
-    expect(harness.provisioner.requests).toHaveLength(2);
-    expect(new Set(harness.provisioner.requests.map((request) => request.clockId)).size).toBe(1);
+    expect(harness.provisioner.requests).toHaveLength(0);
   });
 
   it("[FL-105] a retry after the registry was written but not the lead finishes the lead, with still one row", async () => {
@@ -70,7 +79,7 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     await handlerOf(harness, ["fghij"])(confirmationEvent());
     expect((await harness.leads.store.get(hashOf(EMAIL)))?.status).toBe("CONFIRMED");
     expect(guestRows(harness)).toHaveLength(1);
-    expect(harness.provisioner.requests.map((request) => request.clockId)).toEqual(["GUEST#isp-guest-s261001abcde"]);
+    expect(harness.provisioner.requests).toEqual([]);
   });
 
   it("[FL-122] an account made by AdminCreateUser finishing its first password (guest-07, an internal user) → no row, no world, SIGNUP_CONFIRM_IGNORED without email", async () => {
@@ -110,16 +119,17 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     expect((await harness.leads.store.get(hashOf(EMAIL)))?.retiredUsernames).toEqual([username(1)]);
     await handlerOf(harness, ["abcde"])(confirmationEvent({ user: 1 }));
     expect(ignoredLog(harness)).toEqual([]);
-    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PROVISIONING" });
+    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PHONE_PENDING" });
     expect(await harness.leads.store.get(hashOf(EMAIL))).toMatchObject({ status: "CONFIRMED", cognitoUsername: username(1), userId: USER_ID });
-    expect(harness.provisioner.requests).toHaveLength(1);
+    expect(harness.provisioner.requests).toHaveLength(0);
   });
 
-  it("[FL-112] with the cap of active sign-up worlds full: account and lead created, world CAP_FULL, GuestWorlds not asked", async () => {
+  it("[FL-112] with the cap of active sign-up worlds full: account and lead created, world CAP_FULL after the SMS code, GuestWorlds not asked", async () => {
     const harness = guestHarness();
     await harness.client.put("Runtime", { PK: worldsDayKey("PUBLIC", "260930"), SK: "META", count: SIGNUP_WORLD_LIMITS.activeWorlds });
     await pendingLead(harness);
     await handlerOf(harness, ["abcde"])(confirmationEvent());
+    await codePassed(harness);
     expect(guestRows(harness)).toHaveLength(1);
     expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "CAP_FULL" });
     expect((await getGuestAccount(harness.client, USER_ID))?.slotDay).toBeUndefined();
@@ -135,8 +145,10 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     for (const [index, email] of addresses.entries()) {
       await handlerOf(harness, [`abcd${"efg"[index] ?? "h"}`])(confirmationEvent({ email, user: index + 1, sub: `sub-000${index + 1}` }));
     }
-    const statuses = await Promise.all([1, 2, 3].map(async (n) => (await getGuestAccount(harness.client, signupUserId(n)))?.status));
-    expect(statuses).toEqual(["PROVISIONING", "PROVISIONING", "PERSON_LIMIT"]);
+    const statusesOf = () => Promise.all([1, 2, 3].map(async (n) => (await getGuestAccount(harness.client, signupUserId(n)))?.status));
+    expect(await statusesOf()).toEqual(["PHONE_PENDING", "PHONE_PENDING", "PERSON_LIMIT"]);
+    for (const n of [1, 2, 3]) await codePassed(harness, `sub-000${n}`);
+    expect(await statusesOf()).toEqual(["PROVISIONING", "PROVISIONING", "PERSON_LIMIT"]);
     expect(harness.provisioner.requests.map((request) => request.userId)).toEqual([signupUserId(1), signupUserId(2)]);
     expect((await getGuestAccount(harness.client, signupUserId(3)))?.slotDay).toBeUndefined();
     // The Cognito user and the lead stay (ADR-0025 §3); only the world is not given.
@@ -151,6 +163,7 @@ describe("[FL-105] post confirmation: a confirmed sign-up becomes a guest with a
     const harness = guestHarness();
     await pendingLead(harness, { email: QA_EMAIL });
     await handlerOf(harness, ["abcde"])(confirmationEvent({ email: QA_EMAIL }));
+    await codePassed(harness);
     expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PROVISIONING", slotScope: "QA#qa-812-1" });
     expect(await harness.client.get("Runtime", { PK: "GUESTWORLDS#QA#qa-812-1#261001", SK: "META" })).toMatchObject({ count: 1 });
     expect(await harness.client.get("Runtime", { PK: worldsDayKey("PUBLIC", "261001"), SK: "META" })).toBeUndefined();

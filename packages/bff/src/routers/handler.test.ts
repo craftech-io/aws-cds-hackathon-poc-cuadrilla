@@ -8,6 +8,7 @@ import { createLogger } from "../lib/log";
 import { resetSecretCache } from "../lib/secrets";
 import { type SignupHarness, VIEWER_IP, signupForm, signupHarness } from "../signup/testing";
 import type { ContextDeps } from "./deps";
+import { passedGate } from "../phone/testing";
 import { stripApiPrefix } from "./api-path";
 import { ORIGIN_HEADER, VIEWER_ADDRESS_HEADER } from "./edge";
 import { createHandler, handler as deployedHandler } from "./handler";
@@ -43,6 +44,7 @@ const deps: ContextDeps = {
   }),
   wallClock: () => new Date(),
   loggerFor: (correlationId) => createLogger({ correlationId, sink: (line) => void lines.push(line) }),
+  phoneGate: passedGate(),
 };
 
 const testRouter = router({

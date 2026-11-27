@@ -6,6 +6,7 @@ import { signupUserId, username } from "../leads/testing";
 import { allRows } from "../worlds/testing";
 import { createPostAuthenticationHandler } from "./post-authentication";
 import { createPostConfirmationHandler } from "./post-confirmation";
+import { ensureWorld } from "../guest/sign-in";
 
 const USER_ID = signupUserId(1);
 const DAY_MS = 86_400_000;
@@ -21,6 +22,16 @@ async function signupGuest(harness: GuestHarness): Promise<void> {
   harness.provisioner.requests.length = 0;
 }
 
+/** The session passed its SMS code (ADR-0029): what the BFF does then. */
+const codePassed = (harness: GuestHarness, sub = SUB, suffixes?: string[]) => ensureWorld(harness.signInDeps(suffixes), sub);
+
+/** `phoneCheck AUTOMATION` on the row of a `sub`, as the operator sets it (no person, no SMS). */
+async function markAutomation(harness: GuestHarness, sub = SUB): Promise<void> {
+  const [row] = await harness.client.query("Isps", { index: "GSI1", hashValue: `SUB#${sub}` });
+  if (row === undefined) throw new Error("no row to mark");
+  await harness.client.update("Isps", { PK: row.PK, SK: row.SK }, { phoneCheck: "AUTOMATION" }, harness.now().toISOString());
+}
+
 async function staffRow(harness: GuestHarness, fields: { readonly ispId: string; readonly userId: string; readonly role: string; readonly sub: string }): Promise<void> {
   await harness.client.put("Isps", { PK: `ISP#${fields.ispId}`, SK: `USER#${fields.userId}`, entity: "ConsoleUser", ...fields, name: "Persona", cognitoSub: fields.sub, cognitoSubKey: `SUB#${fields.sub}`, active: true, ...META });
 }
@@ -28,18 +39,20 @@ async function staffRow(harness: GuestHarness, fields: { readonly ispId: string;
 describe("[FL-105] a confirmation that failed after Cognito confirmed the user is finished by the next sign-in", () => {
   const signupSignIn = () => authenticationEvent({ userName: username(1), email: EMAIL });
 
-  it("[FL-105] nothing was written (the trigger timed out): the sign-in opens the row, confirms the lead and asks for the world", async () => {
+  it("[FL-105] nothing was written (the trigger timed out): the sign-in opens the row and confirms the lead; the world waits for the SMS code", async () => {
     const harness = guestHarness();
     await pendingLead(harness);
     await signIn(harness, ["abcde"])(signupSignIn());
     expect(harness.client.dump("Isps").filter((row) => row.entity === "ConsoleUser")).toEqual([expect.objectContaining({ userId: USER_ID, role: "GUEST", guestOrigin: "SIGNUP", cognitoSub: SUB })]);
     expect(await harness.leads.store.get(hashOf(EMAIL))).toMatchObject({ status: "CONFIRMED", cognitoSub: SUB, userId: USER_ID });
-    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PROVISIONING" });
-    expect(harness.provisioner.requests).toEqual([{ userId: USER_ID, clockId: "GUEST#isp-guest-s261001abcde", origin: "SIGNUP" }]);
-    // A second sign-in finds its row: no second account, no second request of a fresh world.
+    expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ status: "PHONE_PENDING" });
+    expect(harness.provisioner.requests).toEqual([]);
+    // A second sign-in finds its row: no second account, and still no world before the code.
     await signIn(harness, ["fghij"])(signupSignIn());
     expect(harness.client.dump("Isps").filter((row) => row.entity === "ConsoleUser")).toHaveLength(1);
-    expect(harness.provisioner.requests).toHaveLength(1);
+    expect(harness.provisioner.requests).toEqual([]);
+    await codePassed(harness);
+    expect(harness.provisioner.requests).toEqual([{ userId: USER_ID, clockId: "GUEST#isp-guest-s261001abcde", origin: "SIGNUP" }]);
   });
 
   it("[FL-105] the transaction committed but the lead did not: the sign-in confirms the lead, once", async () => {
@@ -80,11 +93,22 @@ describe("[FL-108] post authentication of a guest of the own sign-up", () => {
     expect(harness.provisioner.requests).toEqual([]);
   });
 
-  it("[FL-111] a world past its 7 days: a new generation in one transaction (old row out, new row in, SUB# to the new one), GuestWorlds asked", async () => {
+  it("[FL-124] a sign-in with the password alone gives the world nothing: no generation, no slot, no request", async () => {
+    const harness = guestHarness();
+    await signupGuest(harness);
+    harness.advance(8 * DAY_MS);
+    const before = await getGuestAccount(harness.client, USER_ID);
+    await signIn(harness, ["vwxyz"])(authenticationEvent());
+    expect(await getGuestAccount(harness.client, USER_ID)).toEqual(before);
+    expect(harness.provisioner.requests).toEqual([]);
+  });
+
+  it("[FL-111] a world past its 7 days: after the SMS code, a new generation in one transaction (old row out, new row in, SUB# to the new one), GuestWorlds asked", async () => {
     const harness = guestHarness();
     await signupGuest(harness);
     harness.advance(8 * DAY_MS);
     await signIn(harness, ["vwxyz"])(authenticationEvent());
+    await codePassed(harness, SUB, ["vwxyz"]);
     const account = await getGuestAccount(harness.client, USER_ID);
     expect(account).toMatchObject({ clockId: "GUEST#isp-guest-s261009vwxyz", generation: 2, status: "PROVISIONING", expiresAtReal: "2026-10-16T15:00:00.000Z" });
     expect(await harness.client.get("Isps", { PK: "ISP#isp-guest-s261001abcde", SK: `USER#${USER_ID}` })).toBeUndefined();
@@ -101,23 +125,35 @@ describe("[FL-108] post authentication of a guest of the own sign-up", () => {
     const harness = guestHarness();
     await signupGuest(harness);
     await harness.client.delete("Runtime", { PK: `GUESTACCOUNT#${USER_ID}`, SK: "META" });
+    await markAutomation(harness);
     await signIn(harness, ["mnopq"])(authenticationEvent());
     expect(await getGuestAccount(harness.client, USER_ID)).toMatchObject({ clockId: "GUEST#isp-guest-s261001mnopq", generation: 1, status: "PROVISIONING" });
   });
 });
 
 describe("[FL-122] post authentication of everyone else", () => {
-  it("[FL-108] an invited guest without a world: its account opens PROVISIONING without TTL and GuestWorlds builds it; no lead is touched", async () => {
+  it("[FL-108] an invited guest without a world: after its SMS code its account opens PROVISIONING without TTL and GuestWorlds builds it; no lead is touched", async () => {
     const harness = guestHarness();
     await staffRow(harness, { ispId: "isp-guest-07", userId: "usr-guest-07", role: "GUEST", sub: "sub-guest-07" });
     await signIn(harness)(authenticationEvent({ sub: "sub-guest-07" }));
+    expect(await getGuestAccount(harness.client, "usr-guest-07")).toBeUndefined();
+    await codePassed(harness, "sub-guest-07");
     const account = await getGuestAccount(harness.client, "usr-guest-07");
     expect(account).toMatchObject({ guestOrigin: "INVITED", clockId: "GUEST#isp-guest-07", status: "PROVISIONING" });
     expect(account?.expiresAtReal).toBeUndefined();
     expect(harness.provisioner.requests).toEqual([{ userId: "usr-guest-07", clockId: "GUEST#isp-guest-07", origin: "INVITED" }]);
     expect(await harness.leads.store.scan()).toEqual([]);
-    await signIn(harness)(authenticationEvent({ sub: "sub-guest-07" }));
+    await codePassed(harness, "sub-guest-07");
     expect(harness.provisioner.requests).toHaveLength(1);
+  });
+
+  it("[FL-125] an account marked AUTOMATION by the operator (the scenario runner's) gets its world at the sign-in itself", async () => {
+    const harness = guestHarness();
+    await staffRow(harness, { ispId: "isp-guest-test", userId: "usr-guest-test", role: "GUEST", sub: "sub-guest-test" });
+    await markAutomation(harness, "sub-guest-test");
+    await signIn(harness)(authenticationEvent({ sub: "sub-guest-test" }));
+    expect(await getGuestAccount(harness.client, "usr-guest-test")).toMatchObject({ guestOrigin: "TEST", status: "PROVISIONING" });
+    expect(harness.provisioner.requests).toEqual([{ userId: "usr-guest-test", clockId: "GUEST#isp-guest-test", origin: "TEST" }]);
   });
 
   it("[FL-122] a supervisor, an operator or a sub without a row: no write, no invocation", async () => {

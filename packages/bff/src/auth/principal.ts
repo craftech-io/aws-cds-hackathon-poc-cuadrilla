@@ -35,6 +35,8 @@ export interface Principal {
   readonly authTime: number;
   /** One sign-in (`origin_jti`, kept across refreshes): "one session per world" tells two apart. */
   readonly sessionId: string;
+  /** The verified email of the id token: only to find a sign-up guest's lead (ADR-0029); never logged. */
+  readonly email?: string;
 }
 
 /** Operators whose staff sign in to the console: the demo and each guest (QA and evaluation worlds have none). */
@@ -82,6 +84,7 @@ export function principalFromClaims(claims: IdTokenClaims): Principal {
     isGuest: role === "GUEST",
     authTime: claims.auth_time,
     sessionId: claims.origin_jti ?? `auth-${claims.auth_time}`,
+    ...(typeof claims.email === "string" && claims.email.length > 0 ? { email: claims.email } : {}),
   };
 }
 

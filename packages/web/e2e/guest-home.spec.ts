@@ -65,6 +65,10 @@ function answer(state: ApiState, path: string) {
       return data(view(state.world));
     case "account.deleteGuest":
       return data({ deleted: true });
+    case "phone.status":
+      return data({ state: "PASSED", codeSent: false });
+    case "phone.endSession":
+      return data({ ended: true });
     default:
       return { error: { message: "NOT_FOUND", code: -32_004, data: { code: "NOT_FOUND", httpStatus: 404, path, reason: null, correlationId: "e2e" } } };
   }

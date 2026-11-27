@@ -1,9 +1,11 @@
 // What `LeadStream` does with each record and with its daily schedule (ADR-0026, docs/architecture-
 // integrations.md §9.3):
 //
-//   pending → CONFIRMED   the notice to Craftech (leads/notify.ts, at most once) and the other pending
-//                         and retired users out of Cognito (they could never confirm: the email is already
-//                         the alias of the confirmed account), then `pendingUsernames` emptied
+//   pending → CONFIRMED   the other pending and retired users out of Cognito (they could never confirm:
+//                         the email is already the alias of the confirmed account), then `pendingUsernames`
+//                         emptied; no notice yet (ADR-0029)
+//   phone verified        the notice to Craftech (leads/notify.ts, at most once), with the verified phone:
+//                         an account that never verifies its phone never reaches Craftech
 //   pending lead by TTL   each pending and retired user out of Cognito, `LEAD_EXPIRED`
 //   confirmed lead by TTL `GuestAccountDeletion` with the `userId` of the old image (user, row,
 //                         `GUESTACCOUNT#` and current world, not only the user), `LEAD_EXPIRED`
@@ -42,13 +44,17 @@ function otherUsers(lead: Lead): string[] {
   return [...new Set([...lead.pendingUsernames, ...(lead.retiredUsernames ?? [])])].filter((username) => username !== lead.cognitoUsername);
 }
 
-async function onConfirmed(deps: LeadStreamDeps, lead: Lead): Promise<NotifyResult> {
+async function onConfirmed(deps: LeadStreamDeps, lead: Lead): Promise<void> {
+  const emailHash = emailHashOfPartition(lead.PK);
+  const deleted = await deleteUsers(deps, otherUsers(lead));
+  await deps.store.setPendingUsernames(emailHash, [], deps.now());
+  deps.log.info("lead.confirmed.handled", { leadId: lead.leadId, emailHashPrefix: hashPrefix(emailHash), pendingUsersDeleted: deleted });
+}
+
+async function onPhoneVerified(deps: LeadStreamDeps, lead: Lead): Promise<NotifyResult> {
   const emailHash = emailHashOfPartition(lead.PK);
   const result = await notifyConfirmedLead(deps, emailHash);
-  const siblings = otherUsers(lead);
-  const deleted = await deleteUsers(deps, siblings);
-  await deps.store.setPendingUsernames(emailHash, [], deps.now());
-  deps.log.info("lead.confirmed.handled", { leadId: lead.leadId, emailHashPrefix: hashPrefix(emailHash), notice: result, pendingUsersDeleted: deleted });
+  deps.log.info("lead.phone_verified.handled", { leadId: lead.leadId, emailHashPrefix: hashPrefix(emailHash), notice: result });
   return result;
 }
 
@@ -63,6 +69,7 @@ async function onExpired(deps: LeadStreamDeps, lead: Lead): Promise<void> {
 
 export interface StreamSummary {
   readonly confirmed: number;
+  readonly verified: number;
   readonly expired: number;
   readonly ignored: number;
 }
@@ -70,6 +77,7 @@ export interface StreamSummary {
 /** Every record of one batch, in order. */
 export async function handleLeadRecords(deps: LeadStreamDeps, records: readonly unknown[]): Promise<StreamSummary> {
   let confirmed = 0;
+  let verified = 0;
   let expired = 0;
   let ignored = 0;
   for (const record of records) {
@@ -77,6 +85,9 @@ export async function handleLeadRecords(deps: LeadStreamDeps, records: readonly 
     if (change.kind === "CONFIRMED") {
       await onConfirmed(deps, change.lead);
       confirmed += 1;
+    } else if (change.kind === "PHONE_VERIFIED") {
+      await onPhoneVerified(deps, change.lead);
+      verified += 1;
     } else if (change.kind === "EXPIRED") {
       await onExpired(deps, change.lead);
       expired += 1;
@@ -84,7 +95,7 @@ export async function handleLeadRecords(deps: LeadStreamDeps, records: readonly 
       ignored += 1;
     }
   }
-  return { confirmed, expired, ignored };
+  return { confirmed, verified, expired, ignored };
 }
 
 /** The daily safety net: `gst-*` users still unconfirmed a week after their creation. */

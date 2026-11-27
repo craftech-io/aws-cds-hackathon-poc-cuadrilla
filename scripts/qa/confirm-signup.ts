@@ -6,7 +6,9 @@
 // The fence is the address Cognito holds, never one given here: the script takes only the `gst-*`
 // user, reads its `email` with `AdminGetUser` and goes on only when THAT value matches
 // `^success\+qa-[a-z0-9-]{1,60}@simulator\.amazonses\.com$` (leads/keys.ts, QA_ADDRESS_PATTERN). Then
-// `AdminConfirmSignUp`, which runs the real post confirmation (lead CONFIRMED, registry row, world).
+// `AdminConfirmSignUp`, which runs the real post confirmation (lead CONFIRMED, registry row, account
+// waiting for its phone). Nobody can receive an SMS at a QA address either, so the seam then marks that
+// one account `phoneCheck AUTOMATION` (ADR-0029): its sign-in skips the SMS code and gets its world.
 // `AdminConfirmSignUp` does not verify the email (a code typed on the web would), and the web signs in
 // with the email alias, which Cognito accepts only once verified: with `--verify-email` (the default)
 // the seam also sets `email_verified = true` on that same fenced user (FL-105, "la verificación
@@ -62,12 +64,13 @@ export function maskAddress(email: string): string {
 }
 
 export type SeamOutcome =
-  | { readonly outcome: "CONFIRMED"; readonly userStatus: string; readonly emailVerified: boolean; readonly verifiedBySeam: boolean }
+  | { readonly outcome: "CONFIRMED"; readonly userStatus: string; readonly emailVerified: boolean; readonly verifiedBySeam: boolean; readonly automation: boolean }
   | { readonly outcome: "STATUS"; readonly userStatus: string; readonly emailVerified: boolean }
   | { readonly outcome: "NOT_FOUND" }
   | { readonly outcome: "REFUSED"; readonly reason: "NOT_A_QA_ADDRESS" };
 
 interface UserView {
+  readonly sub: string | undefined;
   readonly status: string;
   readonly email: string | undefined;
   readonly emailVerified: boolean;
@@ -77,7 +80,7 @@ async function readUser(cognito: Pick<CognitoIdentityProviderClient, "send">, us
   try {
     const user = await cognito.send(new AdminGetUserCommand({ UserPoolId: userPoolId, Username: username }));
     const attribute = (name: string) => user.UserAttributes?.find((entry) => entry.Name === name)?.Value;
-    return { status: user.UserStatus ?? "UNKNOWN", email: attribute("email"), emailVerified: attribute("email_verified") === "true" };
+    return { sub: attribute("sub"), status: user.UserStatus ?? "UNKNOWN", email: attribute("email"), emailVerified: attribute("email_verified") === "true" };
   } catch (error) {
     if (error instanceof UserNotFoundException || (error as { name?: string }).name === "UserNotFoundException") return undefined;
     throw error;
@@ -89,6 +92,11 @@ export interface SeamDeps {
   readonly userPoolId: string;
   readonly audit: (line: Record<string, unknown>) => void;
   readonly now: () => Date;
+  /**
+   * `phoneCheck AUTOMATION` on the row the confirmation created (ADR-0029): the runner cannot receive an
+   * SMS, so its account is exempt, one by one and only from here; `false` when no row was found.
+   */
+  readonly markAutomation: (sub: string) => Promise<boolean>;
 }
 
 /** The seam: the fence on the address Cognito holds, then the confirmation (and the verified email). */
@@ -108,7 +116,9 @@ export async function runSeam(request: SeamRequest, deps: SeamDeps): Promise<Sea
     verifiedBySeam = true;
   }
   const after = await readUser(deps.cognito, deps.userPoolId, request.username);
-  const outcome: SeamOutcome = { outcome: "CONFIRMED", userStatus: after?.status ?? "UNKNOWN", emailVerified: after?.emailVerified ?? false, verifiedBySeam };
+  const sub = after?.sub ?? user.sub;
+  const automation = sub === undefined ? false : await deps.markAutomation(sub);
+  const outcome: SeamOutcome = { outcome: "CONFIRMED", userStatus: after?.status ?? "UNKNOWN", emailVerified: after?.emailVerified ?? false, verifiedBySeam, automation };
   deps.audit({ kind: "QA_SIGNUP_CONFIRMED", email: maskAddress(user.email), previousStatus: user.status, emailVerifiedBefore: user.emailVerified, ...outcome, ...base });
   return outcome;
 }
@@ -116,13 +126,18 @@ export async function runSeam(request: SeamRequest, deps: SeamDeps): Promise<Sea
 async function main(): Promise<SeamOutcome> {
   assertOperatorMachine();
   const request = parseSeamArgs(process.argv.slice(2));
-  const [{ CognitoIdentityProviderClient: Client }, { awsClientConfig }, { authConfig }] = await Promise.all([
+  const [{ CognitoIdentityProviderClient: Client }, { awsClientConfig }, { authConfig }, { tableClient }, { subkey }, { adminPhone }] = await Promise.all([
     import("@aws-sdk/client-cognito-identity-provider"),
     import("../../packages/bff/src/lib/clients"),
     import("../../packages/bff/src/auth/config"),
+    import("../../packages/bff/src/connector/index"),
+    import("../../packages/bff/src/lib/secrets"),
+    import("../../packages/bff/src/phone/admin"),
   ]);
   const cognito = new Client({ region: "us-east-1", ...awsClientConfig({ requestTimeoutMs: 10_000, connectionTimeoutMs: 2_000, maxAttempts: 3 }) });
-  return runSeam(request, { cognito, userPoolId: authConfig().userPoolId, audit: (line) => console.log(JSON.stringify(line)), now: () => new Date() });
+  const admin = { client: tableClient(), phoneKey: () => subkey("account-phone"), now: () => new Date() };
+  const markAutomation = async (sub: string) => (await adminPhone(admin, sub, "AUTOMATION")).outcome === "DONE";
+  return runSeam(request, { cognito, userPoolId: authConfig().userPoolId, audit: (line) => console.log(JSON.stringify(line)), now: () => new Date(), markAutomation });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

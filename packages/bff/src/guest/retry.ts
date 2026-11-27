@@ -8,6 +8,8 @@
 //   no account yet (invited, rehearsal) open it and ask for the world
 //   READY, or PROVISIONING just now   nothing
 //   PERSON_LIMIT                      nothing: the person holds its two worlds already (ADR-0025 §3)
+//   PHONE_PENDING                     reserve a slot, like CAP_FULL: the session already passed its SMS
+//                                     code (every procedure but the phone step needs it, ADR-0029)
 import { ToolError, clockIdOfIsp } from "@cuadrilla/shared";
 import type { Connector } from "../connector/ports";
 import type { TableClient } from "../connector/table-client";
@@ -45,11 +47,20 @@ async function renew(ports: RetryPorts, principal: GuestPrincipal, account: Gues
   return "RENEWED";
 }
 
-async function takeSlot(ports: RetryPorts, account: GuestAccount): Promise<RetryOutcome> {
+/**
+ * A slot for the current generation and the request of its world, from `CAP_FULL` (a retry) or from
+ * `PHONE_PENDING` (the first session that passed the SMS code, guest/sign-in.ts). Without room a
+ * `PHONE_PENDING` account moves to `CAP_FULL`, where the portada's retry takes over.
+ */
+export async function takeSlot(ports: Pick<RetryPorts, "client" | "provisioner" | "now">, account: GuestAccount): Promise<RetryOutcome> {
   const now = ports.now();
+  const from = account.status === "PHONE_PENDING" ? "PHONE_PENDING" : "CAP_FULL";
   const slot = await planSlot(ports.client, account.slotScope ?? "PUBLIC", now);
-  if (!slot.ok) return "STILL_FULL";
-  await ports.client.transact([...slot.ops, setStatusOp(account.userId, { to: "PROVISIONING", clockId: account.clockId, from: ["CAP_FULL"], slotDay: slot.day }, now)], now.toISOString());
+  if (!slot.ok) {
+    if (from === "PHONE_PENDING") await setStatus(ports.client, account.userId, { to: "CAP_FULL", clockId: account.clockId, from: ["PHONE_PENDING"] }, now);
+    return "STILL_FULL";
+  }
+  await ports.client.transact([...slot.ops, setStatusOp(account.userId, { to: "PROVISIONING", clockId: account.clockId, from: [from], slotDay: slot.day }, now)], now.toISOString());
   await ports.provisioner.request({ userId: account.userId, clockId: account.clockId, origin: account.guestOrigin });
   return "SLOT_TAKEN";
 }
@@ -79,6 +90,7 @@ export async function retryWorld(ports: RetryPorts, principal: GuestPrincipal): 
   if (account.guestOrigin === "SIGNUP" && (isExpiredAt(account, now) || account.failure === "GENERATION_COLLISION")) return renew(ports, principal, account);
   switch (account.status) {
     case "CAP_FULL":
+    case "PHONE_PENDING":
       return takeSlot(ports, account);
     case "FAILED":
       return requestAgain(ports, account);

@@ -7,10 +7,10 @@
 //      the transaction itself: a condition cannot reach a GSI)
 //
 // Then one transaction opens the first generation (`META` of `isp-guest-s…`), the registry row
-// (`role GUEST`, `guestOrigin SIGNUP`, `cognitoUsername`), `SIGNUPSUB#`, `GUESTACCOUNT#`, one more
-// confirmed account of the person and, when there is room, the slot; after it, the lead becomes
-// `CONFIRMED` (`LeadStore`) and `GuestWorlds` is asked for the world. Without room the account and the
-// lead are created all the same and the world waits in `CAP_FULL`. A person who already holds the two
+// (`role GUEST`, `guestOrigin SIGNUP`, `cognitoUsername`), `SIGNUPSUB#`, `GUESTACCOUNT#` in
+// `PHONE_PENDING` and one more confirmed account of the person; after it, the lead becomes `CONFIRMED`
+// (`LeadStore`). No slot is taken and no world is asked for: that waits for the first session that
+// passes the SMS code (ADR-0029, guest/sign-in.ts `ensureWorld`), and so does the notice of the lead. A person who already holds the two
 // confirmed accounts of ADR-0025 §3 (another address that reduces to the same `abuseHash`) keeps the
 // Cognito user and the lead, but the account opens in `PERSON_LIMIT`: no slot, no world, no count.
 //
@@ -32,7 +32,7 @@ import { openGeneration } from "../worlds/guest-lifecycle";
 import { type GuestAccount, createAccountOp, getGuestAccount } from "./account";
 import type { WorldProvisioner } from "./provisioner";
 import { confirmedAccountOp, getSignupSub, rowsBySub, signupRowOp, signupSubOp, signupUserIdOf } from "./registry";
-import { type SlotScope, planSlot, slotScopeOf } from "./slots";
+import { type SlotScope, slotScopeOf } from "./slots";
 
 export const CONFIRM_SIGNUP = "PostConfirmation_ConfirmSignUp";
 
@@ -114,7 +114,7 @@ export async function confirmSignup(deps: ConfirmationDeps, event: ConfirmationE
   if ((await rowsBySub(deps.client, event.sub)).length > 0) return ignore(deps, "SUB_REGISTERED", event.sub);
 
   const scope: SlotScope = slotScopeOf(lead);
-  let decided: Decided = { status: "CAP_FULL" };
+  let decided: Decided = { status: "PHONE_PENDING" };
   const generation = await openGeneration({
     client: deps.client,
     now: at,
@@ -126,14 +126,10 @@ export async function confirmSignup(deps: ConfirmationDeps, event: ConfirmationE
         decided = { status: "PERSON_LIMIT" };
         return [...rows, createAccountOp({ userId, guestOrigin: "SIGNUP", ispId: next.ispId, clockId: next.clockId, generation: 1, status: "PERSON_LIMIT", slotScope: scope }, at)];
       }
-      const slot = await planSlot(deps.client, scope, at);
-      decided = slot.ok ? { status: "PROVISIONING", slotDay: slot.day } : { status: "CAP_FULL" };
-      return [
-        ...rows,
-        createAccountOp({ userId, guestOrigin: "SIGNUP", ispId: next.ispId, clockId: next.clockId, generation: 1, status: decided.status, slotDay: decided.slotDay, slotScope: scope }, at),
-        confirmedAccountOp(lead.abuseHash, at),
-        ...(slot.ok ? slot.ops : []),
-      ];
+      // No slot and no world before the first session passed the SMS code (ADR-0029): guest/sign-in.ts
+      // `ensureWorld` takes the slot then.
+      decided = { status: "PHONE_PENDING" };
+      return [...rows, createAccountOp({ userId, guestOrigin: "SIGNUP", ispId: next.ispId, clockId: next.clockId, generation: 1, status: "PHONE_PENDING", slotScope: scope }, at), confirmedAccountOp(lead.abuseHash, at)];
     },
     // The trigger reads no operator row: its own rows absent means the generation's id, the slot or the
     // person's ceiling was taken, and the next attempt reads them again.
@@ -143,7 +139,7 @@ export async function confirmSignup(deps: ConfirmationDeps, event: ConfirmationE
   const { status } = decided;
   await confirmLead(deps, event, emailHash, userId, at);
   await provision(deps, { userId, clockId: generation.clockId, status });
-  const metric = status === "CAP_FULL" ? "GuestWorldCapFull" : status === "PERSON_LIMIT" ? "SignupPersonLimit" : "SignupConfirmed";
+  const metric = status === "PERSON_LIMIT" ? "SignupPersonLimit" : "SignupConfirmed";
   deps.log.info("signup.confirm.done", { userId, ispId: generation.ispId, status, resumed: event.resumeFromSignIn === true, metric, value: 1 });
   return { kind: "CONFIRMED", userId, clockId: generation.clockId, status };
 }

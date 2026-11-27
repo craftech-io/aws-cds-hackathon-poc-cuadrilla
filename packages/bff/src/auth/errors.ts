@@ -13,6 +13,8 @@ export const AUTH_REASON = {
   LOGIN_NOT_RECENT: "LOGIN_NOT_RECENT",
   /** Cognito (JWKS or AdminGetUser) could not be reached; the request fails closed. */
   AUTH_UNAVAILABLE: "AUTH_UNAVAILABLE",
+  /** The session has not passed the SMS code yet (ADR-0029): only the phone step answers. */
+  PHONE_VERIFICATION_REQUIRED: "PHONE_VERIFICATION_REQUIRED",
 } as const;
 export type AuthReason = (typeof AUTH_REASON)[keyof typeof AUTH_REASON];
 
@@ -29,6 +31,7 @@ export const AUTH_REFUSAL: Readonly<Record<AuthReason, AuthRefusal>> = {
   CROSS_ISP: "FORBIDDEN",
   LOGIN_NOT_RECENT: "FORBIDDEN",
   AUTH_UNAVAILABLE: "UNAVAILABLE",
+  PHONE_VERIFICATION_REQUIRED: "FORBIDDEN",
 };
 
 /** Error class and message only, for log lines: stacks and causes may quote request data. */

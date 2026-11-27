@@ -44,6 +44,21 @@ describe("GuestAccountDeletion [FL-118]", () => {
     expect(w.lines.some((line) => line.includes("MemoryPurgeIncomplete"))).toBe(true);
   });
 
+  it("[FL-123] the deletion frees the account's verified number, and never a number another account holds", async () => {
+    await signupGuest(w, { user: 1 });
+    await w.data.update("Isps", { PK: `ISP#${GENERATION.ispId}`, SK: `USER#${signupUserId(1)}` }, { phone: "+525512345678", phoneVerifiedAt: T0.toISOString() }, T0.toISOString());
+    await w.data.put("Runtime", { PK: "PHONEOWNER#hash-of-525512345678", SK: "META", entity: "PhoneOwner", userId: signupUserId(1) });
+    await deleteGuestAccount(w.deps, { userId: signupUserId(1) });
+    expect(await w.data.get("Runtime", { PK: "PHONEOWNER#hash-of-525512345678", SK: "META" })).toBeUndefined();
+
+    const other = world();
+    await signupGuest(other, { user: 1 });
+    await other.data.update("Isps", { PK: `ISP#${GENERATION.ispId}`, SK: `USER#${signupUserId(1)}` }, { phone: "+525512345678" }, T0.toISOString());
+    await other.data.put("Runtime", { PK: "PHONEOWNER#hash-of-525512345678", SK: "META", entity: "PhoneOwner", userId: "usr-someone-else" });
+    await deleteGuestAccount(other.deps, { userId: signupUserId(1) });
+    expect(await other.data.get("Runtime", { PK: "PHONEOWNER#hash-of-525512345678", SK: "META" })).toMatchObject({ userId: "usr-someone-else" });
+  });
+
   it("[FL-114] an account opened over the person's limit (PERSON_LIMIT) never counted: its deletion gives nothing back", async () => {
     await signupGuest(w, { user: 1 });
     const abuseHash = (await w.store.get(hashOf(EMAIL)))?.abuseHash ?? "";
