@@ -1006,6 +1006,7 @@ visitante escribió el código que llegó a esa casilla (ADR-0025, riesgo residu
 | `INVALID` — consentimiento (versión vieja, o `TERMS_PRIVACY` sin marcar) | `signup.start` | Reusa el error de validación de la casilla A (no se envía) — no hay un mensaje aparte, el botón sigue deshabilitado. | Same. |
 | `INVALID` (`EMAIL_NOT_ACCEPTED`) — casilla descartable (lista pública o propia), dominio reservado o de prueba, o dominio sin MX ni A/AAAA (ADR-0025 §3, ADR-0029 §10; `docs/test-plan.md` §6.1 lo prueba) | `signup.start` | Usa tu email de trabajo o uno personal que reciba correo: no aceptamos casillas temporales ni de prueba. | Use your work email or a personal one that receives mail: temporary or test mailboxes aren't accepted. |
 | `INVALID` (`PHONE_NOT_PERSONAL`) — rango que no es un celular de persona (ADR-0029 §10) | `signup.start`, `phone.sendCode` | Usa un celular personal. | Use a personal mobile phone. |
+| `INVALID` (`PHONE_COUNTRY_NOT_ALLOWED`) — número de fuera de América (ADR-0029 §12) | `signup.start`, `phone.sendCode` | Por ahora solo aceptamos celulares de países de América. Si necesitas acceso, [escríbenos](https://craftech.io/contact/). | For now we only accept mobile phones from countries in the Americas. If you need access, [write to us](https://craftech.io/contact/). |
 | `UNAVAILABLE` — sin `edge.viewerIp` (el pedido no pasó por CloudFront, ADR-0025 §3) | `signup.start` | No pudimos crear tu cuenta en este momento. Intenta de nuevo en unos minutos. | We couldn't create your account right now. Please try again in a few minutes. |
 | Errores de Cognito en `SignUp`/`ConfirmSignUp` (código inválido, contraseña débil, etc.) | Cognito | Traducidos a los textos de §7.3/§7.4 — nunca el texto crudo de Cognito. | Same. |
 | Challenge silencioso de WAF (`lib/waf-token.ts`, ADR-0025 §4 — "ninguna regla usa CAPTCHA") | Antes de `signup.start` | Sin texto propio: el botón "Crear cuenta" se habilita recién cuando `lib/waf-token.ts` consigue el token. Si no lo consigue en 10s (bloqueador de contenido, extensión de navegador o error de red): "No pudimos verificar tu navegador. Recarga la página, desactiva el bloqueador de contenido para este sitio o intenta desde otro navegador." | "We couldn't verify your browser. Reload the page, turn off your content blocker for this site, or try another browser." |
@@ -1116,9 +1117,10 @@ pierda.
 ### 7.10 Código por SMS después de la contraseña (ADR-0029)
 
 **Alta (§7.3)**: el formulario suma **Celular** (obligatorio, `type="tel"`, `autocomplete="tel"`) debajo
-del email, con la ayuda "Con el prefijo internacional, por ejemplo +52 55 1234 5678. Lo usamos solo para
-verificar tu cuenta con un código por SMS." / "With the international prefix, for example +1 415 555
-0100. We use it only to verify your account with a code by SMS."; "Crear cuenta" sigue deshabilitado
+del email, con la ayuda "Un celular de un país de América, con el prefijo internacional, por ejemplo +52 55
+1234 5678. Lo usamos solo para verificar tu cuenta con un código por SMS." / "A mobile phone from a country in
+the Americas, with the international prefix, for example +1 415 555 0100. We use it only to verify your
+account with a code by SMS."; "Crear cuenta" sigue deshabilitado
 hasta que el número tenga `+` y de 8 a 15 dígitos. La casilla `TERMS_PRIVACY` (versión `2026-11-27`) dice
 que el celular se usa para verificar la cuenta con un código por SMS.
 
@@ -1134,9 +1136,11 @@ vista de la consola; nada de un mundo se muestra antes.
 - **Errores** (`views/phone/copy.ts`): número inválido, rango que no es un celular de persona ("Usa un
   celular personal." / "Use a personal mobile phone."), en uso ("Ese número ya está en uso en otra
   cuenta"), bloqueado, código incorrecto, vencido o agotado, espera del reenvío, topes del día (la cuenta
-  "podrás entrar mañana"), cupo del día de los números de fuera de Latinoamérica y España ("Hoy ya no
-  podemos enviar más códigos a números fuera de Latinoamérica y España…" / "We can't send more codes
-  today to numbers outside Latin America and Spain…") y número al que no llega SMS, cada uno con el
+  "podrás entrar mañana"), cupo del día de los números de fuera de Latinoamérica ("Hoy ya no
+  podemos enviar más códigos a números fuera de Latinoamérica…" / "We can't send more codes
+  today to numbers outside Latin America…"), país fuera de América ("Por ahora solo aceptamos
+  celulares de países de América. Si necesitas acceso, escríbenos." / "For now we only accept mobile
+  phones from countries in the Americas. If you need access, write to us.", con el contacto) y número al que no llega SMS, cada uno con el
   contacto de Craftech cuando la persona no puede seguir sola. "Cerrar sesión" debajo de la tarjeta.
 - **Cuenta bloqueada** (`ACCOUNT_BLOCKED`, ADR-0029 §11): en lugar de la tarjeta, solo "Cuenta bloqueada" /
   "Account blocked" y "Tu cuenta está bloqueada y no puede usar la demo. Si crees que es un error,
