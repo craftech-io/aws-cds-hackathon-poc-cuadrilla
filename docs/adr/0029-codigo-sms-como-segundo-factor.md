@@ -1,0 +1,80 @@
+---
+status: accepted
+---
+
+# Código por SMS: verificación del celular en el alta y segundo factor en cada ingreso
+
+Decisión del dueño del 2026-11-27, común a las demos públicas de Craftech. Ese día un atacante registró cuentas en serie con casillas descartables (ADR-0025 ya las rechaza por lista y por MX): el correo solo no prueba que hay una persona. Desde ahora ninguna cuenta usa la demo ni cuenta como lead sin un celular verificado por SMS, y el código se pide **en cada ingreso**, para que adivinar o robar una contraseña no alcance para entrar. Complementa ADR-0025 (alta propia) y ADR-0026 (leads) y cambia el momento del aviso de lead.
+
+## La decisión
+
+### 1. Teléfono en el alta
+
+- `signup.start` exige `phone`: formato internacional E.164 de cualquier país (`+` y 8 a 15 dígitos), normalizado sin espacios, guiones, puntos ni paréntesis (`phone/number.ts`); fuera de forma, `PHONE_INVALID`. Se guarda en el inicio pendiente del lead (`pending[<username>].phone`) y la confirmación lo promueve al lead como `phone` **sin verificar**: solo sirve para precargar la pantalla del código.
+- El formulario lo pide con el prefijo internacional y lo marca obligatorio. La casilla `TERMS_PRIVACY` (versión `2026-11-27`) dice que el celular se usa para verificar la cuenta con un código por SMS; el aviso de privacidad lo lista entre los datos tratados, nombra a Amazon SNS y la retención del código y de sus contadores.
+- El teléfono **no** es un atributo de Cognito: ninguna decisión del repo lee `phone_number` ni `phone_number_verified`, así que el BFF no los fija y el visitante no tiene nada que escribir ahí.
+
+### 2. Dos momentos, un mismo código
+
+- **Enrolamiento** (la fila `Isps/USER#` sin `phoneVerifiedAt`): la pantalla pide el número, precargado con el del alta y editable hasta verificar; el código correcto hace de ese número el celular de la cuenta (`phone`, `phoneVerifiedAt` en la fila del registro, solo donde no había uno: `absent: [phoneVerifiedAt]`).
+- **Ingreso** (la fila con celular verificado): el servidor manda el código a ese número, que la pantalla muestra solo por sus últimos cuatro dígitos; un número en el pedido se rechaza (`PHONE_LOCKED`), con la sesión verificada o sin verificar. Cambiar el celular verificado es tarea del operador (`npm run console:phone -- --reset-phone`): el usuario nunca puede, ni desde la web ni con su token.
+- Vale para **todas** las cuentas de Cognito: personal interno (`SUPERVISOR`, `OPS`), invitados con credenciales entregadas (`guest-NN`, `guest-test`), cuentas de alta propia nuevas y las que ya existían (al próximo ingreso se enrolan). La única excepción son las cuentas de automatización (§5).
+- **Convivencia con el TOTP de Cognito del personal.** El personal conserva la verificación en dos pasos de Cognito (por eso su token conserva `aws.cognito.signin.user.admin`, `auth-triggers/pre-token.ts`) y además pasa el código por SMS: se aplica lo más estricto, los dos factores. El TOTP lo valida Cognito antes de emitir el token; el SMS lo valida el BFF sobre la sesión de ese token. Los invitados no tienen TOTP: el SMS es su segundo factor.
+
+### 3. La verificación vale por sesión
+
+- `Runtime/PHONESESSION#<userId>#<sessionKey>` (`sessionKey` = los primeros 32 hex del SHA-256 del id de sesión del token: `origin_jti`, o `auth-<auth_time>` si falta) marca "esta sesión pasó el código", con TTL al fin de la vida de la sesión (12 h desde el ingreso interactivo, la del refresh token de `ConsoleWeb`). Otro ingreso (otra contraseña tipeada, otro dispositivo) es otra sesión y pide su código; renovar el token mantiene `origin_jti` y no pide nada; `phone.endSession`, que la web llama al cerrar sesión antes de `RevokeToken`, borra la marca.
+- **La contraseña pedida otra vez dentro de una sesión que ya pasó** (el ingreso reciente de ADR-0011, `stepUp` de la consola, para la validación manual) da otra sesión de Cognito: la web llama `phone.carrySession` con el id token todavía válido de la sesión anterior y la sesión nueva del **mismo** usuario hereda el pase. Sin una sesión anterior con pase (u otro usuario), `SESSION_NOT_CARRIED` y la pantalla pide el código. No es un ingreso nuevo: quien lo hace ya pasó el código en ese navegador y además volvió a escribir la contraseña.
+- **La puerta** (`routers/trpc.ts`, en `resolvePrincipal`): todo principal de Cognito cuya sesión no pasó el código recibe `403 PHONE_VERIFICATION_REQUIRED` en todo procedimiento salvo `PHONE_STEP_PROCEDURES`: `account.session` (quién es; sin reclamar la sesión del mundo, `WORLDSESSION#`) y `phone.status`, `phone.sendCode`, `phone.verifyCode`, `phone.carrySession`, `phone.endSession`. Un contenedor recuerda una sesión pasada un minuto; una no pasada se lee en cada pedido. Los principales del `QaDriver` no tienen sesión de Cognito y no pasan por la puerta.
+- **Nada se gasta antes**: ni mundo, ni slot, ni sesión de mundo, ni modelo. La confirmación del email crea la cuenta en `PHONE_PENDING` (sin slot ni pedido a `GuestWorlds`) y el post authentication ya no pide mundos ni generaciones (salvo para cuentas de automatización): eso lo hace el BFF cuando una sesión pasa su código (`guest/sign-in.ts` `ensureWorld`: el slot de una cuenta `PHONE_PENDING`, la generación nueva de un mundo vencido, el mundo de un `guest-NN` que no lo tiene). Una cuenta `PHONE_PENDING` sin lugar pasa a `CAP_FULL` y la portada ofrece "Reintentar".
+
+### 4. El código
+
+- Seis dígitos de `crypto.randomInt`; en `Runtime/PHONECODE#<userId>#<sessionKey>` solo su huella (HMAC-SHA-256 con la subclave `phone-code` de `SessionTokenKey`, ligada a la cuenta y a la sesión), la huella del número, el número mientras se enrola, `attempts`, `sentAt` y `codeExpiresAt`; TTL y comparación de fecha a los 10 minutos.
+- Cinco intentos por código, contados con un incremento condicional **antes** de comparar en tiempo constante; el quinto fallo borra el código (`CODE_EXHAUSTED`). Reenvío: un minuto de espera (`RESEND_TOO_SOON`), con una escritura condicional sobre el `sentAt` leído para que dos envíos simultáneos no salgan los dos.
+- **Envío** (`phone/sms.ts`): Amazon SNS `Publish` directo al número, `AWS.SNS.SMS.SMSType = Transactional`, SDK v3, 5 s de timeout y **un solo intento** (`CLIENT_TIMEOUTS.sms`): un reintento podría entregar un segundo código. Texto de `copy/phone-code.ts` en el idioma de la pantalla: "Tu código de Cuadrilla es 123456. Vence en 10 minutos." / "Your Cuadrilla code is 123456. It expires in 10 minutes." Un destino que SNS no acepta (país que exige remitente registrado, número inválido o dado de baja) es `SMS_NOT_DELIVERABLE` y la pantalla ofrece el contacto de Craftech; el código de un envío fallido se borra. El puerto `SmsSender` tiene un doble en memoria (`memorySmsSender`) para los tests, los flujos locales y el servidor de UI: ninguna prueba manda SMS reales.
+
+### 5. Cuentas de automatización
+
+- `phoneCheck: "AUTOMATION"` en la fila del registro exime del código a una cuenta que ninguna persona usa y que no puede recibir un SMS (el corredor de escenarios y de pruebas). Solo la pone el operador, una cuenta por vez: `npm run console:phone -- --stage poc --username <usuario> --automation` (y `--human` la saca) y `qa:confirm-signup`, que marca la cuenta de una dirección del puente de QA después de confirmarla. Nunca por dominio de correo, grupo, rol ni nada que el visitante pueda influir: ningún procedimiento la escribe.
+- El post authentication de una cuenta marcada hace lo de siempre (mundo, generación, slot), así los escenarios y las pruebas desplegadas siguen corriendo sin SMS.
+
+### 6. Topes (`phone/limits.ts`, un único lugar)
+
+| Contador (`Runtime`) | Tope | Motivo |
+|---|---|---|
+| `PHONESMS#ACCOUNT#<userId>#<realDay>` | 6 SMS por cuenta por día (enrolamiento e ingresos sumados) | `SMS_ACCOUNT_LIMIT`: la cuenta no ingresa hasta el día siguiente |
+| `PHONESMS#NUMBER#<phoneHash>#<realDay>` | 3 por número por día | `SMS_NUMBER_LIMIT` |
+| `PHONESMS#IP#<ipHash>#<realDay>` | 5 por IP del visor por día | `SMS_IP_LIMIT` |
+| `PHONESMS#GLOBAL#<realDay>` | 150 por día en el stage | `SMS_DAILY_LIMIT` |
+
+El mismo mecanismo que el alta (`signup/limits.ts` `counterIncrementOp`): los tres del llamador en una transacción con techo, después el del día; 48 h de TTL pasado el período; ninguna clave con el número ni la IP en claro (`phoneHash` con la subclave `account-phone`, `ipHash` con `ip-hash`). Sin la IP del visor (fuera del borde) no se envía nada. La última red es el tope de gasto de SMS de la cuenta (US$50 por mes, configuración de la cuenta compartida).
+
+### 7. Un número, una cuenta
+
+`Runtime/PHONEOWNER#<phoneHash>` (`userId`, sin TTL) se crea al verificar con `ifNotExists`; un número que verificó otra cuenta se rechaza antes de enviar nada y, si dos cuentas compiten, al verificar (`PHONE_IN_USE`, "ese número ya está en uso"). El borrado de la cuenta (`GuestAccountDeletion`) y el `--reset-phone` del operador lo liberan, solo si es de esa cuenta.
+
+### 8. El lead
+
+- El lead de una cuenta de alta propia sigue pasando a `CONFIRMED` al confirmar el email (los usuarios hermanos salen de Cognito como antes), pero **el aviso a Craftech sale recién al verificar el celular**, una sola vez, en el enrolamiento: el BFF escribe `phone` y `phoneVerifiedAt` en el lead (un `UpdateItem` que nombra solo esos atributos, `updatedAt` y `version`, dentro de `BFF_LEAD_ATTRIBUTES`) y `LeadStream` recibe ese `MODIFY` por un filtro propio; el aviso incluye el teléfono verificado. Un lead confirmado sin teléfono verificado no genera aviso (`PHONE_NOT_VERIFIED`).
+- Cuenta como lead (`isQualified`) y es contactable un lead con el teléfono verificado, o uno avisado antes de este cambio (`notifyOutcome SENT`): esos ya llegaron a Craftech con la regla anterior.
+- El asunto sigue diciendo "NO CONTACTAR" cuando la persona no aceptó el consentimiento de contacto (`CONTACT`).
+
+### 9. Infraestructura
+
+- `sns:Publish` sobre `*` solo para el `Bff` (publicar a un número no tiene ARN), con una denegación de `sns:Publish` sobre `arn:aws:sns:*:*:*` en la misma política: solo sirve para SMS directos (`infra/iam-capabilities.ts` `SMS_CODE_GRANTS`).
+- El techo de permisos (`infra/bootstrap/ci-role.yaml`, `DeployBoundary`) suma `sns:Publish` a su sentencia sin recurso (`NoResourceLevelRuntime`); se aplica a mano con el comando de `infra/bootstrap/README.md`. Sin ese cambio aplicado, el envío falla con `AccessDenied` (`SMS_UNAVAILABLE`) y nadie puede pasar el código.
+- Configuración de la cuenta, fuera del repo (`docs/pending.md` P-09): la cuenta fuera del sandbox de SMS de SNS, el tope de gasto mensual de SMS en US$50 y, para países que lo exigen (Estados Unidos, India), un remitente registrado.
+
+## Alternativas descartadas
+
+- **Verificar el teléfono una sola vez.** No frena a quien adivina una contraseña. Descartada por el dueño.
+- **El MFA por SMS de Cognito.** Necesita un rol de SNS del pool, el atributo `phone_number` escribible y su propio flujo de desafío en la web, y no deja aplicar los topes por número, por IP y del día ni el índice de un número por cuenta. Descartada.
+- **Eximir por dominio de correo o por grupo** (por ejemplo, las direcciones `success+qa-…@simulator.amazonses.com`). Cualquiera puede escribir una dirección; la marca va por cuenta y solo del lado del servidor.
+
+## Consecuencias
+
+- Ingresar cuesta un SMS por sesión; los topes y el tope de gasto de la cuenta lo acotan.
+- Los specs de interfaz de las vistas pasan la sesión por un puente de prueba del servidor local (`POST /api/__e2e/phone/pass`, solo en `tests/ui-server/app.ts`); la pantalla del código tiene su spec propio (`phone.spec.ts`).
+- Un `--reset-phone` no cierra las sesiones ya pasadas de esa cuenta: siguen hasta su vencimiento (12 h como máximo).
+- Las cuentas que el operador ya entregó (`guest-NN`) y el personal se enrolan en su próximo ingreso: quien reciba credenciales necesita un celular que reciba SMS.

@@ -6,7 +6,8 @@
 //   auth.signUp           `SignUp` with the `GuestSignup` client and the ticket (or without it, or with
 //                         another user's, to see the pre sign-up refuse); the password is derived on the
 //                         server and never leaves the driver
-//   auth.confirmQaSignup  `AdminConfirmSignUp`, only for a user whose email IN COGNITO is a QA address
+//   auth.confirmQaSignup  `AdminConfirmSignUp`, only for a user whose email IN COGNITO is a QA address, and
+//                         that one account marked `phoneCheck AUTOMATION` (no SMS reaches it, ADR-0029)
 //   auth.qaLogin          `AdminInitiateAuth` with `QaProbe` (same fence): the principal the token carries
 //   auth.cleanupQaSignup  `GuestAccountDeletion` with the user's `userId` (same fence; no `AdminDeleteUser`)
 //   guest.forceExpire     the generation's `expiresAtReal` in the past (same fence), written by `GuestWorlds`
@@ -19,6 +20,7 @@
 import { ToolError } from "@cuadrilla/shared";
 import { signupUserIdOf } from "../guest/registry";
 import { setQaSlotLimits } from "../guest/slots";
+import { adminPhone } from "../phone/admin";
 import { QA_REASON, runIdOfKey } from "./contract";
 import type { QaParsedInput } from "./contract-inputs";
 import type { ActionContext } from "./driver";
@@ -67,8 +69,10 @@ export function seamActions(ports: QaPorts) {
       const user = await fenced(ports, input.username, ctx);
       if (user.status === "UNCONFIRMED") await seam.cognito.confirm(input.username);
       const after = await seam.cognito.getUser(input.username);
-      ctx.log.info("qa_driver.seam", { kind: "QA_SIGNUP_CONFIRMED", user: input.username.slice(0, 8), email: maskQaAddress(user.email), previousStatus: user.status });
-      return { username: input.username, previousStatus: user.status, status: after?.status ?? "UNKNOWN", ...(after?.sub === undefined ? {} : { sub: after.sub }) };
+      // Nobody receives an SMS at a QA address: this one account skips the code (ADR-0029 §5).
+      const automation = after?.sub === undefined ? false : (await adminPhone({ client: ports.client, now: ctx.now }, after.sub, "AUTOMATION")).outcome === "DONE";
+      ctx.log.info("qa_driver.seam", { kind: "QA_SIGNUP_CONFIRMED", user: input.username.slice(0, 8), email: maskQaAddress(user.email), previousStatus: user.status, automation });
+      return { username: input.username, previousStatus: user.status, status: after?.status ?? "UNKNOWN", automation, ...(after?.sub === undefined ? {} : { sub: after.sub }) };
     },
     async "auth.qaLogin"(input: QaParsedInput<"auth.qaLogin">, ctx: ActionContext) {
       const seam = ports.signup();

@@ -43,6 +43,8 @@ const LEAD_META_KEYS = { Keys: { PK: { S: [{ prefix: "LEAD#" }] }, SK: { S: ["ME
  */
 export const LEAD_STREAM_FILTERS = [
   { eventName: ["MODIFY"], dynamodb: { ...LEAD_META_KEYS, OldImage: { status: { S: [{ exists: false }] } }, NewImage: { status: { S: ["CONFIRMED"] } } } },
+  // The account verified its phone by SMS (ADR-0029): the notice to Craftech.
+  { eventName: ["MODIFY"], dynamodb: { ...LEAD_META_KEYS, OldImage: { phoneVerifiedAt: { S: [{ exists: false }] } }, NewImage: { status: { S: ["CONFIRMED"] }, phoneVerifiedAt: { S: [{ exists: true }] } } } },
   { eventName: ["REMOVE"], userIdentity: { type: ["Service"], principalId: ["dynamodb.amazonaws.com"] }, dynamodb: LEAD_META_KEYS },
 ] as const;
 
@@ -107,6 +109,9 @@ export const BFF_LEAD_ATTRIBUTES = [
   "retiredUsernames",
   "signupStartedAt",
   "expiresAt",
+  // The account's phone: typed at the sign-up, verified by the SMS enrolment of the BFF (ADR-0029).
+  "phone",
+  "phoneVerifiedAt",
 ] as const;
 
 /** Written by the confirmation, the sign-in, `LeadStream` or the deletion; never by the BFF. */

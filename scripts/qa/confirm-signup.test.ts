@@ -17,7 +17,7 @@ function fakeCognito(user: FakeUser | undefined) {
     const name = command.constructor.name;
     if (name === "AdminGetUserCommand") {
       if (user === undefined) throw Object.assign(new Error("no user"), { name: "UserNotFoundException" });
-      return { UserStatus: user.status, UserAttributes: [{ Name: "email", Value: user.email }, { Name: "email_verified", Value: String(user.emailVerified) }] };
+      return { UserStatus: user.status, UserAttributes: [{ Name: "sub", Value: "sub-qa-0001" }, { Name: "email", Value: user.email }, { Name: "email_verified", Value: String(user.emailVerified) }] };
     }
     writes.push(name);
     if (user !== undefined && name === "AdminConfirmSignUpCommand") user.status = "CONFIRMED";
@@ -29,7 +29,12 @@ function fakeCognito(user: FakeUser | undefined) {
 
 function deps(cognito: SeamDeps["cognito"]) {
   const audit: Array<Record<string, unknown>> = [];
-  return { audit, deps: { cognito, userPoolId: "us-east-1_Test", audit: (line: Record<string, unknown>) => audit.push(line), now: () => new Date("2026-09-27T02:00:00Z") } satisfies SeamDeps };
+  const marked: string[] = [];
+  return {
+    audit,
+    marked,
+    deps: { cognito, userPoolId: "us-east-1_Test", audit: (line: Record<string, unknown>) => audit.push(line), now: () => new Date("2026-09-27T02:00:00Z"), markAutomation: async (sub: string) => (marked.push(sub), true) } satisfies SeamDeps,
+  };
 }
 
 describe("qa:confirm-signup", () => {
@@ -40,11 +45,12 @@ describe("qa:confirm-signup", () => {
     expect(() => parseSeamArgs([])).toThrow(/gst-<ULID>/);
   });
 
-  it("confirms and verifies the email of a QA address read from Cognito", async () => {
+  it("[FL-125] confirms and verifies the email of a QA address read from Cognito, and marks that one account AUTOMATION", async () => {
     const { cognito, writes } = fakeCognito({ status: "UNCONFIRMED", email: "success+qa-wp62-1@simulator.amazonses.com", emailVerified: false });
-    const { audit, deps: seam } = deps(cognito);
+    const { audit, marked, deps: seam } = deps(cognito);
     const outcome = await runSeam({ username: USER, statusOnly: false, verifyEmail: true }, seam);
-    expect(outcome).toEqual({ outcome: "CONFIRMED", userStatus: "CONFIRMED", emailVerified: true, verifiedBySeam: true });
+    expect(outcome).toEqual({ outcome: "CONFIRMED", userStatus: "CONFIRMED", emailVerified: true, verifiedBySeam: true, automation: true });
+    expect(marked).toEqual(["sub-qa-0001"]);
     expect(writes).toEqual(["AdminConfirmSignUpCommand", "AdminUpdateUserAttributesCommand"]);
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({ kind: "QA_SIGNUP_CONFIRMED", user: "gst-01K8", email: "s***@simulator.amazonses.com" });
@@ -54,9 +60,10 @@ describe("qa:confirm-signup", () => {
   it("refuses a user whose address in Cognito is not a QA one, without any write", async () => {
     for (const email of ["ana@example.com", "success@simulator.amazonses.com", "success+qa-x@simulator.amazonses.com.evil.test", "bounce+qa-x@simulator.amazonses.com"]) {
       const { cognito, writes } = fakeCognito({ status: "UNCONFIRMED", email, emailVerified: false });
-      const { audit, deps: seam } = deps(cognito);
+      const { audit, marked, deps: seam } = deps(cognito);
       expect(await runSeam({ username: USER, statusOnly: false, verifyEmail: true }, seam)).toEqual({ outcome: "REFUSED", reason: "NOT_A_QA_ADDRESS" });
       expect(writes).toEqual([]);
+      expect(marked).toEqual([]);
       expect(audit[0]).toMatchObject({ kind: "QA_SIGNUP_REFUSED" });
       expect(JSON.stringify(audit)).not.toContain(email);
     }

@@ -7,7 +7,7 @@ import { type CognitoUsers, createCognitoUsers } from "../leads/cognito-users";
 import type { DeletionRequestInput } from "../leads/deletion";
 import type { Lead } from "../leads/model";
 import type { LeadStreamDeps } from "../leads/stream";
-import { NOTIFY_FIXTURE, T0, confirmedLead, hashOf, leadHarness, signupUserId, startLead, username } from "../leads/testing";
+import { NOTIFY_FIXTURE, T0, VERIFIED_PHONE, confirmedLead, hashOf, leadHarness, signupUserId, startLead, username } from "../leads/testing";
 import type { MemoryLeadTable } from "../leads/memory-table";
 import { createLogger } from "../lib/log";
 import { handleLeadStream } from "./lead-stream";
@@ -82,14 +82,14 @@ describe("LeadStream [FL-118]", () => {
     h = harness();
   });
 
-  it("[FL-118] MODIFY to CONFIRMED: the notice, the other pending users out of Cognito and the list emptied", async () => {
+  it("[FL-118] MODIFY to CONFIRMED: no notice yet, the other pending users out of Cognito and the list emptied", async () => {
     await startLead(h.deps.store, { user: 1 });
     await startLead(h.deps.store, { user: 2 });
     const before = await h.deps.store.get(hashOf(EMAIL));
     const after = await confirmedLead(h.deps.store, { user: 2 });
     const summary = await handleLeadStream({ Records: [modify(before as Lead, after)] }, h.deps);
-    expect(summary).toEqual({ confirmed: 1, expired: 0, ignored: 0 });
-    expect(h.sent).toHaveLength(1);
+    expect(summary).toEqual({ confirmed: 1, verified: 0, expired: 0, ignored: 0 });
+    expect(h.sent).toHaveLength(0);
     expect(h.deleted).toEqual([username(1)]);
     expect((await h.deps.store.get(hashOf(EMAIL)))?.pendingUsernames).toEqual([]);
   });
@@ -116,8 +116,18 @@ describe("LeadStream [FL-118]", () => {
     const result = await h.deps.store.confirm({ emailHash: hashOf(EMAIL), username: username(1), sub: "sub-0001", userId: signupUserId(1), at: T0 });
     if (result.outcome !== "CONFIRMED") throw new Error("the retired user did not confirm the lead");
     await handleLeadStream({ Records: [modify(pending, result.lead)] }, h.deps);
-    expect(h.sent).toHaveLength(1);
+    expect(h.sent).toHaveLength(0);
     expect([...h.deleted].sort()).toEqual([2, 3, 4].map(username).sort());
+  });
+
+  it("[FL-116] [FL-123] MODIFY to a verified phone: the notice to Craftech, once, with the phone; a retried batch never sends twice", async () => {
+    const confirmed = await confirmedLead(h.deps.store);
+    expect(await h.deps.store.verifyPhone(hashOf(EMAIL), { sub: "sub-0001", phone: VERIFIED_PHONE, at: T0 })).toBe(true);
+    const verified = (await h.deps.store.get(hashOf(EMAIL))) as Lead;
+    expect(await handleLeadStream({ Records: [modify(confirmed, verified)] }, h.deps)).toEqual({ confirmed: 0, verified: 1, expired: 0, ignored: 0 });
+    await handleLeadStream({ Records: [modify(confirmed, verified), modify(verified, { ...verified, version: verified.version + 1 })] }, h.deps);
+    expect(h.sent).toHaveLength(1);
+    expect(h.sent[0]?.Content?.Simple?.Body?.Text?.Data).toContain(VERIFIED_PHONE);
   });
 
   it("[FL-118] a retried batch does not notify twice, and a change after the confirmation is ignored", async () => {
@@ -126,14 +136,14 @@ describe("LeadStream [FL-118]", () => {
     const after = await confirmedLead(h.deps.store);
     await handleLeadStream({ Records: [modify(before as Lead, after)] }, h.deps);
     await handleLeadStream({ Records: [modify(before as Lead, after), modify(after, { ...after, version: after.version + 1 })] }, h.deps);
-    expect(h.sent).toHaveLength(1);
+    expect(h.sent).toHaveLength(0);
   });
 
   it("[FL-118] REMOVE of a pending lead by TTL: each pending user out of Cognito and LEAD_EXPIRED with the leadId", async () => {
     await startLead(h.deps.store, { user: 1 });
     await startLead(h.deps.store, { user: 2 });
     const lead = (await h.deps.store.get(hashOf(EMAIL))) as Lead;
-    expect(await handleLeadStream({ Records: [ttlRemove(lead)] }, h.deps)).toEqual({ confirmed: 0, expired: 1, ignored: 0 });
+    expect(await handleLeadStream({ Records: [ttlRemove(lead)] }, h.deps)).toEqual({ confirmed: 0, verified: 0, expired: 1, ignored: 0 });
     expect(h.deleted).toEqual([username(1), username(2)]);
     expect(h.invoked).toEqual([]);
     expect(h.table.logs).toEqual([expect.objectContaining({ kind: "LEAD_EXPIRED", actor: "TTL", leadId: lead.leadId, reason: "NEVER_CONFIRMED" })]);
@@ -150,7 +160,7 @@ describe("LeadStream [FL-118]", () => {
     const lead = await confirmedLead(h.deps.store);
     const log = { eventName: "INSERT", dynamodb: { Keys: toImage({ PK: "LEADLOG#2026-10", SK: "x" }), NewImage: toImage({ PK: "LEADLOG#2026-10", SK: "x" }) } };
     const insert = { eventName: "INSERT", dynamodb: { Keys: keys(lead), NewImage: toImage(lead) } };
-    expect(await handleLeadStream({ Records: [userRemove(lead), log, insert] }, h.deps)).toEqual({ confirmed: 0, expired: 0, ignored: 3 });
+    expect(await handleLeadStream({ Records: [userRemove(lead), log, insert] }, h.deps)).toEqual({ confirmed: 0, verified: 0, expired: 0, ignored: 3 });
     expect([h.deleted, h.invoked, h.sent]).toEqual([[], [], []]);
   });
 

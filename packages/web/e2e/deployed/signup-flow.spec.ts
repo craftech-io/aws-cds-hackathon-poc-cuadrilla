@@ -66,6 +66,8 @@ async function startSignup(page: Page, account: Account, options: { readonly con
   await page.locator("#hero").getByRole("link", { name: LANDING_COPY[lang].nav.tryDemo }).click();
   await expect(page.getByRole("heading", { name: copy.title })).toBeVisible();
   await page.getByLabel(copy.email, { exact: true }).fill(account.email);
+  // A QA account: `qa:confirm-signup` marks it AUTOMATION, so no SMS ever goes to this fictitious number.
+  await page.getByLabel(copy.phone, { exact: true }).fill("+52 55 0000 0000");
   await page.getByLabel(copy.password, { exact: true }).fill(account.password);
   await page.getByLabel(copy.name).fill("Ana Prueba");
   await page.getByLabel(copy.company).fill("Fibra de Prueba");

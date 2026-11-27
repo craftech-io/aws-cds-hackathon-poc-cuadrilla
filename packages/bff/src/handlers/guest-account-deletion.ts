@@ -18,6 +18,7 @@ import { leadEmailHash } from "../leads/keys";
 import { dynamoDocumentClient } from "../lib/clients";
 import { type Logger, createLogger } from "../lib/log";
 import { subkey } from "../lib/secrets";
+import { accountPhoneHash } from "../phone/number";
 import { worldDestroyer } from "../leads/world-destroyer";
 
 export function defaultDeletionDeps(log: Logger, worlds: GenerationDestroyer = worldDestroyer()): DeletionDeps {
@@ -27,6 +28,7 @@ export function defaultDeletionDeps(log: Logger, worlds: GenerationDestroyer = w
     cognito: createCognitoUsers(),
     worlds,
     emailHash: (email) => leadEmailHash(subkey("email-hash"), email),
+    phoneHash: (phone) => accountPhoneHash(subkey("account-phone"), phone),
     now: () => new Date(),
     log,
   };

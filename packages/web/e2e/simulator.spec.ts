@@ -3,10 +3,8 @@
 // S3 emulator of the presigned POST), started in each worker on a free port with this run's JWKS. The
 // sign-in is the console's own against the route mock of Cognito, as a guest of `isp-guest-07`. What the
 // agent would have written (buttons, lists, a template, a document, a reaction) is put in the server's
-// memory as the worker writes it, so the phone draws it and a tap goes back through the router.
-//
-// Voice: Chromium records from its fake microphone (`--use-fake-device-for-media-stream`); the WebKit
-// case (`@webkit`) records MP4 from a synthetic stream. Nothing reaches AWS.
+// memory as the worker writes it, so the phone draws it and a tap goes back through the router. Voice:
+// Chromium's fake microphone; WebKit (`@webkit`) records MP4 from a synthetic stream. Nothing reaches AWS.
 import { type Page, test as base, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
@@ -21,6 +19,7 @@ import { loginCopy } from "../src/views/login/copy";
 import { expectReadableScreen } from "./support/a11y";
 import { E2E_CLIENT_ID, E2E_POOL_ID, createPool, randomPassword } from "./support/accounts";
 import { routeCognito } from "./support/cognito";
+import { passPhoneStep } from "./support/phone";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = resolve(HERE, "..");
@@ -96,6 +95,7 @@ async function openSimulator(page: Page, ui: UiServer, query = ""): Promise<void
   await page.getByLabel(loginCopy.credentials.password, { exact: true }).fill(password);
   await page.getByRole("button", { name: loginCopy.credentials.submit }).click();
   await expect(page).toHaveURL(/\/app\/simulator/, { timeout: 30_000 });
+  await passPhoneStep(page);
   await expect(page.getByText(copy.frameLabel)).toBeVisible({ timeout: 30_000 });
 }
 

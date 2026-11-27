@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 /** Flows of the catalog; a flow id outside 1..FLOW_COUNT is a typo, not a new flow. */
-export const FLOW_COUNT = 122;
+export const FLOW_COUNT = 125;
 
 export const FlowId = z
   .string()

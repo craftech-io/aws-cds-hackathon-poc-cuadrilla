@@ -42,6 +42,7 @@ export function fromImage(image: Readonly<Record<string, StreamAttributeValue>>)
 
 export type LeadChange =
   | { readonly kind: "CONFIRMED"; readonly lead: Lead }
+  | { readonly kind: "PHONE_VERIFIED"; readonly lead: Lead }
   | { readonly kind: "EXPIRED"; readonly lead: Lead }
   | { readonly kind: "IGNORED"; readonly why: "NOT_A_LEAD" | "NOT_A_CONFIRMATION" | "NOT_A_TTL_REMOVE" | "INSERT" };
 
@@ -59,7 +60,9 @@ export function classifyRecord(raw: DynamoDBRecord | unknown): LeadChange {
   if (record.eventName === "MODIFY") {
     const before = leadOf(record.dynamodb.OldImage);
     const after = leadOf(record.dynamodb.NewImage);
-    return before.status === undefined && after.status === "CONFIRMED" ? { kind: "CONFIRMED", lead: after } : { kind: "IGNORED", why: "NOT_A_CONFIRMATION" };
+    if (before.status === undefined && after.status === "CONFIRMED") return { kind: "CONFIRMED", lead: after };
+    if (before.phoneVerifiedAt === undefined && after.phoneVerifiedAt !== undefined && after.status === "CONFIRMED") return { kind: "PHONE_VERIFIED", lead: after };
+    return { kind: "IGNORED", why: "NOT_A_CONFIRMATION" };
   }
   const byTtl = record.userIdentity?.type === "Service" && record.userIdentity.principalId === "dynamodb.amazonaws.com";
   return byTtl ? { kind: "EXPIRED", lead: leadOf(record.dynamodb.OldImage) } : { kind: "IGNORED", why: "NOT_A_TTL_REMOVE" };

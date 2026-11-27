@@ -12,7 +12,7 @@ La POC publicada es un **producto para un cliente futuro** (decisión del CTO de
    |---|---|
    | Landing, alta, login, recuperación, consola, simulador, páginas públicas | `packages/web/src/**` (salvo tests), `packages/web/index.html`, `packages/web/public/**` (archivos de texto: HTML, JSON, SVG, TXT) |
    | Legales | `packages/web/public/legal/**` |
-   | Textos al personal, plantillas de WhatsApp (y futuras de RCS/SMS), emails de producto, textos del acta, aviso de lead | `packages/bff/src/copy/**`, `packages/bff/src/certificates/**`, `packages/bff/src/leads/**` (salvo tests) |
+   | Textos al personal, plantillas de WhatsApp (y futuras de RCS), el SMS del código (ADR-0029, `copy/phone-code.ts`), emails de producto, textos del acta, aviso de lead | `packages/bff/src/copy/**`, `packages/bff/src/certificates/**`, `packages/bff/src/leads/**` (salvo tests) |
    | Emails de autenticación (código de alta, reenvío, recuperación, invitación) | `packages/bff/src/copy/auth-emails*.ts` (trigger de mensajes de Cognito, ADR-0025) e `infra/auth-email.ts` (plantillas por defecto del pool); además, su **salida renderizada** en es y en |
    | PDF del acta y muestras | Texto de los PDFs versionados (`scripts/seed/photos/templates/*.pdf`, el acta de ejemplo de los tests) |
    | Textos del seed que ve o escucha un usuario | `scripts/seed/data/**` (manual, personas, órdenes, casos y mensajes históricos, plantillas de mundo), `scripts/seed/photos/texts.ts`, `scripts/seed/audio/texts.ts` |

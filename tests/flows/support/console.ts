@@ -11,6 +11,7 @@ import { processInboundEvent } from "../../../packages/bff/src/channels/whatsapp
 import { tableEvalRuns } from "../../../packages/bff/src/metrics/eval-runs";
 import { type ConsolePorts, bindConsolePorts } from "../../../packages/bff/src/routers/console-ports";
 import type { ContextDeps } from "../../../packages/bff/src/routers/deps";
+import { passedGate } from "../../../packages/bff/src/phone/testing";
 import { type AppCaller, createQaCaller } from "../../../packages/bff/src/routers/index";
 import type { DispatchControlClient } from "../../../packages/bff/src/services/demo-controls/dispatch-client";
 import { worldRebuild } from "../../../packages/bff/src/worlds/rebuild";
@@ -58,6 +59,8 @@ export function consoleOf(world: FlowWorld, role: ConsoleRole, clockId: string):
     mocks: async () => ({ network: "OK", dispatch: "OK" }),
     wallClock: world.realNow,
     loggerFor: () => world.stage.log,
+    // A QA principal has no Cognito session: the SMS gate never asks it (ADR-0029).
+    phoneGate: passedGate(),
   };
   return createQaCaller({ role, clockId }, bindConsolePorts(deps, consolePorts(world)));
 }

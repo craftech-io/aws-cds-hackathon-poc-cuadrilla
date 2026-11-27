@@ -84,3 +84,16 @@ export async function confirmedLead(store: LeadStore, options: StartOptions & { 
   if (result.outcome !== "CONFIRMED") throw new Error("the fixture lead did not confirm");
   return result.lead;
 }
+
+export const VERIFIED_PHONE = "+525500000001";
+
+/** A confirmed lead whose account then verified its phone by SMS (ADR-0029): the one Craftech is told about. */
+export async function verifiedLead(store: LeadStore, options: StartOptions & { readonly sub?: string; readonly userId?: string; readonly phone?: string } = {}): Promise<Lead> {
+  const email = options.email ?? "ana.prueba@example.com";
+  const sub = options.sub ?? "sub-0001";
+  await confirmedLead(store, { ...options, sub });
+  if (!(await store.verifyPhone(hashOf(email), { sub, phone: options.phone ?? VERIFIED_PHONE, at: options.at ?? T0 }))) throw new Error("the fixture lead did not verify its phone");
+  const lead = await store.get(hashOf(email));
+  if (lead === undefined) throw new Error("the fixture lead is gone");
+  return lead;
+}

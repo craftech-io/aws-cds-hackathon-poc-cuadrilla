@@ -39,6 +39,8 @@ export interface RegistryRow {
   readonly guestOrigin?: GuestOrigin | undefined;
   readonly cognitoSub: string;
   readonly cognitoUsername?: string | undefined;
+  /** `phoneCheck AUTOMATION` (ADR-0029): no person uses it, its sign-in needs no SMS code. */
+  readonly automation: boolean;
   readonly item: Item;
 }
 
@@ -47,7 +49,7 @@ export function registryRowOf(item: Item): RegistryRow | undefined {
   const parsed = ConsoleUser.safeParse(item);
   if (!parsed.success) return undefined;
   const user = parsed.data;
-  return { ispId: user.ispId, userId: user.userId, role: user.role, guestOrigin: user.guestOrigin, cognitoSub: user.cognitoSub, cognitoUsername: user.cognitoUsername, item };
+  return { ispId: user.ispId, userId: user.userId, role: user.role, guestOrigin: user.guestOrigin, cognitoSub: user.cognitoSub, cognitoUsername: user.cognitoUsername, automation: user.phoneCheck === "AUTOMATION", item };
 }
 
 /** Every registry row the `SUB#<sub>` index lists (eventually consistent: at most a few). */

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { CONSENTS_VERSION } from "@cuadrilla/shared/legal/consents";
 import type { MemoryLeadTable } from "../../packages/bff/src/leads/memory-table";
 import type { LeadStore } from "../../packages/bff/src/leads/store";
-import { T0, confirmedLead, hashOf, leadHarness } from "../../packages/bff/src/leads/testing";
+import { T0, verifiedLead, hashOf, leadHarness } from "../../packages/bff/src/leads/testing";
 import { type EmailSource, readEmailInput } from "./email-input";
 import { selectLeads } from "./export";
 import { main, runUnsubscribe } from "./unsubscribe";
@@ -23,7 +23,7 @@ describe("leads:unsubscribe [FL-117]", () => {
   beforeEach(() => ({ table, store } = leadHarness()));
 
   it("[FL-117] adds CONTACT accepted: false to the history, records CONTACT_WITHDRAWN and leaves the account", async () => {
-    const before = await confirmedLead(store, { contact: true });
+    const before = await verifiedLead(store, { contact: true });
     const result = await runUnsubscribe(EMAIL, { store, emailHash: hashOf, now: () => T0 });
     expect(result).toEqual({ outcome: "WITHDRAWN", leadId: before.leadId });
     const lead = await store.get(hashOf(EMAIL));
@@ -34,7 +34,7 @@ describe("leads:unsubscribe [FL-117]", () => {
   });
 
   it("[FL-117] the lead leaves the default export afterwards", async () => {
-    await confirmedLead(store, { contact: true });
+    await verifiedLead(store, { contact: true });
     expect(selectLeads(await store.scan(), { all: false, origin: "WEB" })).toHaveLength(1);
     await runUnsubscribe(EMAIL, { store, emailHash: hashOf, now: () => T0 });
     expect(selectLeads(await store.scan(), { all: false, origin: "WEB" })).toHaveLength(0);
@@ -43,7 +43,7 @@ describe("leads:unsubscribe [FL-117]", () => {
 
   it("[FL-117] answers NOT_FOUND and ALREADY_WITHDRAWN without writing", async () => {
     expect(await runUnsubscribe("nadie@example.com", { store, emailHash: hashOf, now: () => T0 })).toEqual({ outcome: "NOT_FOUND" });
-    await confirmedLead(store, { contact: false });
+    await verifiedLead(store, { contact: false });
     expect((await runUnsubscribe(EMAIL, { store, emailHash: hashOf, now: () => T0 })).outcome).toBe("ALREADY_WITHDRAWN");
     expect(table.logs).toEqual([]);
   });

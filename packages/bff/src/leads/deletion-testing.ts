@@ -43,6 +43,7 @@ export function world(): World {
     cognito,
     worlds: { destroyGeneration: async (account) => void destroyed.push(account) },
     emailHash: hashOf,
+    phoneHash: (phone) => `hash-of-${phone.slice(1)}`,
     now: () => T0,
     log: createLogger({ level: "debug", sink: (line) => lines.push(line) }),
   };

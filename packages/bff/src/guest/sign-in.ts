@@ -12,6 +12,11 @@
 //   GUEST · SIGNUP whose lead is still pending (the trigger failed after its transaction): the lead
 //                            is confirmed the same way
 //
+// The world part (a new generation, a slot, the invited world) waits for the SMS code (ADR-0029): the
+// trigger does it only for an account marked `phoneCheck AUTOMATION`; for everyone else the BFF does it
+// when the session passes its code (`ensureWorld`, from phone/flow.ts `afterPass`). The lead's
+// `lastLoginAt` and a confirmation left unfinished are still the trigger's.
+//
 // A sign-in is never refused for any of this: a failure is logged, and the portada offers "Reintentar"
 // (`guest.retryWorld`), which does the same from the console.
 import { clockIdOfIsp } from "@cuadrilla/shared";
@@ -24,6 +29,7 @@ import { type ConfirmationDeps, type ConfirmationOutcome, confirmSignup } from "
 import type { WorldProvisioner } from "./provisioner";
 import { type RegistryRow, originOf, rowsBySub } from "./registry";
 import { renewGeneration } from "./renewal";
+import { takeSlot } from "./retry";
 import { type SlotScope, slotScopeOf } from "./slots";
 
 export const SIGN_IN = "PostAuthentication_Authentication";
@@ -32,7 +38,7 @@ export const SIGN_IN = "PostAuthentication_Authentication";
 export const STALE_PROVISIONING_MS = 2 * 60_000;
 
 export type SignInOutcome =
-  | { readonly kind: "NONE"; readonly why: "NOT_A_SIGN_IN" | "NO_ROW" | "NOT_A_GUEST" }
+  | { readonly kind: "NONE"; readonly why: "NOT_A_SIGN_IN" | "NO_ROW" | "NOT_A_GUEST" | "AWAITING_PHONE_CODE" }
   | { readonly kind: "CONFIRMATION"; readonly outcome: ConfirmationOutcome }
   | { readonly kind: "KEPT"; readonly userId: string }
   | { readonly kind: "RENEWED"; readonly userId: string; readonly clockId: string; readonly status: GuestAccount["status"] }
@@ -67,6 +73,8 @@ function finishConfirmation(deps: SignInDeps, event: SignInEvent): Promise<Confi
 
 const isSignupUser = (event: SignInEvent): boolean => SIGNUP_USERNAME_PATTERN.test(event.userName ?? "") && event.email !== undefined;
 
+export type WorldDeps = Pick<SignInDeps, "client" | "provisioner" | "now" | "suffix" | "log">;
+
 async function signupSignIn(deps: SignInDeps, row: RegistryRow, event: SignInEvent, now: Date): Promise<SignInOutcome> {
   let lead = await deps.leads.recordLogin(event.sub, now);
   // No confirmed lead for the sub: the trigger opened the account but never confirmed the lead.
@@ -74,18 +82,29 @@ async function signupSignIn(deps: SignInDeps, row: RegistryRow, event: SignInEve
     await finishConfirmation(deps, event);
     lead = await deps.leads.recordLogin(event.sub, now);
   }
+  if (!row.automation) return { kind: "NONE", why: "AWAITING_PHONE_CODE" };
+  return signupWorld(deps, row, now, lead === undefined ? undefined : slotScopeOf(lead));
+}
+
+/** The world of a sign-up guest: kept, its slot taken after the SMS code, or a new generation. */
+async function signupWorld(deps: WorldDeps, row: RegistryRow, now: Date, leadScope: SlotScope | undefined): Promise<SignInOutcome> {
   const account = await getGuestAccount(deps.client, row.userId);
+  if (account?.status === "PHONE_PENDING" && !isExpiredAt(account, now)) {
+    const outcome = await takeSlot(deps, account);
+    deps.log.info("guest.world.slot", { userId: row.userId, outcome, metric: "GuestWorldAfterPhone", value: 1 });
+    return outcome === "SLOT_TAKEN" ? { kind: "PROVISIONING", userId: row.userId, clockId: account.clockId } : { kind: "KEPT", userId: row.userId };
+  }
   // A current generation stays, even when the index still shows the row of a previous one (it lags);
   // an account over the person's limit never gets a world, whatever its age.
   if (account !== undefined && (!isExpiredAt(account, now) || account.status === "PERSON_LIMIT")) return { kind: "KEPT", userId: row.userId };
-  const scope: SlotScope = account?.slotScope ?? (lead === undefined ? "PUBLIC" : slotScopeOf(lead));
+  const scope: SlotScope = account?.slotScope ?? leadScope ?? "PUBLIC";
   const renewal = await renewGeneration({ client: deps.client, now, scope, withClock: false, ...(deps.suffix === undefined ? {} : { suffix: deps.suffix }) }, { row, account });
   if (renewal.status === "PROVISIONING") await deps.provisioner.request({ userId: row.userId, clockId: renewal.generation.clockId, origin: "SIGNUP" });
   deps.log.info("guest.world.renewed", { userId: row.userId, ispId: renewal.generation.ispId, status: renewal.status, generation: renewal.generationNumber, metric: "GuestWorldRenewed", value: 1 });
   return { kind: "RENEWED", userId: row.userId, clockId: renewal.generation.clockId, status: renewal.status };
 }
 
-async function invitedSignIn(deps: SignInDeps, row: RegistryRow, origin: "INVITED" | "TEST", now: Date): Promise<SignInOutcome> {
+async function invitedWorld(deps: WorldDeps, row: RegistryRow, origin: "INVITED" | "TEST", now: Date): Promise<SignInOutcome> {
   const clockId = clockIdOfIsp(row.ispId);
   const account = await getGuestAccount(deps.client, row.userId);
   if (account !== undefined && account.clockId === clockId && (account.status === "READY" || (account.status === "PROVISIONING" && !isStale(account, now)))) {
@@ -110,5 +129,20 @@ export async function onSignIn(deps: SignInDeps, event: SignInEvent): Promise<Si
   const origin = originOf(row);
   if (row.role !== "GUEST" || origin === undefined) return { kind: "NONE", why: "NOT_A_GUEST" };
   const now = deps.now();
-  return origin === "SIGNUP" ? signupSignIn(deps, row, event, now) : invitedSignIn(deps, row, origin, now);
+  if (origin === "SIGNUP") return signupSignIn(deps, row, event, now);
+  return row.automation ? invitedWorld(deps, row, origin, now) : { kind: "NONE", why: "AWAITING_PHONE_CODE" };
+}
+
+/**
+ * What a guest account needs once a session passed the SMS code (ADR-0029): the same as a sign-in of an
+ * automation account, by the registry row of the `sub`. Staff, and a `sub` without one row, get nothing.
+ */
+export async function ensureWorld(deps: WorldDeps, sub: string): Promise<SignInOutcome> {
+  const rows = await rowsBySub(deps.client, sub);
+  const [row] = rows;
+  if (row === undefined || rows.length > 1) return { kind: "NONE", why: "NO_ROW" };
+  const origin = originOf(row);
+  if (row.role !== "GUEST" || origin === undefined) return { kind: "NONE", why: "NOT_A_GUEST" };
+  const now = deps.now();
+  return origin === "SIGNUP" ? signupWorld(deps, row, now, undefined) : invitedWorld(deps, row, origin, now);
 }

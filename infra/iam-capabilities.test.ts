@@ -108,7 +108,7 @@ describe("forbidden permissions (ADR-0003, ADR-0002)", () => {
         for (const variable of fences ?? []) expect(variables, `${role}: ${action}`).toContain(variable);
       }
     }
-    expect(Object.keys(JUSTIFIED_WILDCARDS).sort()).toEqual(["cloudwatch:PutMetricData", "transcribe:StartTranscriptionJob"]);
+    expect(Object.keys(JUSTIFIED_WILDCARDS).sort()).toEqual(["cloudwatch:PutMetricData", "sns:Publish", "transcribe:StartTranscriptionJob"]);
   });
 
   it("never grants a wildcard action", () => {
@@ -207,7 +207,7 @@ describe("QaDriver", () => {
     const dlq = grants.find((grant) => grant.actions.includes("sqs:ReceiveMessage"));
     expect(dlq).toEqual({ actions: [...QA_DRIVER_DLQ_ONLY_ACTIONS], resources: ["{InstallerEventsDlq}"] });
     for (const fn of ROLES.filter((name) => name !== "QaDriver")) {
-      for (const action of ["cloudwatch:DescribeAlarmHistory", "sns:Publish"]) expect(expectedActions(fn), fn).not.toContain(action);
+      for (const action of ["cloudwatch:DescribeAlarmHistory", ...(fn === "Bff" ? [] : ["sns:Publish"])]) expect(expectedActions(fn), fn).not.toContain(action);
       expect(expectedGrants(fn).filter((grant) => grant.resources.includes("{InstallerEventsDlq}")), fn).toEqual([]);
       // Only the worker's event source mapping receives, and only from InstallerEvents.
       const receives = expectedGrants(fn).filter((grant) => QA_DRIVER_DLQ_ONLY_ACTIONS.some((action) => grant.actions.includes(action)));

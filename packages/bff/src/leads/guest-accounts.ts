@@ -28,6 +28,8 @@ export interface RegistryUser {
   readonly guestOrigin?: string | undefined;
   readonly cognitoUsername?: string | undefined;
   readonly cognitoSub?: string | undefined;
+  /** The account's verified phone (ADR-0029): its `PHONEOWNER#` goes with the account. */
+  readonly phone?: string | undefined;
 }
 
 export interface GuestAccount {
@@ -45,6 +47,8 @@ export interface AccountRemoval {
   readonly accountUserId?: string | undefined;
   /** Subtract one confirmed account of this person, from the value read. */
   readonly signupKey?: { readonly abuseHash: string; readonly current: number } | undefined;
+  /** `PHONEOWNER#<phoneHash>` of the account's verified phone, freed only if this account holds it. */
+  readonly phoneOwner?: { readonly phoneHash: string; readonly userId: string } | undefined;
 }
 
 export interface GuestAccountPorts {
@@ -67,7 +71,7 @@ function registryUserOf(item: Item): RegistryUser | undefined {
   const userId = text(item, "userId");
   const role = text(item, "role");
   if (ispId === undefined || userId === undefined || role === undefined) return undefined;
-  return { ispId, userId, role, guestOrigin: text(item, "guestOrigin"), cognitoUsername: text(item, "cognitoUsername"), cognitoSub: text(item, "cognitoSub") };
+  return { ispId, userId, role, guestOrigin: text(item, "guestOrigin"), cognitoUsername: text(item, "cognitoUsername"), cognitoSub: text(item, "cognitoSub"), phone: text(item, "phone") };
 }
 
 export function createGuestAccountPorts(client: TableClient): GuestAccountPorts {
@@ -108,6 +112,13 @@ export function createGuestAccountPorts(client: TableClient): GuestAccountPorts 
         }
       }
       if (ops.length > 0) await client.transact(ops, at.toISOString());
+      // Apart from the transaction: an index row another account holds (or none) is left as it is.
+      const owner = removal.phoneOwner;
+      if (owner !== undefined) {
+        const key = { PK: `PHONEOWNER#${owner.phoneHash}`, SK: META };
+        const item = await client.get("Runtime", key);
+        if (item?.userId === owner.userId) await client.delete("Runtime", key);
+      }
     },
   };
 }

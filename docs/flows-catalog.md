@@ -1,6 +1,6 @@
-# Catálogo de flujos (FL-001 a FL-122)
+# Catálogo de flujos (FL-001 a FL-125)
 
-Ciento veintidós flujos: caminos felices, alternativas, controles de seguridad y flujos de consola. Cada flujo es una unidad de prueba: su fila en la matriz de trazabilidad de `docs/test-plan.md` §2.2 lista las pruebas que lo prueban y `npm run flows:check` falla si un flujo no tiene fila o si una prueba citada no existe o no lleva su etiqueta.
+Ciento veinticinco flujos: caminos felices, alternativas, controles de seguridad y flujos de consola. Cada flujo es una unidad de prueba: su fila en la matriz de trazabilidad de `docs/test-plan.md` §2.2 lista las pruebas que lo prueban y `npm run flows:check` falla si un flujo no tiene fila o si una prueba citada no existe o no lleva su etiqueta.
 
 Convenciones:
 
@@ -771,10 +771,10 @@ Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `
 
 ### FL-105 · Confirmación del código y alta del invitado
 - Actores: visitante · Canal: web · Disparador: código correcto en el paso de verificación.
-- Pasos: `ConfirmSignUp` → post confirmation (usuario `gst-*`, lead pendiente que lo lista, `sub` sin registro): lead `CONFIRMED` con `sub`, `cognitoUsername`, `userId` y fecha; `Isps/USER#` con `role GUEST` y `guestOrigin SIGNUP`; reserva de mundo; invocación asíncrona de `GuestWorlds`; `LeadStream` borra los demás usuarios pendientes del mismo email. Después, la web ingresa sola por SRP con el email y la contraseña que tuvo en memoria y abre `/app/home` (si falla, `/login` con el email completado). Un código inválido o vencido muestra el error neutral y no cambia nada.
-- Estado esperado: usuario `CONFIRMED`; lead `CONFIRMED` y evento `CONFIRMED`; registro `GUEST`; `GUESTACCOUNT#` en `PROVISIONING`; ningún otro usuario pendiente de ese email en Cognito; ninguna fila `SUPERVISOR`/`OPS` creada por un alta; la contraseña fuera de todo almacenamiento del navegador.
+- Pasos: `ConfirmSignUp` → post confirmation (usuario `gst-*`, lead pendiente que lo lista, `sub` sin registro): lead `CONFIRMED` con `sub`, `cognitoUsername`, `userId` y fecha; `Isps/USER#` con `role GUEST` y `guestOrigin SIGNUP`; `GUESTACCOUNT#` en `PHONE_PENDING`, sin lugar ni pedido a `GuestWorlds` (el mundo espera la primera sesión que pasa el código por SMS, FL-123); `LeadStream` borra los demás usuarios pendientes del mismo email. Después, la web ingresa sola por SRP con el email y la contraseña que tuvo en memoria y abre `/app/home` (si falla, `/login` con el email completado). Un código inválido o vencido muestra el error neutral y no cambia nada.
+- Estado esperado: usuario `CONFIRMED`; lead `CONFIRMED` y evento `CONFIRMED`, sin aviso todavía; registro `GUEST`; `GUESTACCOUNT#` en `PHONE_PENDING`; ningún otro usuario pendiente de ese email en Cognito; ninguna fila `SUPERVISOR`/`OPS` creada por un alta; la contraseña fuera de todo almacenamiento del navegador.
 - Alternativos: el lead toma el formulario, la atribución y los consentimientos del inicio del usuario que confirmó, nunca los de otro inicio del mismo email; si post confirmation falla después de que Cognito confirmó al usuario, el siguiente ingreso (post authentication) termina la confirmación por el mismo camino idempotente; una tercera cuenta confirmada de la misma persona queda en `PERSON_LIMIT`, sin mundo.
-- Reglas: ADR-0025 §1 y §3, ADR-0026.
+- Reglas: ADR-0025 §1 y §3, ADR-0026, ADR-0029.
 - Prueba: U `auth-triggers/post-confirmation.test.ts`, `auth-triggers/post-authentication.test.ts`, `leads/store.test.ts` · UI `signup.spec.ts` · SR `SC-20/3`. Notas: En `SR` la confirmación entra por la costura de QA (`AdminConfirmSignUp`), que dispara el mismo trigger; el código inválido en `UI` con el Cognito falso.
 
 ### FL-106 · Reenvío del código
@@ -848,11 +848,11 @@ Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `
 - Prueba: U `leads/consent.test.ts`, `leads/attribution.test.ts`, `leads/store.test.ts`, `views/signup/signup-model.test.ts` · UI `signup.spec.ts` · SR `SC-20/1`, `SC-20/3`.
 
 ### FL-116 · Aviso de lead nuevo a Craftech
-- Actores: sistema, equipo comercial de Craftech · Canal: email · Disparador: un lead pasa a `CONFIRMED`.
-- Pasos: stream de `Leads` → `LeadStream` → email por SES desde `leads@` a `LeadConfig.notifyRecipients` con el cerco `@craftech.io`; `notifiedAt` condicional; los leads de QA se suprimen.
-- Estado esperado: exactamente un aviso por lead; un destinatario fuera de `@craftech.io` (incluido un sufijo engañoso) nunca recibe (zod del secreto, código e IAM); los campos del visitante escapados, rotulados "sin verificar" y con sus URLs neutralizadas; "NO CONTACTAR" en el asunto y la primera línea si no dio el consentimiento de contacto; `notifyOutcome` registrado; el email del lead nunca en los logs.
-- Reglas: ADR-0026.
-- Prueba: U `leads/notify.test.ts`, `leads/notify-fence.test.ts`, `infra/leads-spec.test.ts` · SR `SC-20/3`. Notas: En `SR` se asierta `SUPPRESSED_QA`; el envío real a la casilla de Craftech lo verifica el operador con `npm run leads:notify-test` (§2.1).
+- Actores: sistema, equipo comercial de Craftech · Canal: email · Disparador: la cuenta de un lead `CONFIRMED` verifica su celular por SMS (`phoneVerifiedAt`, ADR-0029); la confirmación del email sola ya no avisa.
+- Pasos: stream de `Leads` (filtro del `MODIFY` que agrega `phoneVerifiedAt`) → `LeadStream` → email por SES, con el teléfono verificado, desde `leads@` a `LeadConfig.notifyRecipients` con el cerco `@craftech.io`; `notifiedAt` condicional; los leads de QA se suprimen.
+- Estado esperado: exactamente un aviso por lead, solo después de verificar el celular; un lead que nunca lo verifica no genera aviso (`PHONE_NOT_VERIFIED`); un destinatario fuera de `@craftech.io` (incluido un sufijo engañoso) nunca recibe (zod del secreto, código e IAM); los campos del visitante escapados, rotulados "sin verificar" y con sus URLs neutralizadas; "NO CONTACTAR" en el asunto y la primera línea si no dio el consentimiento de contacto; `notifyOutcome` registrado; el email del lead nunca en los logs.
+- Reglas: ADR-0026, ADR-0029.
+- Prueba: U `leads/notify.test.ts`, `leads/notify-fence.test.ts`, `infra/leads-spec.test.ts`, `handlers/lead-stream.test.ts` · SR `SC-20/3`. Notas: En `SR` se asierta `SUPPRESSED_QA`; el envío real a la casilla de Craftech lo verifica el operador con `npm run leads:notify-test` (§2.1).
 
 ### FL-117 · Exportación de leads y baja del contacto
 - Actores: operador · Canal: script con el profile del operador · Disparador: (a) `npm run leads:export -- --out <ruta>`; (b) `npm run leads:unsubscribe` (email por entrada estándar o `--email-file`) al recibir un pedido de no ser contactado.
@@ -895,4 +895,25 @@ Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `
 - Estado esperado: ninguna cuenta de alta propia con un rol interno; ningún usuario interno con una segunda fila de registro (que lo dejaría sin acceso) ni un mundo de alta propia; las invitadas conservan su flujo.
 - Reglas: ADR-0025 §1.
 - Prueba: U `auth-triggers/pre-sign-up.test.ts`, `auth-triggers/post-confirmation.test.ts`, `auth-triggers/post-authentication.test.ts` · SR `SC-20/5`. Notas: El pre-token, que solo estampa lo que dice el registro, sigue probado por sus tests de FL-079.
+
+### FL-123 · Celular del alta y enrolamiento por SMS
+- Actores: visitante, invitado, personal · Canal: web · Disparador: el formulario del alta pide el celular; la primera sesión de una cuenta sin celular verificado (alta propia nueva o existente, `guest-NN`, `SUPERVISOR`, `OPS`).
+- Pasos: 1) `signup.start` exige `phone` E.164 de cualquier país, normalizado (`PHONE_INVALID` si no); queda en el inicio del lead, sin verificar. 2) Después de la contraseña, la consola muestra la pantalla del código (`phone.status` `ENROL`): el número del alta precargado y editable, "Enviar código" (`phone.sendCode`), el campo de 6 dígitos y el reenvío con cuenta regresiva. 3) `phone.verifyCode` con el código correcto: `PHONEOWNER#<phoneHash>` de la cuenta, `phone` y `phoneVerifiedAt` en `Isps/USER#`, `phone` y `phoneVerifiedAt` en el lead (de un alta propia) y `PHONESESSION#` de la sesión; después, el mundo que la cuenta necesita (`ensureWorld`: el lugar de una cuenta `PHONE_PENDING`, una generación nueva o el mundo de un `guest-NN`).
+- Estado esperado: en `Runtime` solo la huella del código; el código vence a los 10 minutos (TTL y fecha); 5 intentos contados con escritura condicional, el quinto fallo lo invalida; reenvío después de 60 s; topes de 6 SMS por cuenta, 3 por número y 5 por IP por día y 150 por día en el stage, con error tipado y el contacto de Craftech; un número que verificó otra cuenta → `PHONE_IN_USE`; un número que SNS no entrega → `SMS_NOT_DELIVERABLE`; el aviso de lead sale recién ahí (FL-116); el borrado de la cuenta libera el número.
+- Reglas: ADR-0029 §1, §2, §4, §6, §7 y §8.
+- Prueba: U `phone/flow.test.ts`, `phone/sms.test.ts`, `routers/signup.test.ts`, `routers/phone.test.ts`, `leads/notify.test.ts`, `handlers/lead-stream.test.ts`, `leads/deletion.test.ts`, `guest/signup-flow.test.ts`, `auth-triggers/post-confirmation.test.ts`, `infra/sms-code-iam.test.ts`, `views/signup/signup-model.test.ts` · UI `phone.spec.ts`. Notas: Ninguna prueba manda un SMS real (`memorySmsSender`); en el stage lo verifica el operador después de `docs/pending.md` P-09.
+
+### FL-124 · Código por SMS en cada ingreso
+- Actores: invitado, personal · Canal: web · Disparador: cada ingreso con contraseña de una cuenta con celular verificado.
+- Pasos: 1) Mientras la sesión (`origin_jti` del id token, o `auth_time`) no pasó el código, el BFF responde `403 PHONE_VERIFICATION_REQUIRED` en todo procedimiento salvo `account.session` y `phone.*`; el post authentication no pide mundos. 2) `phone.status` `SIGN_IN` muestra el número por sus últimos 4 dígitos, sin campo para cambiarlo; `phone.sendCode` lo manda a ese número; un número en el pedido → `PHONE_LOCKED`. 3) El código correcto marca esa sesión (`PHONESESSION#`, 12 h). 4) "Cerrar sesión" llama `phone.endSession` antes de `RevokeToken`.
+- Estado esperado: contraseña correcta sin código no accede a nada; el código abre solo esa sesión; otra sesión de la misma cuenta pide el suyo; renovar el token no pide código; el celular verificado no cambia ni con la sesión verificada ni sin verificar; cerrar sesión borra la marca; la sesión del mundo (`WORLDSESSION#`) no se reclama antes del código; el personal pasa además su TOTP de Cognito (los dos factores).
+- Reglas: ADR-0029 §2, §3 y §6.
+- Prueba: U `routers/phone.test.ts`, `phone/flow.test.ts`, `auth-triggers/post-authentication.test.ts` · UI `phone.spec.ts`.
+
+### FL-125 · Cuentas de automatización sin SMS
+- Actores: operador, corredor de escenarios y de pruebas · Canal: script · Disparador: `npm run console:phone -- --stage poc --username <usuario> --automation` (o `--human`, `--reset-phone`); `qa:confirm-signup` de una dirección del puente de QA.
+- Pasos: el operador marca una cuenta por vez con `phoneCheck AUTOMATION` en su fila del registro (por su `sub`); `qa:confirm-signup` marca la cuenta que acaba de confirmar; el post authentication de una cuenta marcada pide su mundo como antes; `--reset-phone` borra `phone`, `phoneVerifiedAt` y el `PHONEOWNER#` de esa cuenta.
+- Estado esperado: una cuenta marcada nunca recibe la pantalla del código ni un SMS; ningún procedimiento, dominio de correo, grupo ni rol pone la marca; los escenarios y las pruebas desplegadas corren con cuentas marcadas; después de un reset, la próxima sesión se enrola con un número nuevo.
+- Reglas: ADR-0029 §5.
+- Prueba: U `scripts/console/phone.test.ts`, `scripts/qa/confirm-signup.test.ts`, `phone/flow.test.ts`, `routers/phone.test.ts`, `auth-triggers/post-authentication.test.ts`. Notas: Sin `SR` propio: `SC-20` sigue pasando por `qa:confirm-signup`.
 

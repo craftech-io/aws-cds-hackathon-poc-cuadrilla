@@ -1,4 +1,4 @@
-// What `signup.start` accepts (ADR-0025 §3, ADR-0026): the email, the three optional fields, the language
+// What `signup.start` accepts (ADR-0025 §3, ADR-0026, ADR-0029): the email, the phone, the three optional fields, the language
 // of the form, the two consents as the visitor left them and the attribution the landing captured. Never
 // the password (it goes from the browser to Cognito only) and never an `origin`: whether a lead is `WEB`
 // or `QA` is the server's decision (leads/keys.ts). Every object is strict, so an extra field is refused.
@@ -19,6 +19,8 @@ const Utm = z.object(Object.fromEntries(UTM_PARAMS.map((param) => [param, RawAtt
 export const SignupForm = z
   .object({
     email: z.string().trim().max(254).pipe(z.email()),
+    /** Required (ADR-0029): an international number, normalized by `signup.start` (phone/number.ts). */
+    phone: z.string().trim().min(1).max(32),
     name: Optional80,
     company: Optional80,
     jobTitle: Optional80,

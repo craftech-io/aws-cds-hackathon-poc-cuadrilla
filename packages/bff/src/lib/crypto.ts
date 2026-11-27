@@ -14,6 +14,8 @@ export type SecretKey = string | Uint8Array;
  * Fixed labels of the subkeys (HKDF `info`); changing one invalidates every value derived with it.
  * `email-hash` also keys the `Leads` table and the abuse key of the own sign-up; `signup-ticket`
  * signs the sign-up ticket and `ip-hash` hashes the viewer IP of its limits (ADR-0025 §3).
+ * `account-phone` hashes an account's own phone (the one-number-one-account index and the SMS limits,
+ * ADR-0029), apart from `phone-hash` of the simulated people; `phone-code` keys the SMS code's digest.
  */
 export const SUBKEY_PURPOSES = [
   "session",
@@ -25,6 +27,8 @@ export const SUBKEY_PURPOSES = [
   "media-key",
   "signup-ticket",
   "ip-hash",
+  "account-phone",
+  "phone-code",
 ] as const;
 export type SubkeyPurpose = (typeof SUBKEY_PURPOSES)[number];
 

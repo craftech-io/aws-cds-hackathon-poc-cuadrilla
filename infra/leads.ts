@@ -82,7 +82,7 @@ export const Leads = new sst.aws.Dynamo(LEADS_TABLE, {
 
 /** An ARN of a grant, a storage placeholder of infra/storage.ts, the `Leads` table or a caller's reference. */
 export function resolveResource(resource: string, refs: Refs = {}): $util.Input<string> {
-  if (resource.startsWith("arn:")) return resource;
+  if (resource.startsWith("arn:") || resource === "*") return resource;
   const storage = storageResource(resource);
   if (storage !== undefined) return storage;
   if (resource === "{Leads}") return Leads.arn;
@@ -96,6 +96,7 @@ export function resolveResource(resource: string, refs: Refs = {}): $util.Input<
 /** One iam-capabilities.ts grant as a permission statement, every placeholder resolved. */
 export function grantStatement(grant: Grant, refs: Refs = {}): Statement {
   const statement: Statement = { actions: [...grant.actions], resources: grant.resources.map((resource) => resolveResource(resource, refs)) };
+  if (grant.effect === "Deny") statement.effect = "deny";
   if (grant.conditions) statement.conditions = grant.conditions.map((condition) => ({ test: condition.test, variable: condition.variable, values: [...condition.values] }));
   return statement;
 }

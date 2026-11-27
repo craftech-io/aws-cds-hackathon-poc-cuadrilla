@@ -111,8 +111,10 @@ export function SessionProvider({ children }: { readonly children: ReactNode }) 
     const tokens = tokensRef.current;
     setPrompt(undefined);
     setState({ status: "anonymous" });
-    if (auth) void revokeSession(auth.cognito, tokens);
-    else clearTokens();
+    // The session's SMS mark goes first (ADR-0029), with the id token still valid; then the tokens.
+    const ended = tokens === undefined ? Promise.resolve() : createConsoleClient(() => tokens.idToken).phone.endSession.mutate({}).then(() => undefined, () => undefined);
+    if (auth) void ended.then(() => revokeSession(auth.cognito, tokens));
+    else void ended.then(clearTokens);
     navigate(LOGIN_PATH, { replace: true });
   }, [auth, navigate]);
 

@@ -27,6 +27,7 @@ export type SignupErrorCode =
   | "TICKET_INVALID"
   | "EMAIL_DOMAIN"
   | "EMAIL_NOT_ACCEPTED"
+  | "PHONE_INVALID"
   | "UNAVAILABLE"
   | "BROWSER_CHECK"
   | "WEAK_PASSWORD"
@@ -35,6 +36,8 @@ export type SignupErrorCode =
 
 export interface SignupFormValues {
   readonly email: string;
+  /** Required (ADR-0029): international, `+` and 8 to 15 digits; the BFF normalizes it. */
+  readonly phone: string;
   readonly password: string;
   readonly name: string;
   readonly company: string;
@@ -48,6 +51,7 @@ export interface SignupFormValues {
 /** What `signup.start` takes (packages/bff/src/signup/form.ts): never the password, never an origin. */
 export interface SignupStartInput {
   readonly email: string;
+  readonly phone: string;
   readonly name?: string;
   readonly company?: string;
   readonly jobTitle?: string;
@@ -107,7 +111,7 @@ export const INITIAL_SIGNUP: SignupState = { step: "signUp" };
 /** A ticket this close to its end is not worth a retry: a new start is. */
 const TICKET_MARGIN_MS = 30_000;
 
-const START_REASONS: ReadonlySet<string> = new Set(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_DOMAIN", "EMAIL_NOT_ACCEPTED"]);
+const START_REASONS: ReadonlySet<string> = new Set(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_DOMAIN", "EMAIL_NOT_ACCEPTED", "PHONE_INVALID"]);
 
 /** A WafTokenError anywhere in the chain: tRPC wraps what its `fetch` threw in a client error's `cause`. */
 function isBrowserCheck(error: unknown, depth = 0): boolean {
@@ -132,6 +136,7 @@ export function startInputOf(form: SignupFormValues, locale: LegalLocale, attrib
   const jobTitle = optional(form.jobTitle);
   return {
     email: form.email.trim(),
+    phone: compactPhone(form.phone),
     ...(name === undefined ? {} : { name }),
     ...(company === undefined ? {} : { company }),
     ...(jobTitle === undefined ? {} : { jobTitle }),
@@ -141,9 +146,19 @@ export function startInputOf(form: SignupFormValues, locale: LegalLocale, attrib
   };
 }
 
-/** Whether "Crear cuenta" may be pressed: the email looks like one and TERMS_PRIVACY is checked. */
-export function canSubmit(form: Pick<SignupFormValues, "email" | "terms">): boolean {
-  return form.terms && looksLikeEmail(form.email);
+/** The phone without spaces, dashes, dots or parentheses (the BFF checks it again). */
+export function compactPhone(raw: string): string {
+  return raw.trim().replace(/[\s().-]/g, "");
+}
+
+/** `+` and 8 to 15 digits, any country (ADR-0029). */
+export function looksLikePhone(raw: string): boolean {
+  return /^\+[1-9]\d{7,14}$/.test(compactPhone(raw));
+}
+
+/** Whether "Crear cuenta" may be pressed: the email and the phone look right and TERMS_PRIVACY is checked. */
+export function canSubmit(form: Pick<SignupFormValues, "email" | "phone" | "terms">): boolean {
+  return form.terms && looksLikeEmail(form.email) && looksLikePhone(form.phone);
 }
 
 export function passwordAcceptable(password: string): boolean {

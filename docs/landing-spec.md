@@ -1113,6 +1113,29 @@ montado dentro de `LandingView`). Al montar, lee `?lang=` de la URL (§1.3); al 
 flujo (`use-auth-flow.ts`), no en la URL, para que un cambio de paso (`signUp` → `confirmCode`) no la
 pierda.
 
+### 7.10 Código por SMS después de la contraseña (ADR-0029)
+
+**Alta (§7.3)**: el formulario suma **Celular** (obligatorio, `type="tel"`, `autocomplete="tel"`) debajo
+del email, con la ayuda "Con el prefijo internacional, por ejemplo +52 55 1234 5678. Lo usamos solo para
+verificar tu cuenta con un código por SMS." / "With the international prefix, for example +1 415 555
+0100. We use it only to verify your account with a code by SMS."; "Crear cuenta" sigue deshabilitado
+hasta que el número tenga `+` y de 8 a 15 dígitos. La casilla `TERMS_PRIVACY` (versión `2026-11-27`) dice
+que el celular se usa para verificar la cuenta con un código por SMS.
+
+**Pantalla del código** (`views/phone/`, en el `AuthShell` con su conmutador es/en, celular y escritorio):
+aparece después de toda contraseña (alta propia, invitados con credenciales, personal) y antes de cualquier
+vista de la consola; nada de un mundo se muestra antes.
+
+- **Enrolamiento** ("Verifica tu celular" / "Verify your phone"): el número del alta precargado y editable,
+  "Enviar código", el campo de 6 dígitos (`autocomplete="one-time-code"`), "Verificar", "Reenviar código"
+  con la cuenta regresiva "Puedes pedir otro código en 0:45", "Corregir el número" hasta verificar.
+- **Ingreso** ("Ingresa el código" / "Enter the code"): "Para entrar te enviamos un código por SMS a tu
+  celular •••• 5678."; sin campo de número; el mismo código y reenvío.
+- **Errores** (`views/phone/copy.ts`): número inválido, en uso ("Ese número ya está en uso en otra
+  cuenta"), bloqueado, código incorrecto, vencido o agotado, espera del reenvío, topes del día (la cuenta
+  "podrás entrar mañana") y número al que no llega SMS, cada uno con el contacto de Craftech cuando la
+  persona no puede seguir sola. "Cerrar sesión" debajo de la tarjeta.
+
 ---
 
 ## 8. Copy — resumen de dónde vive cada texto

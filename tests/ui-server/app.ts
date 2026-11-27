@@ -5,7 +5,8 @@
 // origin for the presigned links, the repository's seed files as the buckets' content, the real world
 // factory behind "Reiniciar demo" and "Saltar a escena" (worlds.ts) and the real `InboundWhatsApp` in
 // process for the phone simulator (inbound.ts). The own sign-up (`signup.start`
-// over memory), the guest's portada (`guest.*`) and the account (`account.*`) answer as in the stage.
+// over memory), the guest's portada (`guest.*`), the account (`account.*`) and the SMS code (`phone.*`,
+// with the in-memory SMS sender: nothing is texted) answer as in the stage.
 //
 // This server plays the Router's and routers/edge.ts's part for what it answers: it forwards only the
 // headers the BFF reads and hands tRPC the viewer's address as the edge would after the origin check.
@@ -25,6 +26,10 @@ import type { ConsolePorts } from "../../packages/bff/src/routers/console-ports"
 import type { ContextDeps } from "../../packages/bff/src/routers/deps";
 import { appRouter } from "../../packages/bff/src/routers/index";
 import { createContextFactory } from "../../packages/bff/src/routers/trpc";
+import { bearerToken } from "../../packages/bff/src/auth/jwt";
+import { principalFromClaims } from "../../packages/bff/src/auth/principal";
+import { markSessionPassed } from "../../packages/bff/src/phone/session";
+import { type MemoryPhone, memoryPhone } from "../../packages/bff/src/phone/testing";
 import { memorySignupPorts } from "../../packages/bff/src/signup/testing";
 import { stampingVerifier } from "./identity";
 import { type LocalInbound, UI_SIM_ENVELOPE_KEY, createLocalInbound } from "./inbound";
@@ -51,8 +56,29 @@ export interface UiApp {
   /** The router's dependencies, bound to these ports (the server's own tests call the router with them). */
   readonly deps: ContextDeps;
   readonly inbound: LocalInbound;
+  /** The SMS code over memory (ADR-0029): the specs read the code of the last SMS from here. */
+  readonly phone: MemoryPhone;
   /** Answers `/api` and `/s3`; false for anything else (the caller hands it to Vite). */
   handle(request: IncomingMessage, response: ServerResponse): Promise<boolean>;
+}
+
+/**
+ * Test-only seam of this server (never of the Lambda): the session of a verified id token is marked as
+ * passed, the mark a right SMS code leaves (packages/bff/src/phone/session.ts), so the specs of the views
+ * skip the code's screen. The screen and the gate have their own specs.
+ */
+export const E2E_PHONE_PASS = `${API_PREFIX}/__e2e/phone/pass`;
+
+async function passSession(deps: ContextDeps, authorization: string | undefined): Promise<boolean> {
+  try {
+    const principal = principalFromClaims(await deps.verifier.verify(bearerToken(authorization)));
+    const phone = deps.phone?.();
+    if (phone === undefined) return false;
+    await markSessionPassed(phone.client, { userId: principal.userId, sessionId: principal.sessionId, authTime: principal.authTime }, new Date());
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** The headers the Router forwards to the BFF and the BFF reads. */
@@ -78,6 +104,7 @@ export async function createUiApp(options: UiAppOptions): Promise<UiApp> {
   const fetcher = staticJwksFetcher(options.jwks);
   const verifiers = options.pool.clientIds.map((clientId) => createCognitoIdTokenVerifier({ userPoolId: options.pool.userPoolId, clientId } satisfies IdTokenVerifierConfig, { fetcher }));
   const signup = memorySignupPorts();
+  const phone = memoryPhone({ client: memory.client });
   const deps: ContextDeps = bindConsolePorts(
     {
       verifier: stampingVerifier(verifiers, memory.connector),
@@ -88,6 +115,8 @@ export async function createUiApp(options: UiAppOptions): Promise<UiApp> {
       loggerFor: (correlationId) => createLogger({ correlationId, level: "warn", bindings: { service: "ui-server" } }),
       signup: () => signup,
       guest: () => ({ client: memory.client, connector: memory.connector, provisioner: { request: async () => undefined }, now: () => new Date() }),
+      phoneGate: phone.gate,
+      phone: () => phone.ports,
     },
     ports,
   );
@@ -105,8 +134,14 @@ export async function createUiApp(options: UiAppOptions): Promise<UiApp> {
     worlds: factory.worlds,
     deps,
     inbound,
+    phone,
     async handle(request, response) {
       if (await handleS3(ports.objects, request, response, options.origin)) return true;
+      if (request.url === E2E_PHONE_PASS && request.method === "POST") {
+        response.writeHead((await passSession(deps, request.headers.authorization)) ? 204 : 401);
+        response.end();
+        return true;
+      }
       if (!request.url?.startsWith(`${API_PREFIX}/`)) return false;
       await api(request, response);
       return true;

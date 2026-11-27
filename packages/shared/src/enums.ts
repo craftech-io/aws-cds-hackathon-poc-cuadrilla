@@ -201,9 +201,11 @@ export type GuestOrigin = z.infer<typeof GuestOrigin>;
 /**
  * State of a guest's world (`Runtime/GUESTACCOUNT#<userId>.status`, ADR-0025 §2-§3): being built, ready,
  * failed (retryable), without room under the cap of active sign-up worlds (retryable), or never to have
- * one: a third confirmed account of a person who already holds the two of ADR-0025 §3 (not retryable).
+ * one: a third confirmed account of a person who already holds the two of ADR-0025 §3 (not retryable),
+ * or waiting for the account's phone (ADR-0029): a sign-up account is born without a slot and takes one
+ * only after its first session passed the SMS code.
  */
-export const GuestWorldStatus = z.enum(["PROVISIONING", "READY", "FAILED", "CAP_FULL", "PERSON_LIMIT"]);
+export const GuestWorldStatus = z.enum(["PROVISIONING", "READY", "FAILED", "CAP_FULL", "PERSON_LIMIT", "PHONE_PENDING"]);
 export type GuestWorldStatus = z.infer<typeof GuestWorldStatus>;
 
 /** People of an operator by role (`People` GSI2 `ispKindKey`, docs/architecture.md §5). */

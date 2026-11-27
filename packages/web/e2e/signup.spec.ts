@@ -49,6 +49,7 @@ const createButton = (page: Page) => page.getByRole("button", { name: copyOf().s
 async function fillForm(page: Page, email: string, password: string): Promise<void> {
   const copy = copyOf();
   await page.getByLabel(copy.email, { exact: true }).fill(email);
+  await page.getByLabel(copy.phone, { exact: true }).fill("+52 55 1234 5678");
   await page.getByLabel(copy.password, { exact: true }).fill(password);
   await page.getByLabel(copy.name).fill("Ana Prueba");
   await page.getByLabel(copy.company).fill("Fibra de Prueba");

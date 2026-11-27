@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CONSENTS_VERSION } from "@cuadrilla/shared/legal/consents";
 import { contactWithdrawal } from "../../packages/bff/src/leads/consent";
 import type { LeadStore } from "../../packages/bff/src/leads/store";
-import { T0, confirmedLead, hashOf, leadHarness, signupUserId, startLead } from "../../packages/bff/src/leads/testing";
+import { T0, verifiedLead, hashOf, leadHarness, signupUserId, startLead } from "../../packages/bff/src/leads/testing";
 import { EXPORT_COLUMNS, REPO_ROOT, assertOutsideRepo, csvCell, parseExportArgs, runExport } from "./export";
 import { assertOperatorMachine } from "./operator-only";
 
@@ -26,9 +26,9 @@ describe("leads:export [FL-117]", () => {
   beforeEach(async () => {
     store = leadHarness().store;
     written = undefined;
-    await confirmedLead(store, { email: "contactable@example.com", user: 1, sub: "sub-1", userId: signupUserId(1), contact: true, name: "Ana", company: "=HYPERLINK(\"x\")" });
-    await confirmedLead(store, { email: "no-contacto@example.com", user: 2, sub: "sub-2", userId: signupUserId(2), contact: false });
-    await confirmedLead(store, { email: "success+qa-run-1@simulator.amazonses.com", user: 3, sub: "sub-3", userId: signupUserId(3), contact: true });
+    await verifiedLead(store, { email: "contactable@example.com", user: 1, sub: "sub-1", userId: signupUserId(1), contact: true, name: "Ana", company: "=HYPERLINK(\"x\")" });
+    await verifiedLead(store, { email: "no-contacto@example.com", user: 2, sub: "sub-2", userId: signupUserId(2), contact: false });
+    await verifiedLead(store, { email: "success+qa-run-1@simulator.amazonses.com", user: 3, sub: "sub-3", userId: signupUserId(3), contact: true });
     await startLead(store, { email: "pendiente@example.com", user: 4, contact: true });
   });
 

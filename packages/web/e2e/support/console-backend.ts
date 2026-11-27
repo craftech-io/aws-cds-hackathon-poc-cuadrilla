@@ -12,6 +12,7 @@ import type { UiApp, createUiApp } from "../../../../tests/ui-server/app";
 import type { runJwks } from "../../../../tests/ui-server/main";
 import { TOKENS_KEY } from "../../src/lib/auth/tokens";
 import { loginCopy } from "../../src/views/login/copy";
+import { passPhoneStep } from "./phone";
 
 /** The audience of the fake user pool's id tokens (src/lib/auth/testing/fake-cognito.ts). */
 const FAKE_POOL_AUDIENCE = "fake-client";
@@ -113,6 +114,7 @@ export async function signIn(page: Page, path: string, account: { readonly email
   await Promise.race([skip.waitFor(), page.waitForURL(arrived, { waitUntil: "commit" })]);
   if (await skip.isVisible()) await skip.click();
   await page.waitForURL(arrived, { waitUntil: "commit" });
+  await passPhoneStep(page);
 }
 
 /** The id token the page holds (for a call made outside the page, as that same user). */

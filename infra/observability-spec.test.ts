@@ -119,10 +119,12 @@ describe("every grant of the four roles is a link or a statement nobody can wide
   const ROLES: LambdaName[] = ["Bff", "QaDriver", "PolicyAudit", "CertificateWriter"];
   const resolvable = (resource: string) =>
     parseStorageRef(resource) !== undefined || /^\{Leads\}(\/index\/\*)?$/.test(resource) || (STATEMENT_REFS as readonly string[]).includes(resource) || resource.startsWith("arn:aws:");
+  /** The direct SMS of the code (ADR-0029): `*` only with the Deny of every topic ARN (iam-capabilities.test.ts). */
+  const smsCode = (fn: LambdaName, resource: string) => fn === "Bff" && resource === "*";
 
   it.each(ROLES)("%s: each statement or managed policy names storage, Leads, the stage's pool or web ACLs, or an exact ARN", (fn) => {
     const managed = Object.values(managedPolicies(fn)).flat();
-    for (const grant of [...statementGrants(fn), ...managed]) for (const resource of grant.resources) expect(resolvable(resource), `${fn}: ${resource}`).toBe(true);
+    for (const grant of [...statementGrants(fn), ...managed]) for (const resource of grant.resources) expect(resolvable(resource) || smsCode(fn, resource), `${fn}: ${resource}`).toBe(true);
     const all = expectedGrants(fn);
     expect([...statementGrants(fn), ...all.filter(linkCarried), ...managed].length).toBe(all.length);
   });

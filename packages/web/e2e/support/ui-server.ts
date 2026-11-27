@@ -10,6 +10,7 @@ import { type Page, test as base, expect } from "@playwright/test";
 import { loginCopy } from "../../src/views/login/copy";
 import { type AccountRole, E2E_CLIENT_ID, E2E_POOL_ID, addAccount, createPool } from "./accounts";
 import { routeCognito } from "./cognito";
+import { passPhoneStep } from "./phone";
 
 const REPO = fileURLToPath(new URL("../../../..", import.meta.url));
 
@@ -58,4 +59,5 @@ export async function signIn(page: Page, role: AccountRole, path: string): Promi
   await page.getByRole("button", { name: loginCopy.credentials.submit }).click();
   if (role !== "GUEST") await page.getByRole("button", { name: loginCopy.mfaSetup.skip }).click();
   await expect(page).toHaveURL(new RegExp(`${path}$`), { timeout: 30_000 });
+  await passPhoneStep(page);
 }

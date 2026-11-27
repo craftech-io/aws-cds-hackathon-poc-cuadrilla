@@ -82,7 +82,8 @@ export function ispsRepo(ctx: RepoContext): IspsPort {
     listUsersBySub,
     async findBySub(ispId, sub) {
       const user = await findUserBySub(sub);
-      return user === undefined || user.ispId !== ispId ? undefined : { userId: user.userId, active: user.active };
+      if (user === undefined || user.ispId !== ispId) return undefined;
+      return user.phoneCheck === "AUTOMATION" ? { userId: user.userId, active: user.active, automation: true } : { userId: user.userId, active: user.active };
     },
     async setCognitoSub(ispId, userId, sub) {
       const current = await requireUser(ispId, userId);

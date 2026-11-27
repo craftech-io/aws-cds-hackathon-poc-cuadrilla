@@ -56,6 +56,8 @@ export interface Condition {
 
 export interface Grant {
   readonly sid?: string;
+  /** A Deny that narrows the role's Allows (absent: Allow). */
+  readonly effect?: "Deny";
   readonly actions: readonly string[];
   readonly resources: readonly string[];
   readonly conditions?: readonly Condition[];
@@ -180,6 +182,15 @@ export interface RoleCapabilities {
 }
 
 const g = (actions: readonly string[], resources: readonly string[], conditions?: readonly Condition[]): Grant => (conditions ? { actions, resources, conditions } : { actions, resources });
+
+/**
+ * The SMS code of every sign-in (ADR-0029), only for the BFF: SNS `Publish` straight to a phone number
+ * takes no resource ARN, so it is `*`, and a Deny of every topic ARN leaves it good for direct SMS only.
+ */
+export const SMS_CODE_GRANTS: readonly Grant[] = [
+  { sid: "SmsCodeToPhoneNumbers", ...g(["sns:Publish"], ["*"]) },
+  { sid: "NoPublishToTopics", effect: "Deny", ...g(["sns:Publish"], ["arn:aws:sns:*:*:*"]) },
+];
 const sqsSend = (queue = "{InstallerEvents}"): Grant => g(["sqs:SendMessage"], [queue]);
 const guardrailG1 = g(["bedrock:ApplyGuardrail"], ["{G1}"]);
 const invokeModels = (model: "HARNESS" | "PHOTO", actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]): Grant => g(actions, [`{model:${model}}`]);
@@ -246,7 +257,7 @@ export const LAMBDA_CAPABILITIES = {
     capabilities: ["MOCK_NETWORK", "MOCK_DISPATCH", "WORLDS"],
     tables: { ...allAt(APP_TABLES, "write"), Reference: "read" },
     buckets: { Evidence: "read", Media: "write", Manual: "read" },
-    grants: [g(["s3:GetObject"], ["{Seed}/brand/*"]), WORLD_EVIDENCE_PHOTOS, sqsSend(), g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{GuestWorlds}", "{GuestAccountDeletion}"]), BFF_LEADS_GRANT],
+    grants: [g(["s3:GetObject"], ["{Seed}/brand/*"]), WORLD_EVIDENCE_PHOTOS, sqsSend(), g(["lambda:InvokeFunction"], ["{InboundWhatsApp}", "{WorldJanitor}", "{GuestWorlds}", "{GuestAccountDeletion}"]), BFF_LEADS_GRANT, ...SMS_CODE_GRANTS],
   },
   // The historical certificates of the guest worlds it resets at night and of every world the Bff reloads
   // (`RENDER_CERTIFICATES`: guest and demo).
@@ -321,6 +332,9 @@ export const JUSTIFIED_WILDCARDS: Readonly<Record<string, readonly string[]>> = 
   "transcribe:StartTranscriptionJob": ["transcribe:OutputBucketName", "transcribe:OutputKey"],
   // Metrics have no ARN: fenced by the namespace of the app.
   "cloudwatch:PutMetricData": ["cloudwatch:namespace"],
+  // An SMS straight to a phone number has no ARN nor condition key (ADR-0029): fenced by the Deny of every
+  // topic ARN that comes with it (SMS_CODE_GRANTS), and held only by the Bff.
+  "sns:Publish": [],
 };
 
 /** SQS actions of the QaDriver that only the DLQ may receive (`dlq.find`, `dlq.delete`). */

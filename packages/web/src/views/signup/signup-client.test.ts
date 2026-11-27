@@ -6,6 +6,7 @@ import { type SignupStartInput, startErrorOf } from "./signup-model";
 
 const INPUT: SignupStartInput = {
   email: "ana.prueba@example.test",
+  phone: "+525512345678",
   locale: "es-MX",
   consents: { TERMS_PRIVACY: { accepted: true, textVersion: CONSENTS_VERSION }, CONTACT: { accepted: false, textVersion: CONSENTS_VERSION } },
 };

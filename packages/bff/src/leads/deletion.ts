@@ -65,6 +65,8 @@ export interface DeletionDeps {
   readonly worlds: GenerationDestroyer;
   /** `leadEmailHash` with the `email-hash` subkey. */
   readonly emailHash: (email: string) => string;
+  /** The account phone's digest (`account-phone` subkey, ADR-0029): frees `PHONEOWNER#` with the account. */
+  readonly phoneHash?: (phone: string) => string;
   /** Real clock. */
   readonly now: () => Date;
   readonly log: Logger;
@@ -133,6 +135,7 @@ async function removeAccount(deps: DeletionDeps, target: Target, abuseHashHint: 
           sub,
           accountUserId: account?.userId,
           signupKey: abuseHash === undefined || current === undefined ? undefined : { abuseHash, current },
+          phoneOwner: target.row?.phone === undefined || deps.phoneHash === undefined ? undefined : { phoneHash: deps.phoneHash(target.row.phone), userId: target.row.userId },
         },
         deps.now(),
       );

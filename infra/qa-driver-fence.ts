@@ -89,6 +89,17 @@ export function guestTestObjectPrefix(): string {
 
 const QA_OBJECTS = ["qa/*", "eval/*"] as const;
 
+/**
+ * `auth.confirmQaSignup` marks the account it confirmed `phoneCheck AUTOMATION` (ADR-0029): nobody can
+ * receive an SMS at a QA address. One attribute of a sign-up guest's row and nothing else of it.
+ */
+export const QA_SEAM_AUTOMATION_MARK: Grant = {
+  sid: "QaSeamAutomationMark",
+  actions: ["dynamodb:UpdateItem"],
+  resources: ["{Isps}"],
+  conditions: [leadingKeys(["ISP#isp-guest-s*"]), { test: "ForAllValues:StringEquals", variable: "dynamodb:Attributes", values: ["PK", "SK", "phoneCheck", "updatedAt", "version"] }],
+};
+
 /** Every data grant of the QaDriver beyond its reads; `Cases` is the documented exception (no world in its key). */
 function qaDriverDataGrants(): Grant[] {
   const guestTest = guestTestObjectPrefix();
@@ -96,6 +107,7 @@ function qaDriverDataGrants(): Grant[] {
   return [
     ...(Object.entries(QA_DRIVER_WRITE_KEYS) as Array<[QaFencedTable, readonly string[]]>).map(([table, keys]) => ({ actions: ITEM_WRITES, resources: [`{${table}}`], conditions: [leadingKeys(keys)] })),
     { sid: "CasesFencedInCode", actions: ITEM_WRITES, resources: ["{Cases}"] },
+    QA_SEAM_AUTOMATION_MARK,
     { actions: ["s3:GetObject", "s3:PutObject"], resources: own("Media") },
     { actions: ["s3:GetObject"], resources: ["{Media}/sim/*", ...own("Evidence"), ...QA_LEASED_ORDERS.flatMap((id) => [`{Evidence}/photos/${id}`, `{Evidence}/certificates/${id}`])] },
     // The seeded evidence of its presets and scenes (worlds/presets-checklist.ts): QA and evaluation orders, the test guest.

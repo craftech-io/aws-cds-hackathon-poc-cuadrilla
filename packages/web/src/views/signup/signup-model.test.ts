@@ -24,7 +24,8 @@ const PASSWORD = "Fixture-Signup-1!";
 const EMAIL = "ana.prueba@example.test";
 const USERNAME = "gst-01K80000000000000000000001";
 
-const FORM: SignupFormValues = { email: EMAIL, password: PASSWORD, name: "Ana Prueba", company: " ", jobTitle: "Coordinadora", terms: true, contact: false };
+const PHONE = "+52 55 1234 5678";
+const FORM: SignupFormValues = { email: EMAIL, phone: PHONE, password: PASSWORD, name: "Ana Prueba", company: " ", jobTitle: "Coordinadora", terms: true, contact: false };
 
 let pool: FakeCognito;
 let signup: FakeSignupPool;
@@ -65,12 +66,23 @@ beforeEach(() => {
 
 describe("the sign-up form [FL-104] [FL-115]", () => {
   it("[FL-115] cannot be sent without TERMS_PRIVACY; CONTACT never blocks", async () => {
-    expect(canSubmit({ email: EMAIL, terms: false })).toBe(false);
-    expect(canSubmit({ email: EMAIL, terms: true })).toBe(true);
-    expect(canSubmit({ email: "not-an-email", terms: true })).toBe(false);
+    expect(canSubmit({ email: EMAIL, phone: PHONE, terms: false })).toBe(false);
+    expect(canSubmit({ email: EMAIL, phone: PHONE, terms: true })).toBe(true);
+    expect(canSubmit({ email: "not-an-email", phone: PHONE, terms: true })).toBe(false);
     expect(await submit({ ...FORM, terms: false })).toEqual({ state: INITIAL_SIGNUP });
     expect(starts).toEqual([]);
     expect((await submit({ ...FORM, contact: false })).state.step).toBe("confirmCode");
+  });
+
+  it("[FL-123] asks for an international mobile phone of any country and sends it without separators", async () => {
+    expect(canSubmit({ email: EMAIL, phone: "", terms: true })).toBe(false);
+    expect(canSubmit({ email: EMAIL, phone: "55 1234 5678", terms: true })).toBe(false);
+    expect(canSubmit({ email: EMAIL, phone: "+1234567", terms: true })).toBe(false);
+    expect(canSubmit({ email: EMAIL, phone: "+44 (20) 7946-0018", terms: true })).toBe(true);
+    expect(await submit({ ...FORM, phone: "55 1234 5678" })).toEqual({ state: INITIAL_SIGNUP });
+    expect(starts).toEqual([]);
+    await submit(FORM);
+    expect(starts[0]?.phone).toBe("+525512345678");
   });
 
   it("[FL-104] checks the password against the pool's policy before spending a start", async () => {
@@ -86,6 +98,7 @@ describe("the sign-up form [FL-104] [FL-115]", () => {
     expect(starts).toEqual([
       {
         email: EMAIL,
+        phone: "+525512345678",
         name: "Ana Prueba",
         jobTitle: "Coordinadora",
         locale: "es-MX",
