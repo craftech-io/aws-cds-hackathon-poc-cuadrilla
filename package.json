@@ -39,6 +39,7 @@
     "channels:waba-check": "sst shell --stage poc -- tsx scripts/channels/waba-check.ts",
     "console:invite": "sst shell --stage poc -- tsx scripts/console/invite.ts",
     "console:phone": "sst shell --stage poc -- tsx scripts/console/phone.ts",
+    "console:block": "sst shell --stage poc -- tsx scripts/console/block.ts",
     "leads:export": "sst shell --stage poc -- tsx scripts/leads/export.ts",
     "leads:delete": "sst shell --stage poc -- tsx scripts/leads/delete.ts",
     "leads:unsubscribe": "sst shell --stage poc -- tsx scripts/leads/unsubscribe.ts",

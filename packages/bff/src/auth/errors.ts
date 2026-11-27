@@ -15,6 +15,8 @@ export const AUTH_REASON = {
   AUTH_UNAVAILABLE: "AUTH_UNAVAILABLE",
   /** The session has not passed the SMS code yet (ADR-0029): only the phone step answers. */
   PHONE_VERIFICATION_REQUIRED: "PHONE_VERIFICATION_REQUIRED",
+  /** The operator blocked the account (ADR-0029 §11): every procedure, the SMS code's included, is refused. */
+  ACCOUNT_BLOCKED: "ACCOUNT_BLOCKED",
 } as const;
 export type AuthReason = (typeof AUTH_REASON)[keyof typeof AUTH_REASON];
 
@@ -32,6 +34,7 @@ export const AUTH_REFUSAL: Readonly<Record<AuthReason, AuthRefusal>> = {
   LOGIN_NOT_RECENT: "FORBIDDEN",
   AUTH_UNAVAILABLE: "UNAVAILABLE",
   PHONE_VERIFICATION_REQUIRED: "FORBIDDEN",
+  ACCOUNT_BLOCKED: "FORBIDDEN",
 };
 
 /** Error class and message only, for log lines: stacks and causes may quote request data. */

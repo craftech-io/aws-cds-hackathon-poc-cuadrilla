@@ -15,7 +15,8 @@
 // (`PHONESESSION#`, phone/session.ts), every procedure of a principal answers 403
 // `PHONE_VERIFICATION_REQUIRED` but the phone step itself (`PHONE_STEP_PROCEDURES`: who is signed in,
 // and the code's status, send, check and sign-out). An account marked `phoneCheck AUTOMATION` by the
-// operator, and a principal of the `QaDriver` (no Cognito session), are never asked.
+// operator, and a principal of the `QaDriver` (no Cognito session), are never asked. An account the
+// operator blocked (`blockedAt`, `console:block`) gets `ACCOUNT_BLOCKED` everywhere, before any of this.
 //
 // `ispId`, `role` and the world come from the principal, never from the input. A request's principal
 // comes only from a verified id token (`createContextFactory`); the `QaDriver` builds its principals
@@ -198,7 +199,8 @@ function refuse(log: Logger, path: string, error: AuthError, extra: LogFields = 
 }
 
 // A token lives 15 minutes and is verified offline: the registry row (read at most once a minute)
-// says whether the user is still active and still the same user of this operator.
+// says whether the user is still active, not blocked by the operator, and still the same user of this
+// operator. A blocked account is refused in every procedure, the phone step's included (ADR-0029 §11).
 async function confirmRegistered(deps: ContextDeps, principal: Principal, log: Logger, path: string): Promise<UserMatch> {
   let match: UserMatch | undefined;
   try {
@@ -206,6 +208,7 @@ async function confirmRegistered(deps: ContextDeps, principal: Principal, log: L
   } catch (error) {
     refuse(log, path, new AuthError(AUTH_REASON.AUTH_UNAVAILABLE, "could not read the user directory", { cause: error }));
   }
+  if (match?.blocked === true) refuse(log, path, new AuthError(AUTH_REASON.ACCOUNT_BLOCKED, "this account is blocked"));
   if (match === undefined || !match.active) refuse(log, path, new AuthError(AUTH_REASON.USER_INACTIVE, "this console account is no longer active"));
   if (match.userId !== principal.userId) refuse(log, path, new AuthError(AUTH_REASON.PRINCIPAL_INCOMPLETE, "sign in again to continue"));
   return match;

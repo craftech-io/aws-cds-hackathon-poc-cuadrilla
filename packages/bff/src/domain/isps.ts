@@ -136,6 +136,10 @@ export type ShiftRoster = z.infer<typeof ShiftRoster>;
  * session passes its first SMS code (the enrolment), never by the user afterwards; `phoneCheck
  * AUTOMATION` exempts a scenario or test account from the SMS code and is set only by the operator
  * (`console:phone --automation`, `qa:confirm-signup`, `auth.confirmQaSignup`), never from a request.
+ *
+ * `blockedAt` (ADR-0029 §11) blocks the account on the server side: every procedure of its sessions,
+ * the SMS code's included, answers `ACCOUNT_BLOCKED`. Only the operator sets and clears it
+ * (`console:block`), never a request.
  */
 export const ConsoleUser = defineEntity("ConsoleUser", {
   ispId: IspId,
@@ -151,5 +155,6 @@ export const ConsoleUser = defineEntity("ConsoleUser", {
   phone: z.string().regex(/^\+[1-9]\d{7,14}$/).optional(),
   phoneVerifiedAt: IsoInstant.optional(),
   phoneCheck: z.literal("AUTOMATION").optional(),
+  blockedAt: IsoInstant.optional(),
 });
 export type ConsoleUser = z.infer<typeof ConsoleUser>;

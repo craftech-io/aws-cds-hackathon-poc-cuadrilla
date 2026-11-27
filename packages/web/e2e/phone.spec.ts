@@ -22,6 +22,8 @@ interface PhoneState {
   codeSent: boolean;
   /** The next sendCode is refused with this reason. */
   refuseSend?: string;
+  /** The operator blocked the account: every procedure answers ACCOUNT_BLOCKED (ADR-0029 §11). */
+  blocked?: boolean;
   readonly calls: Array<{ readonly path: string; readonly input: unknown }>;
 }
 
@@ -41,6 +43,7 @@ const refused = (path: string, reason: string, code = "TOO_MANY_REQUESTS", httpS
 
 function answer(state: PhoneState, path: string, input: unknown) {
   const data = (value: unknown) => ({ result: { data: value } });
+  if (state.blocked === true && path !== "brand.get") return refused(path, "ACCOUNT_BLOCKED", "FORBIDDEN", 403);
   switch (path) {
     case "brand.get":
       return data(NEUTRAL_BRAND);
@@ -174,6 +177,24 @@ test.describe("the SMS code after the password", () => {
     await signInAsGuest(page);
     await page.getByRole("button", { name: copy.send }).click();
     await expect(page.getByRole("alert")).toHaveText(copy.errors.PHONE_NOT_PERSONAL.map((part) => (typeof part === "string" ? part : part.label)).join(""));
+  });
+
+  test("[FL-126] a blocked account sees only the notice with the contact of Craftech, never the code's form", async ({ page }) => {
+    const state = await routeApi(page, { state: "SIGN_IN", maskedPhone: "•••• 5678", codeSent: false, blocked: true });
+    await signInAsGuest(page);
+    await expect(page.getByRole("heading", { name: copy.blockedTitle })).toBeVisible();
+    await expect(page.getByRole("link", { name: "escríbenos" })).toHaveAttribute("href", "https://craftech.io/contact/");
+    await expect(page.getByRole("button", { name: copy.send })).toHaveCount(0);
+    expect(state.calls.some((call) => call.path === "phone.sendCode")).toBe(false);
+  });
+
+  test("[FL-126] an account blocked while the code's screen is open turns into the notice on its next step", async ({ page }) => {
+    const state = await routeApi(page, { state: "SIGN_IN", maskedPhone: "•••• 5678", codeSent: false });
+    await signInAsGuest(page);
+    await expect(page.getByRole("button", { name: copy.send })).toBeVisible();
+    state.blocked = true;
+    await page.getByRole("button", { name: copy.send }).click();
+    await expect(page.getByRole("heading", { name: copy.blockedTitle })).toBeVisible();
   });
 
   test("[FL-124] the sign-out from the code's screen ends the session", async ({ page }) => {

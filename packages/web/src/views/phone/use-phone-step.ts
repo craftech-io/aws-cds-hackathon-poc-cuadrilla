@@ -8,8 +8,19 @@ import { toApiError } from "../../lib/api-error";
 import { consoleApiOf } from "../../lib/console-api";
 import { PHONE_PROCEDURES, type PhoneErrorCode, PhoneStatus, phoneErrorOf, secondsUntil } from "./phone-model";
 
-/** `unauthorized`: the token itself was refused; the console's own screens ask to sign in again. */
-export type PhoneStepState = { readonly kind: "loading" } | { readonly kind: "ready"; readonly status: PhoneStatus } | { readonly kind: "failed" } | { readonly kind: "unauthorized" };
+/**
+ * `unauthorized`: the token itself was refused; the console's own screens ask to sign in again.
+ * `blocked`: the operator blocked the account (`ACCOUNT_BLOCKED`, ADR-0029 §11); only the notice shows.
+ */
+export type PhoneStepState = { readonly kind: "loading" } | { readonly kind: "ready"; readonly status: PhoneStatus } | { readonly kind: "failed" } | { readonly kind: "unauthorized" } | { readonly kind: "blocked" };
+
+const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
+
+function stateOfFailure(failure: unknown): PhoneStepState {
+  const error = toApiError(failure);
+  if (error.reason === ACCOUNT_BLOCKED) return { kind: "blocked" };
+  return { kind: error.kind === "unauthorized" ? "unauthorized" : "failed" };
+}
 
 export interface PhoneStep {
   readonly state: PhoneStepState;
@@ -37,7 +48,7 @@ export function usePhoneStep(): PhoneStep {
     api.query(PHONE_PROCEDURES.status, undefined, PhoneStatus, controller.signal).then(
       (status) => setState({ kind: "ready", status }),
       (failure: unknown) => {
-        if (!controller.signal.aborted) setState({ kind: toApiError(failure).kind === "unauthorized" ? "unauthorized" : "failed" });
+        if (!controller.signal.aborted) setState(stateOfFailure(failure));
       },
     );
     return () => controller.abort();
@@ -63,7 +74,10 @@ export function usePhoneStep(): PhoneStep {
             setError(undefined);
             setNow(Date.now());
           },
-          (failure: unknown) => setError(phoneErrorOf(failure)),
+          (failure: unknown) => {
+            if (toApiError(failure).reason === ACCOUNT_BLOCKED) setState({ kind: "blocked" });
+            else setError(phoneErrorOf(failure));
+          },
         )
         .finally(() => {
           running.current = false;

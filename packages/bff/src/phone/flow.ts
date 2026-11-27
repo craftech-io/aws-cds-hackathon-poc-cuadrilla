@@ -27,7 +27,7 @@ import { type StoredCode, attemptCode, codeDigest, codeKey, newCode, readCode, r
 import { type LeadSide, PHONE_IN_USE, claimNumber, ownerOf, recordOnLead, recordOnRow, registryUser } from "./enrolment";
 import { PHONE_LIMITS, reserveSms } from "./limits";
 import { accountPhoneHash, isHomeNumber, maskPhone, parseAccountPhone } from "./number";
-import { type SessionGate, clearSession, isSessionPassed, markSessionPassed, sessionKeyOf } from "./session";
+import { type SessionGate, clearSession, indexSession, isSessionPassed, markSessionPassed, sessionKeyOf } from "./session";
 import type { SmsSender } from "./sms";
 
 export interface PhoneKeys {
@@ -71,10 +71,13 @@ export interface PhoneStatus {
 const PASSED: PhoneStatus = { state: "PASSED", codeSent: false };
 
 const notAvailable = (): ToolError => new ToolError("FORBIDDEN", "sign in again to continue", "NO_REGISTRY_ROW");
+const blocked = (): ToolError => new ToolError("FORBIDDEN", "this account is blocked", "ACCOUNT_BLOCKED");
 
 async function rowOf(ports: PhonePorts, principal: Principal): Promise<ConsoleUser> {
   const user = await registryUser(ports.client, principal.ispId, principal.userId);
   if (user === undefined || user.cognitoSub !== principal.sub || !user.active) throw notAvailable();
+  // Read on every call, never cached: a block cuts the SMS at once (ADR-0029 §11).
+  if (user.blockedAt !== undefined) throw blocked();
   return user;
 }
 
@@ -146,6 +149,7 @@ export async function sendPhoneCode(ports: PhonePorts, caller: PhoneCaller, inpu
     if (error instanceof ConnectorError && error.code === "CONFLICT") throw new ToolError("CAP_REACHED", "wait a minute before asking for another code", "RESEND_TOO_SOON");
     throw error;
   }
+  await indexSession(ports.client, principal, Math.ceil((now.getTime() + PHONE_LIMITS.codeTtlMs) / 1000));
   try {
     await ports.sms.send({ phone: target.phone, text: phoneCodeSms(input.locale, code, PHONE_LIMITS.codeTtlMs / 60_000) });
   } catch (error) {

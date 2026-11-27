@@ -25,7 +25,8 @@ export interface PhoneAdminDeps {
 const RETRIES_MS = [500, 1_500];
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-async function rowOf(deps: PhoneAdminDeps, sub: string): Promise<ConsoleUser | undefined> {
+/** The registry row of one Cognito `sub`, retried while the index catches up; `undefined` for none or several. */
+export async function registryRowOf(deps: Pick<PhoneAdminDeps, "client" | "wait">, sub: string): Promise<ConsoleUser | undefined> {
   for (let attempt = 0; ; attempt += 1) {
     const rows = await rowsBySub(deps.client, sub);
     if (rows.length === 1 && rows[0] !== undefined) {
@@ -39,7 +40,7 @@ async function rowOf(deps: PhoneAdminDeps, sub: string): Promise<ConsoleUser | u
 }
 
 export async function adminPhone(deps: PhoneAdminDeps, sub: string, action: PhoneAdminAction): Promise<PhoneAdminOutcome> {
-  const user = await rowOf(deps, sub);
+  const user = await registryRowOf(deps, sub);
   if (user === undefined) return { outcome: "NO_ROW" };
   const key = { PK: `ISP#${user.ispId}`, SK: `USER#${user.userId}` };
   const at = deps.now().toISOString();

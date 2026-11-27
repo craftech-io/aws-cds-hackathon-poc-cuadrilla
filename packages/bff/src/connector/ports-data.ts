@@ -34,6 +34,8 @@ import type {
 export interface UserMatch {
   readonly userId: string;
   readonly active: boolean;
+  readonly automation?: boolean;
+  readonly blocked?: boolean;
 }
 
 export type SettingsPatch = Partial<Omit<NewEntity<typeof IspSettings>, "ispId" | "clockId" | "history">>;
