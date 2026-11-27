@@ -31,7 +31,7 @@ import { TRPCError, initTRPC } from "@trpc/server";
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { z } from "zod";
 import { type ConsoleRole, type IspKind, ToolError, ispKindOfClock } from "@cuadrilla/shared";
-import { AUTH_REASON, AUTH_REFUSAL, AuthError, type AuthRefusal, describeError } from "../auth/errors";
+import { AUTH_REASON, AUTH_REFUSAL, AUTH_REFUSAL_METRIC, AuthError, type AuthRefusal, describeError } from "../auth/errors";
 import { type InputReference, connectorOwners, findTrespass } from "../auth/fence";
 import { bearerToken } from "../auth/jwt";
 import { type Principal, isSignInFresh, principalFromClaims } from "../auth/principal";
@@ -42,6 +42,7 @@ import { type WorldClock, worldClock } from "../lib/clock";
 import { type LogFields, type Logger, correlationIdFrom } from "../lib/log";
 import { type ContextDeps, defaultDeps } from "./deps";
 import { reasonOf, toTrpcError } from "./errors";
+import { noteAccessSub } from "./access-log";
 
 /** What the edge verified before tRPC ran (routers/edge.ts); never built from the request's input. */
 export interface EdgeContext {
@@ -113,7 +114,10 @@ export function createContextFactory(resolveDeps: () => ContextDeps) {
     const origin = { edge: edge ?? null };
     try {
       const claims = await deps.verifier.verify(bearerToken(header(event.headers, "authorization")));
-      return { correlationId, principal: principalFromClaims(claims), authFailure: null, deps, log, ...origin };
+      const principal = principalFromClaims(claims);
+      // The verified `sub` goes on the request's access line (routers/access-log.ts).
+      noteAccessSub(principal.sub);
+      return { correlationId, principal, authFailure: null, deps, log, ...origin };
     } catch (error) {
       const authFailure =
         error instanceof AuthError ? error : new AuthError(AUTH_REASON.AUTH_UNAVAILABLE, "authentication failed unexpectedly", { cause: error });
@@ -192,7 +196,7 @@ export const publicProcedure = baseProcedure;
 const TRPC_CODE: Readonly<Record<AuthRefusal, TRPCError["code"]>> = { UNAUTHENTICATED: "UNAUTHORIZED", FORBIDDEN: "FORBIDDEN", UNAVAILABLE: "SERVICE_UNAVAILABLE" };
 
 function refuse(log: Logger, path: string, error: AuthError, extra: LogFields = {}): never {
-  const fields = { path, reason: error.reason, ...extra, ...(error.unavailable ? describeError(error.cause) : {}) };
+  const fields = { path, reason: error.reason, metric: AUTH_REFUSAL_METRIC[error.reason], value: 1, ...extra, ...(error.unavailable ? describeError(error.cause) : {}) };
   if (error.unavailable) log.error("console.auth.unavailable", fields);
   else log.warn("console.auth.refused", fields);
   throw new TRPCError({ code: TRPC_CODE[AUTH_REFUSAL[error.reason]], message: error.message, cause: error });
