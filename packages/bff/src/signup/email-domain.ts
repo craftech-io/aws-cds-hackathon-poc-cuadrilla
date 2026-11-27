@@ -3,17 +3,21 @@
 // bounce, and bounces feed the SES reputation of the whole account. Checked before anything is written:
 //
 //   MX records               → OK, unless the only one is the null MX of RFC 7505 (`0 .`) → INVALID,
-//                              or one points at a disposable service's mail server → DISPOSABLE
+//                              or one points at a disposable service's mail server (or at a host
+//                              under a disposable domain) → DISPOSABLE
 //   no MX, but A or AAAA     → OK (RFC 5321 §5.1, implicit MX)
-//   no MX, no A, no AAAA     → INVALID
-//   the 1 s deadline passed, or the resolver failed otherwise → UNKNOWN: the start goes on (metric
+//   no MX, no A, no AAAA     → INVALID (a name the DNS says does not exist lands here too)
+//   the 2 s deadline passed, or the resolver failed otherwise → UNKNOWN: the start goes on (metric
 //   `SignupMxUnknown`), a flaky resolver never blocks a real visitor
-import { resolve4, resolve6, resolveMx } from "node:dns/promises";
+//
+// DNS lookups need no AWS permission: the Lambda asks the resolver of its runtime. Tests never do a real
+// lookup: the resolver is a port (signup/testing.ts `fakeResolver`).
+import { Resolver } from "node:dns/promises";
 import { withDeadline } from "../lib/deadline";
 import { isDisposableMxHost } from "./disposable-domains";
 
 /** The whole check, all lookups together (ADR-0025 §3). */
-export const EMAIL_DOMAIN_DEADLINE_MS = 1_000;
+export const EMAIL_DOMAIN_DEADLINE_MS = 2_000;
 
 export interface MxRecord {
   readonly exchange: string;
@@ -29,10 +33,15 @@ export interface DnsResolver {
 
 export type EmailDomainVerdict = "OK" | "INVALID" | "DISPOSABLE" | "UNKNOWN";
 
+let dns: Resolver | undefined;
+
+/** One try per lookup and the same deadline per query, so nothing outlives the check. */
+const runtimeResolver = (): Resolver => (dns ??= new Resolver({ timeout: EMAIL_DOMAIN_DEADLINE_MS, tries: 1 }));
+
 export const nodeResolver: DnsResolver = {
-  mx: (domain) => resolveMx(domain),
-  a: (domain) => resolve4(domain),
-  aaaa: (domain) => resolve6(domain),
+  mx: (domain) => runtimeResolver().resolveMx(domain),
+  a: (domain) => runtimeResolver().resolve4(domain),
+  aaaa: (domain) => runtimeResolver().resolve6(domain),
 };
 
 // The answers that mean "this name has no such record" (or no such name); anything else is a failure.

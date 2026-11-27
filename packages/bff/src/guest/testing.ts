@@ -1,6 +1,6 @@
 // Test kit of the guest flows (never imported by a Lambda): the world harness of worlds/testing.ts, a
 // memory `Leads` table with deterministic ids, a provisioner that records what it was asked for, and
-// the Cognito events of the triggers. Addresses are `@example.com` or the mailbox simulator.
+// the Cognito events of the triggers. Addresses are `@correo-ficticio.mx` or the mailbox simulator.
 import type { PostAuthenticationTriggerEvent, PostConfirmationTriggerEvent } from "aws-lambda";
 import { createLogger, type Logger } from "../lib/log";
 import { hashOf, leadHarness, startLead, username } from "../leads/testing";
@@ -44,7 +44,7 @@ export function guestHarness(start = "2026-10-01T15:00:00.000Z"): GuestHarness {
   });
 }
 
-export const EMAIL = "ana.prueba@example.com";
+export const EMAIL = "ana.prueba@correo-ficticio.mx";
 export const QA_EMAIL = "success+qa-812-1-1@simulator.amazonses.com";
 export const SUB = "sub-0001";
 

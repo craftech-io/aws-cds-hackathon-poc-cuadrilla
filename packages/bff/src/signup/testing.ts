@@ -1,7 +1,7 @@
 // Fixtures of the sign-up tests (never imported by a Lambda): the sign-up's ports over memory (the
 // `Runtime` table, the `Leads` table, the kill switch), the test master key's subkeys, a fake DNS
 // resolver whose domains a test declares, a clock a test moves and deterministic ULIDs. Addresses are
-// `@example.com`, `@gmail.com` or the mailbox simulator; IPs are from the documentation ranges.
+// `@correo-ficticio.mx`, `@gmail.com` or the mailbox simulator; IPs are from the documentation ranges.
 import { CONSENTS_VERSION } from "@cuadrilla/shared/legal/consents";
 import { MemoryTableClient } from "../connector/memory/table-client";
 import { MemoryLeadTable } from "../leads/memory-table";
@@ -129,7 +129,7 @@ export interface FormOptions {
 export function signupForm(options: FormOptions = {}): Record<string, unknown> {
   const version = options.version ?? CONSENTS_VERSION;
   return {
-    email: options.email ?? "ana.prueba@example.com",
+    email: options.email ?? "ana.prueba@correo-ficticio.mx",
     phone: options.phone ?? "+52 55 0100 0001",
     name: "Ana Prueba",
     company: "Fibra de Prueba",

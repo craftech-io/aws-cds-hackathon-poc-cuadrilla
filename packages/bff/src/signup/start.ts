@@ -2,14 +2,17 @@
 // that writes. In this order, and nothing is written before the step that writes:
 //
 //   1. the form (zod, strict; the password is never here)                    INVALID (INVALID_FORM)
-//      and its phone, an international E.164 number of any country            INVALID (PHONE_INVALID)
+//      and its phone, an international E.164 number of any country, not filler INVALID (PHONE_INVALID)
+//      and not a range that is no person's mobile (phone/number.ts)           INVALID (PHONE_NOT_PERSONAL)
 //   2. who is asking: the viewer of the edge (no other caller starts a sign-up) UNAVAILABLE (NO_VIEWER)
 //   3. the two consents against their version in force                       INVALID (CONSENT_…)
 //   4. the cut of the sign-up (KILL#SIGNUP, KILL#ALL)                          CAP_REACHED
-//   5. the domain of the email: not a disposable mailbox (signup/disposable-domains.ts)
-//                                                                             INVALID (EMAIL_NOT_ACCEPTED)
-//      then MX, or A/AAAA, within 1 s                                         INVALID (EMAIL_DOMAIN)
+//   5. the domain of the email: not a disposable mailbox of the public or the own list, nor a
+//      reserved or test domain (signup/disposable-domains.ts)                 INVALID (EMAIL_NOT_ACCEPTED)
+//      then MX, or A/AAAA, within 2 s (a resolver that fails lets it through) INVALID (EMAIL_NOT_ACCEPTED)
 //      and no MX at a disposable service's mail server                        INVALID (EMAIL_NOT_ACCEPTED)
+//      Every refusal of the domain gives the visitor the same answer; the log line tells them apart
+//      (`DISPOSABLE`, `EMAIL_RESERVED`, `EMAIL_DOMAIN`, `DISPOSABLE_MX`).
 //   6. the visitor's counters, then the stage's day (signup/limits.ts)        RATE_LIMITED | CAP_REACHED
 //   7. two confirmed accounts of the same person                             RATE_LIMITED
 //   8. the lead: new, or one more pending user (≤ 3, the oldest retired, each start's form and
@@ -32,7 +35,7 @@ import type { LeadStore } from "../leads/store";
 import type { Logger } from "../lib/log";
 import { type KillSwitchReader, blockingScope } from "../ops/kill-switch";
 import type { EdgeContext } from "../routers/trpc";
-import { isDisposableDomain } from "./disposable-domains";
+import { isDisposableDomain, isReservedDomain } from "./disposable-domains";
 import { type DnsResolver, domainOf, emailDomainVerdict } from "./email-domain";
 import { parseAccountPhone } from "../phone/number";
 import { parseSignupForm } from "./form";
@@ -69,16 +72,16 @@ export interface SignupStarted {
   readonly expiresAt: string;
 }
 
-export type SignupRefusal = "INVALID_FORM" | "PHONE_INVALID" | "NO_VIEWER" | "CONSENT" | "EMAIL_NOT_ACCEPTED" | "EMAIL_DOMAIN" | "RATE_LIMITED" | "CAP_REACHED" | "UNAVAILABLE";
+/** Why a start was refused, as the log line says it (the visitor sees the error's `reason`). */
+export type SignupRefusal = "INVALID_FORM" | "PHONE" | "NO_VIEWER" | "CONSENT" | "DISPOSABLE" | "EMAIL_RESERVED" | "EMAIL_DOMAIN" | "DISPOSABLE_MX" | "RATE_LIMITED" | "CAP_REACHED" | "UNAVAILABLE";
 
-const REFUSALS: Readonly<Record<Exclude<SignupRefusal, "INVALID_FORM" | "PHONE_INVALID" | "CONSENT">, () => ToolError>> = {
+const REFUSALS = {
   NO_VIEWER: () => new ToolError("UNAVAILABLE", "the account could not be created right now", "NO_VIEWER"),
-  EMAIL_NOT_ACCEPTED: () => new ToolError("INVALID", "disposable mailboxes are not accepted", "EMAIL_NOT_ACCEPTED"),
-  EMAIL_DOMAIN: () => new ToolError("INVALID", "the domain of this email cannot receive mail", "EMAIL_DOMAIN"),
+  EMAIL_NOT_ACCEPTED: () => new ToolError("INVALID", "use a work or personal email that receives mail", "EMAIL_NOT_ACCEPTED"),
   RATE_LIMITED: () => new ToolError("CAP_REACHED", "too many sign-ups from this connection or with this email", "RATE_LIMITED"),
   CAP_REACHED: () => new ToolError("CAP_REACHED", "new test accounts are not being opened right now", "CAP_REACHED"),
   UNAVAILABLE: () => new ToolError("UNAVAILABLE", "the account could not be created right now", "UNAVAILABLE"),
-};
+} as const satisfies Readonly<Record<string, () => ToolError>>;
 
 /** The viewer the edge verified: its IP and whether AWS WAF labelled it anonymous. */
 function viewerOf(call: SignupCall): { readonly address: string; readonly anonymous: boolean } | undefined {
@@ -101,7 +104,7 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
   try {
     phone = parseAccountPhone(form.phone);
   } catch (error) {
-    return refuse("PHONE_INVALID", error as ToolError);
+    return refuse("PHONE", error as ToolError);
   }
   const origin = viewerOf(call);
   if (origin === undefined) return refuse("NO_VIEWER", REFUSALS.NO_VIEWER());
@@ -125,10 +128,11 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
   const email = normalizeLeadEmail(form.email);
   const emailKey = p.keys.emailHash();
   const emailHash = leadEmailHash(emailKey, email);
-  if (isDisposableDomain(domainOf(email))) return refuse("EMAIL_NOT_ACCEPTED", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
+  if (isDisposableDomain(domainOf(email))) return refuse("DISPOSABLE", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
+  if (isReservedDomain(domainOf(email))) return refuse("EMAIL_RESERVED", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
   const domain = await emailDomainVerdict(email, p.resolver);
-  if (domain === "INVALID") return refuse("EMAIL_DOMAIN", REFUSALS.EMAIL_DOMAIN(), emailHash);
-  if (domain === "DISPOSABLE") return refuse("EMAIL_NOT_ACCEPTED", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
+  if (domain === "INVALID") return refuse("EMAIL_DOMAIN", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
+  if (domain === "DISPOSABLE") return refuse("DISPOSABLE_MX", REFUSALS.EMAIL_NOT_ACCEPTED(), emailHash);
   if (domain === "UNKNOWN") call.log.warn("signup.email_domain.unknown", { metric: "SignupMxUnknown", value: 1, emailHash: hashPrefix(emailHash) });
 
   const abuseHash = leadAbuseHash(emailKey, email);

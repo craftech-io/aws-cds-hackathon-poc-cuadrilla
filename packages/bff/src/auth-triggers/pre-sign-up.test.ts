@@ -2,12 +2,13 @@ import type { PreSignUpTriggerEvent } from "aws-lambda";
 import { beforeEach, describe, expect, it } from "vitest";
 import { leadEmailHash } from "../leads/keys";
 import { createLogger } from "../lib/log";
+import { SIGNUP_LIMITS } from "../signup/limits";
 import { EMAIL_HASH_KEY, SIGNUP_T0, TICKET_KEY, type SignupHarness, signupForm, signupHarness } from "../signup/testing";
 import { SIGNUP_TICKET_TTL_MS, issueTicket } from "../signup/ticket";
 import { startSignup } from "../signup/start";
 import { type PreSignUpDeps, createPreSignUpHandler } from "./pre-sign-up";
 
-const EMAIL = "ana.prueba@example.com";
+const EMAIL = "ana.prueba@correo-ficticio.mx";
 
 function signUpEvent(userName: string, ticket: string | undefined, attributes: Record<string, string> = {}, triggerSource = "PreSignUp_SignUp"): PreSignUpTriggerEvent {
   return {
@@ -80,7 +81,7 @@ describe("pre sign-up trigger [FL-104] [FL-114] [FL-121] [FL-122]", () => {
   it("[FL-114] without a ticket, expired, for another email, for another user or with a bad signature → TICKET_INVALID", async () => {
     expect(await refusalOf(signUpEvent(username, undefined))).toBe("TICKET_INVALID");
     expect(await refusalOf(signUpEvent("gst-01K80000000000000000000099", ticket))).toBe("TICKET_INVALID");
-    expect(await refusalOf(signUpEvent(username, ticket, { email: "otra.persona@example.com" }))).toBe("TICKET_INVALID");
+    expect(await refusalOf(signUpEvent(username, ticket, { email: "otra.persona@correo-ficticio.mx" }))).toBe("TICKET_INVALID");
     expect(await refusalOf(signUpEvent(username, `${ticket.slice(0, -3)}AAA`))).toBe("TICKET_INVALID");
     const forged = issueTicket("another-key-another-key-another-key-00", { nonce: "01K80000000000000000000077", emailHash: leadEmailHash(EMAIL_HASH_KEY, EMAIL), username, exp: Math.floor(SIGNUP_T0.getTime() / 1000) + 600 });
     expect(await refusalOf(signUpEvent(username, forged))).toBe("TICKET_INVALID");
@@ -129,11 +130,11 @@ describe("pre sign-up trigger [FL-104] [FL-114] [FL-121] [FL-122]", () => {
     h = signupHarness();
     const again = await startSignup(() => h.ports(), { input: signupForm({ email: EMAIL }), edge: { viewerIp: "203.0.113.10" }, log: createLogger({ sink: () => undefined }) });
     const day = `SIGNUP#GLOBAL#${SIGNUP_T0.toISOString().slice(0, 10)}`;
-    // The 300th start of the day still completes its SignUp; a day over the cap takes no more.
-    await h.runtime.update("Runtime", { PK: day, SK: "META" }, { used: 300 }, SIGNUP_T0.toISOString());
+    // The 40th start of the day still completes its SignUp; a day over the cap takes no more.
+    await h.runtime.update("Runtime", { PK: day, SK: "META" }, { used: SIGNUP_LIMITS.startsPerDay }, SIGNUP_T0.toISOString());
     expect(await refusalOf(signUpEvent(again.username, again.ticket))).toBe("ACCEPTED");
-    await h.runtime.update("Runtime", { PK: day, SK: "META" }, { used: 301 }, SIGNUP_T0.toISOString());
+    await h.runtime.update("Runtime", { PK: day, SK: "META" }, { used: SIGNUP_LIMITS.startsPerDay + 1 }, SIGNUP_T0.toISOString());
     expect(await refusalOf(signUpEvent(again.username, again.ticket))).toBe("CAP_REACHED");
-    expect((await h.runtime.get("Runtime", { PK: day, SK: "META" }))?.used).toBe(301);
+    expect((await h.runtime.get("Runtime", { PK: day, SK: "META" }))?.used).toBe(SIGNUP_LIMITS.startsPerDay + 1);
   });
 });
