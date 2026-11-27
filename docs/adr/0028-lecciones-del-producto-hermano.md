@@ -55,6 +55,8 @@ Si el modelo pide dos veces el mismo envío en un turno (mismo canal y mismo tex
 
 ### 6. Observabilidad: solo logs, 30 días, sin tableros
 
+> 2026-11-27: la retención pasa a **14 días** en un solo lugar (`infra/log-retention.ts`), con una línea de acceso por pedido y decisiones de seguridad con nombre (ADR-0030).
+
 - La observabilidad son los **logs JSON** (`lib/log.ts`, enmascarados) con **30 días** de retención en todo grupo: las Lambdas (`$transform`), el runtime `-live` del Harness (IaC), el runtime **`-DEFAULT`** que AgentCore crea solo y sin retención (si ningún provider pinneado lo modela, configuración manual declarada en `docs/architecture.md` §17 ítem 15, con su comando de verificación) y `aws/spans` (configuración de la cuenta, §17 ítem 2).
 - **Sin tableros** (`aws.cloudwatch.Dashboard`) ni alarmas sin acción. ~~Una alarma existe solo si publica en `CostAlerts` y enciende un corte (`CostGuard`: el de costo de ADR-0019 y el del alta de ADR-0025 §4).~~ Desde el 2026-10-14 (P-07, cerrado por el CTO: sin umbral de costo, sin alarma de gasto y sin presupuesto del proyecto) **no hay ninguna alarma ni presupuesto**: cuestan todos los meses aunque nunca se disparen; los cortes los enciende el operador. Un metric filter existe solo si lo lee un paso `SR`/`SMK` que lo asierta. Todo lo demás que `docs/architecture.md` §12 llama indicador es un campo de las líneas de log, que se consulta con CloudWatch Logs Insights; las cifras que muestra el producto (latencias, costo por conversación, medición) salen de sus tablas (`CuadrillaMetrics`, `EvalResult`) y de los reportes del ejecutor, no de CloudWatch.
 - Nada con costo fijo que no se use: lo que se crea "por si acaso" (tableros, alarmas que solo avisan, métricas que nadie lee) se quita.

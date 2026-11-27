@@ -144,3 +144,13 @@ Sin los pasos 1 y 2 el envío falla (`SMS_UNAVAILABLE`) y ninguna sesión de Cog
 2. **Cuenta de SMS** (configuración de la cuenta compartida, fuera del repo, con el OK del CTO): `aws --profile craftech-demos sns get-sms-sandbox-account-status` debe responder `IsInSandbox: false` (si no, pedir la salida del sandbox en la consola de SNS); `aws --profile craftech-demos sns get-sms-attributes --attributes MonthlySpendLimit DefaultSMSType` debe mostrar el tope de US$50 y `Transactional`.
 3. **Remitente registrado** (opcional): sin él, AWS no entrega SMS en algunos países (Estados Unidos e India, entre otros); la pantalla lo dice (`SMS_NOT_DELIVERABLE`) y ofrece el contacto de Craftech.
 4. **Cuentas de automatización.** Cada cuenta de Cognito que usa el corredor de escenarios o de pruebas y que ninguna persona usa se marca una por una: `npm run console:phone -- --stage poc --username <usuario> --automation`. Las del puente de QA (`qa:confirm-signup`) quedan marcadas solas. Las cuentas entregadas a personas (`guest-NN`) y el personal **no** se marcan: se enrolan con su celular en el próximo ingreso.
+
+## 10. Registros y borde compartido (P-10)
+
+Antes de fusionar el cambio de ADR-0030:
+
+1. **Bootstrap.** `infra/bootstrap/ci-role.yaml` suma a `DeployEdgePolicy` las sentencias `SharedEdgeWafLookup` (`wafv2:ListWebACLs` sobre `*`) y `SharedEdgeWafRead` (`wafv2:GetWebACL` sobre `arn:aws:wafv2:us-east-1:<cuenta>:global/webacl/demos-borde/*`). El operador lo aplica con el comando de `infra/bootstrap/README.md` ("Apply").
+2. **`demos-borde` existe**: `aws --profile craftech-demos wafv2 list-web-acls --scope CLOUDFRONT --region us-east-1 --query "WebACLs[?Name=='demos-borde'].ARN"` devuelve un ARN (lo crea `craftech/demos`). Sin ella el deploy falla al buscarla.
+3. **Aviso de privacidad**: la línea de acceso guarda la IP en claro 14 días; el aviso (versión `2026-11-27`) dice que solo se guarda una huella de la IP por 48 horas y que los registros técnicos duran 30 días. Hace falta una versión nueva del aviso y de los términos (`packages/shared/src/legal/consents.ts`, `packages/web/public/legal/*.html`) con la validación legal de P-06.
+4. **Después del deploy**: `aws --profile craftech-demos logs put-retention-policy --log-group-name /aws/bedrock-agentcore/runtimes/<runtimeId>-DEFAULT --retention-in-days 14` (`docs/architecture.md` §17 ítem 15).
+

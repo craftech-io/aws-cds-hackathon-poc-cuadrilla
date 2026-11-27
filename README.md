@@ -117,7 +117,7 @@ The diagram is generated from `docs/assets/architecture/architecture.html`
   world, after opt-in; tools take every id from a signed session token.
 - **Each account's world is isolated** by operator and clock; demo worlds are capped, expire and have
   per-world usage limits inside a stage-wide cost ceiling with a runtime cut.
-- **Observability is logs only**: JSON logs with a correlation id and no personal data, kept 30 days;
+- **Observability is logs only**: JSON logs with a correlation id and no personal data, kept 14 days;
   spend is capped before it happens and the operator switches a runtime cut on or off.
 
 Design documents (in Spanish): `docs/design-brief.md`, `docs/architecture.md`,
@@ -327,6 +327,37 @@ at a time, with the operator's profile, never from CI:
 npm run console:block -- --stage poc --username <cognito user> --block
 npm run console:block -- --stage poc --username <cognito user> --unblock
 echo "<address>" | npm run console:block -- --stage poc --by-email --block   # the address never as an argument
+```
+
+### Logs
+
+Every log group of the app keeps 14 days (`infra/log-retention.ts`). Lines are JSON, masked, with a
+`correlationId` that follows a request through the BFF, the worker, the agent's turn and the tools. The
+account-wide logs (the shared edge web ACL `demos-borde`, SMS delivery, model invocations, AWS
+operations, email events) belong to `craftech/demos`; how to read all of them together is in
+`craftech/seguridad-demos/observabilidad.md` of the `labs` repository.
+
+- **Access**: one line per request of the BFF, refused ones included:
+  `{"message":"access","route","method","status","ip","userAgent","sub","ms"}`. The account's guide calls
+  them `msg "acceso"`, `ruta`, `metodo`, `estado`, `ip`, `agente`, `sub` and `ms`. `ip` is the viewer
+  CloudFront named; the web sends the user's token in the `authorization` header, which no log carries.
+- **Security decisions**, by their `metric` field: `SecondFactorPending`, `AccountBlocked`,
+  `CrossTenantDenied`, `UserInactive`, `RoleDenied`, `RecentLoginRequired`, `AuthRefused` (the BFF's
+  gate), `SmsCapHits` and `PhoneCodeRefused` (the SMS code, with its `reason`), `SignupRejected` (the
+  sign-up, with its `reason`), `TurnCapHits`, `SimulatorCapHits`, `GlobalCapHits`, `GuestSignupCapHits`
+  and `KillSwitchActive` (cost ceilings).
+
+With the operator's profile, in CloudWatch Logs Insights over the BFF's log group
+(`/aws/lambda/<app>-poc-BffFunction-…`):
+
+```text
+fields @timestamp, route, method, status, ip, sub, ms
+| filter message = "access" and status >= 400
+| sort @timestamp desc
+
+fields @timestamp, metric, reason, path, userId
+| filter ispresent(metric) and metric in ["SecondFactorPending", "AccountBlocked", "CrossTenantDenied", "SmsCapHits", "PhoneCodeRefused", "SignupRejected"]
+| stats count() by metric, reason
 ```
 
 ## Privacy
