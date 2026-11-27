@@ -251,7 +251,10 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     });
     expect(await refusalOf(start(signupForm({ email: "ana@mailnuevo.mx" })))).toMatchObject({ code: "BAD_REQUEST", reason: "EMAIL_NOT_ACCEPTED" });
     expect(await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana@mailnuevo.mx"))).toBeUndefined();
-    expect(deps.lines.filter((line) => line.includes('"reason":"DISPOSABLE_MX_ADDRESS"'))).toHaveLength(1);
+    // [FL-127] the decision by its name: SignupRejected with the reason, never the address.
+    const refused = deps.lines.map((line) => JSON.parse(line) as Record<string, unknown>).filter((line) => line.metric === "SignupRejected" && line.reason === "DISPOSABLE_MX_ADDRESS");
+    expect(refused).toHaveLength(1);
+    expect(JSON.stringify(refused)).not.toContain("ana@mailnuevo.mx");
     await expect(start(signupForm({ email: "ana@propio.mx" }))).resolves.toMatchObject({ username: expect.any(String) });
   });
 
