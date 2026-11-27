@@ -305,7 +305,7 @@ Persona que prueba la demo en su propio mundo, con los permisos de `SUPERVISOR` 
 _Avoid_: jurado, juez, evaluador, judge (en código, datos y superficies visibles), demo user
 
 **Código por SMS** (`phone`, ADR-0029):
-Segundo factor de toda sesión de Cognito: seis dígitos por SMS al celular de la cuenta. **Enrolamiento**: el primer código hace del número el celular de la cuenta (`phone`, `phoneVerifiedAt` en `Isps/USER#`), que el usuario ya no cambia; **ingreso**: el código va a ese número. El pase vale para la **sesión** del id token (`origin_jti`), no para la cuenta. Una **cuenta de automatización** (`phoneCheck AUTOMATION`, puesta solo por el operador o la costura de QA) no lo pide.
+Segundo factor de toda sesión de Cognito: seis dígitos por SMS al celular de la cuenta. **Enrolamiento**: el primer código hace del número el celular de la cuenta (`phone`, `phoneVerifiedAt` en `Isps/USER#`), que el usuario ya no cambia; **ingreso**: el código va a ese número. El pase vale para la **sesión** del id token (`origin_jti`), no para la cuenta. Una **cuenta de automatización** (`phoneCheck AUTOMATION`, puesta solo por el operador o la costura de QA) no lo pide. La **región de casa** (`HOME_PREFIXES`: Latinoamérica y España) no tiene cupo propio; un número **de fuera** se acepta, pero comparte con todos los de fuera el **cupo de fuera** del día (`PHONESMS#FOREIGN#`, 5 SMS en toda la demo). Un **rango no personal** (`NON_PERSONAL_PREFIXES`: máquinas, numeración personal, redes internacionales, satelitales) se rechaza al escribir el número (ADR-0029 §10).
 _Avoid_: 2FA de la cuenta, verificación del usuario (es de la sesión), teléfono del simulador (otra cosa: las identidades sintéticas del mundo)
 
 **Alta propia** (`signup`):
