@@ -30,7 +30,7 @@ const QueueUrl = z.object({ url: z.string().url() });
 export const QaTargetsLink = z.object({
   userPoolId: z.string().min(1),
   clients: z.object({ consoleWeb: z.string().min(1), guestSignup: z.string().min(1), qaProbe: z.string().min(1) }),
-  webAcls: z.object({ edge: z.object({ name: z.string(), id: z.string(), scope: z.literal("CLOUDFRONT") }), auth: z.object({ name: z.string(), id: z.string(), scope: z.literal("REGIONAL") }) }),
+  webAcls: z.object({ auth: z.object({ name: z.string(), id: z.string(), scope: z.literal("REGIONAL") }) }),
 });
 export const qaTargets = () => readLinked("QaTargets", QaTargetsLink);
 
@@ -206,12 +206,13 @@ async function wafv2(target: "GetWebACL" | "GetWebACLForResource", body: Record<
 export async function webAcls(): Promise<unknown> {
   const targets = qaTargets();
   const userPoolArn = `arn:aws:cognito-idp:${REGION}:${await accountId()}:userpool/${targets.userPoolId}`;
-  const [edge, auth, poolAssociation] = await Promise.all([
-    wafv2("GetWebACL", { Name: targets.webAcls.edge.name, Id: targets.webAcls.edge.id, Scope: "CLOUDFRONT" }),
+  // The edge ACL is the account's shared `demos-borde` (ADR-0030): craftech/demos owns it, so the probe
+  // reads only this app's pool ACL and its association.
+  const [auth, poolAssociation] = await Promise.all([
     wafv2("GetWebACL", { Name: targets.webAcls.auth.name, Id: targets.webAcls.auth.id, Scope: "REGIONAL" }),
     wafv2("GetWebACLForResource", { ResourceArn: userPoolArn }),
   ]);
-  return { edge, auth, poolAssociation };
+  return { auth, poolAssociation };
 }
 
 async function accountId(): Promise<string> {

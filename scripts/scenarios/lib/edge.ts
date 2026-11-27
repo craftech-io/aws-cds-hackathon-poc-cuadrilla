@@ -1,6 +1,6 @@
 // What `SC-00` checks from the runner itself, over HTTP, never through the `QaDriver` (docs/test-plan.md
 // §4.5 `SMK/1`, `SMK/3`, `SMK/9`, `SMK/10`): the public pages and their headers, the BFF's health through
-// the Router, the sign-up's edge without a token of AWS WAF, and the Bff's Function URL called directly.
+// the Router, the sign-up's edge (an empty form and its batch), and the Bff's Function URL called directly.
 // The verdict functions are the interim smoke's and `qa:edge-probes`' (one source each).
 import { DEFAULT_BASE_URL, healthVerdict, rootProblems } from "../../smoke/interim";
 import { directProbes, routerProbes } from "../../qa/edge-probes";
@@ -58,12 +58,12 @@ export async function healthProblem(): Promise<string | undefined> {
   return verdict === "ok" ? undefined : `GET /api/health.live: ${verdict} (${answer.status})`;
 }
 
-/** `SMK/9`: without a WAF token the sign-up gets the challenge (202), its batch variants the challenge or the app's 400; a reputation 403 is a warning. */
+/** `SMK/9`: an empty sign-up gets the app's 400 `INVALID_FORM`, its batch variants the app's 400 without a body; a reputation 403 is a warning. */
 export async function signupEdge(): Promise<{ readonly problems: string[]; readonly warnings: string[] }> {
   const [single, ...batches] = await routerProbes(config.baseUrl);
   const problems: string[] = [];
   const warnings: string[] = [];
-  if (single !== undefined && !(single.ok && single.detail.startsWith("202"))) {
+  if (single !== undefined && !single.ok) {
     if (single.detail.startsWith("403")) warnings.push(`${single.name}: ${single.detail} (reputation list on the runner's IP)`);
     else problems.push(`${single.name}: ${single.detail}`);
   }

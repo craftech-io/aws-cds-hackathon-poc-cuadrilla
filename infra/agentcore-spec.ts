@@ -17,6 +17,7 @@ import { MASK_MARKERS } from "../packages/bff/src/lib/mask";
 import { CAPABILITIES, expectedGrants, foundationModelOf, type CapabilityName, type Grant, type LambdaName } from "./iam-capabilities";
 import type { GatewayTarget } from "./policy-rules";
 import { parseStorageRef } from "./storage-keys";
+import { LOG_RETENTION_DAYS } from "./log-retention";
 
 // ---- Models (ADR-0015, ADR-0020, ADR-0028) -------------------------------------------------------------
 
@@ -348,8 +349,8 @@ export function gatewayTargetDescription(target: GatewayTarget, tools: number, d
 export const RUNTIME_LOG_GROUP_PREFIX = "/aws/bedrock-agentcore/runtimes/";
 /** AgentCore creates the DEFAULT endpoint's group together with the runtime (ResourceAlreadyExistsException if the IaC does). */
 export const RUNTIME_DEFAULT_ENDPOINT = "DEFAULT";
-/** Every log group of the stage keeps 30 days (docs/architecture.md §12). */
-export const AGENT_LOG_RETENTION_DAYS = 30;
+/** Every log group of the stage keeps the app's one retention (infra/log-retention.ts, docs/architecture.md §12). */
+export const AGENT_LOG_RETENTION_DAYS = LOG_RETENTION_DAYS;
 
 export function runtimeLogGroupName(agentRuntimeId: string, endpointName: string): string {
   if (!/^[a-zA-Z][a-zA-Z0-9_-]{0,99}$/.test(agentRuntimeId)) throw new Error(`Unexpected AgentCore runtime id "${agentRuntimeId}".`);
@@ -381,7 +382,7 @@ export function runtimeLogGroupEndpoints(endpointName: string = HARNESS_ENDPOINT
  * Content in traces, the record docs/architecture.md §12 asks WP-26 for. Neither the Harness nor the
  * HarnessEndpoint has a field that turns off the capture of prompts, tool arguments and results in traces,
  * in the pinned provider or in the control-plane SDK (the test re-reads both). So capture stays on and the
- * retention is what is fixed: the `live` runtime log group (its spans included) by this IaC, 30 days;
+ * retention is what is fixed: the `live` runtime log group (its spans included) by this IaC, 14 days;
  * `aws/spans` belongs to the account's Transaction Search (docs/architecture.md §17 item 2), shared by every
  * project of the account and outside the deploy role's fence, so this app verifies its retention and never
  * manages it. Both enter the log sampling of docs/test-plan.md §7.

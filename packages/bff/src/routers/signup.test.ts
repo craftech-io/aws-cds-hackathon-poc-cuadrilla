@@ -81,6 +81,11 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     for (const phone of ["55 1234 5678", "+1234567", "+0123456789", "+1 234 567 890 123 456"]) expect(await refusalOf(start(signupForm({ phone })))).toMatchObject({ code: "BAD_REQUEST", reason: "PHONE_INVALID" });
     expect(counters()).toEqual([]);
     for (const phone of ["+34 612 345 678", "+44 (20) 7946-0018", "+81 90 1234 5678"]) expect(await refusalOf(start(signupForm({ phone })))).toMatchObject({ code: "BAD_REQUEST", reason: "PHONE_COUNTRY_NOT_ALLOWED" });
+    // [FL-127] each refusal is SignupRejected with its own reason, never the number.
+    const rejected = deps.lines.filter((line) => line.includes('"metric":"SignupRejected"'));
+    expect(rejected.filter((line) => line.includes('"reason":"PHONE_COUNTRY_NOT_ALLOWED"'))).toHaveLength(3);
+    expect(rejected.filter((line) => line.includes('"reason":"PHONE_INVALID"'))).toHaveLength(4);
+    expect(rejected.join("\n")).not.toMatch(/612345678|79460018/);
     expect(counters()).toEqual([]);
     await expect(start(signupForm({ email: "otra.persona@correo-ficticio.mx", phone: "+1 (415) 555-0101" }))).resolves.toBeDefined();
     const answer = await start(signupForm({ phone: "+52 (55) 1234-5678" }));

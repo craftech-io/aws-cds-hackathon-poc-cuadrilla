@@ -74,7 +74,7 @@ export interface SignupStarted {
 }
 
 /** Why a start was refused, as the log line says it (the visitor sees the error's `reason`). */
-export type SignupRefusal = "INVALID_FORM" | "PHONE" | "NO_VIEWER" | "CONSENT" | "DISPOSABLE" | "EMAIL_RESERVED" | "EMAIL_DOMAIN" | "DISPOSABLE_MX" | "RATE_LIMITED" | "CAP_REACHED" | "UNAVAILABLE";
+export type SignupRefusal = "INVALID_FORM" | "PHONE_INVALID" | "PHONE_NOT_PERSONAL" | "PHONE_COUNTRY_NOT_ALLOWED" | "NO_VIEWER" | "CONSENT" | "DISPOSABLE" | "EMAIL_RESERVED" | "EMAIL_DOMAIN" | "DISPOSABLE_MX" | "RATE_LIMITED" | "CAP_REACHED" | "UNAVAILABLE";
 
 const REFUSALS = {
   NO_VIEWER: () => new ToolError("UNAVAILABLE", "the account could not be created right now", "NO_VIEWER"),
@@ -105,7 +105,8 @@ export async function startSignup(ports: () => SignupPorts, call: SignupCall): P
   try {
     phone = parseAccountPhone(form.phone);
   } catch (error) {
-    return refuse("PHONE", error as ToolError);
+    const refusal = error as ToolError;
+    return refuse(refusal.reason === "PHONE_NOT_PERSONAL" || refusal.reason === "PHONE_COUNTRY_NOT_ALLOWED" ? refusal.reason : "PHONE_INVALID", refusal);
   }
   const origin = viewerOf(call);
   if (origin === undefined) return refuse("NO_VIEWER", REFUSALS.NO_VIEWER());

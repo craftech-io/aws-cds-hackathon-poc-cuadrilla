@@ -90,7 +90,7 @@ La revisión de seguridad del diseño (2026-09-26, antes de la ola 2b.1) agregó
 
 **Elegida A** por ser nativa de AWS, cubrir el formulario, la Function URL y la API directa de Cognito y costar alrededor de **USD 30 por mes** fijos (USD 20 de las reglas y USD 10 de la suscripción de Bot Control que exige la URL de integración). Las correcciones de la revisión (origen verificado, etiqueta de IP anónima, corte del alta, configuration set del pool) **no cambian el costo fijo**: no suman reglas ni ACL; las alarmas nuevas son unas pocas de CloudWatch (centavos por mes). Detalle:
 
-- **ACL de borde** `aws-cds-hackathon-poc-cuadrilla-poc-edge` (alcance `CLOUDFRONT`, en `us-east-1`), asociada a la distribución del Router por `webAclId` (`infra/waf.ts`, valores en `infra/waf-spec.ts`):
+- **ACL de borde** `aws-cds-hackathon-poc-cuadrilla-poc-edge` (alcance `CLOUDFRONT`, en `us-east-1`), asociada a la distribución del Router por `webAclId` (`infra/waf.ts`, valores en `infra/waf-spec.ts`). **Reemplazada el 2026-11-27 por la web ACL compartida `demos-borde` (ADR-0030)**: lo que sigue de esta ACL describe la versión anterior; ADR-0030 §4 dice qué reglas se pierden y qué las cubre. La ACL del pool sigue igual.
 
   | Prioridad | Regla | Alcance | Acción |
   |---|---|---|---|

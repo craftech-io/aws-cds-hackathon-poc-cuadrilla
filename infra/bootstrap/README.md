@@ -19,7 +19,8 @@
   uploads only to `Media`, images and audio only from `Media`, `Evidence` and `Seed` (the design
   partner's logos under `Seed/brand/`), scripts from the app and the AWS WAF SDK
   (`https://*.sdk.awswaf.com`) and calls to AWS WAF's token hosts (`https://*.token.awswaf.com`):
-  the silent challenge of the sign-up (ADR-0025 §4). Wildcards because the integration URL is born
+  the silent challenge of the sign-up (ADR-0025 §4; unused since the Router moved to the shared edge ACL
+  `demos-borde`, which challenges nothing, ADR-0030). Wildcards because the integration URL is born
   with the web ACL, after this template is applied. The AWS WAF guide ("Using the JavaScript API
   with content security policies") allowlists the apex `https://*.awswaf.com` in `script-src`,
   `script-src-elem` and `connect-src`; the console narrows it to the SDK and token hosts it uses.
@@ -84,7 +85,8 @@ What each group of statements is for:
 | `AppInferenceProfileCreate` / `AppInferenceProfiles` | The app's inference profile `<app>-poc-sonnet-5-5` (ADR-0028): create and tag on `application-inference-profile/*` (plus the global profile and the foundation model it copies, which the create also authorizes) only when the request tags it `Project` = the app with no key outside the app's tag keys, in one statement so both conditions hold together; get, delete, list tags and untag only on a profile tagged `Project` = the app. Deploy role only (named-resources policy): no role of the app creates or deletes a profile. In the boundary, `InvokeModels` names `application-inference-profile/*` of the region (the Harness, Memory and `ToolEvidence` call through it) and their `bedrock:GetInferenceProfile` rides `TaggedAppResources`: the profile carries `sst:app` from the provider's default tags |
 | `CloudControlTransport` | `awsnative.*` resources go through the Cloud Control API, IAM prefix `cloudformation` |
 | Edge policy | CloudFront functions `<app>-poc-*`, the bootstrap key-value store and the declared cache policy only; reads of the origin request and cache policies of `/api/*` |
-| `WebAclsOfThisApp` (edge policy) | Create, update, delete, tag and associate only the web ACLs `<app>-*` of both scopes (`<app>-poc-edge` on the Router, `<app>-poc-auth` on the user pool). AWS WAF has no tag fence on create, so the fence is the name |
+| `WebAclsOfThisApp` (edge policy) | Create, update, delete, tag and associate only the web ACLs `<app>-*` of both scopes (`<app>-poc-auth` on the user pool; it also deletes the old `<app>-poc-edge`). AWS WAF has no tag fence on create, so the fence is the name |
+| `SharedEdgeWafLookup`, `SharedEdgeWafRead` (edge policy) | `ListWebACLs` on `*` and `GetWebACL` on `global/webacl/demos-borde/*` only: the deploy finds the account's shared edge ACL by name and puts its ARN on the Router's distribution (`cloudfront:UpdateDistribution`, already allowed). Never creates, changes or deletes it (ADR-0030) |
 | `ManagedRuleGroupReads` (edge policy) | Read AWS's managed rule groups the ACLs reference (IP reputation, anonymous IP list, Bot Control) and check capacity. No action on AWS WAF API keys exists anywhere: no CAPTCHA (ADR-0025 §4) |
 | `WebAclLookupByResource` (edge policy) | `GetWebACLForResource` on `*`: reading back the user pool's association asks for its ACL before knowing it (`webacl/*/*`); read only |
 | `CognitoWebAclAssociation` | `AssociateWebACL` and `GetWebACLForResource` of Cognito on the account's pools: Cognito's check of the association does not see the pool's tags and the pool's ARN has an opaque id, so the fence is the web ACL (`WebAclsOfThisApp`) |
@@ -196,8 +198,7 @@ has no action on AWS WAF API keys:
 aws --profile craftech-demos iam simulate-principal-policy \
   --policy-source-arn arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy \
   --action-names wafv2:CreateWebACL wafv2:UpdateWebACL wafv2:AssociateWebACL \
-  --resource-arns arn:aws:wafv2:us-east-1:776805327629:global/webacl/aws-cds-hackathon-poc-cuadrilla-poc-edge/x \
-                  arn:aws:wafv2:us-east-1:776805327629:regional/webacl/aws-cds-hackathon-poc-cuadrilla-poc-auth/x
+  --resource-arns                   arn:aws:wafv2:us-east-1:776805327629:regional/webacl/aws-cds-hackathon-poc-cuadrilla-poc-auth/x
 aws --profile craftech-demos iam simulate-principal-policy \
   --policy-source-arn arn:aws:iam::776805327629:role/aws-cds-hackathon-poc-cuadrilla-github-deploy \
   --action-names wafv2:UpdateWebACL wafv2:DeleteWebACL wafv2:CreateAPIKey \

@@ -66,12 +66,13 @@ describe("interim smoke", () => {
 });
 
 describe("interim smoke of the sign-up's edge (ADR-0025 §3-§4) [FL-114]", () => {
-  it("takes AWS WAF's challenge, and the app's empty 400 for a batch, as the only good answers", () => {
+  it("tells AWS WAF's challenge, the app's empty 400 for a batch and its refusal of an empty form from anything that could start a sign-up", () => {
     expect(signupEdgeVerdict(202, { "x-amzn-waf-action": "challenge" }, "<html>")).toBe("challenge");
     expect(signupEdgeVerdict(405, { "x-amzn-waf-action": "Challenge" }, "")).toBe("challenge");
     expect(signupEdgeVerdict(400, {}, "")).toBe("rejected");
+    expect(signupEdgeVerdict(400, {}, '{"error":{"message":"the sign-up form is not valid","data":{"code":"BAD_REQUEST","reason":"INVALID_FORM"}}}')).toBe("refused");
     expect(signupEdgeVerdict(200, {}, '{"result":{"data":{"ticket":"x"}}}')).toBe("failed");
-    expect(signupEdgeVerdict(429, {}, '{"error":{"message":"RATE_LIMITED"}}')).toBe("failed");
+    expect(signupEdgeVerdict(429, {}, '{"error":{"message":"RATE_LIMITED","data":{"reason":"RATE_LIMITED"}}}')).toBe("failed");
     expect(signupEdgeVerdict(400, {}, '{"error":{"message":"INVALID"}}')).toBe("failed");
   });
 
@@ -81,29 +82,28 @@ describe("interim smoke of the sign-up's edge (ADR-0025 §3-§4) [FL-114]", () =
     expect(directUrlProblems(403, "Forbidden")).toHaveLength(1);
   });
 
-  const EDGE_ARN = "arn:aws:wafv2:us-east-1:1:global/webacl/app-poc-edge/1";
+  const EDGE_ARN = "arn:aws:wafv2:us-east-1:1:global/webacl/demos-borde/1";
   const AUTH_ARN = "arn:aws:wafv2:us-east-1:1:regional/webacl/app-poc-auth/2";
   const POOL = "arn:aws:cognito-idp:us-east-1:1:userpool/us-east-1_x";
   const state = (resources: unknown[]) => ({ latest: { resources } });
   const attached = [
     { type: "aws:lambda/functionUrl:FunctionUrl", outputs: { authorizationType: "NONE", functionUrl: "https://bff.lambda-url.us-east-1.on.aws/" } },
     { type: "aws:lambda/functionUrl:FunctionUrl", outputs: { authorizationType: "AWS_IAM", functionUrl: "https://mock.lambda-url.us-east-1.on.aws/" } },
-    { type: "aws:wafv2/webAcl:WebAcl", outputs: { name: "app-poc-edge", arn: EDGE_ARN } },
     { type: "aws:wafv2/webAcl:WebAcl", outputs: { name: "app-poc-auth", arn: AUTH_ARN } },
     { type: "aws:cloudfront/distribution:Distribution", outputs: { webAclId: EDGE_ARN } },
     { type: "aws:cognito/userPool:UserPool", outputs: { arn: POOL } },
     { type: "aws:wafv2/webAclAssociation:WebAclAssociation", outputs: { webAclArn: AUTH_ARN, resourceArn: POOL } },
   ];
 
-  it("finds the one public Function URL and both web ACLs attached, from the app's own state", () => {
+  it("finds the one public Function URL, the shared edge ACL on the distribution and the pool's ACL, from the app's own state", () => {
     expect(edgeInventory(state(attached))).toEqual({ publicFunctionUrls: ["https://bff.lambda-url.us-east-1.on.aws/"], problems: [] });
   });
 
-  it("reports a second public URL, a Router without the edge ACL and a pool without its ACL", () => {
-    const broken = [...attached.slice(0, 4), { type: "aws:lambda/functionUrl:FunctionUrl", outputs: { authorizationType: "NONE", functionUrl: "https://x/" } }, { type: "aws:cloudfront/distribution:Distribution", outputs: { webAclId: "" } }];
+  it("reports a second public URL, a Router without the shared edge ACL and a pool without its ACL", () => {
+    const broken = [...attached.slice(0, 3), { type: "aws:lambda/functionUrl:FunctionUrl", outputs: { authorizationType: "NONE", functionUrl: "https://x/" } }, { type: "aws:cloudfront/distribution:Distribution", outputs: { webAclId: "" } }];
     expect(edgeInventory(state(broken)).problems).toEqual([
       "expected exactly one public Function URL (the Bff's), found 2",
-      "the edge web ACL is not on the Router's distribution",
+      "the shared edge web ACL (demos-borde) is not on the Router's distribution",
       "the user pool's web ACL is not associated with the pool",
     ]);
   });

@@ -68,7 +68,7 @@ import {
 } from "./observability-spec";
 import { BrandConfig, OriginVerifyKey, SeedOverrides, SessionTokenKey, WhatsAppMetaPhoneNumberId } from "./secrets";
 import { evidenceBucket, mediaBucket, seedBucket, storageLinks, storagePermissions } from "./storage";
-import { authWebAcl, edgeWebAcl } from "./waf";
+import { authWebAcl } from "./waf";
 import { API_PATH, EDGE_BUDGETS } from "./web-spec";
 import { router } from "./web";
 import { WorldTemplates } from "./world-templates";
@@ -165,7 +165,6 @@ function capabilityLinks(fn: LambdaName): Array<$util.Input<unknown>> {
 const refs: Refs = {
   "{UserPool}": () => userPool.arn,
   "{Auth}": () => userPool.arn,
-  "{EdgeWebAcl}": () => edgeWebAcl.arn,
   "{AuthWebAcl}": () => authWebAcl.arn,
 };
 
@@ -248,13 +247,12 @@ export const bff = new sst.aws.Function("Bff", {
 
 // ---- QaDriver -----------------------------------------------------------------------------------
 
-/** What the QA seam and the probes need to name: the pool, its three clients and the two web ACLs. */
+/** What the QA seam and the probes need to name: the pool, its three clients and the pool's web ACL. */
 export const QaTargets = new sst.Linkable("QaTargets", {
   properties: {
     userPoolId: userPool.id,
     clients: { consoleWeb: webClient.id, guestSignup: guestSignupClient.id, qaProbe: qaProbeClient.id },
     webAcls: {
-      edge: { name: edgeWebAcl.name, id: edgeWebAcl.id, scope: "CLOUDFRONT" },
       auth: { name: authWebAcl.name, id: authWebAcl.id, scope: "REGIONAL" },
     },
   },

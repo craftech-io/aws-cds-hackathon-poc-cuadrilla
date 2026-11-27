@@ -25,7 +25,8 @@ describe("fixed names of docs/architecture.md §1", () => {
     ["kb-aws-cds-hackathon-poc-cuadrilla-poc-manual", "vector bucket", `${PREFIX}s3vectors:\${Region}:\${AWS::AccountId}:bucket/kb-\${AppName}-*"`],
     ["cuadrilla-poc-ftth-es-mx", "Transcribe vocabulary", `${PREFIX}transcribe:\${Region}:\${AWS::AccountId}:vocabulary/cuadrilla-poc-*"`],
     ["cuadrilla-poc-<sha256", "Transcribe jobs", `${PREFIX}transcribe:\${Region}:\${AWS::AccountId}:transcription-job/cuadrilla-poc-*"`],
-    ["aws-cds-hackathon-poc-cuadrilla-poc-edge", "edge web ACL", `${PREFIX}wafv2:\${Region}:\${AWS::AccountId}:global/webacl/\${AppName}-*"`],
+    // The Router's ACL is the account's shared one (ADR-0030): read only, by its exact name.
+    ["demos-borde", "shared edge web ACL", `${PREFIX}wafv2:\${Region}:\${AWS::AccountId}:global/webacl/demos-borde/*"`],
     ["aws-cds-hackathon-poc-cuadrilla-poc-auth", "user pool web ACL", `${PREFIX}wafv2:\${Region}:\${AWS::AccountId}:regional/webacl/\${AppName}-*"`],
     ["aws-cds-hackathon-poc-cuadrilla-poc-guest-account-deletion", "account deletion", `${PREFIX}lambda:\${Region}:\${AWS::AccountId}:function:\${AppName}-\${DeployStage}-guest-account-deletion"`],
   ];
@@ -35,6 +36,18 @@ describe("fixed names of docs/architecture.md §1", () => {
   it.each(FIXED)("%s (%s) is in docs/architecture.md and covered by a statement with its exact ARN", (name, _what, arn) => {
     expect(architecture).toContain(name);
     expect(statements.some(({ body }) => body.includes(arn)), arn).toBe(true);
+  });
+});
+
+describe("shared edge web ACL demos-borde (ADR-0030) [FL-114]", () => {
+  const statements = statementsOf(template);
+  const bodies = statements.filter(({ body }) => body.includes("demos-borde"));
+
+  it("only finds it by name and reads it: no statement creates, changes, deletes or associates it", () => {
+    expect(bodies.map(({ sid }) => sid)).toEqual(["SharedEdgeWafRead"]);
+    expect(bodies[0]?.body).toMatch(/Action: wafv2:GetWebACL\n/);
+    const lookup = statements.find(({ sid }) => sid === "SharedEdgeWafLookup")?.body ?? "";
+    expect(lookup).toMatch(/Action: wafv2:ListWebACLs\n\s+Resource: "\*"/);
   });
 });
 

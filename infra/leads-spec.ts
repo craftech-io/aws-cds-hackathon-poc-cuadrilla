@@ -197,13 +197,13 @@ const WEB_ACL_LOOKUP = `arn:aws:wafv2:${REGION}:${ACCOUNT_ID}:regional/webacl/*/
 
 /**
  * The QaDriver's seam of ADR-0025 §7 (`auth.signUp`, `auth.confirmQaSignup`, `auth.qaLogin`, `guest.*`,
- * `waf.probe`) on the stage's pool, the two web ACLs and the guest Lambdas; never `AdminDeleteUser`
+ * `waf.probe`) on the stage's pool, its web ACL and the guest Lambdas; never `AdminDeleteUser`
  * (the clean-up goes through `GuestAccountDeletion`). `leads.get` comes with LEADS_READ.
  */
 export const QA_SEAM_GRANTS: readonly Grant[] = [
   g(["cognito-idp:AdminConfirmSignUp", "cognito-idp:AdminInitiateAuth", "cognito-idp:AdminGetUser", "cognito-idp:GetWebACLForResource"], ["{UserPool}"]),
   g(["lambda:InvokeFunction"], ["{GuestWorlds}", "{GuestAccountDeletion}"]),
-  g(["wafv2:GetWebACL"], ["{EdgeWebAcl}", "{AuthWebAcl}"]),
+  g(["wafv2:GetWebACL"], ["{AuthWebAcl}"]),
   // WAF authorizes GetWebACLForResource on `regional/webacl/*/*` (the ACL is what the call finds out);
   // the pool asked about is fenced by `cognito-idp:GetWebACLForResource` on `{UserPool}` above.
   g(["wafv2:GetWebACLForResource"], [WEB_ACL_LOOKUP]),

@@ -88,7 +88,7 @@ describe("cross-operator fence of the console [FL-081]", () => {
     expect(await (await asUser(tokens.guest07())).scope.world({ clockId: G07.clockId })).toBe(G07.clockId);
   });
 
-  it("[FL-081] refuses a guest an order of another guest with 403 and AuditLog DENY CROSS_ISP in its own operator", async () => {
+  it("[FL-081] [FL-127] refuses a guest an order of another guest with 403 and AuditLog DENY CROSS_ISP in its own operator", async () => {
     const caller = await asUser(tokens.guest07());
     expect(await reasonOf(caller.orders.get({ workOrderId: "wo-24817-g03" }))).toEqual({ code: "FORBIDDEN", reason: AUTH_REASON.CROSS_ISP });
     const [row, ...rest] = await denials(G07.ispId);
@@ -104,6 +104,10 @@ describe("cross-operator fence of the console [FL-081]", () => {
       refs: { procedure: "orders.get" },
       detail: { targetKind: "workOrder", field: "workOrderId", requestedId: "wo-24817-g03" },
     });
+    // The decision by its fixed name (ADR-0030), without the operator's data on the line.
+    const refused = deps.lines.map((line) => JSON.parse(line) as Record<string, unknown>).filter((line) => line.metric === "CrossTenantDenied");
+    expect(refused).toHaveLength(1);
+    expect(refused[0]).toMatchObject({ message: "console.auth.refused", reason: "CROSS_ISP", path: "orders.get", value: 1 });
     expect(await denials(G03.ispId)).toEqual([]);
     expect(deps.lines.some((line) => line.includes("console.auth.refused") && line.includes("CROSS_ISP"))).toBe(true);
   });

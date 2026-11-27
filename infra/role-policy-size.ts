@@ -67,7 +67,6 @@ const OTHER_REFS: Readonly<Record<string, readonly string[]>> = {
   "{whatsappPhone}": [whatsappPhoneArn(`phone-number-id-${filler(32).replace(/x/g, "0")}`) ?? ""],
   "{UserPool}": [arnOf("cognito-idp", `userpool/${REGION}_${filler(9)}`)],
   "{Auth}": [arnOf("cognito-idp", `userpool/${REGION}_${filler(9)}`)],
-  "{EdgeWebAcl}": [arnOf("wafv2", `global/webacl/${filler(LAMBDA_NAME_MAX)}/${filler(36)}`)],
   "{AuthWebAcl}": [arnOf("wafv2", `regional/webacl/${filler(LAMBDA_NAME_MAX)}/${filler(36)}`)],
   "{Feeds}": [arnOf("events", `event-bus/${sstPhysicalName(256, "Feeds")}`)],
 };

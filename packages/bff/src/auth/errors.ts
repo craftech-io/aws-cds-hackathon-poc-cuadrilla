@@ -20,6 +20,24 @@ export const AUTH_REASON = {
 } as const;
 export type AuthReason = (typeof AUTH_REASON)[keyof typeof AUTH_REASON];
 
+/**
+ * The fixed `metric` of the log line of each refusal (ADR-0030): a security decision is read by its name,
+ * never by parsing a message. No personal data rides with it (the line carries the path and the reason).
+ */
+export const AUTH_REFUSAL_METRIC: Readonly<Record<AuthReason, string>> = {
+  TOKEN_MISSING: "AuthRefused",
+  TOKEN_INVALID: "AuthRefused",
+  TOKEN_EXPIRED: "AuthRefused",
+  PRINCIPAL_INCOMPLETE: "AuthRefused",
+  USER_INACTIVE: "UserInactive",
+  ROLE_NOT_ALLOWED: "RoleDenied",
+  CROSS_ISP: "CrossTenantDenied",
+  LOGIN_NOT_RECENT: "RecentLoginRequired",
+  AUTH_UNAVAILABLE: "AuthUnavailable",
+  PHONE_VERIFICATION_REQUIRED: "SecondFactorPending",
+  ACCOUNT_BLOCKED: "AccountBlocked",
+};
+
 /** What a refusal means over HTTP: 401, 403 or 503. */
 export type AuthRefusal = "UNAUTHENTICATED" | "FORBIDDEN" | "UNAVAILABLE";
 

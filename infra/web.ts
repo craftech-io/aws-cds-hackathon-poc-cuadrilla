@@ -22,12 +22,13 @@
 //
 // Security headers (CSP, HSTS, no framing, nosniff, referrer): the response headers policy the
 // bootstrap creates, read by name and attached to every cache behavior. The deploy role cannot
-// change it, so a commit cannot loosen the CSP of the console. The CSP allows the AWS WAF SDK
-// (`*.sdk.awswaf.com`) and token (`*.token.awswaf.com`) hosts the sign-up's silent challenge uses.
+// change it, so a commit cannot loosen the CSP of the console. The CSP still allows the AWS WAF SDK
+// (`*.sdk.awswaf.com`) and token (`*.token.awswaf.com`) hosts, unused while the shared edge ACL has no
+// challenge (ADR-0030).
 //
 // Edge of the BFF (ADR-0025 §3 and §4), all through `transform.cdn`, the only place the Router lets a
 // module shape its distribution:
-//   - web ACL: the edge ACL of infra/waf.ts on the distribution (`webAclId`).
+//   - web ACL: the account's shared `demos-borde` (infra/waf.ts) on the distribution (`webAclArn`).
 //   - origin header: `x-cuadrilla-origin: <OriginVerifyKey>` as an origin custom header of the
 //     distribution's default origin. The Router routes every request with `cf.updateRequestOrigin`
 //     without `customHeaders`, and CloudFront then keeps the assigned origin's custom headers, so every
@@ -41,19 +42,18 @@
 //     `GET` otherwise, and the console sends its tRPC queries as `GET`. The console keeps SST's
 //     cache policy.
 //
-// Build variables of the console: the pool and its clients (auth.ts) and the edge ACL's integration
-// URL (`challenge.js` of the silent challenge, packages/web/src/lib/waf-token.ts).
+// Build variables of the console: the pool and its clients (auth.ts). The shared edge ACL has no
+// integration URL (ADR-0030): packages/web/src/lib/waf-token.ts uses the plain `fetch` without one.
 //
 // Verify (docs/build-plan.md WP-04):
 //   curl -sI https://cuadrilla.demo.craftech.io                     → 200 with CSP, HSTS, X-Frame-Options DENY
 //   curl -sI https://cuadrilla.demo.craftech.io/legal/privacy.html  → 200, content-type text/html
 
-import { WEB_ENV_NAMES } from "./auth-email";
 import { authWebEnvironment } from "./auth";
 import { consoleHeadersPolicyName, routerKeyValueStoreName } from "./ci-spec";
 import { appDomain, dns } from "./dns";
 import { OriginVerifyKey } from "./secrets";
-import { edgeWebAcl, wafIntegrationUrl } from "./waf";
+import { sharedEdgeWebAcl } from "./waf";
 import { API_ORIGIN_REQUEST_POLICY_ID, API_PATH_PATTERN, LEGAL_PAGES, ORIGIN_VERIFY_HEADER, STATIC_FILE_OPTIONS, apiCachePolicyName, legalUrl } from "./web-spec";
 
 export { API_PATH, LEGAL_PAGES } from "./web-spec";
@@ -108,7 +108,8 @@ export const router = new sst.aws.Router("Router", {
   edge: { viewerRequest: { injection: "", kvStore: bootstrapKvStoreArn } },
   transform: {
     cdn: (args) => {
-      args.webAclArn = edgeWebAcl.arn;
+      // The account's shared edge ACL (`demos-borde`, infra/waf.ts), looked up by name on every deploy.
+      args.webAclArn = sharedEdgeWebAcl.arn;
       args.origins = withOriginHeader(args.origins);
       const ordered = $util.all([args.orderedCacheBehaviors ?? [], apiBehavior(args.defaultCacheBehavior)]).apply(([behaviors, api]) => [api, ...(behaviors ?? [])]);
       args.orderedCacheBehaviors = ordered.apply((behaviors) => $util.all(behaviors.map((behavior) => withHeadersPolicy(behavior, consoleHeadersPolicyId))));
@@ -134,6 +135,7 @@ export const consoleSite = new sst.aws.StaticSite("Console", {
   router: {
     instance: router,
   },
-  // Cognito pool and clients (auth.ts) and the challenge host of AWS WAF; read by packages/web/src/lib/env.ts.
-  environment: { ...authWebEnvironment, [WEB_ENV_NAMES.wafIntegrationUrl]: wafIntegrationUrl },
+  // Cognito pool and clients (auth.ts); read by packages/web/src/lib/env.ts. No AWS WAF integration URL:
+  // the shared edge ACL challenges nothing (ADR-0030), so the sign-up uses the plain `fetch`.
+  environment: { ...authWebEnvironment },
 });

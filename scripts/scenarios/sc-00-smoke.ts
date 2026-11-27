@@ -184,7 +184,7 @@ export default defineScenario({
     },
     {
       id: "9",
-      title: "WAF from the runner: the sign-up without a token gets the challenge; its batch the challenge or the app's 400; waf.probe of both web ACLs",
+      title: "Edge from the runner: an empty sign-up gets the app's refusal, never a start; its batch and encoded path the app's 400; waf.probe of the pool's web ACL",
       kind: "det",
       flows: ["FL-114"],
       after: "preset",
@@ -192,8 +192,8 @@ export default defineScenario({
         const edge = await signupEdge();
         ctx.check(edge.problems.length === 0, edge.problems.join("; "));
         for (const warning of edge.warnings) ctx.warn(warning);
-        const acls = (await ctx.qa("waf.probe", {})) as { edge?: { WebACL?: unknown }; auth?: { WebACL?: unknown }; poolAssociation?: { WebACL?: unknown } };
-        ctx.check(acls.edge?.WebACL !== undefined && acls.auth?.WebACL !== undefined, "both web ACLs exist");
+        const acls = (await ctx.qa("waf.probe", {})) as { auth?: { WebACL?: unknown }; poolAssociation?: { WebACL?: unknown } };
+        ctx.check(acls.auth?.WebACL !== undefined, "the pool's web ACL exists");
         ctx.check(acls.poolAssociation?.WebACL !== undefined, "the user pool has its web ACL");
       },
     },

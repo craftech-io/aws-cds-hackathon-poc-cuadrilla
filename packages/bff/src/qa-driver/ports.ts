@@ -119,7 +119,7 @@ export interface StageProbes {
   applyG1(text: string): Promise<{ readonly action: string; readonly policies: readonly string[] }>;
   /** The three clients of the pool, the pool's verification setting and the JWKS (`auth.probe`). */
   authConfig(): Promise<unknown>;
-  /** The two web ACLs and their associations (`waf.probe`). */
+  /** The pool's web ACL and its association (`waf.probe`); the edge ACL is the account's shared one. */
   webAcls(): Promise<unknown>;
   alarmHistory(sinceReal: string): Promise<AlarmTransition[]>;
   /** Publishes a foreign event on our topic with `qa-foreign=1`; SNS's message id (the probe's key). */

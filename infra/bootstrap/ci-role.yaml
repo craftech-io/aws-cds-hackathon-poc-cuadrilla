@@ -827,6 +827,15 @@ Resources:
             Effect: Allow
             Action: wafv2:GetWebACLForResource
             Resource: "*"
+          # Shared edge ACL demos-borde (ADR-0030): found by name, read only.
+          - Sid: SharedEdgeWafLookup
+            Effect: Allow
+            Action: wafv2:ListWebACLs
+            Resource: "*"
+          - Sid: SharedEdgeWafRead
+            Effect: Allow
+            Action: wafv2:GetWebACL
+            Resource: !Sub "arn:${AWS::Partition}:wafv2:${Region}:${AWS::AccountId}:global/webacl/demos-borde/*"
           - Sid: CloudFrontFunctionsOfThisApp
             Effect: Allow
             Action:

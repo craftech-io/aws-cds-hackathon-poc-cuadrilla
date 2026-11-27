@@ -28,6 +28,7 @@ import { type LeadSide, PHONE_IN_USE, claimNumber, ownerOf, recordOnLead, record
 import { PHONE_LIMITS, reserveSms } from "./limits";
 import { accountPhoneHash, assertAmericas, isHomeNumber, maskPhone, parseAccountPhone } from "./number";
 import { type SessionGate, clearSession, indexSession, isSessionPassed, markSessionPassed, sessionKeyOf } from "./session";
+import { withRefusalLog } from "./decisions";
 import type { SmsSender } from "./sms";
 
 export interface PhoneKeys {
@@ -127,6 +128,10 @@ async function numberFor(ports: PhonePorts, principal: Principal, user: ConsoleU
 }
 
 export async function sendPhoneCode(ports: PhonePorts, caller: PhoneCaller, input: SendInput): Promise<PhoneStatus> {
+  return withRefusalLog(caller.log, caller.principal.userId, "SEND", () => send(ports, caller, input));
+}
+
+async function send(ports: PhonePorts, caller: PhoneCaller, input: SendInput): Promise<PhoneStatus> {
   const { principal } = caller;
   const user = await rowOf(ports, principal);
   const now = ports.now();
@@ -170,6 +175,10 @@ const CODE_ERRORS = {
 } as const;
 
 export async function verifyPhoneCode(ports: PhonePorts, caller: PhoneCaller, rawCode: unknown): Promise<PhoneStatus> {
+  return withRefusalLog(caller.log, caller.principal.userId, "VERIFY", () => verify(ports, caller, rawCode));
+}
+
+async function verify(ports: PhonePorts, caller: PhoneCaller, rawCode: unknown): Promise<PhoneStatus> {
   const { principal } = caller;
   if (typeof rawCode !== "string" || !/^\d{6}$/.test(rawCode)) throw new ToolError("INVALID", "the code has six digits", "CODE_INVALID");
   const user = await rowOf(ports, principal);

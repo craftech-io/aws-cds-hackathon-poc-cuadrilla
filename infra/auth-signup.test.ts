@@ -112,7 +112,11 @@ beforeAll(async () => {
     lambda: { EventSourceMapping: recorder("aws.lambda.EventSourceMapping") },
     iam: { Policy: recorder("aws.iam.Policy"), getPolicyDocumentOutput: (args: unknown) => ({ json: out(args) }) },
     cloudwatch: { MetricAlarm: recorder("aws.cloudwatch.MetricAlarm") },
-    wafv2: { WebAcl: recorder("aws.wafv2.WebAcl", { applicationIntegrationUrl: out("https://abc.edge.sdk.awswaf.com/abc/def/") }), WebAclAssociation: recorder("aws.wafv2.WebAclAssociation") },
+    wafv2: {
+      WebAcl: recorder("aws.wafv2.WebAcl"),
+      WebAclAssociation: recorder("aws.wafv2.WebAclAssociation"),
+      getWebAclOutput: (args: { name: string; scope: string }) => ({ arn: out(`arn:aws:wafv2:us-east-1:${ACCOUNT}:global/webacl/${args.name}/shared-id`) }),
+    },
     cloudfront: {
       KeyValueStore: { get: () => ({ arn: out("kvs") }) },
       getResponseHeadersPolicyOutput: () => ({ id: out("headers-policy") }),
@@ -237,8 +241,9 @@ describe("the edge of the Bff (ADR-0025 §3) [FL-114]", () => {
     expect(defaultCacheBehavior).toEqual({ ...DEFAULT, responseHeadersPolicyId: "headers-policy" });
   });
 
-  it("puts the edge web ACL on the distribution", async () => {
-    expect((await transformed()).webAclArn).toBe(arnOf("aws.wafv2.WebAcl", "EdgeWebAcl"));
+  it("puts the account's shared edge web ACL (demos-borde), looked up by name, on the distribution, and creates no edge ACL of its own", async () => {
+    expect((await transformed()).webAclArn).toBe(`arn:aws:wafv2:us-east-1:${ACCOUNT}:global/webacl/demos-borde/shared-id`);
+    expect(created.filter((item) => item.type === "aws.wafv2.WebAcl").map((item) => item.name)).toEqual(["AuthWebAcl"]);
   });
 
   it("builds the Bff behind /api with a public URL, no CORS, its budget and the origin key", async () => {
