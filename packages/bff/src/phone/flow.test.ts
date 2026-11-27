@@ -275,7 +275,7 @@ describe("caps of the SMS [FL-123]", () => {
   });
 
   it("[FL-123] a number of the home region never takes the foreign quota", async () => {
-    for (const [n, phone] of ["+5491123456781", "+34612345678", "+18095550123"].entries()) {
+    for (const [n, phone] of ["+5491123456781", "+56912345678", "+18095550123"].entries()) {
       await sendTo(phone, `203.0.113.${n + 1}`);
       h.advance(60_000);
     }
@@ -284,15 +284,15 @@ describe("caps of the SMS [FL-123]", () => {
     expect(await h.client.get("Runtime", { PK: smsDayKey(T0), SK: "META" })).toMatchObject({ used: 3 });
   });
 
-  it("[FL-123] numbers outside the home region share 5 SMS a day in the whole demo: the sixth is SMS_FOREIGN_LIMIT, a home number still goes out", async () => {
+  it("[FL-123] numbers of the Americas outside the home region share 5 SMS a day in the whole demo: the sixth is SMS_FOREIGN_LIMIT, a home number still goes out", async () => {
     expect(PHONE_LIMITS.smsForeignPerDay).toBe(5);
-    const foreign = ["+14155550101", "+447911123456", "+4915112345678", "+33612345678", "+819012345678"];
+    const foreign = ["+14155550101", "+14165550123", "+5352345678", "+50937123456", "+13105550199"];
     for (const [n, phone] of foreign.entries()) {
       await sendTo(phone, `203.0.113.${n + 1}`);
       h.advance(60_000);
     }
     expect(await h.client.get("Runtime", { PK: smsForeignDayKey(T0), SK: "META" })).toMatchObject({ used: 5 });
-    await expect(sendTo("+358401234567", "203.0.113.50")).rejects.toMatchObject({ code: "CAP_REACHED", reason: "SMS_FOREIGN_LIMIT" });
+    await expect(sendTo("+16465550142", "203.0.113.50")).rejects.toMatchObject({ code: "CAP_REACHED", reason: "SMS_FOREIGN_LIMIT" });
     expect(h.phone.sms.sent).toHaveLength(5);
     await account(h, "usr-guest-08");
     await expect(sendTo(PHONE, "203.0.113.51", principal("usr-guest-08"))).resolves.toMatchObject({ codeSent: true });
@@ -305,5 +305,23 @@ describe("caps of the SMS [FL-123]", () => {
     }
     await expect(sendTo("+5491100000000", IP)).rejects.toMatchObject({ reason: "PHONE_INVALID" });
     expect(h.phone.sms.sent).toEqual([]);
+  });
+
+  it("[FL-123] a number outside the Americas is refused when typed or corrected, before any SMS or counter", async () => {
+    for (const phone of ["+34612345678", "+447911123456", "+819012345678", "+8613812345678"]) {
+      await expect(sendTo(phone, IP)).rejects.toMatchObject({ code: "INVALID", reason: "PHONE_COUNTRY_NOT_ALLOWED" });
+    }
+    expect(h.phone.sms.sent).toEqual([]);
+    expect(h.client.dump("Runtime").filter((row) => String(row.PK).startsWith("PHONESMS#"))).toEqual([]);
+    await expect(sendTo("+14155550101", IP)).resolves.toMatchObject({ codeSent: true });
+  });
+
+  it("[FL-124] the sign-in of an account verified with a number outside the Americas gets no SMS: PHONE_COUNTRY_NOT_ALLOWED", async () => {
+    await account(h, "usr-guest-09", { phone: "+34612345678", phoneVerifiedAt: T0.toISOString() });
+    const who = principal("usr-guest-09");
+    expect(await phoneStatusOf(h.phone.ports, caller(who))).toMatchObject({ state: "SIGN_IN", maskedPhone: "•••• 5678" });
+    await expect(sendPhoneCode(h.phone.ports, caller(who), { locale: "es-MX" })).rejects.toMatchObject({ reason: "PHONE_COUNTRY_NOT_ALLOWED" });
+    expect(h.phone.sms.sent).toEqual([]);
+    expect(h.client.dump("Runtime").filter((row) => String(row.PK).startsWith("PHONESMS#"))).toEqual([]);
   });
 });

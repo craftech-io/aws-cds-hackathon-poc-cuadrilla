@@ -75,15 +75,18 @@ describe("signup.start [FL-104] [FL-112] [FL-113] [FL-115] [FL-121]", () => {
     expect(h.leadTable.leads.size).toBe(0);
   });
 
-  it("[FL-123] the phone is required, international (+ and 8 to 15 digits, any country) and kept on the start without separators", async () => {
+  it("[FL-123] the phone is required, international (+ and 8 to 15 digits, a country of the Americas) and kept on the start without separators", async () => {
     const { phone: _phone, ...withoutPhone } = signupForm();
     expect(await refusalOf(start(withoutPhone))).toMatchObject({ code: "BAD_REQUEST", reason: "INVALID_FORM", message: expect.stringContaining("phone") });
     for (const phone of ["55 1234 5678", "+1234567", "+0123456789", "+1 234 567 890 123 456"]) expect(await refusalOf(start(signupForm({ phone })))).toMatchObject({ code: "BAD_REQUEST", reason: "PHONE_INVALID" });
     expect(counters()).toEqual([]);
-    const answer = await start(signupForm({ phone: "+44 (20) 7946-0018" }));
+    for (const phone of ["+34 612 345 678", "+44 (20) 7946-0018", "+81 90 1234 5678"]) expect(await refusalOf(start(signupForm({ phone })))).toMatchObject({ code: "BAD_REQUEST", reason: "PHONE_COUNTRY_NOT_ALLOWED" });
+    expect(counters()).toEqual([]);
+    await expect(start(signupForm({ email: "otra.persona@correo-ficticio.mx", phone: "+1 (415) 555-0101" }))).resolves.toBeDefined();
+    const answer = await start(signupForm({ phone: "+52 (55) 1234-5678" }));
     const lead = await h.leads.get(leadEmailHash(EMAIL_HASH_KEY, "ana.prueba@correo-ficticio.mx"));
-    expect(lead?.phone).toBe("+442079460018");
-    expect(lead?.pending?.[answer.username]?.phone).toBe("+442079460018");
+    expect(lead?.phone).toBe("+525512345678");
+    expect(lead?.pending?.[answer.username]?.phone).toBe("+525512345678");
     expect(lead?.phoneVerifiedAt).toBeUndefined();
   });
 

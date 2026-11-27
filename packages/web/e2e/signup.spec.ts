@@ -171,12 +171,12 @@ test.describe("own sign-up", () => {
     await fillForm(page, newEmail(), randomPassword());
     await terms(page).check();
     const texts = copyOf().errors({ login: "", forgot: "" });
-    for (const reason of ["RATE_LIMITED", "CAP_REACHED", "EMAIL_NOT_ACCEPTED", "PHONE_NOT_PERSONAL"] as const) {
+    for (const reason of ["RATE_LIMITED", "CAP_REACHED", "EMAIL_NOT_ACCEPTED", "PHONE_NOT_PERSONAL", "PHONE_COUNTRY_NOT_ALLOWED"] as const) {
       api.refusal = reason;
       await createButton(page).click();
       const expected = texts[reason].map((part) => (typeof part === "string" ? part : part.label)).join("");
       await expect(page.getByRole("alert")).toHaveText(expected);
-      if (reason === "RATE_LIMITED" || reason === "CAP_REACHED") await expect(page.getByRole("alert").getByRole("link")).toHaveAttribute("href", CONTACT_URL);
+      if (reason === "RATE_LIMITED" || reason === "CAP_REACHED" || reason === "PHONE_COUNTRY_NOT_ALLOWED") await expect(page.getByRole("alert").getByRole("link")).toHaveAttribute("href", CONTACT_URL);
     }
   });
 

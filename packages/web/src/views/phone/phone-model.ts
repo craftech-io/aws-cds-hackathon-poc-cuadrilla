@@ -20,6 +20,7 @@ export type PhoneStatus = z.infer<typeof PhoneStatus>;
 export const PHONE_ERRORS = [
   "PHONE_INVALID",
   "PHONE_NOT_PERSONAL",
+  "PHONE_COUNTRY_NOT_ALLOWED",
   "PHONE_REQUIRED",
   "PHONE_IN_USE",
   "PHONE_LOCKED",
@@ -51,7 +52,7 @@ export function compactPhone(raw: string): string {
   return raw.trim().replace(/[\s().-]/g, "");
 }
 
-/** `+` and 8 to 15 digits, any country. */
+/** `+` and 8 to 15 digits; the server also checks the country is of the Americas. */
 export function looksLikePhone(raw: string): boolean {
   return /^\+[1-9]\d{7,14}$/.test(compactPhone(raw));
 }

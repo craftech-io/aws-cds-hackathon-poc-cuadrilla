@@ -15,7 +15,7 @@ export interface StartRequest {
 
 export interface SignupApi {
   readonly starts: StartRequest[];
-  /** The next starts are refused with this `reason` (EMAIL_TAKEN, RATE_LIMITED, CAP_REACHED, EMAIL_NOT_ACCEPTED, PHONE_NOT_PERSONAL). */
+  /** The next starts are refused with this `reason` (EMAIL_TAKEN, RATE_LIMITED, CAP_REACHED, EMAIL_NOT_ACCEPTED, PHONE_NOT_PERSONAL, PHONE_COUNTRY_NOT_ALLOWED). */
   refusal: string | undefined;
 }
 
@@ -27,6 +27,7 @@ const HTTP_OF_REASON: Readonly<Record<string, readonly [string, number]>> = {
   CAP_REACHED: ["TOO_MANY_REQUESTS", 429],
   EMAIL_NOT_ACCEPTED: ["BAD_REQUEST", 400],
   PHONE_NOT_PERSONAL: ["BAD_REQUEST", 400],
+  PHONE_COUNTRY_NOT_ALLOWED: ["BAD_REQUEST", 400],
 };
 
 /** Crockford ULID bodies in sequence for the users the fake start creates. */

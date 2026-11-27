@@ -168,7 +168,16 @@ test.describe("the SMS code after the password", () => {
     await signInAsGuest(page);
     await page.getByRole("button", { name: copy.send }).click();
     const alert = page.getByRole("alert");
-    await expect(alert).toContainText("fuera de Latinoamérica y España");
+    await expect(alert).toContainText("fuera de Latinoamérica");
+    await expect(alert.getByRole("link", { name: "escríbenos" })).toHaveAttribute("href", "https://craftech.io/contact/");
+  });
+
+  test("[FL-123] a number outside the Americas, typed or verified before, says so and offers the contact of Craftech", async ({ page }) => {
+    await routeApi(page, { state: "SIGN_IN", maskedPhone: "•••• 5678", codeSent: false, refuseSend: "PHONE_COUNTRY_NOT_ALLOWED" });
+    await signInAsGuest(page);
+    await page.getByRole("button", { name: copy.send }).click();
+    const alert = page.getByRole("alert");
+    await expect(alert).toHaveText(copy.errors.PHONE_COUNTRY_NOT_ALLOWED.map((part) => (typeof part === "string" ? part : part.label)).join(""));
     await expect(alert.getByRole("link", { name: "escríbenos" })).toHaveAttribute("href", "https://craftech.io/contact/");
   });
 

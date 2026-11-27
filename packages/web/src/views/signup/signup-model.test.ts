@@ -74,7 +74,7 @@ describe("the sign-up form [FL-104] [FL-115]", () => {
     expect((await submit({ ...FORM, contact: false })).state.step).toBe("confirmCode");
   });
 
-  it("[FL-123] asks for an international mobile phone of any country and sends it without separators", async () => {
+  it("[FL-123] asks for an international mobile phone and sends it without separators", async () => {
     expect(canSubmit({ email: EMAIL, phone: "", terms: true })).toBe(false);
     expect(canSubmit({ email: EMAIL, phone: "55 1234 5678", terms: true })).toBe(false);
     expect(canSubmit({ email: EMAIL, phone: "+1234567", terms: true })).toBe(false);
@@ -118,7 +118,7 @@ describe("the sign-up form [FL-104] [FL-115]", () => {
 });
 
 describe("refusals of the start and of Cognito [FL-113] [FL-114] [FL-121]", () => {
-  it.each(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_NOT_ACCEPTED", "PHONE_INVALID", "PHONE_NOT_PERSONAL"] as const)("[FL-113] signup.start answering %s stays on the form with that message", async (reason) => {
+  it.each(["EMAIL_TAKEN", "RATE_LIMITED", "CAP_REACHED", "EMAIL_NOT_ACCEPTED", "PHONE_INVALID", "PHONE_NOT_PERSONAL", "PHONE_COUNTRY_NOT_ALLOWED"] as const)("[FL-113] signup.start answering %s stays on the form with that message", async (reason) => {
     startAnswer = refusedBy(reason);
     expect(await submit()).toEqual({ state: INITIAL_SIGNUP, error: reason });
     expect(signup.calls).toEqual([]);

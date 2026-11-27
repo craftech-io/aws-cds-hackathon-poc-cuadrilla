@@ -47,9 +47,10 @@ describe("SMS of the code [FL-123]", () => {
     expect(sms.lastCode("+14155550100")).toBeUndefined();
   });
 
-  it("[FL-123] the account's phone is E.164 of any country, typed with or without separators", () => {
+  it("[FL-123] the account's phone is E.164 of a country of the Americas, typed with or without separators", () => {
     expect(parseAccountPhone(" +54 9 (11) 5555-0101 ")).toBe("+5491155550101");
-    expect(parseAccountPhone("+81.3.1234.5678")).toBe("+81312345678");
+    expect(parseAccountPhone("+1.416.555.0123")).toBe("+14165550123");
+    expect(() => parseAccountPhone("+81.3.1234.5678")).toThrow();
     for (const bad of ["5491155550101", "+1234567", "+0123456789", "+1234567890123456", "+52 55 abc", 5491155550101]) expect(() => parseAccountPhone(bad)).toThrow();
     expect(maskPhone("+5491155550101")).toBe("•••• 0101");
   });
