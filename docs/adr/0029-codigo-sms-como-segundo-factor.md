@@ -80,10 +80,21 @@ El mismo día en que se publicó el código, un atacante lo pasó en una demo he
 
 No cambian la infraestructura (`infra/`, bootstrap, permisos, WAF) ni los demás topes.
 
+### 11. Cuenta bloqueada (2026-11-27)
+
+En una demo hermana, una cuenta ya deshabilitada en Cognito siguió pidiendo SMS (once pedidos de código) y usando la demo con su pase vigente: el id token se verifica sin consultar a Cognito y deshabilitar al usuario no lo invalida. Este repo ya leía en cada pedido la fila del registro (`Isps/USER#`, `active`, a lo sumo una vez por minuto por contenedor), pero nada la cambiaba al deshabilitar a alguien en Cognito, y las sesiones que ya habían pasado el código seguían marcadas. Se agrega:
+
+- **Marca de bloqueo** `blockedAt` en la misma fila que ya lee la puerta (`routers/trpc.ts`): una cuenta bloqueada recibe `403 ACCOUNT_BLOCKED` en **todo** procedimiento, incluidos `account.session` y `phone.*`, antes de la puerta del código. Los pasos del código (`phone/flow.ts`) leen además la fila en cada llamada, sin caché: con la marca puesta no sale ningún SMS ni se acepta un código, en el acto. El resto de los procedimientos la ven en el acto o, en un contenedor que leyó la fila en el último minuto, al vencer esa lectura (a lo sumo 60 s).
+- **Índice de sesiones** `Runtime/PHONESESSIONS#<userId>` · `<sessionKey>` (TTL igual al de la sesión o del código): cada envío de código y cada pase lo escriben, y el cierre de sesión lo borra. Las marcas `PHONESESSION#<userId>#<sessionKey>` no se pueden listar por cuenta sin recorrer la tabla; el índice permite borrarlas.
+- **Script del operador** `npm run console:block -- --stage poc (--username <usuario> | --by-email) (--block | --unblock)` (`scripts/console/block.ts`, `phone/block.ts`), con el profile del operador, nunca CI ni un pedido. `--block`, en este orden: pone `blockedAt`, deshabilita al usuario en Cognito (`AdminDisableUser`), cierra sus sesiones (`AdminUserGlobalSignOut`: ningún refresh) y borra sus marcas de pase y sus códigos pendientes. `--unblock` quita la marca y vuelve a habilitar al usuario (`AdminEnableUser`): la persona ingresa de nuevo y pasa un código nuevo. Con `--by-email` la dirección llega por la entrada estándar o `--email-file` (nunca como argumento) y se busca con `ListUsers`; la salida nombra al usuario de Cognito, nunca la dirección.
+- **Web**: la pantalla del código, ante `ACCOUNT_BLOCKED`, muestra solo el aviso "Cuenta bloqueada" con el contacto de Craftech y "Cerrar sesión"; las vistas de la consola traducen el mismo motivo.
+- Una sesión que pasó el código antes de que existiera el índice no se borra, pero la marca de bloqueo la corta igual y el cierre de sesiones de Cognito impide renovar su token (15 minutos como máximo). Ningún permiso nuevo: el BFF no lista nada y el script usa el profile del operador.
+
 ## Alternativas descartadas
 
 - **Verificar el teléfono una sola vez.** No frena a quien adivina una contraseña. Descartada por el dueño.
 - **El MFA por SMS de Cognito.** Necesita un rol de SNS del pool, el atributo `phone_number` escribible y su propio flujo de desafío en la web, y no deja aplicar los topes por número, por IP y del día ni el índice de un número por cuenta. Descartada.
+- **Bloquear con `active: false`.** Ese interruptor ya existía y responde `USER_INACTIVE`, que la web trata como un problema de la operadora; el bloqueo necesita su propio motivo para el aviso y una marca que solo pone el operador.
 - **Rechazar los números de fuera de la región de casa.** Descartada por el dueño: se aceptan, con un cupo diario compartido chico.
 - **Eximir por dominio de correo o por grupo** (por ejemplo, las direcciones `success+qa-…@simulator.amazonses.com`). Cualquiera puede escribir una dirección; la marca va por cuenta y solo del lado del servidor.
 

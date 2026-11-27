@@ -1138,6 +1138,10 @@ vista de la consola; nada de un mundo se muestra antes.
   podemos enviar más códigos a números fuera de Latinoamérica y España…" / "We can't send more codes
   today to numbers outside Latin America and Spain…") y número al que no llega SMS, cada uno con el
   contacto de Craftech cuando la persona no puede seguir sola. "Cerrar sesión" debajo de la tarjeta.
+- **Cuenta bloqueada** (`ACCOUNT_BLOCKED`, ADR-0029 §11): en lugar de la tarjeta, solo "Cuenta bloqueada" /
+  "Account blocked" y "Tu cuenta está bloqueada y no puede usar la demo. Si crees que es un error,
+  escríbenos." / "Your account is blocked and can't use the demo. If you think this is a mistake, write to
+  us.", con el link de contacto de Craftech; sin campo de número ni de código.
 
 ---
 

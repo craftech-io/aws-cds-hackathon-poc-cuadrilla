@@ -1,4 +1,4 @@
-# Catálogo de flujos (FL-001 a FL-125)
+# Catálogo de flujos (FL-001 a FL-126)
 
 Ciento veinticinco flujos: caminos felices, alternativas, controles de seguridad y flujos de consola. Cada flujo es una unidad de prueba: su fila en la matriz de trazabilidad de `docs/test-plan.md` §2.2 lista las pruebas que lo prueban y `npm run flows:check` falla si un flujo no tiene fila o si una prueba citada no existe o no lleva su etiqueta.
 
@@ -916,4 +916,11 @@ Decisiones en ADR-0023 a ADR-0026; UX en `docs/landing-spec.md` §7. Los pasos `
 - Estado esperado: una cuenta marcada nunca recibe la pantalla del código ni un SMS; ningún procedimiento, dominio de correo, grupo ni rol pone la marca; los escenarios y las pruebas desplegadas corren con cuentas marcadas; después de un reset, la próxima sesión se enrola con un número nuevo.
 - Reglas: ADR-0029 §5.
 - Prueba: U `scripts/console/phone.test.ts`, `scripts/qa/confirm-signup.test.ts`, `phone/flow.test.ts`, `routers/phone.test.ts`, `auth-triggers/post-authentication.test.ts`. Notas: Sin `SR` propio: `SC-20` sigue pasando por `qa:confirm-signup`.
+
+### FL-126 · Cuenta bloqueada por el operador
+- Actores: operador, invitado, personal · Canal: script, web · Disparador: `npm run console:block -- --stage poc --username <usuario> --block` (o `--by-email` con la dirección por la entrada estándar; `--unblock` para revertir).
+- Pasos: 1) el script pone `blockedAt` en la fila del registro, deshabilita al usuario en Cognito, cierra todas sus sesiones y borra sus marcas `PHONESESSION#` y sus códigos `PHONECODE#` (por el índice `PHONESESSIONS#<userId>`). 2) Todo pedido de esa cuenta, con un token todavía válido y una sesión que ya había pasado el código, recibe `403 ACCOUNT_BLOCKED`, incluidos `account.session` y `phone.*`; los pasos del código leen la fila en cada llamada. 3) La web muestra solo el aviso de cuenta bloqueada con el contacto de Craftech. 4) `--unblock` quita la marca y habilita al usuario.
+- Estado esperado: ningún SMS sale ni se acepta un código de una cuenta bloqueada; ninguna marca de pase ni código queda de esa cuenta; ningún pedido de la web pone ni quita la marca; después del desbloqueo, la sesión vieja pide un código nuevo.
+- Reglas: ADR-0029 §11.
+- Prueba: U `routers/account-block.test.ts`, `scripts/console/block.test.ts` · UI `phone.spec.ts`. Notas: Cognito es un doble en las pruebas; el script no corre en CI.
 

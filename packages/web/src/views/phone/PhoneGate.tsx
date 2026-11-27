@@ -8,7 +8,7 @@ import { useSession } from "../../context/SessionContext";
 import { useRouter } from "../../lib/router";
 import { AuthShell } from "../login/AuthShell";
 import { type AuthLang, AuthLangProvider, useAuthLang } from "../login/auth-lang";
-import { ErrorNote, LinkButton } from "../login/form-parts";
+import { ErrorNote, LinkButton, StepHeading } from "../login/form-parts";
 import { langOf } from "../guest-home/guest-home-model";
 import { RichNote } from "../signup/RichNote";
 import { phoneCopy } from "./copy";
@@ -23,7 +23,16 @@ function PhoneScreen({ step }: { readonly step: PhoneStep }) {
   const copy = phoneCopy[lang];
   const below = <LinkButton onClick={signOut}>{copy.signOut}</LinkButton>;
   let body: ReactNode;
-  if (step.state.kind === "failed") {
+  if (step.state.kind === "blocked") {
+    body = (
+      <div className="space-y-3">
+        <StepHeading title={copy.blockedTitle} />
+        <ErrorNote>
+          <RichNote text={copy.blocked} />
+        </ErrorNote>
+      </div>
+    );
+  } else if (step.state.kind === "failed") {
     body = (
       <div className="space-y-3">
         <ErrorNote>

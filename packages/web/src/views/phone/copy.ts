@@ -21,6 +21,8 @@ export interface PhoneCopy {
   readonly signOut: string;
   readonly loading: string;
   readonly retry: string;
+  readonly blockedTitle: string;
+  readonly blocked: RichText;
   readonly errors: Readonly<Record<PhoneErrorCode, RichText>>;
 }
 
@@ -45,6 +47,8 @@ export const phoneCopy: Readonly<Record<"es" | "en", PhoneCopy>> = {
     signOut: "Cerrar sesión",
     loading: "Un momento…",
     retry: "Reintentar",
+    blockedTitle: "Cuenta bloqueada",
+    blocked: ["Tu cuenta está bloqueada y no puede usar la demo. Si crees que es un error, ", talkEs, "."],
     errors: {
       PHONE_INVALID: ["Revisa el número: escríbelo con el prefijo internacional, + y de 8 a 15 dígitos."],
       PHONE_NOT_PERSONAL: ["Usa un celular personal."],
@@ -82,6 +86,8 @@ export const phoneCopy: Readonly<Record<"es" | "en", PhoneCopy>> = {
     signOut: "Sign out",
     loading: "One moment…",
     retry: "Try again",
+    blockedTitle: "Account blocked",
+    blocked: ["Your account is blocked and can't use the demo. If you think this is a mistake, ", talkEn, "."],
     errors: {
       PHONE_INVALID: ["Check the number: write it with the international prefix, + and 8 to 15 digits."],
       PHONE_NOT_PERSONAL: ["Use a personal mobile phone."],

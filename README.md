@@ -317,6 +317,18 @@ There is no local stage: everything is tested locally with unit, local-flow and 
 Operator scripts: `npm run seed:load`, `npm run ops:kill` (runtime cut), and the lead scripts
 `leads:export`, `leads:unsubscribe` and `leads:delete` (confirmed sign-ups; see the privacy policy).
 
+Blocking an account (abuse, a leaked password): `npm run console:block` marks the account as blocked on
+the server (every request of its sessions, the SMS code included, is refused at once and no SMS is
+sent), disables the Cognito user, signs it out everywhere and deletes its passed SMS sessions. The
+unblock takes the mark away and enables the user, who then signs in and passes a new code. One account
+at a time, with the operator's profile, never from CI:
+
+```sh
+npm run console:block -- --stage poc --username <cognito user> --block
+npm run console:block -- --stage poc --username <cognito user> --unblock
+echo "<address>" | npm run console:block -- --stage poc --by-email --block   # the address never as an argument
+```
+
 ## Privacy
 
 Sign-up asks for an email and a password; name, company and role are optional. Two separate,

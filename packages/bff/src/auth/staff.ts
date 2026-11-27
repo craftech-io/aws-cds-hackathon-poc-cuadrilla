@@ -8,6 +8,8 @@ export interface UserMatch {
   readonly active: boolean;
   /** `phoneCheck AUTOMATION` of the row (ADR-0029): an account no person uses, exempt from the SMS code. */
   readonly automation?: boolean;
+  /** `blockedAt` of the row (ADR-0029 §11): the operator blocked the account; nothing answers it. */
+  readonly blocked?: boolean;
 }
 
 /** What the directory needs from the connector (WP-07 implements it over `Isps`). */
